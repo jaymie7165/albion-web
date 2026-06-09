@@ -427,6 +427,7 @@ app.get('/audit', requireAuth, (req, res) => res.send(renderAudit(req)));
 app.get('/statistiky', requireAuth, (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
+app.get('/sazeni', requireAuth, (req, res) => res.send(renderSazeni(req)));
 
 // ── BASE STYLES ───────────────────────────────────────────────────────────────
 function baseStyles() {
@@ -618,6 +619,7 @@ function renderNav(req, active) {
         <li><a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky</a></li>
         <li><a href="/lore" class="${active==='lore'?'active':''}">Historie</a></li>
         <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a></li>
+        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">🌱 Sázení</a></li>
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">🔔<span class="notif-badge" id="notifBadge">0</span></button>
@@ -1358,6 +1360,219 @@ function renderAuth(page, error, data) {
   if (page === 'register_complete') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Dokončení registrace</title>${style}</head><body><div class="box"><div class="logo"><h1>ALBION</h1><p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.8rem;color:#888;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label>Tvoje IC jméno (ve hře)</label><input type="text" name="ic_name" placeholder="Christopher Sinclair" required><label>Heslo</label><input type="password" name="password" placeholder="Alespoň 6 znaků" required><label>Heslo znovu</label><input type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="btn">✅ Dokončit registraci</button></form></div></body></html>`;
   if (page === 'login_password') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Heslo</title>${style}</head><body><div class="box"><div class="logo"><h1>ALBION</h1><p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.8rem;color:#888;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label>Heslo</label><input type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="btn">🔓 Přihlásit se</button></form></div></body></html>`;
   return '<h1>404</h1>';
+}
+
+// ── RENDER SÁZENÍ ─────────────────────────────────────────────────────────────
+function renderSazeni(req) {
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Sázení trávy</title>
+  ${baseStyles()}
+  <style>
+    /* ── SÁZENÍ EXTRA STYLES ── */
+    .sazeni-hero{background:linear-gradient(135deg,rgba(0,60,20,0.18),rgba(0,30,10,0.08));border:1px solid rgba(0,200,80,0.12);padding:2rem;margin-bottom:2rem;position:relative;overflow:hidden}
+    .sazeni-hero::before{content:'🌱';position:absolute;right:2rem;top:50%;transform:translateY(-50%);font-size:5rem;opacity:0.08;pointer-events:none}
+    .cost-table{width:100%;border-collapse:collapse;margin:1rem 0}
+    .cost-table th{font-size:0.57rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--silver-bright);padding:0.75rem 1rem;text-align:left;border-bottom:1px solid var(--border-silver)}
+    .cost-table td{padding:0.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.82rem}
+    .cost-table tr:last-child td{border-bottom:none;font-weight:500;color:var(--text)}
+    .cost-table .total-row td{border-top:2px solid rgba(0,200,80,0.25);color:var(--text);font-family:'Cinzel',serif}
+    .cost-table .item-icon{margin-right:0.4rem}
+    .cost-amount{color:var(--gold);font-weight:500}
+    .cost-multi{color:var(--text-muted);font-size:0.75rem;margin-left:0.3rem}
+
+    /* ── KALKULAČKA CARD ── */
+    .kalk-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem}
+    .kalk-block{background:var(--bg-mid);border:1px solid var(--border-hover);padding:1.5rem;position:relative}
+    .kalk-block-label{font-size:0.58rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem}
+    .kalk-block-label::before{content:'';display:inline-block;width:3px;height:14px;background:var(--crimson-light)}
+    .kalk-input-wrap{display:flex;align-items:center;gap:0.5rem}
+    .kalk-input{background:var(--input-bg);border:1px solid var(--border-hover);color:var(--text);padding:0.9rem 1rem;font-family:'Cinzel',serif;font-size:1.4rem;width:100%;outline:none;transition:border-color 0.2s,box-shadow 0.2s;text-align:center}
+    .kalk-input:focus{border-color:rgba(0,200,80,0.4);box-shadow:0 0 0 2px rgba(0,200,80,0.08)}
+    .kalk-unit{font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap}
+    .kalk-result{margin-top:1rem;padding:1rem;background:rgba(0,200,80,0.06);border:1px solid rgba(0,200,80,0.15);text-align:center}
+    .kalk-result-num{font-family:'Cinzel',serif;font-size:2rem;color:#00C853;line-height:1.1}
+    .kalk-result-label{font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-top:0.3rem}
+    .kalk-arrow{text-align:center;font-size:1.5rem;display:flex;align-items:center;justify-content:center;color:var(--text-muted);opacity:0.4}
+    .breakdown-row{display:flex;justify-content:space-between;padding:0.4rem 0;font-size:0.8rem;color:var(--text-dim);border-bottom:1px solid var(--border)}
+    .breakdown-row:last-child{border-bottom:none;color:var(--text);font-weight:500;padding-top:0.7rem;margin-top:0.3rem}
+    .breakdown-row .green{color:#00C853}
+    .bd-label{display:flex;align-items:center;gap:0.4rem}
+
+    /* ── SLIDER ── */
+    .slider-wrap{margin:1.5rem 0}
+    .slider{-webkit-appearance:none;width:100%;height:4px;background:linear-gradient(90deg,rgba(0,200,80,0.5) var(--pct,50%),var(--border-hover) var(--pct,50%));outline:none;border-radius:2px}
+    .slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--crimson-light);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 6px rgba(0,200,80,0.3)}
+    .slider-labels{display:flex;justify-content:space-between;font-size:0.6rem;color:var(--text-muted);letter-spacing:0.1em;margin-top:0.4rem}
+
+    /* ── PROFIT INDICATOR ── */
+    .profit-bar{height:6px;background:var(--border);margin-top:1rem;position:relative;overflow:hidden}
+    .profit-fill{height:100%;background:linear-gradient(90deg,rgba(0,200,80,0.6),#00C853);transition:width 0.4s}
+
+    @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}}
+  </style>
+  </head><body>
+  ${renderNav(req, 'sazeni')}
+  <main>
+    <div class="page-header">
+      <div class="page-label">Albion — Produkce</div>
+      <div class="page-title">Sázení trávy</div>
+      <div class="page-sub">Kalkulačka nákladů na pěstování cannabisu</div>
+    </div>
+
+    <!-- HERO INFO -->
+    <div class="sazeni-hero">
+      <div style="font-size:0.58rem;letter-spacing:0.35em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.5rem">Informace o produkci</div>
+      <div style="font-family:'Cinzel',serif;font-size:1.1rem;margin-bottom:0.5rem">Náklady na jednu kytku</div>
+      <div style="font-size:0.82rem;color:var(--text-dim);line-height:1.8">
+        Níže vidíš přesný rozpis všeho, co potřebuješ na vypěstování jedné rostliny trávy. Kalkulačka ti pomůže spočítat náklady na libovolný počet kytek nebo zjistit, kolik jich zvládneš za daný rozpočet.
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+
+      <!-- COST BREAKDOWN -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">📋 Rozpis nákladů / 1 kytka</span><span class="card-badge">Fixní ceny</span></div>
+        <table class="cost-table">
+          <thead><tr><th>Položka</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>
+          <tbody>
+            <tr><td><span class="item-icon">💧</span>Konev s vodou</td><td>1×</td><td class="cost-amount">$20</td><td class="cost-amount">$20</td></tr>
+            <tr><td><span class="item-icon">🌱</span>Semínko</td><td>1×</td><td class="cost-amount">$50</td><td class="cost-amount">$50</td></tr>
+            <tr><td><span class="item-icon">🧪</span>Hnojivo</td><td>1×</td><td class="cost-amount">$25</td><td class="cost-amount">$25</td></tr>
+            <tr><td><span class="item-icon">💊</span>Kvalitní hnojivo</td><td>4×</td><td class="cost-amount">$50</td><td class="cost-amount">$200</td></tr>
+            <tr><td><span class="item-icon">🫙</span>Výživná voda</td><td>4×</td><td class="cost-amount">$40</td><td class="cost-amount">$160</td></tr>
+            <tr class="total-row"><td colspan="3" style="font-size:0.75rem;letter-spacing:0.15em">CELKEM NA KYTKU</td><td class="cost-amount" style="font-size:1.1rem">$455</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:1rem;padding:0.8rem 1rem;background:rgba(201,168,76,0.06);border:1px solid var(--border-gold);font-size:0.78rem;color:var(--text-muted)">
+          💡 Cena <strong style="color:var(--gold)">$455</strong> je náklad na <strong style="color:var(--text)">jednu rostlinu</strong>. Při prodeji za $150/ks je zisk <strong style="color:#00C853">−$305</strong> (ztráta bez započtení finálního prodeje celé sklizně).
+        </div>
+      </div>
+
+      <!-- RYCHLÁ KALKULAČKA -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">🧮 Rychlá kalkulačka</span><span class="card-badge">Interaktivní</span></div>
+        <div class="kalk-grid">
+          <div class="kalk-block">
+            <div class="kalk-block-label">Počet kytek</div>
+            <input type="number" class="kalk-input" id="inputKytky" min="1" max="9999" value="10" oninput="calcFromKytky(this.value)">
+            <div class="kalk-result" id="resultCena">
+              <div class="kalk-result-num" id="outCena">$4,550</div>
+              <div class="kalk-result-label">celkový náklad</div>
+            </div>
+          </div>
+          <div class="kalk-arrow">⇄</div>
+          <div class="kalk-block">
+            <div class="kalk-block-label">Dostupný budget</div>
+            <input type="number" class="kalk-input" id="inputBudget" min="0" value="4550" oninput="calcFromBudget(this.value)" style="border-color:rgba(0,200,80,0.2)">
+            <div class="kalk-result" id="resultKytky" style="background:rgba(0,200,80,0.06);border-color:rgba(0,200,80,0.2)">
+              <div class="kalk-result-num" id="outKytky" style="color:#00C853">10</div>
+              <div class="kalk-result-label">kytek lze zasadit</div>
+            </div>
+          </div>
+        </div>
+        <div class="slider-wrap">
+          <input type="range" class="slider" id="kytkySlider" min="1" max="200" value="10" oninput="sliderChange(this.value)" style="--pct:4.5%">
+          <div class="slider-labels"><span>1 kytka</span><span>50</span><span>100</span><span>150</span><span>200 kytek</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETAILNÍ ROZPAD -->
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header"><span class="card-title">📊 Detailní rozpad nákladů</span><span class="card-badge" id="bdKytkyLabel">10 kytek</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">
+        <div>
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Položky celkem</div>
+          <div class="breakdown-row"><div class="bd-label">💧 Konev s vodou <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-konev-qty">(10×)</span></div><div class="green" id="bd-konev">$200</div></div>
+          <div class="breakdown-row"><div class="bd-label">🌱 Semínko <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-seminko-qty">(10×)</span></div><div class="green" id="bd-seminko">$500</div></div>
+          <div class="breakdown-row"><div class="bd-label">🧪 Hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-hnojivo-qty">(10×)</span></div><div class="green" id="bd-hnojivo">$250</div></div>
+          <div class="breakdown-row"><div class="bd-label">💊 Kvalitní hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-khnojivo-qty">(40×)</span></div><div class="green" id="bd-khnojivo">$2,000</div></div>
+          <div class="breakdown-row"><div class="bd-label">🫙 Výživná voda <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-voda-qty">(40×)</span></div><div class="green" id="bd-voda">$1,600</div></div>
+          <div class="breakdown-row"><div class="bd-label" style="font-family:'Cinzel',serif">CELKEM</div><div style="font-family:'Cinzel',serif;color:var(--gold)" id="bd-total">$4,550</div></div>
+        </div>
+        <div>
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Přehled investice</div>
+          <div class="breakdown-row"><div class="bd-label">💰 Celkový náklad</div><div style="color:var(--gold)" id="ov-naklad">$4,550</div></div>
+          <div class="breakdown-row"><div class="bd-label">🌿 Počet kytek</div><div id="ov-kytky">10</div></div>
+          <div class="breakdown-row"><div class="bd-label">📦 Náklad / kytka</div><div>$455</div></div>
+          <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border-silver)">
+            <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver);margin-bottom:0.6rem">Investice na položku</div>
+            <div class="profit-bar"><div class="profit-fill" id="profitFill" style="width:50%"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem">
+              <span>Největší náklad: <strong style="color:var(--text)" id="biggestItem">Kvalitní hnojivo (44%)</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+  <script>
+    const COST_PER = 455;
+    const ITEMS = [
+      { id:'konev',   label:'Konev s vodou',   qty:1, unit:20 },
+      { id:'seminko', label:'Semínko',          qty:1, unit:50 },
+      { id:'hnojivo', label:'Hnojivo',          qty:1, unit:25 },
+      { id:'khnojivo',label:'Kvalitní hnojivo', qty:4, unit:50 },
+      { id:'voda',    label:'Výživná voda',     qty:4, unit:40 },
+    ];
+
+    function fmt(n) { return '$' + Math.round(n).toLocaleString('cs-CZ'); }
+
+    function updateAll(kytky) {
+      kytky = Math.max(1, Math.floor(kytky));
+      const total = kytky * COST_PER;
+
+      // rychlá kalk
+      document.getElementById('outCena').textContent = fmt(total);
+      document.getElementById('outKytky').textContent = kytky.toLocaleString('cs-CZ');
+
+      // breakdown
+      document.getElementById('bdKytkyLabel').textContent = kytky + ' kytek';
+      ITEMS.forEach(it => {
+        const totalQty = it.qty * kytky;
+        const totalCost = totalQty * it.unit;
+        document.getElementById('bd-' + it.id).textContent = fmt(totalCost);
+        document.getElementById('bd-' + it.id + '-qty').textContent = '(' + totalQty + '×)';
+      });
+      document.getElementById('bd-total').textContent = fmt(total);
+      document.getElementById('ov-naklad').textContent = fmt(total);
+      document.getElementById('ov-kytky').textContent = kytky.toLocaleString('cs-CZ');
+
+      // slider
+      const slider = document.getElementById('kytkySlider');
+      const clampedSlider = Math.min(kytky, 200);
+      slider.value = clampedSlider;
+      const pct = ((clampedSlider - 1) / 199 * 100).toFixed(1);
+      slider.style.setProperty('--pct', pct + '%');
+
+      // profit bar (biggest = khnojivo = 200/455 = 44%)
+      document.getElementById('profitFill').style.width = '44%';
+    }
+
+    function calcFromKytky(v) {
+      const k = parseInt(v) || 1;
+      const budget = k * COST_PER;
+      document.getElementById('inputBudget').value = budget;
+      updateAll(k);
+    }
+
+    function calcFromBudget(v) {
+      const b = parseFloat(v) || 0;
+      const k = Math.floor(b / COST_PER);
+      document.getElementById('inputKytky').value = Math.max(1, k);
+      updateAll(Math.max(1, k));
+    }
+
+    function sliderChange(v) {
+      document.getElementById('inputKytky').value = v;
+      calcFromKytky(v);
+    }
+
+    // init
+    updateAll(10);
+  </script>
+  </body></html>`;
 }
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
