@@ -436,7 +436,7 @@ function baseStyles() {
   return `
     <link rel="icon" type="image/png" href="/logo.png">
     <link rel="apple-touch-icon" href="/logo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
 
@@ -445,37 +445,37 @@ function baseStyles() {
         --crimson-light:#C0282D;
         --crimson-glow:rgba(192,40,45,0.15);
         --crimson-bright:#E03030;
-        --silver:#A8A8B8;
-        --silver-bright:#D0D0E0;
-        --silver-dim:rgba(180,180,210,0.1);
-        --bg:#050508;
-        --bg-soft:#08080D;
-        --bg-mid:#0D0D14;
-        --bg-card:#0A0A10;
-        --bg-card2:#0F0F18;
-        --bg-card3:#111120;
-        --text:#ECEEF6;
-        --text-dim:#A0A0BC;
-        --text-muted:#404050;
-        --text-label:#5A5A6E;
-        --border:rgba(255,255,255,0.04);
-        --border-hover:rgba(255,255,255,0.10);
-        --border-silver:rgba(180,180,220,0.18);
-        --border-gold:rgba(201,168,76,0.15);
+        --silver:#B0B0C0;
+        --silver-bright:#E0E0EC;
+        --silver-dim:rgba(200,200,220,0.08);
+        --bg:#060608;
+        --bg-soft:#0A0A0E;
+        --bg-mid:#0E0E16;
+        --bg-card:#0C0C14;
+        --bg-card2:#111118;
+        --bg-card3:#141420;
+        --text:#F0F0FA;
+        --text-dim:#B8B8D0;
+        --text-muted:#555568;
+        --text-label:#666678;
+        --border:rgba(255,255,255,0.06);
+        --border-hover:rgba(255,255,255,0.12);
+        --border-silver:rgba(200,200,230,0.16);
+        --border-gold:rgba(201,168,76,0.18);
         --gold:#C9A84C;
-        --gold-dim:rgba(201,168,76,0.08);
-        --input-bg:#0D0D14;
-        --shadow:0 8px 40px rgba(0,0,0,0.8);
-        --shadow-card:0 2px 20px rgba(0,0,0,0.6);
-        --red-glow:0 0 30px rgba(192,40,45,0.2);
-        --nav-h:68px;
+        --gold-dim:rgba(201,168,76,0.09);
+        --input-bg:#0E0E16;
+        --shadow:0 8px 40px rgba(0,0,0,0.85);
+        --shadow-card:0 2px 24px rgba(0,0,0,0.65);
+        --red-glow:0 0 32px rgba(192,40,45,0.22);
+        --nav-h:64px;
       }
       body.light{
-        --bg:#EEEEF6;--bg-soft:#E6E6F0;--bg-mid:#DCDCE8;--bg-card:#F4F4FA;--bg-card2:#ECECF4;--bg-card3:#E8E8F2;
-        --silver:#505064;--silver-bright:#303048;--silver-dim:rgba(50,50,80,0.08);
-        --text:#12121E;--text-dim:#2A2A3A;--text-muted:#9090A8;--text-label:#5A5A70;
-        --border:rgba(0,0,0,0.06);--border-hover:rgba(0,0,0,0.14);--border-silver:rgba(60,60,100,0.18);
-        --input-bg:#DCDCE8;--shadow:0 4px 20px rgba(0,0,0,0.12);--shadow-card:0 2px 10px rgba(0,0,0,0.08);
+        --bg:#F0F0F8;--bg-soft:#E8E8F2;--bg-mid:#E0E0EC;--bg-card:#F8F8FF;--bg-card2:#F0F0FA;--bg-card3:#EAEAF4;
+        --silver:#484860;--silver-bright:#282840;--silver-dim:rgba(40,40,70,0.07);
+        --text:#0E0E1E;--text-dim:#1E1E32;--text-muted:#8888A0;--text-label:#5A5A72;
+        --border:rgba(0,0,0,0.07);--border-hover:rgba(0,0,0,0.16);--border-silver:rgba(50,50,90,0.16);
+        --input-bg:#E0E0EC;--shadow:0 4px 20px rgba(0,0,0,0.10);--shadow-card:0 2px 12px rgba(0,0,0,0.07);
       }
 
       html{scroll-behavior:smooth}
@@ -483,23 +483,25 @@ function baseStyles() {
         background:var(--bg);
         color:var(--text);
         font-family:'Inter',sans-serif;
-        font-weight:300;
+        font-weight:400;
+        font-size:15px;
+        line-height:1.6;
         min-height:100vh;
         transition:background 0.4s,color 0.4s;
-        animation:pageFadeIn 0.5s cubic-bezier(0.22,1,0.36,1);
+        animation:pageFadeIn 0.4s cubic-bezier(0.22,1,0.36,1);
       }
-      @keyframes pageFadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes pageFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
       /* ── SCROLLBAR ── */
-      ::-webkit-scrollbar{width:6px;height:6px}
+      ::-webkit-scrollbar{width:5px;height:5px}
       ::-webkit-scrollbar-track{background:var(--bg-soft)}
-      ::-webkit-scrollbar-thumb{background:rgba(192,40,45,0.4);border-radius:3px}
-      ::-webkit-scrollbar-thumb:hover{background:rgba(192,40,45,0.7)}
+      ::-webkit-scrollbar-thumb{background:rgba(192,40,45,0.45);border-radius:3px}
+      ::-webkit-scrollbar-thumb:hover{background:rgba(192,40,45,0.72)}
 
       /* ── NAV ── */
       nav{
-        background:rgba(5,5,8,0.85);
-        border-bottom:1px solid var(--border-silver);
+        background:rgba(6,6,8,0.92);
+        border-bottom:1px solid rgba(192,40,45,0.2);
         padding:0 2rem;
         display:flex;
         align-items:center;
@@ -508,8 +510,8 @@ function baseStyles() {
         top:0;
         z-index:200;
         height:var(--nav-h);
-        backdrop-filter:blur(20px) saturate(180%);
-        -webkit-backdrop-filter:blur(20px) saturate(180%);
+        backdrop-filter:blur(24px) saturate(160%);
+        -webkit-backdrop-filter:blur(24px) saturate(160%);
         transition:background 0.4s;
       }
       nav::after{
@@ -517,52 +519,54 @@ function baseStyles() {
         position:absolute;
         bottom:0;left:0;right:0;
         height:1px;
-        background:linear-gradient(90deg,transparent,var(--crimson-light) 30%,var(--crimson-light) 70%,transparent);
-        opacity:0.25;
+        background:linear-gradient(90deg,transparent,var(--crimson-light) 25%,var(--crimson-light) 75%,transparent);
+        opacity:0.35;
         pointer-events:none;
       }
-      body.light nav{background:rgba(238,238,246,0.9)}
+      body.light nav{background:rgba(240,240,248,0.94)}
 
       .nav-logo{
         font-family:'Cinzel',serif;
-        letter-spacing:0.4em;
-        font-size:1.05rem;
+        letter-spacing:0.38em;
+        font-size:1.1rem;
         text-decoration:none;
         color:var(--text);
         display:flex;
         align-items:center;
-        gap:0.9rem;
+        gap:0.85rem;
         flex-shrink:0;
         transition:opacity 0.2s;
       }
       .nav-logo:hover{opacity:0.8}
       .nav-logo-img{
-        width:30px;height:30px;
+        width:32px;height:32px;
         object-fit:contain;
-        filter:drop-shadow(0 0 8px rgba(192,40,45,0.55));
+        filter:drop-shadow(0 0 10px rgba(192,40,45,0.6));
         transition:filter 0.3s;
       }
-      .nav-logo:hover .nav-logo-img{filter:drop-shadow(0 0 14px rgba(192,40,45,0.85))}
+      .nav-logo:hover .nav-logo-img{filter:drop-shadow(0 0 16px rgba(192,40,45,0.9))}
       .nav-logo-text .b-red{
         color:var(--crimson-light);
-        text-shadow:0 0 16px rgba(192,40,45,0.5);
+        text-shadow:0 0 18px rgba(192,40,45,0.55);
       }
 
       .nav-menu{display:flex;gap:0;list-style:none;height:100%}
       .nav-menu li{height:100%}
       .nav-menu a{
-        display:flex;align-items:center;gap:0.4rem;
-        padding:0 1rem;
+        display:flex;align-items:center;flex-direction:column;justify-content:center;
+        padding:0 1.1rem;
         height:100%;
-        font-size:0.6rem;
-        letter-spacing:0.14em;
+        font-size:0.68rem;
+        letter-spacing:0.16em;
         text-transform:uppercase;
+        font-weight:500;
         color:var(--text-muted);
         text-decoration:none;
         border-bottom:2px solid transparent;
         transition:color 0.2s,border-color 0.2s,background 0.2s;
         white-space:nowrap;
         position:relative;
+        gap:0.2rem;
       }
       .nav-menu a::before{
         content:'';
@@ -572,59 +576,57 @@ function baseStyles() {
         opacity:0;
         transition:opacity 0.2s;
       }
-      .nav-menu a:hover{color:var(--text-dim)}
-      .nav-menu a:hover::before{opacity:0.5}
+      .nav-menu a:hover{color:var(--silver-bright)}
+      .nav-menu a:hover::before{opacity:0.55}
       .nav-menu a.active{
-        color:var(--silver-bright);
+        color:#ffffff;
         border-bottom-color:var(--crimson-light);
-        background:rgba(192,40,45,0.06);
+        background:rgba(192,40,45,0.07);
       }
-      .nav-menu a .nav-icon{font-size:0.9rem}
-      .nav-menu a .nav-label{display:flex;flex-direction:column;line-height:1.2}
       .nav-menu a .nav-desc{
-        font-size:0.46rem;letter-spacing:0.06em;
-        color:var(--text-muted);opacity:0.65;
-        margin-top:0.1rem;font-weight:300;
+        font-size:0.52rem;letter-spacing:0.07em;
+        color:var(--text-muted);opacity:0.7;
+        font-weight:300;line-height:1;
       }
 
       .nav-right{display:flex;align-items:center;gap:0.75rem;flex-shrink:0}
-      .nav-user{font-size:0.66rem;color:var(--text-muted);letter-spacing:0.06em;white-space:nowrap}
-      .nav-user strong{color:var(--silver-bright);font-weight:400}
+      .nav-user{font-size:0.72rem;color:var(--text-muted);letter-spacing:0.05em;white-space:nowrap}
+      .nav-user strong{color:var(--silver-bright);font-weight:500}
       .nav-logout{
-        font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;
+        font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:500;
         color:var(--crimson-light);text-decoration:none;
-        padding:0.35rem 0.8rem;
-        border:1px solid rgba(192,40,45,0.25);
+        padding:0.38rem 0.9rem;
+        border:1px solid rgba(192,40,45,0.28);
         transition:all 0.2s;
       }
       .nav-logout:hover{background:var(--crimson-glow);border-color:var(--crimson-light)}
       .theme-toggle{
         background:none;border:1px solid var(--border-hover);
         color:var(--text-muted);width:32px;height:32px;cursor:pointer;
-        font-size:0.85rem;display:flex;align-items:center;justify-content:center;
+        font-size:0.9rem;display:flex;align-items:center;justify-content:center;
         transition:all 0.2s;
       }
       .theme-toggle:hover{border-color:var(--silver);color:var(--silver)}
       .notif-bell{
         position:relative;cursor:pointer;background:none;border:none;
-        color:var(--text-muted);font-size:1rem;padding:0.3rem;transition:color 0.2s;
+        color:var(--text-muted);font-size:1.05rem;padding:0.3rem;transition:color 0.2s;
       }
       .notif-bell:hover{color:var(--crimson-bright)}
       .notif-badge{
         position:absolute;top:-3px;right:-5px;
         background:var(--crimson-light);color:white;
-        font-size:0.48rem;min-width:14px;height:14px;
+        font-size:0.5rem;min-width:14px;height:14px;
         border-radius:7px;display:none;align-items:center;justify-content:center;padding:0 3px;
       }
       .notif-badge.visible{display:flex}
 
       /* ── LAYOUT ── */
-      main{max-width:1480px;margin:0 auto;padding:2.5rem 2rem 4rem}
+      main{max-width:1480px;margin:0 auto;padding:2.5rem 2rem 5rem}
 
       /* ── PAGE HEADER ── */
       .page-header{
         margin-bottom:2.5rem;
-        padding-bottom:1.5rem;
+        padding-bottom:1.8rem;
         border-bottom:1px solid var(--border-silver);
         position:relative;
         display:flex;
@@ -636,35 +638,59 @@ function baseStyles() {
         content:'';
         position:absolute;
         bottom:-1px;left:0;
-        width:80px;height:2px;
+        width:100px;height:2px;
         background:linear-gradient(90deg,var(--crimson-light),transparent);
       }
       .page-label{
-        font-size:0.55rem;letter-spacing:0.55em;text-transform:uppercase;
-        color:var(--crimson-light);margin-bottom:0.7rem;opacity:0.8;
+        font-size:0.6rem;letter-spacing:0.5em;text-transform:uppercase;
+        color:var(--crimson-light);margin-bottom:0.65rem;opacity:0.85;font-weight:500;
       }
       .page-title{
         font-family:'Cinzel',serif;
-        font-size:2rem;color:var(--text);font-weight:400;letter-spacing:0.03em;
+        font-size:2.1rem;color:var(--text);font-weight:500;letter-spacing:0.02em;
       }
       .page-sub{
         font-family:'Cormorant Garamond',serif;
-        font-style:italic;color:var(--text-muted);
-        margin-top:0.5rem;font-size:1.05rem;
+        font-style:italic;color:var(--text-dim);
+        margin-top:0.5rem;font-size:1.1rem;
+      }
+
+      /* ── PAGE INFO BOX ── */
+      .page-info{
+        background:linear-gradient(135deg,rgba(192,40,45,0.07),rgba(192,40,45,0.03));
+        border:1px solid rgba(192,40,45,0.2);
+        border-left:3px solid var(--crimson-light);
+        padding:1.2rem 1.5rem;
+        margin-bottom:2rem;
+        display:flex;
+        align-items:flex-start;
+        gap:1rem;
+      }
+      .page-info-icon{
+        font-size:1.1rem;flex-shrink:0;margin-top:0.1rem;
+      }
+      .page-info-body{}
+      .page-info-title{
+        font-family:'Cinzel',serif;
+        font-size:0.78rem;letter-spacing:0.12em;text-transform:uppercase;
+        color:var(--crimson-light);margin-bottom:0.4rem;
+      }
+      .page-info-text{
+        font-size:0.85rem;color:var(--text-dim);line-height:1.8;
       }
 
       /* ── CARDS ── */
       .card{
         background:var(--bg-card);
         border:1px solid var(--border);
-        padding:1.6rem;
+        padding:1.8rem;
         transition:border-color 0.3s,box-shadow 0.3s;
         box-shadow:var(--shadow-card);
         position:relative;
       }
       .card::before{
         content:'';position:absolute;top:0;left:0;right:0;height:1px;
-        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent);
         pointer-events:none;
       }
       .card:hover{
@@ -678,7 +704,7 @@ function baseStyles() {
       }
       .card-title{
         font-family:'Cinzel',serif;
-        font-size:0.82rem;letter-spacing:0.12em;color:var(--text-dim);
+        font-size:0.88rem;letter-spacing:0.1em;color:var(--text);
       }
       .card-badge{
         font-size:0.54rem;letter-spacing:0.22em;text-transform:uppercase;
@@ -687,25 +713,25 @@ function baseStyles() {
       }
 
       /* ── FORMS ── */
-      .form-section{margin-top:1.5rem;padding-top:1.4rem;border-top:1px solid var(--border)}
-      .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem}
-      .form-group{display:flex;flex-direction:column;gap:0.3rem}
+      .form-section{margin-top:1.6rem;padding-top:1.4rem;border-top:1px solid var(--border)}
+      .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-bottom:0.85rem}
+      .form-group{display:flex;flex-direction:column;gap:0.4rem}
       label{
-        font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;
-        color:var(--text-label);
+        font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;
+        color:var(--silver);font-weight:500;
       }
       select,input[type=text],input[type=number],textarea{
         background:var(--input-bg);
         border:1px solid var(--border-hover);
         color:var(--text);
-        padding:0.7rem 0.9rem;
+        padding:0.75rem 1rem;
         font-family:'Inter',sans-serif;
-        font-size:0.82rem;
+        font-size:0.9rem;
         width:100%;outline:none;
         transition:border-color 0.2s,box-shadow 0.2s;
         appearance:none;-webkit-appearance:none;
       }
-      textarea{resize:vertical;min-height:90px}
+      textarea{resize:vertical;min-height:100px}
       select:focus,input:focus,textarea:focus{
         border-color:var(--crimson-light);
         box-shadow:0 0 0 2px var(--crimson-glow);
@@ -713,37 +739,37 @@ function baseStyles() {
       select option{background:var(--bg-mid)}
       .btn-submit{
         background:linear-gradient(135deg,var(--crimson) 0%,var(--crimson-light) 100%);
-        color:#F5F3EF;border:none;
-        padding:0.8rem 1.5rem;
+        color:#FFFFFF;border:none;
+        padding:0.85rem 1.5rem;
         font-family:'Inter',sans-serif;
-        font-size:0.66rem;letter-spacing:0.28em;text-transform:uppercase;
-        cursor:pointer;width:100%;margin-top:0.5rem;
+        font-size:0.7rem;letter-spacing:0.24em;text-transform:uppercase;font-weight:600;
+        cursor:pointer;width:100%;margin-top:0.6rem;
         transition:opacity 0.2s,transform 0.15s,box-shadow 0.2s;
-        box-shadow:0 2px 16px rgba(139,26,26,0.35);
+        box-shadow:0 2px 18px rgba(139,26,26,0.38);
       }
-      .btn-submit:hover{opacity:0.9;box-shadow:0 4px 24px rgba(192,40,45,0.5);transform:translateY(-1px)}
+      .btn-submit:hover{opacity:0.9;box-shadow:0 4px 26px rgba(192,40,45,0.55);transform:translateY(-1px)}
       .btn-submit:active{transform:scale(0.99)}
-      .typ-toggle{display:flex;gap:0.35rem;margin-bottom:1rem}
+      .typ-toggle{display:flex;gap:0.4rem;margin-bottom:1rem}
       .typ-btn{
-        flex:1;padding:0.5rem;background:transparent;
+        flex:1;padding:0.6rem;background:transparent;
         border:1px solid var(--border-hover);
         color:var(--text-muted);font-family:'Inter',sans-serif;
-        font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;
+        font-size:0.65rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;cursor:pointer;
         transition:all 0.2s;
       }
-      .typ-btn:hover{color:var(--text-dim);border-color:var(--border-silver)}
-      .typ-btn.active-vklad{background:rgba(0,255,136,0.07);border-color:rgba(0,255,136,0.3);color:#00FF88}
-      .typ-btn.active-vyber{background:rgba(255,68,68,0.07);border-color:rgba(255,68,68,0.3);color:#FF5555}
+      .typ-btn:hover{color:var(--silver-bright);border-color:var(--border-silver)}
+      .typ-btn.active-vklad{background:rgba(0,200,100,0.09);border-color:rgba(0,200,100,0.35);color:#00D97A}
+      .typ-btn.active-vyber{background:rgba(220,50,50,0.09);border-color:rgba(220,50,50,0.35);color:#FF5555}
       .info-box{
         background:var(--gold-dim);border:1px solid var(--border-gold);
-        padding:0.8rem 1rem;font-size:0.76rem;color:var(--text-dim);margin-top:0.8rem;display:none;
+        padding:0.85rem 1.1rem;font-size:0.82rem;color:var(--text-dim);margin-top:0.9rem;display:none;
       }
 
       /* ── TOP STATS STRIP ── */
       .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
       .stat{
         background:var(--bg-card);border:1px solid var(--border);
-        padding:1.5rem 1.6rem;
+        padding:1.6rem 1.8rem;
         transition:all 0.3s;
         position:relative;overflow:hidden;
         box-shadow:var(--shadow-card);
@@ -758,20 +784,20 @@ function baseStyles() {
         transform:translateY(-3px);
         box-shadow:var(--shadow-card),var(--red-glow);
       }
-      .stat-label{font-size:0.54rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--text-label);margin-bottom:0.6rem}
-      .stat-value{font-family:'Cinzel',serif;font-size:1.8rem;color:var(--text);line-height:1}
-      .stat-sub{font-size:0.62rem;color:var(--silver);margin-top:0.5rem;opacity:0.85}
+      .stat-label{font-size:0.62rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.65rem;font-weight:500}
+      .stat-value{font-family:'Cinzel',serif;font-size:2rem;color:var(--text);line-height:1}
+      .stat-sub{font-size:0.72rem;color:var(--text-dim);margin-top:0.55rem}
 
       /* ── SKLAD ── */
       .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem}
       .sklad-row{
         display:flex;justify-content:space-between;align-items:center;
-        padding:0.6rem 0;border-bottom:1px solid var(--border);
-        font-size:0.8rem;
+        padding:0.7rem 0;border-bottom:1px solid var(--border);
+        font-size:0.88rem;
         transition:background 0.15s;
       }
       .sklad-row:last-child{border-bottom:none}
-      .sklad-row:hover{background:rgba(255,255,255,0.02);margin:0 -0.5rem;padding-left:0.5rem;padding-right:0.5rem}
+      .sklad-row:hover{background:rgba(255,255,255,0.025);margin:0 -0.5rem;padding-left:0.5rem;padding-right:0.5rem}
       .sklad-row em{color:var(--gold);font-style:normal;margin-left:0.5rem;font-size:0.7rem;opacity:0.85}
 
       /* ── TOAST ── */
@@ -791,46 +817,46 @@ function baseStyles() {
 
       /* ── TABULKY ── */
       .table-wrap{overflow-x:auto}
-      table{width:100%;border-collapse:collapse;font-size:0.78rem}
+      table{width:100%;border-collapse:collapse;font-size:0.88rem}
       th{
-        font-size:0.54rem;letter-spacing:0.24em;text-transform:uppercase;
-        color:var(--silver);padding:0.8rem 1rem;text-align:left;
-        border-bottom:1px solid var(--border-silver);background:rgba(255,255,255,0.015);
+        font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;font-weight:600;
+        color:var(--silver);padding:0.85rem 1.1rem;text-align:left;
+        border-bottom:1px solid var(--border-silver);background:rgba(255,255,255,0.018);
       }
-      td{padding:0.75rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim)}
+      td{padding:0.82rem 1.1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.88rem}
       tr:last-child td{border-bottom:none}
-      tr:hover td{background:rgba(192,40,45,0.03);color:var(--text)}
+      tr:hover td{background:rgba(192,40,45,0.035);color:var(--text)}
       .badge{
-        font-size:0.56rem;padding:0.2rem 0.6rem;
-        letter-spacing:0.12em;text-transform:uppercase;
+        font-size:0.6rem;padding:0.22rem 0.7rem;
+        letter-spacing:0.12em;text-transform:uppercase;font-weight:500;
       }
-      .badge.vklad{background:rgba(0,255,136,0.07);color:#00FF88;border:1px solid rgba(0,255,136,0.2)}
-      .badge.vyber{background:rgba(255,85,85,0.07);color:#FF5555;border:1px solid rgba(255,85,85,0.2)}
-      .badge.prijem{background:rgba(0,255,136,0.07);color:#00FF88;border:1px solid rgba(0,255,136,0.2)}
-      .badge.vydaj{background:rgba(255,85,85,0.07);color:#FF5555;border:1px solid rgba(255,85,85,0.2)}
+      .badge.vklad{background:rgba(0,200,100,0.09);color:#00D97A;border:1px solid rgba(0,200,100,0.25)}
+      .badge.vyber{background:rgba(220,50,50,0.09);color:#FF5555;border:1px solid rgba(220,50,50,0.25)}
+      .badge.prijem{background:rgba(0,200,100,0.09);color:#00D97A;border:1px solid rgba(0,200,100,0.25)}
+      .badge.vydaj{background:rgba(220,50,50,0.09);color:#FF5555;border:1px solid rgba(220,50,50,0.25)}
 
       /* ── NÁSTĚNKA ── */
       .nastenska-list{display:flex;flex-direction:column;gap:1rem}
       .nastenska-item{
         background:var(--bg-card);border:1px solid var(--border);
         border-left:3px solid var(--border-silver);
-        padding:1.4rem 1.6rem;transition:all 0.25s;
+        padding:1.5rem 1.8rem;transition:all 0.25s;
       }
       .nastenska-item:hover{border-left-color:var(--silver);background:var(--bg-card2)}
       .nastenska-item.new{border-left-color:var(--crimson-light);animation:pulseCard 2s ease}
       @keyframes pulseCard{0%,100%{box-shadow:none}50%{box-shadow:var(--red-glow)}}
-      .nastenska-meta{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5rem}
-      .nastenska-title{font-family:'Cinzel',serif;font-size:0.95rem;margin-bottom:0.5rem;color:var(--text);font-weight:400}
-      .nastenska-content{font-size:0.84rem;color:var(--text-dim);line-height:1.8;white-space:pre-wrap}
+      .nastenska-meta{font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.6rem;font-weight:500}
+      .nastenska-title{font-family:'Cinzel',serif;font-size:1.05rem;margin-bottom:0.55rem;color:var(--text);font-weight:500}
+      .nastenska-content{font-size:0.92rem;color:var(--text-dim);line-height:1.85;white-space:pre-wrap}
       .new-badge{
-        display:inline-block;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;
-        background:var(--crimson-light);color:white;padding:0.15rem 0.5rem;margin-left:0.5rem;vertical-align:middle;
+        display:inline-block;font-size:0.55rem;letter-spacing:0.14em;text-transform:uppercase;
+        background:var(--crimson-light);color:white;padding:0.16rem 0.55rem;margin-left:0.55rem;vertical-align:middle;font-weight:600;
       }
 
       /* ── KODEX ── */
       .kodex-section{margin-bottom:2.5rem}
-      .kodex-number{font-family:'Cinzel',serif;font-size:3.5rem;color:var(--silver);opacity:0.08;float:left;line-height:1;margin-right:1.2rem;margin-top:-0.3rem;font-weight:700}
-      .kodex-rule{font-size:0.84rem;line-height:2;color:var(--text-dim);overflow:hidden}
+      .kodex-number{font-family:'Cinzel',serif;font-size:3.5rem;color:var(--silver);opacity:0.07;float:left;line-height:1;margin-right:1.2rem;margin-top:-0.3rem;font-weight:700}
+      .kodex-rule{font-size:0.92rem;line-height:2;color:var(--text-dim);overflow:hidden}
       .kodex-rule strong{color:var(--text);font-weight:500}
       .kodex-divider{height:1px;background:var(--border);margin:1.8rem 0}
 
@@ -845,14 +871,14 @@ function baseStyles() {
         display:flex;justify-content:space-between;align-items:flex-start;
         margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--border-silver);
       }
-      .stat-card-name{font-family:'Cinzel',serif;font-size:0.95rem;color:var(--text);font-weight:400}
-      .stat-card-discord{font-size:0.6rem;letter-spacing:0.1em;color:var(--text-muted);margin-top:0.2rem}
-      .stat-row{display:flex;justify-content:space-between;font-size:0.77rem;padding:0.3rem 0;color:var(--text-dim)}
-      .stat-row strong{color:var(--text);font-weight:400}
+      .stat-card-name{font-family:'Cinzel',serif;font-size:1rem;color:var(--text);font-weight:500}
+      .stat-card-discord{font-size:0.68rem;letter-spacing:0.08em;color:var(--text-muted);margin-top:0.25rem}
+      .stat-row{display:flex;justify-content:space-between;font-size:0.86rem;padding:0.35rem 0;color:var(--text-dim)}
+      .stat-row strong{color:var(--text);font-weight:500}
       .stat-section-label{
-        font-size:0.56rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);
-        margin-top:0.9rem;margin-bottom:0.3rem;opacity:0.85;
-        padding-top:0.6rem;border-top:1px solid var(--border);
+        font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--silver);font-weight:600;
+        margin-top:0.9rem;margin-bottom:0.4rem;
+        padding-top:0.65rem;border-top:1px solid var(--border);
       }
       .stat-section-label:first-of-type{border-top:none;margin-top:0}
       .stat-item-group{margin-left:0.5rem}
@@ -867,33 +893,33 @@ function baseStyles() {
       .chapter::before{
         content:'';position:absolute;left:-5px;top:2px;
         width:8px;height:8px;
-        background:var(--crimson-light);opacity:0.6;
+        background:var(--crimson-light);opacity:0.65;
         transform:rotate(45deg);
       }
-      .chapter-meta{font-size:0.56rem;letter-spacing:0.38em;text-transform:uppercase;color:var(--crimson-light);margin-bottom:0.8rem;opacity:0.8}
-      .chapter-title{font-family:'Cinzel',serif;font-size:1.3rem;color:var(--text);margin-bottom:1rem;font-weight:400}
-      .chapter-text{font-family:'Cormorant Garamond',serif;font-size:1.08rem;line-height:2;color:var(--text-dim)}
+      .chapter-meta{font-size:0.6rem;letter-spacing:0.36em;text-transform:uppercase;color:var(--crimson-light);margin-bottom:0.8rem;font-weight:500}
+      .chapter-title{font-family:'Cinzel',serif;font-size:1.35rem;color:var(--text);margin-bottom:1rem;font-weight:500}
+      .chapter-text{font-family:'Cormorant Garamond',serif;font-size:1.12rem;line-height:2;color:var(--text-dim)}
       .sidebar{
         background:var(--bg-card);border:1px solid var(--border-silver);
         padding:2rem;position:sticky;top:calc(var(--nav-h) + 1.5rem);
         box-shadow:var(--shadow-card);
       }
       .sidebar-title{
-        font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.3em;text-transform:uppercase;
+        font-family:'Cinzel',serif;font-size:0.75rem;letter-spacing:0.28em;text-transform:uppercase;
         margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);color:var(--silver);
       }
       .toc-item{
-        font-size:0.74rem;padding:0.6rem 0;border-bottom:1px solid var(--border);
+        font-size:0.82rem;padding:0.65rem 0;border-bottom:1px solid var(--border);
         color:var(--text-dim);display:flex;gap:0.8rem;align-items:center;
         transition:color 0.2s;cursor:default;
       }
       .toc-item:last-child{border-bottom:none}
       .toc-item:hover{color:var(--text)}
-      .toc-num{color:var(--crimson-light);font-weight:500;min-width:1.5rem;font-family:'Cinzel',serif;font-size:0.78rem}
+      .toc-num{color:var(--crimson-light);font-weight:600;min-width:1.5rem;font-family:'Cinzel',serif;font-size:0.82rem}
       .rank-list{display:flex;flex-direction:column;gap:0}
       .rank-item{
         display:flex;align-items:flex-start;gap:1.5rem;
-        padding:1.6rem 1.8rem;
+        padding:1.8rem 2rem;
         background:var(--bg-card);border:1px solid var(--border);
         border-top:none;transition:all 0.25s;
         position:relative;
@@ -902,63 +928,59 @@ function baseStyles() {
       .rank-item:hover{
         background:var(--bg-card2);
         border-left:3px solid var(--crimson-light);
-        padding-left:calc(1.8rem - 2px);
+        padding-left:calc(2rem - 2px);
       }
       .rank-item.founder{
         border-top:2px solid var(--crimson-light)!important;
         background:linear-gradient(135deg,var(--bg-card),var(--bg-card2));
       }
-      .rank-num{font-family:'Cinzel',serif;font-size:1.5rem;color:var(--crimson-light);opacity:0.35;min-width:2.5rem;line-height:1}
-      .rank-item.founder .rank-num{opacity:0.8}
-      .rank-info h3{font-family:'Cinzel',serif;font-size:0.9rem;color:var(--text);margin-bottom:0.2rem;font-weight:400}
-      .rank-info .rank-member{font-size:0.76rem;color:var(--silver-bright);margin-bottom:0.4rem}
-      .rank-info p{font-size:0.78rem;color:var(--text-muted);line-height:1.75}
-      .rank-rights{margin-top:0.7rem;display:flex;flex-wrap:wrap;gap:0.3rem}
+      .rank-num{font-family:'Cinzel',serif;font-size:1.6rem;color:var(--crimson-light);opacity:0.35;min-width:2.5rem;line-height:1}
+      .rank-item.founder .rank-num{opacity:0.85}
+      .rank-info h3{font-family:'Cinzel',serif;font-size:1rem;color:var(--text);margin-bottom:0.25rem;font-weight:500}
+      .rank-info .rank-member{font-size:0.84rem;color:var(--silver-bright);margin-bottom:0.5rem}
+      .rank-info p{font-size:0.88rem;color:var(--text-dim);line-height:1.8}
+      .rank-rights{margin-top:0.8rem;display:flex;flex-wrap:wrap;gap:0.35rem}
       .rank-right-tag{
-        font-size:0.56rem;letter-spacing:0.1em;padding:0.2rem 0.6rem;
+        font-size:0.62rem;letter-spacing:0.08em;padding:0.25rem 0.7rem;
         background:var(--silver-dim);border:1px solid var(--border-silver);
-        color:var(--silver);white-space:nowrap;
+        color:var(--silver);white-space:nowrap;font-weight:500;
       }
 
       /* ── SÁZENÍ EXTRA ── */
       .sazeni-hero{
         background:linear-gradient(135deg,rgba(0,80,30,0.14),rgba(0,40,15,0.06));
-        border:1px solid rgba(0,200,80,0.1);
+        border:1px solid rgba(0,200,80,0.12);
         padding:2rem;margin-bottom:2rem;position:relative;overflow:hidden;
       }
-      .sazeni-hero::after{
-        content:'🌱';position:absolute;right:2.5rem;top:50%;
-        transform:translateY(-50%);font-size:5rem;opacity:0.06;pointer-events:none;
-      }
       .cost-table{width:100%;border-collapse:collapse;margin:1rem 0}
-      .cost-table th{font-size:0.54rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--silver);padding:0.75rem 1rem;text-align:left;border-bottom:1px solid var(--border-silver)}
-      .cost-table td{padding:0.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.82rem}
-      .cost-table tr:last-child td{border-bottom:none;font-weight:500;color:var(--text)}
-      .cost-table .total-row td{border-top:2px solid rgba(0,200,80,0.2);color:var(--text);font-family:'Cinzel',serif}
-      .cost-amount{color:var(--gold);font-weight:500}
+      .cost-table th{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:600;color:var(--silver);padding:0.8rem 1rem;text-align:left;border-bottom:1px solid var(--border-silver)}
+      .cost-table td{padding:0.75rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.9rem}
+      .cost-table tr:last-child td{border-bottom:none;font-weight:600;color:var(--text)}
+      .cost-table .total-row td{border-top:2px solid rgba(0,200,80,0.22);color:var(--text);font-family:'Cinzel',serif}
+      .cost-amount{color:var(--gold);font-weight:600}
       .kalk-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem}
       .kalk-block{background:var(--bg-mid);border:1px solid var(--border-hover);padding:1.5rem;position:relative}
-      .kalk-block-label{font-size:0.56rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem}
+      .kalk-block-label{font-size:0.62rem;letter-spacing:0.25em;text-transform:uppercase;font-weight:600;color:var(--silver);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem}
       .kalk-block-label::before{content:'';display:inline-block;width:3px;height:13px;background:var(--crimson-light)}
       .kalk-input{
         background:var(--input-bg);border:1px solid var(--border-hover);
         color:var(--text);padding:0.9rem 1rem;
-        font-family:'Cinzel',serif;font-size:1.4rem;
+        font-family:'Cinzel',serif;font-size:1.5rem;
         width:100%;outline:none;transition:border-color 0.2s,box-shadow 0.2s;text-align:center;
       }
       .kalk-input:focus{border-color:rgba(0,200,80,0.4);box-shadow:0 0 0 2px rgba(0,200,80,0.08)}
       .kalk-result{margin-top:1rem;padding:1rem;background:rgba(0,200,80,0.05);border:1px solid rgba(0,200,80,0.14);text-align:center}
-      .kalk-result-num{font-family:'Cinzel',serif;font-size:2rem;color:#00C853;line-height:1.1}
-      .kalk-result-label{font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-top:0.3rem}
+      .kalk-result-num{font-family:'Cinzel',serif;font-size:2.1rem;color:#00C853;line-height:1.1}
+      .kalk-result-label{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:500;color:var(--text-muted);margin-top:0.35rem}
       .kalk-arrow{text-align:center;font-size:1.5rem;display:flex;align-items:center;justify-content:center;color:var(--text-muted);opacity:0.35}
-      .breakdown-row{display:flex;justify-content:space-between;padding:0.4rem 0;font-size:0.8rem;color:var(--text-dim);border-bottom:1px solid var(--border)}
+      .breakdown-row{display:flex;justify-content:space-between;padding:0.45rem 0;font-size:0.88rem;color:var(--text-dim);border-bottom:1px solid var(--border)}
       .breakdown-row:last-child{border-bottom:none;color:var(--text);padding-top:0.7rem;margin-top:0.3rem}
       .breakdown-row .green{color:#00C853}
       .bd-label{display:flex;align-items:center;gap:0.4rem}
       .slider-wrap{margin:1.5rem 0}
       .slider{-webkit-appearance:none;width:100%;height:4px;background:linear-gradient(90deg,rgba(0,200,80,0.5) var(--pct,50%),var(--border-hover) var(--pct,50%));outline:none}
       .slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:var(--crimson-light);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 8px rgba(192,40,45,0.4)}
-      .slider-labels{display:flex;justify-content:space-between;font-size:0.58rem;color:var(--text-muted);letter-spacing:0.1em;margin-top:0.4rem}
+      .slider-labels{display:flex;justify-content:space-between;font-size:0.66rem;color:var(--text-muted);letter-spacing:0.08em;margin-top:0.4rem}
       .profit-bar{height:5px;background:var(--border);margin-top:1rem;position:relative;overflow:hidden}
       .profit-fill{height:100%;background:linear-gradient(90deg,rgba(0,200,80,0.5),#00C853);transition:width 0.4s}
 
@@ -978,14 +1000,14 @@ function renderNav(req, active) {
         <span class="nav-logo-text">AL<span class="b-red">B</span>ION</span>
       </a>
       <ul class="nav-menu">
-        <li><a href="/dashboard" class="${active==='dashboard'?'active':''}"><span class="nav-icon">🏛</span><span class="nav-label">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></span></a></li>
-        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}"><span class="nav-icon">📢</span><span class="nav-label">Nástěnka<span class="nav-desc">Oznámení & Discord</span></span></a></li>
-        <li><a href="/kodex" class="${active==='kodex'?'active':''}"><span class="nav-icon">📜</span><span class="nav-label">Kodex<span class="nav-desc">Pravidla organizace</span></span></a></li>
-        <li><a href="/audit" class="${active==='audit'?'active':''}"><span class="nav-icon">🔍</span><span class="nav-label">Audit<span class="nav-desc">Záznamy akcí</span></span></a></li>
-        <li><a href="/statistiky" class="${active==='statistiky'?'active':''}"><span class="nav-icon">📊</span><span class="nav-label">Statistiky<span class="nav-desc">Přehled členů</span></span></a></li>
-        <li><a href="/lore" class="${active==='lore'?'active':''}"><span class="nav-icon">📖</span><span class="nav-label">Historie<span class="nav-desc">Příběh Albionu</span></span></a></li>
-        <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}"><span class="nav-icon">👑</span><span class="nav-label">Hierarchie<span class="nav-desc">Ranky & pozice</span></span></a></li>
-        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}"><span class="nav-icon">🌱</span><span class="nav-label">Sázení<span class="nav-desc">Weed kalkulačka</span></span></a></li>
+        <li><a href="/dashboard" class="${active==='dashboard'?'active':''}">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></a></li>
+        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka<span class="nav-desc">Oznámení & Discord</span></a></li>
+        <li><a href="/kodex" class="${active==='kodex'?'active':''}">Kodex<span class="nav-desc">Pravidla organizace</span></a></li>
+        <li><a href="/audit" class="${active==='audit'?'active':''}">Audit<span class="nav-desc">Záznamy akcí</span></a></li>
+        <li><a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky<span class="nav-desc">Přehled členů</span></a></li>
+        <li><a href="/lore" class="${active==='lore'?'active':''}">Historie<span class="nav-desc">Příběh Albionu</span></a></li>
+        <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie<span class="nav-desc">Ranky & pozice</span></a></li>
+        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">Sázení<span class="nav-desc">Weed kalkulačka</span></a></li>
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">🔔<span class="notif-badge" id="notifBadge">0</span></button>
@@ -1071,7 +1093,14 @@ function renderDashboard(req, data) {
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div id="live-clock" style="font-family:'Cinzel',serif;font-size:1.3rem;color:var(--silver-bright);letter-spacing:0.1em"></div>
-        <div id="live-date" style="font-size:0.6rem;letter-spacing:0.2em;color:var(--text-muted);text-transform:uppercase;margin-top:0.3rem"></div>
+        <div id="live-date" style="font-size:0.68rem;letter-spacing:0.16em;color:var(--text-dim);text-transform:uppercase;margin-top:0.3rem"></div>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon">⬛</div>
+      <div class="page-info-body">
+        <div class="page-info-title">Centrální sklad organizace</div>
+        <div class="page-info-text">Zde eviduješ pohyb zbraní, weedu, drog a financí. Každý vklad nebo výběr se automaticky zaznamená do Google Sheets a odešle notifikaci na Discord. Přepínač <strong>Uložit / Vybrat</strong> určuje směr pohybu zásob. U výběru zbraní nezapomeň vyplnit účel.</div>
       </div>
     </div>
     <script>
@@ -1090,12 +1119,12 @@ function renderDashboard(req, data) {
     </div>
     <div class="grid">
       <div class="card">
-        <div class="card-header"><span class="card-title">🔫 Zbraně & Střelivo</span><span class="card-badge">Sklad</span></div>
+        <div class="card-header"><span class="card-title">Zbraně & Střelivo</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(zbrane, null)}
         <div class="form-section">
           <div class="typ-toggle">
-            <button class="typ-btn active-vklad" onclick="setTyp('zbrane','VKLAD',this)">➕ Uložit</button>
-            <button class="typ-btn" onclick="setTyp('zbrane','VÝBĚR',this)">➖ Vybrat</button>
+            <button class="typ-btn active-vklad" onclick="setTyp('zbrane','VKLAD',this)">Uložit</button>
+            <button class="typ-btn" onclick="setTyp('zbrane','VÝBĚR',this)">Vybrat</button>
           </div>
           <input type="hidden" id="zbrane-typ" value="VKLAD">
           <div class="form-row">
@@ -1110,12 +1139,12 @@ function renderDashboard(req, data) {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><span class="card-title">🌿 Weed</span><span class="card-badge">Sklad</span></div>
+        <div class="card-header"><span class="card-title">Weed</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(weed, {"Žlutý kanabis":{prodej:150},"Zelený kanabis":{prodej:150},"Kanabis":{prodej:150},"Červený kanabis":{prodej:150},"Modrý kanabis":{prodej:150}})}
         <div class="form-section">
           <div class="typ-toggle">
-            <button class="typ-btn active-vklad" onclick="setTyp('weed','VKLAD',this)">➕ Uložit</button>
-            <button class="typ-btn" onclick="setTyp('weed','VÝBĚR',this)">➖ Vybrat</button>
+            <button class="typ-btn active-vklad" onclick="setTyp('weed','VKLAD',this)">Uložit</button>
+            <button class="typ-btn" onclick="setTyp('weed','VÝBĚR',this)">Vybrat</button>
           </div>
           <input type="hidden" id="weed-typ" value="VKLAD">
           <div class="form-row">
@@ -1127,12 +1156,12 @@ function renderDashboard(req, data) {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><span class="card-title">💊 Drogy</span><span class="card-badge">Sklad</span></div>
+        <div class="card-header"><span class="card-title">Drogy</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(drogy, null)}
         <div class="form-section">
           <div class="typ-toggle">
-            <button class="typ-btn active-vklad" onclick="setTyp('drogy','VKLAD',this)">➕ Uložit</button>
-            <button class="typ-btn" onclick="setTyp('drogy','VÝBĚR',this)">➖ Vybrat</button>
+            <button class="typ-btn active-vklad" onclick="setTyp('drogy','VKLAD',this)">Uložit</button>
+            <button class="typ-btn" onclick="setTyp('drogy','VÝBĚR',this)">Vybrat</button>
           </div>
           <input type="hidden" id="drogy-typ" value="VKLAD">
           <div class="form-row">
@@ -1143,12 +1172,12 @@ function renderDashboard(req, data) {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><span class="card-title">💱 Účetnictví</span><span class="card-badge">Finance</span></div>
+        <div class="card-header"><span class="card-title">Účetnictví</span><span class="card-badge">Finance</span></div>
         ${formatUcet(recentUcet)}
         <div class="form-section">
           <div class="typ-toggle">
-            <button class="typ-btn active-vklad" onclick="setTyp('ucet','PŘÍJEM',this)">↑ Příjem</button>
-            <button class="typ-btn" onclick="setTyp('ucet','VÝDAJ',this)">↓ Výdaj</button>
+            <button class="typ-btn active-vklad" onclick="setTyp('ucet','PŘÍJEM',this)">Příjem</button>
+            <button class="typ-btn" onclick="setTyp('ucet','VÝDAJ',this)">Výdaj</button>
           </div>
           <input type="hidden" id="ucet-typ" value="PŘÍJEM">
           <div class="form-row">
@@ -1191,8 +1220,8 @@ function renderDashboard(req, data) {
       const kategorie=document.getElementById('zbrane-kat').value;
       const ucel=document.getElementById('zbrane-ucel').value;
       const r=await post('/api/zbrane',{typ,polozka,mnozstvi,kategorie,ucel});
-      if(r.ok){showToast('✅ Záznam uložen');setTimeout(()=>location.reload(),1500);}
-      else showToast('❌ '+r.error,true);
+      if(r.ok){showToast('OK Záznam uložen');setTimeout(()=>location.reload(),1500);}
+      else showToast(' '+r.error,true);
     }
     function updateWeedInfo(){
       const odruda=document.getElementById('weed-odruda').value;
@@ -1211,26 +1240,26 @@ function renderDashboard(req, data) {
       const odruda=document.getElementById('weed-odruda').value;
       const mnozstvi=document.getElementById('weed-mnozstvi').value;
       const r=await post('/api/weed',{typ,odruda,mnozstvi});
-      if(r.ok){showToast('✅ Weed uložen — Výroba: ~$'+r.celkVyroba+' | Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
-      else showToast('❌ '+r.error,true);
+      if(r.ok){showToast('OK Weed uložen — Výroba: ~$'+r.celkVyroba+' | Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
+      else showToast(' '+r.error,true);
     }
     async function submitDrogy(){
       const typ=document.getElementById('drogy-typ').value;
       const droga=document.getElementById('drogy-droga').value;
       const mnozstvi=document.getElementById('drogy-mnozstvi').value;
       const r=await post('/api/drogy',{typ,droga,mnozstvi});
-      if(r.ok){showToast('✅ Drogy uloženy');setTimeout(()=>location.reload(),1500);}
-      else showToast('❌ '+r.error,true);
+      if(r.ok){showToast('OK Drogy uloženy');setTimeout(()=>location.reload(),1500);}
+      else showToast(' '+r.error,true);
     }
     async function submitUcet(){
       const typ=document.getElementById('ucet-typ').value;
       const castka=document.getElementById('ucet-castka').value;
       const valuta=document.getElementById('ucet-valuta').value;
       const poznamka=document.getElementById('ucet-poznamka').value;
-      if(!castka||!poznamka)return showToast('❌ Vyplň všechna pole',true);
+      if(!castka||!poznamka)return showToast(' Vyplň všechna pole',true);
       const r=await post('/api/ucet',{typ,castka,valuta,poznamka});
-      if(r.ok){showToast('✅ Transakce zaznamenána');setTimeout(()=>location.reload(),1500);}
-      else showToast('❌ '+r.error,true);
+      if(r.ok){showToast('OK Transakce zaznamenána');setTimeout(()=>location.reload(),1500);}
+      else showToast(' '+r.error,true);
     }
   </script>
   </body></html>`;
@@ -1248,6 +1277,13 @@ function renderNastenska(req) {
         <div class="page-label">Organizace Albion</div>
         <h1 class="page-title">Nástěnka</h1>
         <p class="page-sub">Oznámení z Discord kanálu — synchronizováno v reálném čase</p>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon">📋</div>
+      <div class="page-info-body">
+        <div class="page-info-title">Oznámení organizace</div>
+        <div class="page-info-text">Nástěnka zobrazuje zprávy přímo z interního Discord kanálu Albionu a aktualizuje se každých 30 sekund. Nová oznámení jsou označena červeně. Zprávu zde lze i odeslat — automaticky se publikuje na Discord a upozorní ostatní členy.</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start">
@@ -1294,15 +1330,15 @@ function renderNastenska(req) {
     async function sendAnnouncement() {
       const title = document.getElementById('ann-title').value;
       const content = document.getElementById('ann-content').value;
-      if (!content.trim()) return showToast('❌ Obsah nemůže být prázdný', true);
+      if (!content.trim()) return showToast(' Obsah nemůže být prázdný', true);
       const res = await fetch('/api/nastenska', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content})});
       const data = await res.json();
       if (data.ok) {
-        showToast('✅ Oznámení odesláno na Discord');
+        showToast('OK Oznámení odesláno na Discord');
         document.getElementById('ann-title').value = '';
         document.getElementById('ann-content').value = '';
         setTimeout(loadAnnouncements, 2000);
-      } else showToast('❌ ' + (data.error || 'Chyba'), true);
+      } else showToast(' ' + (data.error || 'Chyba'), true);
     }
 
     const evtSrc = new EventSource('/api/events');
@@ -1341,6 +1377,13 @@ function renderKodex(req) {
         <p class="page-sub">Principy a zásady, které definují každého člena Albionu</p>
       </div>
     </div>
+    <div class="page-info">
+      <div class="page-info-icon">⚖</div>
+      <div class="page-info-body">
+        <div class="page-info-title">Závazný řád organizace</div>
+        <div class="page-info-text">Kodex Albionu je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Neznalost pravidel není omluvou. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení z organizace.</div>
+      </div>
+    </div>
     <div class="lore-grid">
       <div class="chapters">
         ${articles.map(a => `
@@ -1377,6 +1420,13 @@ function renderAudit(req) {
         <p class="page-sub">Kompletní záznam všech akcí — posledních 200 záznamů</p>
       </div>
     </div>
+    <div class="page-info">
+      <div class="page-info-icon">🔎</div>
+      <div class="page-info-body">
+        <div class="page-info-title">Přehled všech transakcí</div>
+        <div class="page-info-text">Audit zobrazuje chronologicky seřazené záznamy všech akcí v systému — vklady a výběry ze skladu, finanční pohyby i jejich autory. Záznamy lze filtrovat podle sekce. Nahoře je zobrazen také finanční souhrn per člen, viditelný u filtrů Vše a Účetnictví.</div>
+      </div>
+    </div>
 
     <div id="ucet-souhrn-wrap" style="display:none;margin-bottom:2rem">
       <div style="font-size:0.55rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem;opacity:0.85">Účetnictví — souhrn per člen</div>
@@ -1386,10 +1436,10 @@ function renderAudit(req) {
     <div class="card">
       <div style="display:flex;gap:0.4rem;margin-bottom:1.5rem;flex-wrap:wrap">
         <button class="typ-btn active-vklad" onclick="filterAudit('vse')" id="filter-vse" style="flex:none;padding:0.4rem 1rem">Vše</button>
-        <button class="typ-btn" onclick="filterAudit('Zbraně')" id="filter-zbrane" style="flex:none;padding:0.4rem 1rem">🔫 Zbraně</button>
-        <button class="typ-btn" onclick="filterAudit('Weed')" id="filter-weed" style="flex:none;padding:0.4rem 1rem">🌿 Weed</button>
-        <button class="typ-btn" onclick="filterAudit('Drogy')" id="filter-drogy" style="flex:none;padding:0.4rem 1rem">💊 Drogy</button>
-        <button class="typ-btn" onclick="filterAudit('Účetnictví')" id="filter-ucet" style="flex:none;padding:0.4rem 1rem">💱 Účetnictví</button>
+        <button class="typ-btn" onclick="filterAudit('Zbraně')" id="filter-zbrane" style="flex:none;padding:0.4rem 1rem">Zbraně</button>
+        <button class="typ-btn" onclick="filterAudit('Weed')" id="filter-weed" style="flex:none;padding:0.4rem 1rem">Weed</button>
+        <button class="typ-btn" onclick="filterAudit('Drogy')" id="filter-drogy" style="flex:none;padding:0.4rem 1rem">Drogy</button>
+        <button class="typ-btn" onclick="filterAudit('Účetnictví')" id="filter-ucet" style="flex:none;padding:0.4rem 1rem">Účetnictví</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -1453,11 +1503,11 @@ function renderAudit(req) {
       tbody.innerHTML = events.map(e => {
         const typCls = e.typ === 'VKLAD' || e.typ === 'PŘÍJEM' ? 'vklad' : 'vyber';
         return \`<tr>
-          <td style="white-space:nowrap;color:var(--text-muted);font-size:0.72rem">\${e.cas}</td>
-          <td>\${e.icon} \${e.sekce}</td>
+          <td style="white-space:nowrap;color:var(--text-muted);font-size:0.82rem">\${e.cas}</td>
+          <td style="font-weight:500">\${e.sekce}</td>
           <td><span class="badge \${typCls}">\${e.typ}</span></td>
-          <td style="color:var(--silver-bright)">\${e.uzivatel}</td>
-          <td style="color:var(--text-muted)">\${e.detail}</td>
+          <td style="color:var(--silver-bright);font-weight:500">\${e.uzivatel}</td>
+          <td style="color:var(--text-dim)">\${e.detail}</td>
         </tr>\`;
       }).join('');
     }
@@ -1492,6 +1542,13 @@ function renderStatistiky(req) {
         <div class="page-label">Organizace Albion</div>
         <h1 class="page-title">Statistiky členů</h1>
         <p class="page-sub">Detailní přehled příspěvků každého člena organizace</p>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon">📊</div>
+      <div class="page-info-body">
+        <div class="page-info-title">Individuální aktivita členů</div>
+        <div class="page-info-text">Statistiky zobrazují celkové příspěvky každého člena — kolik čeho vložil nebo vybral ze skladu a jak se pohybovaly jeho finance. Zelená čísla (+) označují vklady, červená (–) výběry. Data jsou načítána přímo z Google Sheets.</div>
       </div>
     </div>
     <div id="stats-container" class="stats-grid">
@@ -1537,12 +1594,12 @@ function renderStatistiky(req) {
               \${s.discordUsername ? \`<div class="stat-card-discord">\${s.discordUsername}</div>\` : ''}
             </div>
           </div>
-          \${hasZbrane ? \`<div class="stat-section-label">🔫 Zbraně</div>\${renderItemGroup(s.zbrane)}\` : ''}
-          \${hasNaboje ? \`<div class="stat-section-label">🔴 Střelivo</div>\${renderItemGroup(s.naboje)}\` : ''}
-          \${hasAkce   ? \`<div class="stat-section-label">⚡ Akce</div>\${renderItemGroup(s.akce)}\` : ''}
-          \${hasWeed   ? \`<div class="stat-section-label">🌿 Weed</div>\${renderItemGroup(s.weed)}\` : ''}
-          \${hasDrogy  ? \`<div class="stat-section-label">💊 Drogy</div>\${renderItemGroup(s.drogy)}\` : ''}
-          \${hasUcet ? \`<div class="stat-section-label">💱 Účetnictví</div>
+          \${hasZbrane ? \`<div class="stat-section-label">Zbraně</div>\${renderItemGroup(s.zbrane)}\` : ''}
+          \${hasNaboje ? \`<div class="stat-section-label">Střelivo</div>\${renderItemGroup(s.naboje)}\` : ''}
+          \${hasAkce   ? \`<div class="stat-section-label">Akce</div>\${renderItemGroup(s.akce)}\` : ''}
+          \${hasWeed   ? \`<div class="stat-section-label">Weed</div>\${renderItemGroup(s.weed)}\` : ''}
+          \${hasDrogy  ? \`<div class="stat-section-label">Drogy</div>\${renderItemGroup(s.drogy)}\` : ''}
+          \${hasUcet ? \`<div class="stat-section-label">Účetnictví</div>
             \${s.ucet.prijem_usd  ? \`<div class="stat-row"><span>Příjmy USD</span><strong style="color:#00CC66">$\${s.ucet.prijem_usd.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.vydaj_usd   ? \`<div class="stat-row"><span>Výdaje USD</span><strong style="color:#FF5555">$\${s.ucet.vydaj_usd.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.prijem_pesos? \`<div class="stat-row"><span>Příjmy Pesos</span><strong style="color:#00CC66">₱\${s.ucet.prijem_pesos.toLocaleString('cs-CZ')}</strong></div>\` : ''}
@@ -1571,6 +1628,13 @@ function renderLore(req) {
         <div class="page-label">Organizace Albion</div>
         <h1 class="page-title">Historie & Původ</h1>
         <p class="page-sub">Kronika organizace — od počátků po současnost</p>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon">📖</div>
+      <div class="page-info-body">
+        <div class="page-info-title">Kronika Albionu</div>
+        <div class="page-info-text">Historie zaznamenává vznik a vývoj organizace Albion od prvních dnů Christophera Sinclaira v Los Santos po současnost. Každá kapitola popisuje klíčové momenty, které formovaly organizaci do podoby, jakou má dnes.</div>
       </div>
     </div>
     <div class="lore-grid">
@@ -1666,6 +1730,13 @@ function renderHierarchy(req) {
         <div class="page-label">Organizace Albion</div>
         <h1 class="page-title">Hierarchie</h1>
         <p class="page-sub">Struktura a řád organizace Albion</p>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon">👑</div>
+      <div class="page-info-body">
+        <div class="page-info-title">Struktura organizace</div>
+        <div class="page-info-text">Hierarchie definuje pět úrovní členství v Albionu — od zakladatele po Associate. Každý rank nese specifické pravomoci a odpovědnosti. Postup v hierarchii závisí na prokazování loajality, schopností a přispívání k rozvoji organizace.</div>
       </div>
     </div>
     <div class="rank-list">
@@ -1849,11 +1920,11 @@ function renderSazeni(req) {
         <table class="cost-table">
           <thead><tr><th>Položka</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>
           <tbody>
-            <tr><td>💧 Konev s vodou</td><td>1×</td><td class="cost-amount">$20</td><td class="cost-amount">$20</td></tr>
-            <tr><td>🌱 Semínko</td><td>1×</td><td class="cost-amount">$50</td><td class="cost-amount">$50</td></tr>
-            <tr><td>🧪 Hnojivo</td><td>1×</td><td class="cost-amount">$25</td><td class="cost-amount">$25</td></tr>
-            <tr><td>💊 Kvalitní hnojivo</td><td>4×</td><td class="cost-amount">$50</td><td class="cost-amount">$200</td></tr>
-            <tr><td>🫙 Výživná voda</td><td>4×</td><td class="cost-amount">$40</td><td class="cost-amount">$160</td></tr>
+            <tr><td>Konev s vodou</td><td>1×</td><td class="cost-amount">$20</td><td class="cost-amount">$20</td></tr>
+            <tr><td>Semínko</td><td>1×</td><td class="cost-amount">$50</td><td class="cost-amount">$50</td></tr>
+            <tr><td>Hnojivo</td><td>1×</td><td class="cost-amount">$25</td><td class="cost-amount">$25</td></tr>
+            <tr><td>Kvalitní hnojivo</td><td>4×</td><td class="cost-amount">$50</td><td class="cost-amount">$200</td></tr>
+            <tr><td>Výživná voda</td><td>4×</td><td class="cost-amount">$40</td><td class="cost-amount">$160</td></tr>
             <tr class="total-row"><td colspan="3" style="font-size:0.72rem;letter-spacing:0.15em">CELKEM NA KYTKU</td><td class="cost-amount" style="font-size:1.1rem">$455</td></tr>
           </tbody>
         </table>
@@ -1895,11 +1966,11 @@ function renderSazeni(req) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">
         <div>
           <div style="font-size:0.55rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Položky celkem</div>
-          <div class="breakdown-row"><div class="bd-label">💧 Konev s vodou <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-konev-qty">(10×)</span></div><div class="green" id="bd-konev">$200</div></div>
-          <div class="breakdown-row"><div class="bd-label">🌱 Semínko <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-seminko-qty">(10×)</span></div><div class="green" id="bd-seminko">$500</div></div>
-          <div class="breakdown-row"><div class="bd-label">🧪 Hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-hnojivo-qty">(10×)</span></div><div class="green" id="bd-hnojivo">$250</div></div>
-          <div class="breakdown-row"><div class="bd-label">💊 Kvalitní hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-khnojivo-qty">(40×)</span></div><div class="green" id="bd-khnojivo">$2 000</div></div>
-          <div class="breakdown-row"><div class="bd-label">🫙 Výživná voda <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-voda-qty">(40×)</span></div><div class="green" id="bd-voda">$1 600</div></div>
+          <div class="breakdown-row"><div class="bd-label">Konev s vodou <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-konev-qty">(10×)</span></div><div class="green" id="bd-konev">$200</div></div>
+          <div class="breakdown-row"><div class="bd-label">Semínko <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-seminko-qty">(10×)</span></div><div class="green" id="bd-seminko">$500</div></div>
+          <div class="breakdown-row"><div class="bd-label">Hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-hnojivo-qty">(10×)</span></div><div class="green" id="bd-hnojivo">$250</div></div>
+          <div class="breakdown-row"><div class="bd-label">Kvalitní hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-khnojivo-qty">(40×)</span></div><div class="green" id="bd-khnojivo">$2 000</div></div>
+          <div class="breakdown-row"><div class="bd-label">Výživná voda <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-voda-qty">(40×)</span></div><div class="green" id="bd-voda">$1 600</div></div>
           <div class="breakdown-row"><div class="bd-label" style="font-family:'Cinzel',serif">CELKEM</div><div style="font-family:'Cinzel',serif;color:var(--gold)" id="bd-total">$4 550</div></div>
         </div>
         <div>
