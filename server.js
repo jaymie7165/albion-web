@@ -273,19 +273,29 @@ app.get('/api/stats', requireAuth, async (req, res) => {
       sheets.getRows('Účetnictví').catch(() => []),
     ]);
 
-    // Sestavit obousměrné mapy: ic_name <-> discord_username
+    // Sestavit normalizační mapu: cokoliv → ic_name
     const allUsers = db.prepare('SELECT * FROM users').all();
-    const icToDiscord = {};
-    const discordToIc = {};
+    const nameMapStats = {};
     allUsers.forEach(u => {
-      if (u.ic_name && u.discord_username) {
-        icToDiscord[u.ic_name] = u.discord_username;
-        discordToIc[u.discord_username] = u.ic_name;
+      if (u.ic_name) {
+        nameMapStats[u.ic_name.toLowerCase()] = u.ic_name;
+        if (u.discord_username) nameMapStats[u.discord_username.toLowerCase()] = u.ic_name;
+        if (u.discord_display_name) nameMapStats[u.discord_display_name.toLowerCase()] = u.ic_name;
+        if (u.global_name) nameMapStats[u.global_name.toLowerCase()] = u.ic_name;
       }
     });
+    const icToDiscord = {};
+    allUsers.forEach(u => { if (u.ic_name && u.discord_username) icToDiscord[u.ic_name] = u.discord_username; });
 
-    // Normalizace: discord_username → ic_name (aby se záznamy nesčítaly zvlášť)
-    const normalizeUser = (name) => discordToIc[name] || name;
+    const normalizeUser = (name) => {
+      if (!name) return name;
+      const lower = name.trim().toLowerCase();
+      if (nameMapStats[lower]) return nameMapStats[lower];
+      for (const [key, icName] of Object.entries(nameMapStats)) {
+        if (key.includes(lower) || lower.includes(key)) return icName;
+      }
+      return name.trim();
+    };
 
     const stats = {};
 
@@ -374,33 +384,96 @@ app.get('/api/audit', requireAuth, async (req, res) => {
       sheets.getRows('Účetnictví').catch(() => []),
     ]);
 
-    // Normalizace jmen: discord_username → ic_name
+    // Normalizace jmen — mapujeme vše co bot může napsat na ic_name
     const allUsersAudit = db.prepare('SELECT * FROM users').all();
-    const discordToIcAudit = {};
+    // Mapa: cokoliv → ic_name (username, display_name, ic_name — vše lowercase)
+    const nameMap = {};
     allUsersAudit.forEach(u => {
-      if (u.ic_name && u.discord_username) discordToIcAudit[u.discord_username] = u.ic_name;
+      if (u.ic_name) {
+        // ic_name sám na sebe (case normalizace)
+        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
+        // discord_username → ic_name
+        if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
+        // discord_display_name → ic_name (pokud sloupec existuje)
+        if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
+        // global_name → ic_name (novější Discord API pole)
+        if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
+      }
     });
-    const normAudit = (name) => discordToIcAudit[name] || name;
+    // Normalizace: zkusí přesný match, pak partial match (pro oříznutá jména v Sheets)
+    const normAudit = (name) => {
+      if (!name || name === '—') return name || '—';
+      const trimmed = name.trim();
+      const lower = trimmed.toLowerCase();
+      // Přesný match
+      if (nameMap[lower]) return nameMap[lower];
+      // Partial match — hledáme záznam v DB jehož username/display_name začíná nebo obsahuje hodnotu ze Sheets
+      // (Sheets může mít oříznuté jméno kvůli šířce sloupce, ale data jsou kompletní)
+      for (const [key, icName] of Object.entries(nameMap)) {
+        if (key.includes(lower) || lower.includes(key)) return icName;
+      }
+      // Žádný match — vrátíme raw hodnotu ze Sheets (aspoň něco vidíme v auditu)
+      return trimmed;
+    };
 
     const events = [];
 
     const addRows = (rows, sekce, icon) => {
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
-        if (!r[0]) continue;
+        // Přijmi řádek i když r[0] je prázdné (Discord bot může mít jiný timestamp sloupec)
+        // Hledáme libovolný neprázdný sloupec s hodnotou jako identifikátor záznamu
+        const hasContent = r && r.some(cell => cell && cell.toString().trim() !== '');
+        if (!hasContent) continue;
+
         let detail = '';
-        if (sekce === 'Zbraně') detail = `${r[2]} (${r[3]} ks) [${r[4]}]${r[6] && r[6] !== '-' ? ' | Účel: '+r[6] : ''}`;
-        else if (sekce === 'Weed') detail = `${r[2]} (${r[3]} ks) | Výroba: ~$${(parseFloat(r[4])||0)*(parseInt(r[3])||0)} | Prodej: $${(parseFloat(r[5])||0)*(parseInt(r[3])||0)}`;
-        else if (sekce === 'Drogy') detail = `${r[2]} (${r[3]} ks)`;
-        else if (sekce === 'Účetnictví') { const sym = (r[3]||'') === 'USD' ? '$' : '₱'; detail = `${sym}${r[2]} | ${r[4]}`; }
-        const rawUzivatel = r[sekce === 'Účetnictví' ? 5 : (sekce === 'Zbraně' ? 5 : 6)] || '—';
+        let rawUzivatel = '—';
+
+        if (sekce === 'Zbraně') {
+          detail = `${r[2] || '?'} (${r[3] || '?'} ks) [${r[4] || '?'}]${r[6] && r[6] !== '-' ? ' | Účel: '+r[6] : ''}`;
+          rawUzivatel = r[5] || '—';
+        } else if (sekce === 'Weed') {
+          // Web zapisuje: [cas, typ, odruda, qty, ceny.vyroba, ceny.prodej, uzivatel]  → uzivatel na [6]
+          // Discord bot může psát jinak — zkusíme oba možné indexy
+          const vyrobaCena = parseFloat(r[4]) || 0;
+          const prodejCena = parseFloat(r[5]) || 0;
+          const qty = parseInt(r[3]) || 0;
+          detail = `${r[2] || '?'} (${qty} ks)${vyrobaCena ? ` | Výroba: ~$${vyrobaCena * qty}` : ''}${prodejCena ? ` | Prodej: $${prodejCena * qty}` : ''}`;
+          rawUzivatel = r[6] || r[5] || '—';
+          // Pokud r[6] vypadá jako číslo (cena), uživatel je jinde
+          if (rawUzivatel && !isNaN(rawUzivatel)) rawUzivatel = r[7] || r[5] || '—';
+        } else if (sekce === 'Drogy') {
+          detail = `${r[2] || '?'} (${r[3] || '?'} ks)`;
+          rawUzivatel = r[6] || r[5] || '—';
+          if (rawUzivatel && !isNaN(rawUzivatel)) rawUzivatel = r[7] || r[5] || '—';
+        } else if (sekce === 'Účetnictví') {
+          const sym = (r[3]||'') === 'USD' ? '$' : '₱';
+          detail = `${sym}${r[2] || '?'} | ${r[4] || '—'}`;
+          rawUzivatel = r[5] || '—';
+        }
+
+        // Fallback: prohledej všechny sloupce od konce pro jméno uživatele
+        if (!rawUzivatel || rawUzivatel === '—') {
+          for (let ci = r.length - 1; ci >= 0; ci--) {
+            const v = (r[ci] || '').toString().trim();
+            if (v && isNaN(v) && v !== '-' && v.length > 1) {
+              rawUzivatel = v;
+              break;
+            }
+          }
+        }
+
+        const cas = r[0] && r[0].toString().trim() ? r[0] : (r[r.length-1] || '—');
+        const typ = (r[1]||'').toString().toUpperCase();
+
         events.push({
-          cas: r[0],
+          cas,
           sekce,
           icon,
-          typ: (r[1]||'').toUpperCase(),
+          typ: typ || 'NEZNÁMÝ',
           uzivatel: normAudit(rawUzivatel),
           detail,
+          _raw: r, // pro debug — odstraň v produkci pokud nechceš
         });
       }
     };
@@ -414,7 +487,7 @@ app.get('/api/audit', requireAuth, async (req, res) => {
     const ucetSouhrn = {};
     for (let i = 1; i < ucetRows.length; i++) {
       const r = ucetRows[i];
-      const uz = normAudit(r[5]); if (!uz) continue;
+      const uz = normAudit(r[5]); if (!uz || uz === '—') continue;
       if (!ucetSouhrn[uz]) ucetSouhrn[uz] = { prijem_usd: 0, vydaj_usd: 0, prijem_pesos: 0, vydaj_pesos: 0 };
       const typ = (r[1]||'').toUpperCase();
       const castka = parseFloat((r[2]||'0').replace(',','.')) || 0;
@@ -424,7 +497,12 @@ app.get('/api/audit', requireAuth, async (req, res) => {
       else                  { if (valuta === 'USD') s.vydaj_usd += castka; else s.vydaj_pesos += castka; }
     }
 
-    events.sort((a, b) => b.cas.localeCompare(a.cas));
+    events.sort((a, b) => {
+      // Robustní řazení — funguje i pro různé formáty timestampu
+      const ta = a.cas || '';
+      const tb = b.cas || '';
+      return tb.localeCompare(ta);
+    });
 
     res.json({ ok: true, events: events.slice(0, 200), ucetSouhrn });
   } catch (e) {
@@ -433,7 +511,22 @@ app.get('/api/audit', requireAuth, async (req, res) => {
   }
 });
 
-// ── STRÁNKY ───────────────────────────────────────────────────────────────────
+// ── API — DEBUG SHEETS (dočasný endpoint pro diagnostiku) ─────────────────────
+app.get('/api/debug-sheets', requireAuth, async (req, res) => {
+  try {
+    const sheet = req.query.sheet || 'Weed';
+    const rows = await sheets.getRows(sheet).catch(e => ({ error: e.message }));
+    // Vrátí prvních 10 řádků (včetně hlavičky) s indexy sloupců viditelně popsanými
+    const preview = Array.isArray(rows)
+      ? rows.slice(0, 15).map((r, i) => ({ rowIndex: i, cols: r }))
+      : rows;
+    res.json({ sheet, totalRows: Array.isArray(rows) ? rows.length : '?', preview });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
+
 app.get('/dashboard', requireAuth, async (req, res) => {
   try {
     const [zbrane, weed, drogy, ucet, recentUcet] = await Promise.all([
