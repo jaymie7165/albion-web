@@ -471,11 +471,30 @@ function baseStyles() {
         --nav-h:64px;
       }
       body.light{
-        --bg:#F0F0F8;--bg-soft:#E8E8F2;--bg-mid:#E0E0EC;--bg-card:#F8F8FF;--bg-card2:#F0F0FA;--bg-card3:#EAEAF4;
-        --silver:#484860;--silver-bright:#282840;--silver-dim:rgba(40,40,70,0.07);
-        --text:#0E0E1E;--text-dim:#1E1E32;--text-muted:#8888A0;--text-label:#5A5A72;
-        --border:rgba(0,0,0,0.07);--border-hover:rgba(0,0,0,0.16);--border-silver:rgba(50,50,90,0.16);
-        --input-bg:#E0E0EC;--shadow:0 4px 20px rgba(0,0,0,0.10);--shadow-card:0 2px 12px rgba(0,0,0,0.07);
+        --bg:#F2F0F7;
+        --bg-soft:#EAE8F2;
+        --bg-mid:#E2DFEE;
+        --bg-card:#FAFAFF;
+        --bg-card2:#F4F2FC;
+        --bg-card3:#EDEAF7;
+        --silver:#5A5878;
+        --silver-bright:#2A2850;
+        --silver-dim:rgba(60,55,100,0.07);
+        --text:#0E0C1E;
+        --text-dim:#282545;
+        --text-muted:#7A7898;
+        --text-label:#5A5878;
+        --border:rgba(60,50,100,0.09);
+        --border-hover:rgba(60,50,100,0.18);
+        --border-silver:rgba(80,70,130,0.18);
+        --border-gold:rgba(160,120,40,0.22);
+        --gold:#A07828;
+        --gold-dim:rgba(160,120,40,0.08);
+        --input-bg:#E8E5F2;
+        --shadow:0 4px 24px rgba(30,20,70,0.12);
+        --shadow-card:0 2px 14px rgba(30,20,70,0.08);
+        --red-glow:0 0 28px rgba(192,40,45,0.14);
+        --crimson-glow:rgba(192,40,45,0.10);
       }
 
       html{scroll-behavior:smooth}
@@ -489,7 +508,24 @@ function baseStyles() {
         min-height:100vh;
         transition:background 0.4s,color 0.4s;
         animation:pageFadeIn 0.4s cubic-bezier(0.22,1,0.36,1);
+        position:relative;
       }
+
+      /* ── AMBIENT BACKGROUND ── */
+      body::before{
+        content:'';
+        position:fixed;inset:0;
+        background:
+          radial-gradient(ellipse 70% 45% at 15% 15%, rgba(192,40,45,0.055) 0%, transparent 65%),
+          radial-gradient(ellipse 55% 35% at 85% 80%, rgba(130,25,30,0.04) 0%, transparent 60%);
+        pointer-events:none;z-index:0;
+      }
+      body.light::before{
+        background:
+          radial-gradient(ellipse 70% 45% at 15% 15%, rgba(192,40,45,0.06) 0%, transparent 65%),
+          radial-gradient(ellipse 55% 35% at 85% 80%, rgba(140,100,200,0.04) 0%, transparent 60%);
+      }
+
       @keyframes pageFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
       /* ── SCROLLBAR ── */
@@ -500,8 +536,8 @@ function baseStyles() {
 
       /* ── NAV ── */
       nav{
-        background:rgba(6,6,8,0.92);
-        border-bottom:1px solid rgba(192,40,45,0.2);
+        background:rgba(6,6,8,0.93);
+        border-bottom:1px solid rgba(192,40,45,0.18);
         padding:0 2rem;
         display:flex;
         align-items:center;
@@ -510,8 +546,8 @@ function baseStyles() {
         top:0;
         z-index:200;
         height:var(--nav-h);
-        backdrop-filter:blur(24px) saturate(160%);
-        -webkit-backdrop-filter:blur(24px) saturate(160%);
+        backdrop-filter:blur(28px) saturate(180%);
+        -webkit-backdrop-filter:blur(28px) saturate(180%);
         transition:background 0.4s;
       }
       nav::after{
@@ -520,10 +556,14 @@ function baseStyles() {
         bottom:0;left:0;right:0;
         height:1px;
         background:linear-gradient(90deg,transparent,var(--crimson-light) 25%,var(--crimson-light) 75%,transparent);
-        opacity:0.35;
+        opacity:0.38;
         pointer-events:none;
       }
-      body.light nav{background:rgba(240,240,248,0.94)}
+      body.light nav{
+        background:rgba(242,240,247,0.95);
+        border-bottom-color:rgba(192,40,45,0.22);
+        box-shadow:0 1px 20px rgba(30,20,70,0.08);
+      }
 
       .nav-logo{
         font-family:'Cinzel',serif;
@@ -542,9 +582,12 @@ function baseStyles() {
         width:32px;height:32px;
         object-fit:contain;
         filter:drop-shadow(0 0 10px rgba(192,40,45,0.6));
-        transition:filter 0.3s;
+        transition:filter 0.3s,transform 0.3s;
       }
-      .nav-logo:hover .nav-logo-img{filter:drop-shadow(0 0 16px rgba(192,40,45,0.9))}
+      .nav-logo:hover .nav-logo-img{
+        filter:drop-shadow(0 0 18px rgba(192,40,45,0.95));
+        transform:scale(1.05);
+      }
       .nav-logo-text .b-red{
         color:var(--crimson-light);
         text-shadow:0 0 18px rgba(192,40,45,0.55);
@@ -579,10 +622,11 @@ function baseStyles() {
       .nav-menu a:hover{color:var(--silver-bright)}
       .nav-menu a:hover::before{opacity:0.55}
       .nav-menu a.active{
-        color:#ffffff;
+        color:var(--text);
         border-bottom-color:var(--crimson-light);
         background:rgba(192,40,45,0.07);
       }
+      body.light .nav-menu a.active{color:var(--text)}
       .nav-menu a .nav-desc{
         font-size:0.52rem;letter-spacing:0.07em;
         color:var(--text-muted);opacity:0.7;
@@ -603,15 +647,20 @@ function baseStyles() {
       .theme-toggle{
         background:none;border:1px solid var(--border-hover);
         color:var(--text-muted);width:32px;height:32px;cursor:pointer;
-        font-size:0.9rem;display:flex;align-items:center;justify-content:center;
+        display:flex;align-items:center;justify-content:center;
         transition:all 0.2s;
       }
+      .theme-toggle svg{width:15px;height:15px;transition:transform 0.3s}
       .theme-toggle:hover{border-color:var(--silver);color:var(--silver)}
+      .theme-toggle:hover svg{transform:rotate(20deg)}
       .notif-bell{
         position:relative;cursor:pointer;background:none;border:none;
-        color:var(--text-muted);font-size:1.05rem;padding:0.3rem;transition:color 0.2s;
+        color:var(--text-muted);padding:0.3rem;transition:color 0.2s;
+        display:flex;align-items:center;
       }
+      .notif-bell svg{width:18px;height:18px;transition:transform 0.2s}
       .notif-bell:hover{color:var(--crimson-bright)}
+      .notif-bell:hover svg{transform:rotate(-12deg) scale(1.1)}
       .notif-badge{
         position:absolute;top:-3px;right:-5px;
         background:var(--crimson-light);color:white;
@@ -621,7 +670,7 @@ function baseStyles() {
       .notif-badge.visible{display:flex}
 
       /* ── LAYOUT ── */
-      main{max-width:1480px;margin:0 auto;padding:2.5rem 2rem 5rem}
+      main{max-width:1480px;margin:0 auto;padding:2.5rem 2rem 5rem;position:relative;z-index:1}
 
       /* ── PAGE HEADER ── */
       .page-header{
@@ -638,12 +687,12 @@ function baseStyles() {
         content:'';
         position:absolute;
         bottom:-1px;left:0;
-        width:100px;height:2px;
+        width:120px;height:2px;
         background:linear-gradient(90deg,var(--crimson-light),transparent);
       }
       .page-label{
         font-size:0.6rem;letter-spacing:0.5em;text-transform:uppercase;
-        color:var(--crimson-light);margin-bottom:0.65rem;opacity:0.85;font-weight:500;
+        color:var(--crimson-light);margin-bottom:0.65rem;opacity:0.9;font-weight:500;
       }
       .page-title{
         font-family:'Cinzel',serif;
@@ -657,8 +706,8 @@ function baseStyles() {
 
       /* ── PAGE INFO BOX ── */
       .page-info{
-        background:linear-gradient(135deg,rgba(192,40,45,0.07),rgba(192,40,45,0.03));
-        border:1px solid rgba(192,40,45,0.2);
+        background:linear-gradient(135deg,rgba(192,40,45,0.08),rgba(192,40,45,0.03));
+        border:1px solid rgba(192,40,45,0.22);
         border-left:3px solid var(--crimson-light);
         padding:1.2rem 1.5rem;
         margin-bottom:2rem;
@@ -666,9 +715,16 @@ function baseStyles() {
         align-items:flex-start;
         gap:1rem;
       }
-      .page-info-icon{
-        font-size:1.1rem;flex-shrink:0;margin-top:0.1rem;
+      body.light .page-info{
+        background:linear-gradient(135deg,rgba(192,40,45,0.06),rgba(192,40,45,0.02));
+        border-color:rgba(192,40,45,0.18);
       }
+      .page-info-icon{
+        flex-shrink:0;margin-top:0.1rem;
+        color:var(--crimson-light);
+        opacity:0.85;
+      }
+      .page-info-icon svg{width:20px;height:20px}
       .page-info-body{}
       .page-info-title{
         font-family:'Cinzel',serif;
@@ -684,19 +740,35 @@ function baseStyles() {
         background:var(--bg-card);
         border:1px solid var(--border);
         padding:1.8rem;
-        transition:border-color 0.3s,box-shadow 0.3s;
+        transition:border-color 0.3s,box-shadow 0.3s,transform 0.25s;
         box-shadow:var(--shadow-card);
         position:relative;
+        overflow:hidden;
       }
       .card::before{
         content:'';position:absolute;top:0;left:0;right:0;height:1px;
-        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.05),transparent);
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent);
         pointer-events:none;
+      }
+      body.light .card::before{
+        background:linear-gradient(90deg,transparent,rgba(192,40,45,0.08),transparent);
+      }
+      /* Corner accent */
+      .card::after{
+        content:'';position:absolute;top:0;right:0;
+        width:0;height:0;
+        border-style:solid;
+        border-width:0 22px 22px 0;
+        border-color:transparent rgba(192,40,45,0.12) transparent transparent;
+        pointer-events:none;
+        transition:border-color 0.3s;
       }
       .card:hover{
         border-color:var(--border-silver);
         box-shadow:var(--shadow-card),var(--red-glow);
+        transform:translateY(-1px);
       }
+      .card:hover::after{border-color:transparent rgba(192,40,45,0.28) transparent transparent}
       .card-header{
         display:flex;align-items:center;justify-content:space-between;
         margin-bottom:1.4rem;padding-bottom:1rem;
@@ -705,7 +777,9 @@ function baseStyles() {
       .card-title{
         font-family:'Cinzel',serif;
         font-size:0.88rem;letter-spacing:0.1em;color:var(--text);
+        display:flex;align-items:center;gap:0.6rem;
       }
+      .card-title svg{width:14px;height:14px;color:var(--crimson-light);flex-shrink:0}
       .card-badge{
         font-size:0.54rem;letter-spacing:0.22em;text-transform:uppercase;
         color:var(--silver);background:var(--silver-dim);
@@ -728,13 +802,14 @@ function baseStyles() {
         font-family:'Inter',sans-serif;
         font-size:0.9rem;
         width:100%;outline:none;
-        transition:border-color 0.2s,box-shadow 0.2s;
+        transition:border-color 0.2s,box-shadow 0.2s,background 0.2s;
         appearance:none;-webkit-appearance:none;
       }
       textarea{resize:vertical;min-height:100px}
       select:focus,input:focus,textarea:focus{
         border-color:var(--crimson-light);
-        box-shadow:0 0 0 2px var(--crimson-glow);
+        box-shadow:0 0 0 3px var(--crimson-glow);
+        background:var(--bg-card);
       }
       select option{background:var(--bg-mid)}
       .btn-submit{
@@ -746,8 +821,17 @@ function baseStyles() {
         cursor:pointer;width:100%;margin-top:0.6rem;
         transition:opacity 0.2s,transform 0.15s,box-shadow 0.2s;
         box-shadow:0 2px 18px rgba(139,26,26,0.38);
+        position:relative;overflow:hidden;
       }
-      .btn-submit:hover{opacity:0.9;box-shadow:0 4px 26px rgba(192,40,45,0.55);transform:translateY(-1px)}
+      .btn-submit::after{
+        content:'';
+        position:absolute;inset:0;
+        background:linear-gradient(135deg,transparent 30%,rgba(255,255,255,0.08) 50%,transparent 70%);
+        transform:translateX(-100%);
+        transition:transform 0.5s;
+      }
+      .btn-submit:hover::after{transform:translateX(100%)}
+      .btn-submit:hover{opacity:0.92;box-shadow:0 4px 28px rgba(192,40,45,0.58);transform:translateY(-1px)}
       .btn-submit:active{transform:scale(0.99)}
       .typ-toggle{display:flex;gap:0.4rem;margin-bottom:1rem}
       .typ-btn{
@@ -779,6 +863,14 @@ function baseStyles() {
         content:'';position:absolute;top:0;left:0;right:0;height:2px;
         background:linear-gradient(90deg,var(--crimson),var(--crimson-light) 50%,transparent);
       }
+      /* Animated shimmer line */
+      .stat::before{
+        content:'';position:absolute;
+        bottom:0;left:-60%;width:40%;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(192,40,45,0.35),transparent);
+        transition:left 0.6s ease;
+      }
+      .stat:hover::before{left:120%}
       .stat:hover{
         border-color:var(--border-silver);
         transform:translateY(-3px);
@@ -794,10 +886,10 @@ function baseStyles() {
         display:flex;justify-content:space-between;align-items:center;
         padding:0.7rem 0;border-bottom:1px solid var(--border);
         font-size:0.88rem;
-        transition:background 0.15s;
+        transition:background 0.15s,padding 0.15s;
       }
       .sklad-row:last-child{border-bottom:none}
-      .sklad-row:hover{background:rgba(255,255,255,0.025);margin:0 -0.5rem;padding-left:0.5rem;padding-right:0.5rem}
+      .sklad-row:hover{background:rgba(192,40,45,0.04);margin:0 -0.5rem;padding-left:0.5rem;padding-right:0.5rem}
       .sklad-row em{color:var(--gold);font-style:normal;margin-left:0.5rem;font-size:0.7rem;opacity:0.85}
 
       /* ── TOAST ── */
@@ -823,6 +915,7 @@ function baseStyles() {
         color:var(--silver);padding:0.85rem 1.1rem;text-align:left;
         border-bottom:1px solid var(--border-silver);background:rgba(255,255,255,0.018);
       }
+      body.light th{background:rgba(60,50,100,0.04)}
       td{padding:0.82rem 1.1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.88rem}
       tr:last-child td{border-bottom:none}
       tr:hover td{background:rgba(192,40,45,0.035);color:var(--text)}
@@ -841,8 +934,16 @@ function baseStyles() {
         background:var(--bg-card);border:1px solid var(--border);
         border-left:3px solid var(--border-silver);
         padding:1.5rem 1.8rem;transition:all 0.25s;
+        position:relative;overflow:hidden;
+      }
+      .nastenska-item::before{
+        content:'';position:absolute;
+        top:0;left:0;bottom:0;width:3px;
+        background:linear-gradient(180deg,transparent,var(--silver),transparent);
+        opacity:0;transition:opacity 0.3s;
       }
       .nastenska-item:hover{border-left-color:var(--silver);background:var(--bg-card2)}
+      .nastenska-item:hover::before{opacity:0.5}
       .nastenska-item.new{border-left-color:var(--crimson-light);animation:pulseCard 2s ease}
       @keyframes pulseCard{0%,100%{box-shadow:none}50%{box-shadow:var(--red-glow)}}
       .nastenska-meta{font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.6rem;font-weight:500}
@@ -855,18 +956,30 @@ function baseStyles() {
 
       /* ── KODEX ── */
       .kodex-section{margin-bottom:2.5rem}
-      .kodex-number{font-family:'Cinzel',serif;font-size:3.5rem;color:var(--silver);opacity:0.07;float:left;line-height:1;margin-right:1.2rem;margin-top:-0.3rem;font-weight:700}
+      .kodex-number{font-family:'Cinzel',serif;font-size:3.5rem;color:var(--crimson-light);opacity:0.09;float:left;line-height:1;margin-right:1.2rem;margin-top:-0.3rem;font-weight:700}
       .kodex-rule{font-size:0.92rem;line-height:2;color:var(--text-dim);overflow:hidden}
       .kodex-rule strong{color:var(--text);font-weight:500}
-      .kodex-divider{height:1px;background:var(--border);margin:1.8rem 0}
+      .kodex-divider{
+        height:1px;
+        background:linear-gradient(90deg,var(--crimson-light),var(--border),transparent);
+        margin:1.8rem 0;
+        opacity:0.4;
+      }
 
       /* ── STATISTIKY ── */
       .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5rem}
       .stat-card{
         background:var(--bg-card);border:1px solid var(--border);
         padding:1.8rem;transition:all 0.3s;box-shadow:var(--shadow-card);
+        position:relative;overflow:hidden;
       }
-      .stat-card:hover{border-color:var(--border-silver);box-shadow:var(--shadow-card),var(--red-glow)}
+      .stat-card::after{
+        content:'';position:absolute;top:0;left:0;right:0;height:2px;
+        background:linear-gradient(90deg,var(--crimson),transparent 60%);
+        opacity:0;transition:opacity 0.3s;
+      }
+      .stat-card:hover::after{opacity:1}
+      .stat-card:hover{border-color:var(--border-silver);box-shadow:var(--shadow-card),var(--red-glow);transform:translateY(-2px)}
       .stat-card-header{
         display:flex;justify-content:space-between;align-items:flex-start;
         margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--border-silver);
@@ -889,13 +1002,17 @@ function baseStyles() {
       .chapter{
         border-left:2px solid var(--border-silver);
         padding-left:2rem;position:relative;
+        transition:border-color 0.3s;
       }
+      .chapter:hover{border-left-color:rgba(192,40,45,0.4)}
       .chapter::before{
         content:'';position:absolute;left:-5px;top:2px;
         width:8px;height:8px;
         background:var(--crimson-light);opacity:0.65;
         transform:rotate(45deg);
+        transition:opacity 0.3s,transform 0.3s;
       }
+      .chapter:hover::before{opacity:1;transform:rotate(45deg) scale(1.2)}
       .chapter-meta{font-size:0.6rem;letter-spacing:0.36em;text-transform:uppercase;color:var(--crimson-light);margin-bottom:0.8rem;font-weight:500}
       .chapter-title{font-family:'Cinzel',serif;font-size:1.35rem;color:var(--text);margin-bottom:1rem;font-weight:500}
       .chapter-text{font-family:'Cormorant Garamond',serif;font-size:1.12rem;line-height:2;color:var(--text-dim)}
@@ -911,10 +1028,10 @@ function baseStyles() {
       .toc-item{
         font-size:0.82rem;padding:0.65rem 0;border-bottom:1px solid var(--border);
         color:var(--text-dim);display:flex;gap:0.8rem;align-items:center;
-        transition:color 0.2s;cursor:default;
+        transition:color 0.2s,padding-left 0.2s;cursor:default;
       }
       .toc-item:last-child{border-bottom:none}
-      .toc-item:hover{color:var(--text)}
+      .toc-item:hover{color:var(--text);padding-left:0.3rem}
       .toc-num{color:var(--crimson-light);font-weight:600;min-width:1.5rem;font-family:'Cinzel',serif;font-size:0.82rem}
       .rank-list{display:flex;flex-direction:column;gap:0}
       .rank-item{
@@ -944,13 +1061,19 @@ function baseStyles() {
         font-size:0.62rem;letter-spacing:0.08em;padding:0.25rem 0.7rem;
         background:var(--silver-dim);border:1px solid var(--border-silver);
         color:var(--silver);white-space:nowrap;font-weight:500;
+        transition:border-color 0.2s,color 0.2s;
       }
+      .rank-right-tag:hover{border-color:var(--crimson-light);color:var(--text)}
 
       /* ── SÁZENÍ EXTRA ── */
       .sazeni-hero{
         background:linear-gradient(135deg,rgba(0,80,30,0.14),rgba(0,40,15,0.06));
-        border:1px solid rgba(0,200,80,0.12);
+        border:1px solid rgba(0,200,80,0.14);
         padding:2rem;margin-bottom:2rem;position:relative;overflow:hidden;
+      }
+      body.light .sazeni-hero{
+        background:linear-gradient(135deg,rgba(0,100,30,0.08),rgba(0,60,15,0.04));
+        border-color:rgba(0,150,60,0.18);
       }
       .cost-table{width:100%;border-collapse:collapse;margin:1rem 0}
       .cost-table th{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:600;color:var(--silver);padding:0.8rem 1rem;text-align:left;border-bottom:1px solid var(--border-silver)}
@@ -968,7 +1091,7 @@ function baseStyles() {
         font-family:'Cinzel',serif;font-size:1.5rem;
         width:100%;outline:none;transition:border-color 0.2s,box-shadow 0.2s;text-align:center;
       }
-      .kalk-input:focus{border-color:rgba(0,200,80,0.4);box-shadow:0 0 0 2px rgba(0,200,80,0.08)}
+      .kalk-input:focus{border-color:rgba(0,200,80,0.4);box-shadow:0 0 0 3px rgba(0,200,80,0.08)}
       .kalk-result{margin-top:1rem;padding:1rem;background:rgba(0,200,80,0.05);border:1px solid rgba(0,200,80,0.14);text-align:center}
       .kalk-result-num{font-family:'Cinzel',serif;font-size:2.1rem;color:#00C853;line-height:1.1}
       .kalk-result-label{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:500;color:var(--text-muted);margin-top:0.35rem}
@@ -1010,19 +1133,30 @@ function renderNav(req, active) {
         <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">Sázení<span class="nav-desc">Weed kalkulačka</span></a></li>
       </ul>
       <div class="nav-right">
-        <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">🔔<span class="notif-badge" id="notifBadge">0</span></button>
-        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Přepnout téma">🌙</button>
+        <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-badge" id="notifBadge">0</span>
+        </button>
+        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Přepnout téma">
+          <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
         <span class="nav-user">přihlášen jako <strong>${ic}</strong></span>
         <a href="/logout" class="nav-logout">Odhlásit</a>
       </div>
     </nav>
     <script>
       const savedTheme = localStorage.getItem('albion_theme') || 'dark';
-      if (savedTheme === 'light') { document.body.classList.add('light'); document.getElementById('themeBtn').textContent = '☀️'; }
+      if (savedTheme === 'light') {
+        document.body.classList.add('light');
+        document.getElementById('iconMoon').style.display = 'none';
+        document.getElementById('iconSun').style.display = 'block';
+      }
       function toggleTheme() {
         const isLight = document.body.classList.toggle('light');
         localStorage.setItem('albion_theme', isLight ? 'light' : 'dark');
-        document.getElementById('themeBtn').textContent = isLight ? '☀️' : '🌙';
+        document.getElementById('iconMoon').style.display = isLight ? 'none' : 'block';
+        document.getElementById('iconSun').style.display = isLight ? 'block' : 'none';
       }
       let newCount = 0;
       const evtSource = new EventSource('/api/events');
@@ -1032,16 +1166,16 @@ function renderNav(req, active) {
         const badge = document.getElementById('notifBadge');
         badge.textContent = newCount;
         badge.classList.add('visible');
-        showToast('📢 ' + d.title + ' — ' + d.uzivatel);
+        showToast('[Oznámení] ' + d.title + ' — ' + d.uzivatel);
       });
       evtSource.addEventListener('skladUpdate', (e) => {
         const d = JSON.parse(e.data);
-        const label = d.sekce === 'zbrane' ? '🔫' : d.sekce === 'weed' ? '🌿' : '💊';
+        const label = d.sekce === 'zbrane' ? '[Zbraně]' : d.sekce === 'weed' ? '[Weed]' : '[Drogy]';
         showToast(label + ' ' + (d.polozka || d.odruda || d.droga) + ' — ' + d.uzivatel);
       });
       evtSource.addEventListener('ucetUpdate', (e) => {
         const d = JSON.parse(e.data);
-        showToast('💱 ' + d.typ + ' — ' + (d.valuta === 'USD' ? '$' : '₱') + d.castka);
+        showToast('[Finance] ' + d.typ + ' — ' + (d.valuta === 'USD' ? '$' : '₱') + d.castka);
       });
       function showToast(msg, isError) {
         let t = document.getElementById('toast');
@@ -1097,7 +1231,7 @@ function renderDashboard(req, data) {
       </div>
     </div>
     <div class="page-info">
-      <div class="page-info-icon">⬛</div>
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Centrální sklad organizace</div>
         <div class="page-info-text">Zde eviduješ pohyb zbraní, weedu, drog a financí. Každý vklad nebo výběr se automaticky zaznamená do Google Sheets a odešle notifikaci na Discord. Přepínač <strong>Uložit / Vybrat</strong> určuje směr pohybu zásob. U výběru zbraní nezapomeň vyplnit účel.</div>
@@ -1280,7 +1414,7 @@ function renderNastenska(req) {
       </div>
     </div>
     <div class="page-info">
-      <div class="page-info-icon">📋</div>
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Oznámení organizace</div>
         <div class="page-info-text">Nástěnka zobrazuje zprávy přímo z interního Discord kanálu Albionu a aktualizuje se každých 30 sekund. Nová oznámení jsou označena červeně. Zprávu zde lze i odeslat — automaticky se publikuje na Discord a upozorní ostatní členy.</div>
@@ -1378,7 +1512,7 @@ function renderKodex(req) {
       </div>
     </div>
     <div class="page-info">
-      <div class="page-info-icon">⚖</div>
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Závazný řád organizace</div>
         <div class="page-info-text">Kodex Albionu je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Neznalost pravidel není omluvou. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení z organizace.</div>
@@ -1421,7 +1555,7 @@ function renderAudit(req) {
       </div>
     </div>
     <div class="page-info">
-      <div class="page-info-icon">🔎</div>
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Přehled všech transakcí</div>
         <div class="page-info-text">Audit zobrazuje chronologicky seřazené záznamy všech akcí v systému — vklady a výběry ze skladu, finanční pohyby i jejich autory. Záznamy lze filtrovat podle sekce. Nahoře je zobrazen také finanční souhrn per člen, viditelný u filtrů Vše a Účetnictví.</div>
@@ -1545,7 +1679,7 @@ function renderStatistiky(req) {
       </div>
     </div>
     <div class="page-info">
-      <div class="page-info-icon">📊</div>
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Individuální aktivita členů</div>
         <div class="page-info-text">Statistiky zobrazují celkové příspěvky každého člena — kolik čeho vložil nebo vybral ze skladu a jak se pohybovaly jeho finance. Zelená čísla (+) označují vklady, červená (–) výběry. Data jsou načítána přímo z Google Sheets.</div>
@@ -1631,7 +1765,7 @@ function renderLore(req) {
       </div>
     </div>
     <div class="page-info">
-      <div class="page-info-icon">📖</div>
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Kronika Albionu</div>
         <div class="page-info-text">Historie zaznamenává vznik a vývoj organizace Albion od prvních dnů Christophera Sinclaira v Los Santos po současnost. Každá kapitola popisuje klíčové momenty, které formovaly organizaci do podoby, jakou má dnes.</div>
@@ -1733,7 +1867,7 @@ function renderHierarchy(req) {
       </div>
     </div>
     <div class="page-info">
-      <div class="page-info-icon">👑</div>
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 11 3 20 21 20 21 11"/><path d="M3 11L12 3l9 8"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Struktura organizace</div>
         <div class="page-info-text">Hierarchie definuje pět úrovní členství v Albionu — od zakladatele po Associate. Každý rank nese specifické pravomoci a odpovědnosti. Postup v hierarchii závisí na prokazování loajality, schopností a přispívání k rozvoji organizace.</div>
