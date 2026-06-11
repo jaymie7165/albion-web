@@ -1967,7 +1967,7 @@ function renderDashboard(req, data) {
       showModal(
         typ==='VKLAD'?'Vložit do skladu':'Vybrat ze skladu',
         typ==='VKLAD'?'Potvrzením přidáš tuto položku do skladu organizace.':'Potvrzením odeberete tuto položku ze skladu.',
-        [['Typ', typ],['Položka', polozka],['Množství', mnozstvi+' ks'],['Kategorie', kategorie],..( ucel?[['Účel', ucel]]:[])],
+        [['Typ', typ],['Položka', polozka],['Množství', mnozstvi+' ks'],['Kategorie', kategorie],...( ucel?[['Účel', ucel]]:[])],
         async () => {
           const r=await post('/api/zbrane',{typ,polozka,mnozstvi,kategorie,ucel});
           if(r.ok){showToast('✓ Záznam uložen');setTimeout(()=>location.reload(),1500);}
