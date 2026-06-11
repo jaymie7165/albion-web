@@ -38,6 +38,33 @@ const CONFIG = {
     "Modrý kanabis":  { vyroba: 100, prodej: 150 },
   },
   drogyTypy: ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"],
+  drogyCeny: {
+    "Kapky":       { prodej: 200 },
+    "Kokain":      { prodej: 500 },
+    "Extáze":      { prodej: 350 },
+    "Metamfetamin":{ prodej: 450 },
+    "Benzo":       { prodej: 300 },
+    "Joyka":       { prodej: 250 },
+    "Heroin":      { prodej: 600 },
+    "Speed":       { prodej: 280 },
+    "LSD":         { prodej: 400 },
+  },
+  zbraneCeny: {
+    "Pump Shotgun":           { prodej: 8000 },
+    "Pistol MK2":             { prodej: 12000 },
+    "Pistol":                 { prodej: 5000 },
+    "Combat Pistol":          { prodej: 7000 },
+    "Double Action Revolver": { prodej: 15000 },
+    "Navy Revolver":          { prodej: 14000 },
+    "Vintage Pistol":         { prodej: 6000 },
+    "Gusenberg":              { prodej: 18000 },
+    "Dlouhé":                 { prodej: 25000 },
+    "9mm":                    { prodej: 100 },
+    "9mm Mk2":                { prodej: 150 },
+    ".75cal":                 { prodej: 300 },
+    ".50cal":                 { prodej: 250 },
+    "12-gauge":               { prodej: 200 },
+  },
 };
 
 // ── SSE — živé notifikace ─────────────────────────────────────────────────────
@@ -496,6 +523,64 @@ function baseStyles() {
         --red-glow:0 0 28px rgba(192,40,45,0.14);
         --crimson-glow:rgba(192,40,45,0.10);
       }
+      body.red{
+        --bg:#0A0005;
+        --bg-soft:#100008;
+        --bg-mid:#16000C;
+        --bg-card:#0E0008;
+        --bg-card2:#130010;
+        --bg-card3:#180014;
+        --crimson:#B01020;
+        --crimson-light:#E0202A;
+        --crimson-glow:rgba(220,30,40,0.18);
+        --crimson-bright:#FF3040;
+        --silver:#D080A0;
+        --silver-bright:#FFB8CC;
+        --silver-dim:rgba(220,100,140,0.08);
+        --text:#FFE8F0;
+        --text-dim:#E0A0B8;
+        --text-muted:#6A3045;
+        --text-label:#7A3050;
+        --border:rgba(220,30,60,0.09);
+        --border-hover:rgba(220,30,60,0.18);
+        --border-silver:rgba(220,80,120,0.20);
+        --border-gold:rgba(220,100,60,0.22);
+        --gold:#D0604C;
+        --gold-dim:rgba(220,80,60,0.09);
+        --input-bg:#120008;
+        --shadow:0 8px 40px rgba(0,0,0,0.9);
+        --shadow-card:0 2px 24px rgba(0,0,0,0.7);
+        --red-glow:0 0 32px rgba(220,30,40,0.30);
+      }
+      body.silver{
+        --bg:#08080F;
+        --bg-soft:#0C0C14;
+        --bg-mid:#10101A;
+        --bg-card:#0A0A12;
+        --bg-card2:#0F0F18;
+        --bg-card3:#14141E;
+        --crimson:#8090B0;
+        --crimson-light:#A0B4D8;
+        --crimson-glow:rgba(160,180,220,0.12);
+        --crimson-bright:#C0D0F0;
+        --silver:#C8D0E8;
+        --silver-bright:#E8EEFF;
+        --silver-dim:rgba(200,210,240,0.08);
+        --text:#E8EEFF;
+        --text-dim:#A0AACC;
+        --text-muted:#484860;
+        --text-label:#585870;
+        --border:rgba(180,190,230,0.07);
+        --border-hover:rgba(180,190,230,0.14);
+        --border-silver:rgba(180,190,230,0.20);
+        --border-gold:rgba(180,180,210,0.22);
+        --gold:#9090C0;
+        --gold-dim:rgba(140,140,200,0.09);
+        --input-bg:#0C0C16;
+        --shadow:0 8px 40px rgba(0,0,0,0.88);
+        --shadow-card:0 2px 24px rgba(0,0,0,0.68);
+        --red-glow:0 0 32px rgba(160,180,220,0.20);
+      }
 
       html{scroll-behavior:smooth}
       body{
@@ -646,13 +731,30 @@ function baseStyles() {
       .nav-logout:hover{background:var(--crimson-glow);border-color:var(--crimson-light)}
       .theme-toggle{
         background:none;border:1px solid var(--border-hover);
-        color:var(--text-muted);width:32px;height:32px;cursor:pointer;
-        display:flex;align-items:center;justify-content:center;
-        transition:all 0.2s;
+        color:var(--text-muted);height:32px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;gap:0.4rem;
+        padding:0 0.7rem;
+        transition:all 0.2s;position:relative;
       }
-      .theme-toggle svg{width:15px;height:15px;transition:transform 0.3s}
+      .theme-toggle svg{width:15px;height:15px;transition:transform 0.3s;flex-shrink:0}
       .theme-toggle:hover{border-color:var(--silver);color:var(--silver)}
       .theme-toggle:hover svg{transform:rotate(20deg)}
+      .theme-label{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:500}
+      .theme-menu{
+        position:absolute;top:calc(100% + 6px);right:0;
+        background:var(--bg-card2);border:1px solid var(--border-hover);
+        box-shadow:var(--shadow);z-index:500;min-width:130px;
+        display:none;flex-direction:column;
+      }
+      .theme-menu.open{display:flex}
+      .theme-option{
+        padding:0.55rem 1rem;font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;
+        color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:0.6rem;
+        transition:background 0.15s,color 0.15s;border:none;background:none;width:100%;text-align:left;
+      }
+      .theme-option:hover{background:var(--crimson-glow);color:var(--text)}
+      .theme-option.active{color:var(--crimson-light)}
+      .theme-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
       .notif-bell{
         position:relative;cursor:pointer;background:none;border:none;
         color:var(--text-muted);padding:0.3rem;transition:color 0.2s;
@@ -1110,6 +1212,46 @@ function baseStyles() {
       @media(max-width:1200px){.nav-menu a .nav-desc{display:none}}
       @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
       @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}main{padding:1.5rem 1rem}}
+
+      /* ── GALERIE OBRÁZKŮ ── */
+      .img-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1rem}
+      .img-card{
+        position:relative;overflow:hidden;cursor:pointer;
+        background:var(--bg-card);border:1px solid var(--border);
+        transition:all 0.25s;aspect-ratio:1;
+      }
+      .img-card:hover{border-color:var(--crimson-light);box-shadow:var(--red-glow);transform:scale(1.02)}
+      .img-card img{width:100%;height:100%;object-fit:cover;opacity:0.75;transition:opacity 0.25s,transform 0.4s}
+      .img-card:hover img{opacity:1;transform:scale(1.07)}
+      .img-card-label{
+        position:absolute;bottom:0;left:0;right:0;
+        padding:0.5rem 0.7rem;
+        background:linear-gradient(0deg,rgba(0,0,0,0.85),transparent);
+        font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:#fff;font-weight:500;
+      }
+      .img-tabs{display:flex;gap:0.4rem;margin-bottom:1.2rem;flex-wrap:wrap}
+      .img-tab{
+        padding:0.4rem 1rem;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;
+        background:transparent;border:1px solid var(--border-hover);color:var(--text-muted);cursor:pointer;transition:all 0.2s;
+      }
+      .img-tab.active{background:var(--crimson-glow);border-color:var(--crimson-light);color:var(--text)}
+      .img-tab:hover{color:var(--silver-bright);border-color:var(--border-silver)}
+      /* Lightbox */
+      .lightbox{
+        position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:1000;
+        display:none;align-items:center;justify-content:center;
+        animation:fadeIn 0.2s;
+      }
+      .lightbox.open{display:flex}
+      .lightbox img{max-width:90vw;max-height:90vh;object-fit:contain;box-shadow:0 0 80px rgba(0,0,0,0.9)}
+      .lightbox-close{
+        position:fixed;top:1.5rem;right:1.5rem;
+        background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);
+        color:#fff;width:40px;height:40px;cursor:pointer;font-size:1.2rem;
+        display:flex;align-items:center;justify-content:center;transition:background 0.2s;
+      }
+      .lightbox-close:hover{background:rgba(192,40,45,0.5)}
+      @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     </style>
   `;
 }
@@ -1124,40 +1266,65 @@ function renderNav(req, active) {
       </a>
       <ul class="nav-menu">
         <li><a href="/dashboard" class="${active==='dashboard'?'active':''}">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></a></li>
-        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka<span class="nav-desc">Oznámení & Discord</span></a></li>
+        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka<span class="nav-desc">Oznámení & Aplikace</span></a></li>
         <li><a href="/kodex" class="${active==='kodex'?'active':''}">Kodex<span class="nav-desc">Pravidla organizace</span></a></li>
         <li><a href="/audit" class="${active==='audit'?'active':''}">Audit<span class="nav-desc">Záznamy akcí</span></a></li>
         <li><a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky<span class="nav-desc">Přehled členů</span></a></li>
         <li><a href="/lore" class="${active==='lore'?'active':''}">Historie<span class="nav-desc">Příběh Albionu</span></a></li>
         <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie<span class="nav-desc">Ranky & pozice</span></a></li>
         <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">Sázení<span class="nav-desc">Weed kalkulačka</span></a></li>
+        <li><a href="/galerie" class="${active==='galerie'?'active':''}">Galerie<span class="nav-desc">Zbraně · Drogy · Weed</span></a></li>
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge" id="notifBadge">0</span>
         </button>
-        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Přepnout téma">
-          <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-          <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <button class="theme-toggle" id="themeBtn" onclick="toggleThemeMenu(event)" title="Přepnout téma">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          <span class="theme-label" id="themeLabel">Téma</span>
+          <div class="theme-menu" id="themeMenu">
+            <button class="theme-option" onclick="setTheme('dark',event)"><span class="theme-dot" style="background:#8B1A1A"></span>Tmavé</button>
+            <button class="theme-option" onclick="setTheme('light',event)"><span class="theme-dot" style="background:#A080C0"></span>Světlé</button>
+            <button class="theme-option" onclick="setTheme('red',event)"><span class="theme-dot" style="background:#E02030"></span>Červené</button>
+            <button class="theme-option" onclick="setTheme('silver',event)"><span class="theme-dot" style="background:#A0B4D8"></span>Stříbrné</button>
+          </div>
         </button>
         <span class="nav-user">přihlášen jako <strong>${ic}</strong></span>
         <a href="/logout" class="nav-logout">Odhlásit</a>
       </div>
     </nav>
     <script>
-      const savedTheme = localStorage.getItem('albion_theme') || 'dark';
-      if (savedTheme === 'light') {
-        document.body.classList.add('light');
-        document.getElementById('iconMoon').style.display = 'none';
-        document.getElementById('iconSun').style.display = 'block';
+      const THEMES = ['dark','light','red','silver'];
+      const THEME_LABELS = {dark:'Tmavé',light:'Světlé',red:'Červené',silver:'Stříbrné'};
+      let currentTheme = localStorage.getItem('albion_theme') || 'dark';
+      function applyTheme(t) {
+        THEMES.forEach(c => document.body.classList.remove(c));
+        if (t !== 'dark') document.body.classList.add(t);
+        currentTheme = t;
+        localStorage.setItem('albion_theme', t);
+        const lbl = document.getElementById('themeLabel');
+        if (lbl) lbl.textContent = THEME_LABELS[t] || 'Téma';
+        document.querySelectorAll('.theme-option').forEach(b => {
+          b.classList.toggle('active', b.textContent.trim() === (THEME_LABELS[t] || ''));
+        });
       }
-      function toggleTheme() {
-        const isLight = document.body.classList.toggle('light');
-        localStorage.setItem('albion_theme', isLight ? 'light' : 'dark');
-        document.getElementById('iconMoon').style.display = isLight ? 'none' : 'block';
-        document.getElementById('iconSun').style.display = isLight ? 'block' : 'none';
+      applyTheme(currentTheme);
+      function toggleThemeMenu(e) {
+        e.stopPropagation();
+        const m = document.getElementById('themeMenu');
+        if (m) m.classList.toggle('open');
       }
+      function setTheme(t, e) {
+        if (e) e.stopPropagation();
+        applyTheme(t);
+        const m = document.getElementById('themeMenu');
+        if (m) m.classList.remove('open');
+      }
+      document.addEventListener('click', () => {
+        const m = document.getElementById('themeMenu');
+        if (m) m.classList.remove('open');
+      });
       let newCount = 0;
       const evtSource = new EventSource('/api/events');
       evtSource.addEventListener('nastenska', (e) => {
@@ -1234,7 +1401,7 @@ function renderDashboard(req, data) {
       <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Centrální sklad organizace</div>
-        <div class="page-info-text">Zde eviduješ pohyb zbraní, weedu, drog a financí. Každý vklad nebo výběr se automaticky zaznamená do Google Sheets a odešle notifikaci na Discord. Přepínač <strong>Uložit / Vybrat</strong> určuje směr pohybu zásob. U výběru zbraní nezapomeň vyplnit účel.</div>
+        <div class="page-info-text">Zde eviduješ pohyb zbraní, weedu, drog a financí. Každý vklad nebo výběr se automaticky zaznamená do tabulka a odešle notifikaci do aplikace. Přepínač <strong>Uložit / Vybrat</strong> určuje směr pohybu zásob. U výběru zbraní nezapomeň vyplnit účel.</div>
       </div>
     </div>
     <script>
@@ -1245,11 +1412,27 @@ function renderDashboard(req, data) {
       }
       updateClock();setInterval(updateClock,1000);
     </script>
-    <div class="stats">
-      <div class="stat"><div class="stat-label">Zůstatek USD</div><div class="stat-value">$${ucet.usd.toLocaleString('cs-CZ')}</div><div class="stat-sub">Americké dolary</div></div>
+    <div class="stats" style="grid-template-columns:repeat(5,1fr)">
+      <div class="stat"><div class="stat-label">Zůstatek USD</div><div class="stat-value">${ucet.usd.toLocaleString('cs-CZ')}</div><div class="stat-sub">Americké dolary</div></div>
       <div class="stat"><div class="stat-label">Zůstatek Pesos</div><div class="stat-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div><div class="stat-sub">Mexické peso</div></div>
       <div class="stat"><div class="stat-label">Položky Weed</div><div class="stat-value">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
       <div class="stat"><div class="stat-label">Položky Drogy</div><div class="stat-value">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
+      <div class="stat" style="border-top-color:var(--gold)">
+        <div class="stat-label">Hodnota skladu</div>
+        <div class="stat-value" style="font-size:1.4rem;color:var(--gold)">
+          ${(() => {
+            const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
+            const DROGY_P = {"Kapky":200,"Kokain":500,"Extáze":350,"Metamfetamin":450,"Benzo":300,"Joyka":250,"Heroin":600,"Speed":280,"LSD":400};
+            const ZBRANE_P = {"Pump Shotgun":8000,"Pistol MK2":12000,"Pistol":5000,"Combat Pistol":7000,"Double Action Revolver":15000,"Navy Revolver":14000,"Vintage Pistol":6000,"Gusenberg":18000,"Dlouhé":25000,"9mm":100,"9mm Mk2":150,".75cal":300,".50cal":250,"12-gauge":200};
+            let total = 0;
+            Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) total += q * WEED_P[k]; });
+            Object.entries(drogy).forEach(([k,q]) => { if(q>0 && DROGY_P[k]) total += q * DROGY_P[k]; });
+            Object.entries(zbrane).forEach(([k,q]) => { if(q>0 && ZBRANE_P[k]) total += q * ZBRANE_P[k]; });
+            return total.toLocaleString('cs-CZ');
+          })()}
+        </div>
+        <div class="stat-sub">Weed + Drogy + Zbraně</div>
+      </div>
     </div>
     <div class="grid">
       <div class="card">
@@ -1410,14 +1593,14 @@ function renderNastenska(req) {
       <div>
         <div class="page-label">Organizace Albion</div>
         <h1 class="page-title">Nástěnka</h1>
-        <p class="page-sub">Oznámení z Discord kanálu — synchronizováno v reálném čase</p>
+        <p class="page-sub">Oznámení z aplikace kanálu — synchronizováno v reálném čase</p>
       </div>
     </div>
     <div class="page-info">
       <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Oznámení organizace</div>
-        <div class="page-info-text">Nástěnka zobrazuje zprávy přímo z interního Discord kanálu Albionu a aktualizuje se každých 30 sekund. Nová oznámení jsou označena červeně. Zprávu zde lze i odeslat — automaticky se publikuje na Discord a upozorní ostatní členy.</div>
+        <div class="page-info-text">Nástěnka zobrazuje zprávy přímo z interního aplikace Albion a aktualizuje se každých 30 sekund. Nová oznámení jsou označena červeně. Zprávu zde lze i odeslat — automaticky se publikuje do aplikace a upozorní ostatní členy.</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start">
@@ -1431,7 +1614,7 @@ function renderNastenska(req) {
         <div class="form-group" style="margin-bottom:0.8rem"><label>Název</label><input type="text" id="ann-title" placeholder="Důležité oznámení..."></div>
         <div class="form-group" style="margin-bottom:1rem"><label>Obsah</label><textarea id="ann-content" placeholder="Napište oznámení..." rows="5"></textarea></div>
         <button class="btn-submit" onclick="sendAnnouncement()">Zveřejnit</button>
-        <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.8rem;text-align:center">Oznámení se odešle i do Discord kanálu</p>
+        <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.8rem;text-align:center">Oznámení se odešle i do aplikace kanálu</p>
       </div>
     </div>
   </main>
@@ -1468,7 +1651,7 @@ function renderNastenska(req) {
       const res = await fetch('/api/nastenska', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content})});
       const data = await res.json();
       if (data.ok) {
-        showToast('OK Oznámení odesláno na Discord');
+        showToast('OK Oznámení odesláno do aplikace');
         document.getElementById('ann-title').value = '';
         document.getElementById('ann-content').value = '';
         setTimeout(loadAnnouncements, 2000);
@@ -1682,7 +1865,7 @@ function renderStatistiky(req) {
       <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Individuální aktivita členů</div>
-        <div class="page-info-text">Statistiky zobrazují celkové příspěvky každého člena — kolik čeho vložil nebo vybral ze skladu a jak se pohybovaly jeho finance. Zelená čísla (+) označují vklady, červená (–) výběry. Data jsou načítána přímo z Google Sheets.</div>
+        <div class="page-info-text">Statistiky zobrazují celkové příspěvky každého člena — kolik čeho vložil nebo vybral ze skladu a jak se pohybovaly jeho finance. Zelená čísla (+) označují vklady, červená (–) výběry. Data jsou načítána přímo z tabulka.</div>
       </div>
     </div>
     <div id="stats-container" class="stats-grid">
@@ -1895,7 +2078,7 @@ function renderHierarchy(req) {
 function renderAuth(page, error, data) {
   const errors = {
     no_code: 'Discord autorizace selhala.',
-    not_on_server: 'Nejsi členem Discord serveru Albion.',
+    not_on_server: 'Nejsi členem aplikace serveru Albion.',
     already_registered: 'Tento Discord účet je již registrován.',
     not_registered: 'Nemáš účet. Zaregistruj se nejdřív.',
     auth_failed: 'Přihlášení selhalo. Zkus to znovu.',
@@ -2018,10 +2201,10 @@ function renderAuth(page, error, data) {
 
   const logoHtml = `<div class="auth-logo"><img src="/logo.png" class="auth-logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1>`;
 
-  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Přihlášení do systému</p></div>${errMsg}<a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a><div class="auth-divider">nebo</div><a href="/register" class="auth-btn secondary">Registrovat se</a></div>${successReg}</body></html>`;
-  if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;line-height:1.75;margin-bottom:1.5rem">Pro registraci musíš být členem Discord serveru Albion.</p><a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a><div class="auth-sep"></div><a href="/login" class="auth-btn secondary">Zpět na přihlášení</a></div></body></html>`;
-  if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Discord: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required><label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="auth-btn">Dokončit registraci</button></form></div></body></html>`;
-  if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Discord: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="auth-btn">Přihlásit se</button></form></div></body></html>`;
+  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Přihlášení do systému</p></div>${errMsg}<a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes aplikaci</a><div class="auth-divider">nebo</div><a href="/register" class="auth-btn secondary">Registrovat se</a></div>${successReg}</body></html>`;
+  if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;line-height:1.75;margin-bottom:1.5rem">Pro registraci musíš být členem aplikace serveru Albion.</p><a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes aplikaci</a><div class="auth-sep"></div><a href="/login" class="auth-btn secondary">Zpět na přihlášení</a></div></body></html>`;
+  if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Aplikace: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required><label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="auth-btn">Dokončit registraci</button></form></div></body></html>`;
+  if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Aplikace: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="auth-btn">Přihlásit se</button></form></div></body></html>`;
   return '<h1>404</h1>';
 }
 
@@ -2161,5 +2344,90 @@ function renderSazeni(req) {
   </script>
   </body></html>`;
 }
+
+
+// ── RENDER GALERIE ────────────────────────────────────────────────────────────
+function renderGalerie(req) {
+  // Používáme volně dostupné obrázky z Unsplash / Picsum - v produkci nahradit vlastními
+  const categories = {
+    weed: [
+      { label: 'Kanabis',         url: 'https://images.unsplash.com/photo-1603909223429-69bb7101f420?w=400&q=75&fit=crop' },
+      { label: 'Zelená odrůda',   url: 'https://images.unsplash.com/photo-1616671276441-2f2c277b8bf6?w=400&q=75&fit=crop' },
+      { label: 'Žlutá odrůda',    url: 'https://images.unsplash.com/photo-1598511757337-fe2cafc31ba0?w=400&q=75&fit=crop' },
+      { label: 'Červená odrůda',  url: 'https://images.unsplash.com/photo-1564419320461-6870880221ad?w=400&q=75&fit=crop' },
+      { label: 'Modrá odrůda',    url: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab12?w=400&q=75&fit=crop' },
+      { label: 'Sklizeň',         url: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=400&q=75&fit=crop' },
+    ],
+    drogy: [
+      { label: 'Kokain',          url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&q=75&fit=crop' },
+      { label: 'Pilulky',         url: 'https://images.unsplash.com/photo-1550572017-26b5655df0e6?w=400&q=75&fit=crop' },
+      { label: 'Krystaly',        url: 'https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=400&q=75&fit=crop' },
+      { label: 'Heroin',          url: 'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&q=75&fit=crop' },
+      { label: 'LSD',             url: 'https://images.unsplash.com/photo-1506459225024-1428097a7e18?w=400&q=75&fit=crop' },
+      { label: 'Extáze',          url: 'https://images.unsplash.com/photo-1603107253654-d7f57ce71e03?w=400&q=75&fit=crop' },
+    ],
+    zbrane: [
+      { label: 'Pistole',         url: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=75&fit=crop' },
+      { label: 'Revolver',        url: 'https://images.unsplash.com/photo-1504309092620-4d0ec726efa4?w=400&q=75&fit=crop' },
+      { label: 'Pump Shotgun',    url: 'https://images.unsplash.com/photo-1516222338250-863216ce01ea?w=400&q=75&fit=crop' },
+      { label: 'Střelivo',        url: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=75&fit=crop' },
+      { label: 'Bojová pistole',  url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=75&fit=crop' },
+      { label: 'Zásobníky',       url: 'https://images.unsplash.com/photo-1625591339971-4b6a9cb94fd4?w=400&q=75&fit=crop' },
+    ],
+  };
+
+  const buildCards = (items) => items.map(i =>
+    `<div class="img-card" onclick="openLightbox('${i.url.replace(/w=400/, 'w=1200')}')">
+      <img src="${i.url}" alt="${i.label}" loading="lazy">
+      <div class="img-card-label">${i.label}</div>
+    </div>`
+  ).join('');
+
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Galerie</title>
+  ${baseStyles()}
+  </head><body>
+  ${renderNav(req, 'galerie')}
+  <main>
+    <div class="page-header">
+      <div>
+        <div class="page-label">Albion — Materiály</div>
+        <h1 class="page-title">Galerie</h1>
+        <p class="page-sub">Vizuální přehled komodit organizace</p>
+      </div>
+    </div>
+    <div class="img-tabs">
+      <button class="img-tab active" onclick="showCat('weed',this)">🌿 Weed</button>
+      <button class="img-tab" onclick="showCat('drogy',this)">💊 Drogy</button>
+      <button class="img-tab" onclick="showCat('zbrane',this)">🔫 Zbraně</button>
+    </div>
+    <div id="cat-weed"   class="img-gallery">${buildCards(categories.weed)}</div>
+    <div id="cat-drogy"  class="img-gallery" style="display:none">${buildCards(categories.drogy)}</div>
+    <div id="cat-zbrane" class="img-gallery" style="display:none">${buildCards(categories.zbrane)}</div>
+  </main>
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightbox-img" src="" alt="">
+  </div>
+  <script>
+    function showCat(cat, btn) {
+      ['weed','drogy','zbrane'].forEach(c => {
+        document.getElementById('cat-' + c).style.display = c === cat ? 'grid' : 'none';
+      });
+      document.querySelectorAll('.img-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+    function openLightbox(url) {
+      document.getElementById('lightbox-img').src = url;
+      document.getElementById('lightbox').classList.add('open');
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+    }
+    document.addEventListener('keydown', e => { if(e.key === 'Escape') closeLightbox(); });
+  </script>
+  </body></html>`;
+}
+
+app.get('/galerie', requireAuth, (req, res) => res.send(renderGalerie(req)));
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
