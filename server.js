@@ -17,6 +17,7 @@ const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+// Logo is served from public/logo.png via express.static above
 app.use(session({
   secret: process.env.SESSION_SECRET || 'albion_secret',
   resave: false,
@@ -432,6 +433,8 @@ app.get('/sazeni', requireAuth, (req, res) => res.send(renderSazeni(req)));
 // ── BASE STYLES ───────────────────────────────────────────────────────────────
 function baseStyles() {
   return `
+    <link rel="icon" type="image/png" href="/logo.png">
+    <link rel="apple-touch-icon" href="/logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
@@ -458,17 +461,24 @@ function baseStyles() {
         --input-bg:#DCDCE8;--shadow:0 4px 20px rgba(0,0,0,0.1);--shadow-card:0 2px 8px rgba(0,0,0,0.08);
       }
 
-      body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;font-weight:300;min-height:100vh;transition:background 0.3s,color 0.3s}
+      body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;font-weight:300;min-height:100vh;transition:background 0.3s,color 0.3s;animation:pageFadeIn 0.4s ease}
+      @keyframes pageFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
       /* ── NAV ── */
-      nav{background:var(--bg-soft);border-bottom:1px solid var(--border-silver);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;height:64px;transition:background 0.3s;backdrop-filter:blur(8px)}
-      .nav-logo{font-family:'Cinzel',serif;letter-spacing:0.35em;font-size:1.1rem;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:0.6rem}
-      .nav-logo-dot{width:6px;height:6px;background:var(--crimson-light);border-radius:50%;flex-shrink:0}
+      nav{background:var(--bg-soft);border-bottom:1px solid var(--border-silver);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;height:64px;transition:background 0.3s;backdrop-filter:blur(12px)}
+      nav::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--crimson-light),transparent);opacity:0.4;pointer-events:none}
+      .nav-logo{font-family:'Cinzel',serif;letter-spacing:0.35em;font-size:1.1rem;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:0.8rem;transition:opacity 0.2s}
+      .nav-logo:hover{opacity:0.85}
+      .nav-logo-img{width:28px;height:28px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 0 6px rgba(139,26,26,0.5))}
+      .nav-logo-text .b-red{color:var(--crimson-light);text-shadow:0 0 12px rgba(178,34,34,0.6)}
       .nav-logo span{color:var(--silver-bright)}
       .nav-menu{display:flex;gap:0;list-style:none;height:100%}
-      .nav-menu a{display:flex;align-items:center;gap:0.3rem;padding:0 0.9rem;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);text-decoration:none;height:100%;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap}
-      .nav-menu a:hover{color:var(--text-dim)}
-      .nav-menu a.active{color:var(--silver-bright);border-bottom-color:var(--crimson)}
+      .nav-menu a{display:flex;align-items:center;gap:0.35rem;padding:0 0.9rem;font-size:0.58rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);text-decoration:none;height:100%;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap}
+      .nav-menu a:hover{color:var(--text-dim);background:rgba(200,200,230,0.03)}
+      .nav-menu a.active{color:var(--silver-bright);border-bottom-color:var(--crimson);background:rgba(139,26,26,0.05)}
+      .nav-menu a .nav-emoji{font-size:0.85rem;opacity:0.85}
+      .nav-menu a .nav-label{display:flex;flex-direction:column;line-height:1.2}
+      .nav-menu a .nav-desc{font-size:0.44rem;letter-spacing:0.08em;color:var(--text-muted);opacity:0.7;margin-top:0.1rem;font-weight:300}
       .nav-right{display:flex;align-items:center;gap:0.8rem}
       .nav-user{font-size:0.68rem;color:var(--text-muted);letter-spacing:0.05em}
       .nav-user strong{color:var(--text);font-weight:400}
@@ -491,7 +501,7 @@ function baseStyles() {
 
       /* ── CARDS ── */
       .card{background:var(--bg-card);border:1px solid var(--border);padding:1.5rem;transition:background 0.3s,border 0.3s,box-shadow 0.3s;box-shadow:var(--shadow-card)}
-      .card:hover{border-color:var(--border-hover)}
+      .card:hover{border-color:var(--border-silver);box-shadow:0 4px 28px rgba(0,0,0,0.6),0 0 0 1px rgba(180,180,210,0.08)}
       .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
       .card-title{font-family:'Cinzel',serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim)}
       .card-badge{font-size:0.57rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver-bright);background:var(--silver-dim);padding:0.25rem 0.65rem;border:1px solid var(--border-silver)}
@@ -517,8 +527,10 @@ function baseStyles() {
 
       /* ── STATS TOP ── */
       .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
-      .stat{background:var(--bg-card);border:1px solid var(--border);border-top:2px solid var(--crimson);padding:1.5rem;transition:background 0.3s;position:relative;overflow:hidden;box-shadow:var(--shadow-card)}
+      .stat{background:var(--bg-card);border:1px solid var(--border);border-top:2px solid var(--crimson);padding:1.5rem;transition:all 0.3s;position:relative;overflow:hidden;box-shadow:var(--shadow-card);cursor:default}
       .stat::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--crimson-light),transparent)}
+      .stat:hover{border-color:var(--border-silver);transform:translateY(-2px);box-shadow:0 6px 30px rgba(0,0,0,0.65)}
+      .stat::before{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(139,26,26,0.03));pointer-events:none}
       .stat-label{font-size:0.57rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--text-label);margin-bottom:0.6rem}
       .stat-value{font-family:'Cinzel',serif;font-size:1.75rem;color:var(--text)}
       .stat-sub{font-size:0.65rem;color:var(--silver);margin-top:0.4rem;opacity:0.9}
@@ -610,16 +622,19 @@ function renderNav(req, active) {
   const ic = req.session.icName;
   return `
     <nav>
-      <a href="/dashboard" class="nav-logo"><div class="nav-logo-dot"></div>AL<span>B</span>ION</a>
+      <a href="/dashboard" class="nav-logo">
+        <img src="/logo.png" class="nav-logo-img" alt="Albion">
+        <span class="nav-logo-text">AL<span class="b-red">B</span>ION</span>
+      </a>
       <ul class="nav-menu">
-        <li><a href="/dashboard" class="${active==='dashboard'?'active':''}">Sklad</a></li>
-        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka</a></li>
-        <li><a href="/kodex" class="${active==='kodex'?'active':''}">Kodex</a></li>
-        <li><a href="/audit" class="${active==='audit'?'active':''}">Audit</a></li>
-        <li><a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky</a></li>
-        <li><a href="/lore" class="${active==='lore'?'active':''}">Historie</a></li>
-        <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a></li>
-        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">🌱 Sázení</a></li>
+        <li><a href="/dashboard" class="${active==='dashboard'?'active':''}"><span class="nav-emoji">🏛️</span><span class="nav-label">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></span></a></li>
+        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}"><span class="nav-emoji">📢</span><span class="nav-label">Nástěnka<span class="nav-desc">Oznámení & Discord</span></span></a></li>
+        <li><a href="/kodex" class="${active==='kodex'?'active':''}"><span class="nav-emoji">📜</span><span class="nav-label">Kodex<span class="nav-desc">Pravidla organizace</span></span></a></li>
+        <li><a href="/audit" class="${active==='audit'?'active':''}"><span class="nav-emoji">🔍</span><span class="nav-label">Audit<span class="nav-desc">Záznamy akcí</span></span></a></li>
+        <li><a href="/statistiky" class="${active==='statistiky'?'active':''}"><span class="nav-emoji">📊</span><span class="nav-label">Statistiky<span class="nav-desc">Přehled členů</span></span></a></li>
+        <li><a href="/lore" class="${active==='lore'?'active':''}"><span class="nav-emoji">📖</span><span class="nav-label">Historie<span class="nav-desc">Příběh Albionu</span></span></a></li>
+        <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}"><span class="nav-emoji">👑</span><span class="nav-label">Hierarchie<span class="nav-desc">Ranky & pozice</span></span></a></li>
+        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}"><span class="nav-emoji">🌱</span><span class="nav-label">Sázení<span class="nav-desc">Weed kalkulačka</span></span></a></li>
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">🔔<span class="notif-badge" id="notifBadge">0</span></button>
@@ -697,11 +712,25 @@ function renderDashboard(req, data) {
   </head><body>
   ${renderNav(req, 'dashboard')}
   <main>
-    <div style="margin-bottom:2rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-gold);position:relative">
-      <div style="font-size:0.58rem;letter-spacing:0.5em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem;opacity:0.8">Albion — Systém</div>
-      <h2 style="font-family:'Cinzel',serif;font-size:1.5rem;font-weight:400">Vítej, ${icName}</h2>
-      <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--text-muted);margin-top:0.3rem;font-size:1rem">Přehled skladu a účetnictví organizace</p>
+    <div style="margin-bottom:2rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-gold);position:relative;display:flex;align-items:flex-end;justify-content:space-between">
+      <div>
+        <div style="font-size:0.58rem;letter-spacing:0.5em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem;opacity:0.8">Albion — Systém</div>
+        <h2 style="font-family:'Cinzel',serif;font-size:1.5rem;font-weight:400">Vítej, ${icName}</h2>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--text-muted);margin-top:0.3rem;font-size:1rem">Přehled skladu a účetnictví organizace</p>
+      </div>
+      <div style="text-align:right">
+        <div id="live-clock" style="font-family:'Cinzel',serif;font-size:1.2rem;color:var(--silver-bright);letter-spacing:0.1em"></div>
+        <div id="live-date" style="font-size:0.62rem;letter-spacing:0.2em;color:var(--text-muted);text-transform:uppercase;margin-top:0.2rem"></div>
+      </div>
     </div>
+    <script>
+      function updateClock(){
+        const now=new Date();
+        document.getElementById('live-clock').textContent=now.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        document.getElementById('live-date').textContent=now.toLocaleDateString('cs-CZ',{weekday:'long',day:'numeric',month:'long'});
+      }
+      updateClock();setInterval(updateClock,1000);
+    </script>
     <div class="stats">
       <div class="stat"><div class="stat-label">Zůstatek USD</div><div class="stat-value">$${ucet.usd.toLocaleString('cs-CZ')}</div><div class="stat-sub">Americké dolary</div></div>
       <div class="stat"><div class="stat-label">Zůstatek Pesos</div><div class="stat-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div><div class="stat-sub">Mexické peso</div></div>
@@ -1333,32 +1362,42 @@ function renderAuth(page, error, data) {
   const successReg = page === 'login' ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='alert success';a.textContent='Registrace proběhla. Přihlaš se.';document.querySelector('.box').prepend(a);}<\/script>` : '';
 
   const style = `
+    <link rel="icon" type="image/png" href="/logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@300;400&display=swap" rel="stylesheet">
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
-      body{background:#0A0A0A;color:#F5F3EF;font-family:'Montserrat',sans-serif;font-weight:300;min-height:100vh;display:flex;align-items:center;justify-content:center}
-      .box{width:100%;max-width:400px;padding:3rem 2.5rem;background:#111;border:1px solid rgba(192,192,192,0.08)}
+      body{background:#07070A;color:#F5F3EF;font-family:'Montserrat',sans-serif;font-weight:300;min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+      body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(139,26,26,0.12) 0%,transparent 60%);pointer-events:none}
+      body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(139,26,26,0.06) 0%,transparent 60%);pointer-events:none}
+      .box{width:100%;max-width:420px;padding:3rem 2.5rem;background:rgba(14,14,19,0.95);border:1px solid rgba(180,180,210,0.12);backdrop-filter:blur(12px);box-shadow:0 8px 60px rgba(0,0,0,0.8),0 0 0 1px rgba(139,26,26,0.08);position:relative;z-index:1}
+      .box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(178,34,34,0.6),transparent)}
       .logo{text-align:center;margin-bottom:2.5rem}
+      .logo-img{width:64px;height:64px;object-fit:contain;margin-bottom:1rem;filter:drop-shadow(0 0 20px rgba(139,26,26,0.5));animation:logoFloat 3s ease-in-out infinite}
+      @keyframes logoFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.02)}}
       .logo h1{font-family:'Cinzel',serif;font-size:2rem;letter-spacing:0.4em}
-      .logo p{font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;color:#666;margin-top:0.5rem}
-      .btn{display:block;width:100%;padding:0.9rem;background:#8B1A1A;color:#F5F3EF;border:none;font-family:'Montserrat',sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;text-decoration:none;text-align:center;margin-top:1rem;transition:background 0.2s}
-      .btn:hover{background:#B22222}
-      .btn.secondary{background:transparent;border:1px solid rgba(192,192,192,0.2);color:#888}
-      .btn.secondary:hover{color:#F5F3EF;border-color:rgba(192,192,192,0.4)}
-      input{display:block;width:100%;padding:0.8rem 1rem;background:#1A1A1A;border:1px solid rgba(192,192,192,0.1);color:#F5F3EF;font-family:'Montserrat',sans-serif;font-size:0.85rem;margin-bottom:1rem;outline:none;transition:border-color 0.2s}
-      input:focus{border-color:#8B1A1A}
-      label{display:block;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:#888;margin-bottom:0.4rem}
-      .alert{padding:0.8rem 1rem;background:rgba(139,26,26,0.2);border-left:3px solid #8B1A1A;font-size:0.8rem;margin-bottom:1.5rem}
-      .alert.success{background:rgba(0,255,136,0.1);border-left-color:#00FF88;color:#00FF88}
-      .divider{text-align:center;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:#444;margin:1.5rem 0}
-      .sep{height:1px;background:rgba(192,192,192,0.06);margin:1.5rem 0}
+      .logo h1 .b-red{color:#B22222;text-shadow:0 0 14px rgba(178,34,34,0.7)}
+      .logo p{font-size:0.68rem;letter-spacing:0.25em;text-transform:uppercase;color:#444;margin-top:0.5rem}
+      .btn{display:block;width:100%;padding:0.9rem;background:linear-gradient(135deg,#8B1A1A,#B22222);color:#F5F3EF;border:none;font-family:'Montserrat',sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;text-decoration:none;text-align:center;margin-top:1rem;transition:all 0.2s;box-shadow:0 2px 16px rgba(139,26,26,0.3)}
+      .btn:hover{opacity:0.9;box-shadow:0 4px 24px rgba(139,26,26,0.5);transform:translateY(-1px)}
+      .btn:active{transform:translateY(0)}
+      .btn.secondary{background:transparent;border:1px solid rgba(180,180,210,0.15);color:#666;box-shadow:none}
+      .btn.secondary:hover{color:#F5F3EF;border-color:rgba(180,180,210,0.35);background:rgba(180,180,210,0.05);box-shadow:none;transform:none}
+      input{display:block;width:100%;padding:0.85rem 1rem;background:#131318;border:1px solid rgba(180,180,210,0.1);color:#F5F3EF;font-family:'Montserrat',sans-serif;font-size:0.85rem;margin-bottom:1rem;outline:none;transition:border-color 0.2s,box-shadow 0.2s}
+      input:focus{border-color:#8B1A1A;box-shadow:0 0 0 3px rgba(139,26,26,0.1)}
+      label{display:block;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:#555;margin-bottom:0.4rem}
+      .alert{padding:0.8rem 1rem;background:rgba(139,26,26,0.15);border-left:3px solid #8B1A1A;font-size:0.8rem;margin-bottom:1.5rem;border:1px solid rgba(139,26,26,0.25);border-left:3px solid #8B1A1A}
+      .alert.success{background:rgba(0,255,136,0.06);border-left-color:#00FF88;border-color:rgba(0,255,136,0.2);color:#00FF88}
+      .divider{text-align:center;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:#333;margin:1.5rem 0;position:relative}
+      .divider::before,.divider::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:rgba(180,180,210,0.08)}
+      .divider::before{left:0}.divider::after{right:0}
+      .sep{height:1px;background:rgba(180,180,210,0.07);margin:1.5rem 0}
     </style>
   `;
 
-  if (page === 'login') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="box"><div class="logo"><h1>ALBION</h1><p>Přihlášení do systému</p></div>${errMsg}<a href="/auth/discord?action=login" class="btn">🔐 Přihlásit se přes Discord</a><div class="divider">nebo</div><a href="/register" class="btn secondary">Nemáš účet? Zaregistruj se</a></div>${successReg}</body></html>`;
-  if (page === 'register') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="box"><div class="logo"><h1>ALBION</h1><p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.8rem;color:#888;line-height:1.7;margin-bottom:1.5rem">Pro registraci musíš být členem Discord serveru Albion.</p><a href="/auth/discord?action=register" class="btn">🔗 Pokračovat přes Discord</a><div class="sep"></div><a href="/login" class="btn secondary">Zpět na přihlášení</a></div></body></html>`;
-  if (page === 'register_complete') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Dokončení registrace</title>${style}</head><body><div class="box"><div class="logo"><h1>ALBION</h1><p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.8rem;color:#888;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label>Tvoje IC jméno (ve hře)</label><input type="text" name="ic_name" placeholder="Christopher Sinclair" required><label>Heslo</label><input type="password" name="password" placeholder="Alespoň 6 znaků" required><label>Heslo znovu</label><input type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="btn">✅ Dokončit registraci</button></form></div></body></html>`;
-  if (page === 'login_password') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Heslo</title>${style}</head><body><div class="box"><div class="logo"><h1>ALBION</h1><p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.8rem;color:#888;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label>Heslo</label><input type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="btn">🔓 Přihlásit se</button></form></div></body></html>`;
+  if (page === 'login') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Přihlášení do systému</p></div>${errMsg}<a href="/auth/discord?action=login" class="btn">🔐 Přihlásit se přes Discord</a><div class="divider">nebo</div><a href="/register" class="btn secondary">Nemáš účet? Zaregistruj se</a></div>${successReg}</body></html>`;
+  if (page === 'register') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.8rem;color:#555;line-height:1.7;margin-bottom:1.5rem">Pro registraci musíš být členem Discord serveru Albion.</p><a href="/auth/discord?action=register" class="btn">🔗 Pokračovat přes Discord</a><div class="sep"></div><a href="/login" class="btn secondary">Zpět na přihlášení</a></div></body></html>`;
+  if (page === 'register_complete') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Dokončení registrace</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.8rem;color:#555;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label>Tvoje IC jméno (ve hře)</label><input type="text" name="ic_name" placeholder="Christopher Sinclair" required><label>Heslo</label><input type="password" name="password" placeholder="Alespoň 6 znaků" required><label>Heslo znovu</label><input type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="btn">✅ Dokončit registraci</button></form></div></body></html>`;
+  if (page === 'login_password') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Heslo</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.8rem;color:#555;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label>Heslo</label><input type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="btn">🔓 Přihlásit se</button></form></div></body></html>`;
   return '<h1>404</h1>';
 }
 
