@@ -134,7 +134,7 @@ app.get('/auth/callback', async (req, res) => {
 });
 
 // ── AUTH STRÁNKY ──────────────────────────────────────────────────────────────
-app.get('/', requireAuth, (req, res) => res.redirect('/dashboard'));
+app.get('/', requireAuth, (req, res) => res.redirect('/home'));
 app.get('/login', (req, res) => res.send(renderAuth('login', req.query.error)));
 app.get('/register', (req, res) => res.send(renderAuth('register', req.query.error)));
 
@@ -175,7 +175,7 @@ app.post('/login/password', async (req, res) => {
   req.session.icName = user.ic_name;
   req.session.discordUsername = user.discord_username;
   req.session.pendingDiscord = null;
-  res.redirect('/dashboard');
+  res.redirect('/home');
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
@@ -386,34 +386,36 @@ app.get('/api/audit', requireAuth, async (req, res) => {
 
     // Normalizace jmen — mapujeme vše co bot může napsat na ic_name
     const allUsersAudit = db.prepare('SELECT * FROM users').all();
-    // Mapa: cokoliv → ic_name (username, display_name, ic_name — vše lowercase)
     const nameMap = {};
     allUsersAudit.forEach(u => {
       if (u.ic_name) {
-        // ic_name sám na sebe (case normalizace)
         nameMap[u.ic_name.toLowerCase()] = u.ic_name;
-        // discord_username → ic_name
         if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
-        // discord_display_name → ic_name (pokud sloupec existuje)
         if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
-        // global_name → ic_name (novější Discord API pole)
         if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
       }
     });
-    // Normalizace: zkusí přesný match, pak partial match (pro oříznutá jména v Sheets)
     const normAudit = (name) => {
       if (!name || name === '—') return name || '—';
       const trimmed = name.trim();
       const lower = trimmed.toLowerCase();
-      // Přesný match
       if (nameMap[lower]) return nameMap[lower];
-      // Partial match — hledáme záznam v DB jehož username/display_name začíná nebo obsahuje hodnotu ze Sheets
-      // (Sheets může mít oříznuté jméno kvůli šířce sloupce, ale data jsou kompletní)
       for (const [key, icName] of Object.entries(nameMap)) {
         if (key.includes(lower) || lower.includes(key)) return icName;
       }
-      // Žádný match — vrátíme raw hodnotu ze Sheets (aspoň něco vidíme v auditu)
       return trimmed;
+    };
+
+    // Detekuje zdroj záznamu: web zapíše timestamp v prvním sloupci ve formátu DD.MM.YYYY,
+    // Discord bot může psát jiný formát nebo ponechat prázdné
+    const detectSource = (r) => {
+      const ts = (r[0] || '').toString().trim();
+      if (!ts) return 'discord';
+      // Web timestamp: "12.6.2025, 14:30:00" nebo podobné CZ formáty
+      if (/\d{1,2}\.\s?\d{1,2}\.\s?\d{4}/.test(ts)) return 'web';
+      // ISO formát — může být bot nebo web
+      if (/^\d{4}-\d{2}-\d{2}/.test(ts)) return 'bot';
+      return 'discord';
     };
 
     const events = [];
@@ -421,49 +423,55 @@ app.get('/api/audit', requireAuth, async (req, res) => {
     const addRows = (rows, sekce, icon) => {
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
-        // Přijmi řádek i když r[0] je prázdné (Discord bot může mít jiný timestamp sloupec)
-        // Hledáme libovolný neprázdný sloupec s hodnotou jako identifikátor záznamu
         const hasContent = r && r.some(cell => cell && cell.toString().trim() !== '');
         if (!hasContent) continue;
 
         let detail = '';
         let rawUzivatel = '—';
+        const source = detectSource(r);
 
         if (sekce === 'Zbraně') {
-          detail = `${r[2] || '?'} (${r[3] || '?'} ks) [${r[4] || '?'}]${r[6] && r[6] !== '-' ? ' | Účel: '+r[6] : ''}`;
+          // Web: [cas, typ, polozka, qty, kategorie, uzivatel, ucel]
+          // Bot: může mít různé pořadí — hledáme inteligentně
+          const polozka = r[2] || '?';
+          const qty = r[3] || '?';
+          const kat = r[4] || '?';
+          const ucel = r[6] && r[6] !== '-' ? r[6] : '';
+          detail = `${polozka} (${qty} ks) [${kat}]${ucel ? ' | Účel: '+ucel : ''}`;
           rawUzivatel = r[5] || '—';
         } else if (sekce === 'Weed') {
-          // Web zapisuje: [cas, typ, odruda, qty, ceny.vyroba, ceny.prodej, uzivatel]  → uzivatel na [6]
-          // Discord bot může psát jinak — zkusíme oba možné indexy
+          // Web: [cas, typ, odruda, qty, vyroba, prodej, uzivatel]
+          const qty = parseInt(r[3]) || 0;
           const vyrobaCena = parseFloat(r[4]) || 0;
           const prodejCena = parseFloat(r[5]) || 0;
-          const qty = parseInt(r[3]) || 0;
           detail = `${r[2] || '?'} (${qty} ks)${vyrobaCena ? ` | Výroba: ~$${vyrobaCena * qty}` : ''}${prodejCena ? ` | Prodej: $${prodejCena * qty}` : ''}`;
-          rawUzivatel = r[6] || r[5] || '—';
-          // Pokud r[6] vypadá jako číslo (cena), uživatel je jinde
-          if (rawUzivatel && !isNaN(rawUzivatel)) rawUzivatel = r[7] || r[5] || '—';
+          // Pokud r[6] je číslo, uživatel je na r[7]; jinak r[6]
+          rawUzivatel = (r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '—');
         } else if (sekce === 'Drogy') {
-          detail = `${r[2] || '?'} (${r[3] || '?'} ks)`;
-          rawUzivatel = r[6] || r[5] || '—';
-          if (rawUzivatel && !isNaN(rawUzivatel)) rawUzivatel = r[7] || r[5] || '—';
+          // Web: [cas, typ, droga, qty, '-', '-', uzivatel]
+          const qty = r[3] || '?';
+          detail = `${r[2] || '?'} (${qty} ks)`;
+          rawUzivatel = (r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '—');
         } else if (sekce === 'Účetnictví') {
+          // Web: [cas, typ, castka, valuta, poznamka, uzivatel]
           const sym = (r[3]||'') === 'USD' ? '$' : '₱';
           detail = `${sym}${r[2] || '?'} | ${r[4] || '—'}`;
           rawUzivatel = r[5] || '—';
         }
 
-        // Fallback: prohledej všechny sloupce od konce pro jméno uživatele
-        if (!rawUzivatel || rawUzivatel === '—') {
+        // Fallback: projdi sloupce odzadu a najdi první non-numerický text = jméno
+        if (!rawUzivatel || rawUzivatel === '—' || rawUzivatel === '-') {
           for (let ci = r.length - 1; ci >= 0; ci--) {
             const v = (r[ci] || '').toString().trim();
-            if (v && isNaN(v) && v !== '-' && v.length > 1) {
+            if (v && isNaN(v) && v !== '-' && v !== '—' && v.length > 1 &&
+                !/^\d{1,2}\.\d{1,2}\.\d{4}/.test(v) && !/^(VKLAD|VÝBĚR|PŘÍJEM|VÝDAJ|USD|PESOS)$/i.test(v)) {
               rawUzivatel = v;
               break;
             }
           }
         }
 
-        const cas = r[0] && r[0].toString().trim() ? r[0] : (r[r.length-1] || '—');
+        const cas = r[0] && r[0].toString().trim() ? r[0] : (new Date().toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' }));
         const typ = (r[1]||'').toString().toUpperCase();
 
         events.push({
@@ -473,7 +481,8 @@ app.get('/api/audit', requireAuth, async (req, res) => {
           typ: typ || 'NEZNÁMÝ',
           uzivatel: normAudit(rawUzivatel),
           detail,
-          _raw: r, // pro debug — odstraň v produkci pokud nechceš
+          source, // 'web' nebo 'discord'/'bot'
+          _raw: r,
         });
       }
     };
@@ -498,7 +507,6 @@ app.get('/api/audit', requireAuth, async (req, res) => {
     }
 
     events.sort((a, b) => {
-      // Robustní řazení — funguje i pro různé formáty timestampu
       const ta = a.cas || '';
       const tb = b.cas || '';
       return tb.localeCompare(ta);
@@ -527,7 +535,28 @@ app.get('/api/debug-sheets', requireAuth, async (req, res) => {
 });
 
 
-app.get('/dashboard', requireAuth, async (req, res) => {
+app.get('/home', requireAuth, async (req, res) => {
+  try {
+    const [zbrane, weed, drogy, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy] = await Promise.all([
+      sheets.getStockSummary('Zbraně').catch(() => ({})),
+      sheets.getStockSummary('Weed').catch(() => ({})),
+      sheets.getStockSummary('Drogy').catch(() => ({})),
+      sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 })),
+      sheets.getRecentRows('Účetnictví', 5).catch(() => []),
+      sheets.getRecentRows('Zbraně', 3).catch(() => []),
+      sheets.getRecentRows('Weed', 3).catch(() => []),
+      sheets.getRecentRows('Drogy', 3).catch(() => []),
+    ]);
+    res.send(renderHome(req, { zbrane, weed, drogy, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy }));
+  } catch (e) {
+    res.send(renderHome(req, { zbrane: {}, weed: {}, drogy: {}, ucet: { usd: 0, pesos: 0 }, recentUcet: [], recentZbrane: [], recentWeed: [], recentDrogy: [] }));
+  }
+});
+
+app.get('/dashboard', requireAuth, async (req, res) => res.redirect('/home'));
+
+
+app.get('/sklad', requireAuth, async (req, res) => {
   try {
     const [zbrane, weed, drogy, ucet, recentUcet] = await Promise.all([
       sheets.getStockSummary('Zbraně').catch(() => ({})),
@@ -621,65 +650,35 @@ function baseStyles() {
         --shadow-card:0 2px 14px rgba(0,0,0,0.07);
         --red-glow:0 0 28px rgba(180,24,24,0.18);
       }
-      body.red{
-        /* ── ČERVENÁ — krvavě červené pozadí, černá + bílá ── */
-        --crimson:#1A0000;
-        --crimson-light:#0A0000;
-        --crimson-glow:rgba(0,0,0,0.25);
-        --crimson-bright:#000000;
-        --silver:#F5F0F0;
-        --silver-bright:#FFFFFF;
-        --silver-dim:rgba(245,240,240,0.10);
-        --bg:#6B0000;
-        --bg-soft:#7A0000;
-        --bg-mid:#880000;
-        --bg-card:#720000;
-        --bg-card2:#7E0000;
-        --bg-card3:#8C0000;
-        --text:#FFFFFF;
-        --text-dim:#F0E0E0;
-        --text-muted:#C88080;
-        --text-label:#B87070;
-        --border:rgba(0,0,0,0.20);
-        --border-hover:rgba(0,0,0,0.35);
-        --border-silver:rgba(255,255,255,0.15);
-        --border-gold:rgba(0,0,0,0.25);
-        --gold:#F5F0F0;
-        --gold-dim:rgba(245,240,240,0.08);
-        --input-bg:#7A0000;
-        --shadow:0 8px 40px rgba(0,0,0,0.60);
-        --shadow-card:0 2px 24px rgba(0,0,0,0.45);
-        --red-glow:0 0 40px rgba(0,0,0,0.40);
-      }
-      body.silver{
-        /* ── STŘÍBRNÁ — krystalové pozadí, krystalová modrá ── */
-        --crimson:#4A7FB0;
-        --crimson-light:#5A9AD0;
-        --crimson-glow:rgba(90,154,208,0.14);
-        --crimson-bright:#70B4E8;
-        --silver:#A8C8E8;
-        --silver-bright:#D8ECFF;
-        --silver-dim:rgba(168,200,232,0.10);
-        --bg:#E8F0F8;
-        --bg-soft:#DDE8F4;
-        --bg-mid:#D0DFF0;
-        --bg-card:#EEF4FC;
-        --bg-card2:#E4EEF8;
-        --bg-card3:#D8E8F4;
-        --text:#0A1828;
-        --text-dim:#1E3450;
-        --text-muted:#7090B0;
-        --text-label:#5878A0;
-        --border:rgba(90,140,200,0.14);
-        --border-hover:rgba(90,140,200,0.26);
-        --border-silver:rgba(90,154,208,0.28);
-        --border-gold:rgba(70,130,190,0.22);
-        --gold:#3A6EA0;
-        --gold-dim:rgba(58,110,160,0.09);
-        --input-bg:#DCE8F4;
-        --shadow:0 4px 28px rgba(40,80,140,0.14);
-        --shadow-card:0 2px 14px rgba(40,80,140,0.10);
-        --red-glow:0 0 32px rgba(90,154,208,0.28);
+      body.crystal{
+        /* ── KRYSTAL — tmavé sklovité pozadí, krystalová modrá + červená ── */
+        --crimson:#C0392B;
+        --crimson-light:#E74C3C;
+        --crimson-glow:rgba(231,76,60,0.18);
+        --crimson-bright:#FF6B5B;
+        --silver:#7EC8E3;
+        --silver-bright:#B8E8F8;
+        --silver-dim:rgba(126,200,227,0.10);
+        --bg:#06111A;
+        --bg-soft:#08161F;
+        --bg-mid:#0C1D28;
+        --bg-card:#091520;
+        --bg-card2:#0E1E2C;
+        --bg-card3:#122435;
+        --text:#D6F0FF;
+        --text-dim:#8DB8CC;
+        --text-muted:#3A6070;
+        --text-label:#2E5060;
+        --border:rgba(100,200,240,0.09);
+        --border-hover:rgba(100,200,240,0.18);
+        --border-silver:rgba(126,200,227,0.22);
+        --border-gold:rgba(192,57,43,0.28);
+        --gold:#E74C3C;
+        --gold-dim:rgba(231,76,60,0.09);
+        --input-bg:#0A1820;
+        --shadow:0 8px 40px rgba(0,5,15,0.90);
+        --shadow-card:0 2px 24px rgba(0,10,30,0.70);
+        --red-glow:0 0 32px rgba(126,200,227,0.22), 0 0 60px rgba(192,57,43,0.14);
       }
 
       html{scroll-behavior:smooth}
@@ -710,15 +709,11 @@ function baseStyles() {
           radial-gradient(ellipse 70% 45% at 15% 15%, rgba(160,20,20,0.05) 0%, transparent 65%),
           radial-gradient(ellipse 55% 35% at 85% 80%, rgba(120,10,10,0.03) 0%, transparent 60%);
       }
-      body.red::before{
+      body.crystal::before{
         background:
-          radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,0,0,0.30) 0%, transparent 70%),
-          radial-gradient(ellipse 60% 40% at 50% 100%, rgba(0,0,0,0.20) 0%, transparent 60%);
-      }
-      body.silver::before{
-        background:
-          radial-gradient(ellipse 70% 50% at 20% 10%, rgba(180,220,255,0.35) 0%, transparent 65%),
-          radial-gradient(ellipse 55% 40% at 80% 90%, rgba(140,190,240,0.20) 0%, transparent 60%);
+          radial-gradient(ellipse 70% 50% at 20% 10%, rgba(0,120,200,0.18) 0%, transparent 65%),
+          radial-gradient(ellipse 55% 40% at 80% 90%, rgba(192,57,43,0.12) 0%, transparent 60%),
+          radial-gradient(ellipse 40% 30% at 50% 50%, rgba(100,200,240,0.06) 0%, transparent 70%);
       }
 
       @keyframes pageFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -759,14 +754,10 @@ function baseStyles() {
         border-bottom-color:rgba(0,0,0,0.10);
         box-shadow:0 1px 20px rgba(0,0,0,0.08);
       }
-      body.red nav{
-        background:rgba(80,0,0,0.95);
-        border-bottom-color:rgba(0,0,0,0.30);
-      }
-      body.silver nav{
-        background:rgba(220,234,248,0.92);
-        border-bottom-color:rgba(90,140,200,0.22);
-        box-shadow:0 1px 20px rgba(40,80,140,0.10);
+      body.crystal nav{
+        background:rgba(4,10,18,0.95);
+        border-bottom-color:rgba(126,200,227,0.18);
+        box-shadow:0 1px 30px rgba(0,100,180,0.15), 0 0 1px rgba(192,57,43,0.3);
       }
 
       .nav-logo{
@@ -1310,6 +1301,108 @@ function baseStyles() {
       .profit-bar{height:5px;background:var(--border);margin-top:1rem;position:relative;overflow:hidden}
       .profit-fill{height:100%;background:linear-gradient(90deg,rgba(0,200,80,0.5),#00C853);transition:width 0.4s}
 
+      /* ── CONFIRM MODAL ── */
+      .modal-overlay{
+        position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;
+        display:flex;align-items:center;justify-content:center;
+        opacity:0;pointer-events:none;transition:opacity 0.25s;
+        backdrop-filter:blur(6px);
+      }
+      .modal-overlay.open{opacity:1;pointer-events:all}
+      .modal-box{
+        background:var(--bg-card2);border:1px solid var(--border-silver);
+        padding:2.5rem;max-width:420px;width:90%;
+        box-shadow:var(--shadow),var(--red-glow);
+        transform:translateY(24px) scale(0.97);
+        transition:transform 0.28s cubic-bezier(0.22,1,0.36,1);
+        position:relative;
+      }
+      .modal-overlay.open .modal-box{transform:translateY(0) scale(1)}
+      .modal-box::before{
+        content:'';position:absolute;top:0;left:0;right:0;height:2px;
+        background:linear-gradient(90deg,var(--crimson),var(--crimson-light) 50%,transparent);
+      }
+      .modal-title{font-family:'Cinzel',serif;font-size:1rem;letter-spacing:0.08em;margin-bottom:0.6rem;color:var(--text)}
+      .modal-subtitle{font-size:0.84rem;color:var(--text-dim);line-height:1.7;margin-bottom:1.8rem}
+      .modal-detail{
+        background:var(--bg-mid);border:1px solid var(--border-hover);
+        padding:0.9rem 1.1rem;margin-bottom:1.6rem;font-size:0.83rem;color:var(--text-dim);
+        display:grid;grid-template-columns:auto 1fr;gap:0.35rem 1rem;
+      }
+      .modal-detail dt{font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--silver);padding-top:0.1rem}
+      .modal-detail dd{color:var(--text);font-weight:500}
+      .modal-actions{display:flex;gap:0.75rem}
+      .modal-btn-cancel{
+        flex:1;padding:0.75rem;background:transparent;border:1px solid var(--border-hover);
+        color:var(--text-muted);font-family:'Inter',sans-serif;font-size:0.7rem;
+        letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;
+      }
+      .modal-btn-cancel:hover{border-color:var(--border-silver);color:var(--text)}
+      .modal-btn-confirm{
+        flex:2;padding:0.75rem;
+        background:linear-gradient(135deg,var(--crimson),var(--crimson-light));
+        color:#fff;border:none;font-family:'Inter',sans-serif;
+        font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;
+        cursor:pointer;transition:all 0.2s;
+        box-shadow:0 2px 12px var(--crimson-glow);
+      }
+      .modal-btn-confirm:hover{opacity:0.88;transform:translateY(-1px)}
+
+      /* ── ACTIVITY FEED ── */
+      .activity-item{
+        display:flex;align-items:flex-start;gap:0.9rem;
+        padding:0.7rem 0;border-bottom:1px solid var(--border);
+        transition:background 0.15s;
+      }
+      .activity-item:last-child{border-bottom:none}
+      .activity-item:hover{background:var(--crimson-glow);margin:0 -0.5rem;padding-left:0.5rem;padding-right:0.5rem}
+      .activity-icon{
+        width:28px;height:28px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        font-size:0.75rem;flex-shrink:0;margin-top:0.1rem;
+        background:var(--silver-dim);border:1px solid var(--border-silver);
+      }
+      .activity-body{flex:1;min-width:0}
+      .activity-main{font-size:0.86rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .activity-meta{font-size:0.68rem;color:var(--text-muted);margin-top:0.2rem;letter-spacing:0.05em}
+      .activity-source-web{color:var(--crimson-light)}
+      .activity-source-bot{color:var(--silver)}
+
+      /* ── HOME DASHBOARD EXTRA ── */
+      .home-hero{
+        background:linear-gradient(135deg,var(--crimson-glow) 0%,transparent 60%);
+        border:1px solid var(--border-gold);
+        border-left:3px solid var(--crimson-light);
+        padding:2rem 2.5rem;margin-bottom:2rem;
+        position:relative;overflow:hidden;
+        display:flex;align-items:center;justify-content:space-between;gap:2rem;
+      }
+      .home-hero::after{
+        content:'ALBION';
+        position:absolute;right:-1rem;top:50%;transform:translateY(-50%);
+        font-family:'Cinzel',serif;font-size:5rem;font-weight:700;
+        color:var(--crimson-light);opacity:0.04;letter-spacing:0.3em;pointer-events:none;
+        white-space:nowrap;
+      }
+      .quick-actions{display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.5rem}
+      .quick-btn{
+        display:inline-flex;align-items:center;gap:0.5rem;
+        padding:0.6rem 1.2rem;background:var(--silver-dim);
+        border:1px solid var(--border-silver);color:var(--text-dim);
+        font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;
+        text-decoration:none;transition:all 0.2s;
+      }
+      .quick-btn:hover{background:var(--crimson-glow);border-color:var(--crimson-light);color:var(--text);transform:translateY(-1px)}
+      .quick-btn svg{width:13px;height:13px;opacity:0.7}
+
+      /* ── MINI STOCK BARS ── */
+      .mini-stock-row{display:flex;align-items:center;gap:0.8rem;padding:0.5rem 0;border-bottom:1px solid var(--border)}
+      .mini-stock-row:last-child{border-bottom:none}
+      .mini-stock-name{font-size:0.82rem;color:var(--text-dim);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .mini-stock-bar-wrap{width:80px;height:4px;background:var(--border);position:relative;border-radius:2px;flex-shrink:0}
+      .mini-stock-bar-fill{height:100%;background:linear-gradient(90deg,var(--crimson),var(--crimson-light));border-radius:2px;transition:width 0.6s ease}
+      .mini-stock-qty{font-size:0.78rem;color:var(--text);font-weight:500;min-width:36px;text-align:right;flex-shrink:0}
+
       @media(max-width:1200px){.nav-menu a .nav-desc{display:none}}
       @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
       @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}main{padding:1.5rem 1rem}}
@@ -1327,13 +1420,13 @@ function renderNav(req, active) {
         <span class="nav-logo-text">AL<span class="b-red">B</span>ION</span>
       </a>
       <ul class="nav-menu">
-        <li><a href="/dashboard" class="${active==='dashboard'?'active':''}">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></a></li>
+        <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Dashboard & Souhrn</span></a></li>
+        <li><a href="/sklad" class="${active==='sklad'?'active':''}">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></a></li>
         <li><a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka<span class="nav-desc">Oznámení & Aplikace</span></a></li>
         <li><a href="/audit" class="${active==='audit'?'active':''}">Audit<span class="nav-desc">Záznamy akcí</span></a></li>
         <li><a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky<span class="nav-desc">Přehled členů</span></a></li>
         <li><a href="/kodex" class="${active==='kodex'?'active':''}">Kodex<span class="nav-desc">Pravidla & Hierarchie</span></a></li>
         <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">Sázení<span class="nav-desc">Weed kalkulačka</span></a></li>
-
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
@@ -1341,17 +1434,16 @@ function renderNav(req, active) {
           <span class="notif-badge" id="notifBadge">0</span>
         </button>
         <div class="theme-switcher" title="Přepnout téma">
-          <button class="theme-dot-btn" id="td-dark"   style="background:#0A0A0A;border:1.5px solid #CC2020" onclick="setTheme('dark')"   title="Černá"></button>
-          <button class="theme-dot-btn" id="td-light"  style="background:#F5F5F5;border:1.5px solid #CC1818" onclick="setTheme('light')"  title="Světlá"></button>
-          <button class="theme-dot-btn" id="td-red"    style="background:#7A0000;border:1.5px solid #000000" onclick="setTheme('red')"    title="Červená"></button>
-          <button class="theme-dot-btn" id="td-silver" style="background:#D8ECFF;border:1.5px solid #5A9AD0" onclick="setTheme('silver')" title="Stříbrná"></button>
+          <button class="theme-dot-btn" id="td-dark"    style="background:#0A0A0A;border:1.5px solid #CC2020" onclick="setTheme('dark')"    title="Černá"></button>
+          <button class="theme-dot-btn" id="td-light"   style="background:#F5F5F5;border:1.5px solid #CC1818" onclick="setTheme('light')"   title="Světlá"></button>
+          <button class="theme-dot-btn" id="td-crystal" style="background:#06111A;border:1.5px solid #7EC8E3;box-shadow:0 0 6px rgba(126,200,227,0.5)" onclick="setTheme('crystal')" title="Krystal"></button>
         </div>
         <span class="nav-user">přihlášen jako <strong>${ic}</strong></span>
         <a href="/logout" class="nav-logout">Odhlásit</a>
       </div>
     </nav>
     <script>
-      const THEMES = ['dark','light','red','silver'];
+      const THEMES = ['dark','light','crystal'];
       let currentTheme = localStorage.getItem('albion_theme') || 'dark';
       function applyTheme(t) {
         THEMES.forEach(c => document.body.classList.remove(c));
@@ -1398,7 +1490,240 @@ function renderNav(req, active) {
   `;
 }
 
-// ── RENDER DASHBOARD ──────────────────────────────────────────────────────────
+// ── RENDER HOME (Main Dashboard) ─────────────────────────────────────────────
+function renderHome(req, data) {
+  const { zbrane, weed, drogy, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy } = data;
+  const icName = req.session.icName;
+
+  // Výpočet hodnoty skladu
+  const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
+  const DROGY_P = {"Kapky":200,"Kokain":500,"Extáze":350,"Metamfetamin":450,"Benzo":300,"Joyka":250,"Heroin":600,"Speed":280,"LSD":400};
+  const ZBRANE_P = {"Pump Shotgun":8000,"Pistol MK2":12000,"Pistol":5000,"Combat Pistol":7000,"Double Action Revolver":15000,"Navy Revolver":14000,"Vintage Pistol":6000,"Gusenberg":18000,"Dlouhé":25000,"9mm":100,"9mm Mk2":150,".75cal":300,".50cal":250,"12-gauge":200};
+  let totalValue = 0;
+  Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
+  Object.entries(drogy).forEach(([k,q]) => { if(q>0 && DROGY_P[k]) totalValue += q * DROGY_P[k]; });
+  Object.entries(zbrane).forEach(([k,q]) => { if(q>0 && ZBRANE_P[k]) totalValue += q * ZBRANE_P[k]; });
+
+  const totalWeed = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalDrogy = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalZbrane = Object.values(zbrane).filter(q=>q>0).reduce((a,b)=>a+b,0);
+
+  // Top 3 položky každé kategorie pro mini-grafy
+  const topItems = (obj, priceMap, limit=5) => Object.entries(obj)
+    .filter(([,q])=>q>0)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,limit)
+    .map(([item,qty]) => ({ item, qty, value: priceMap[item] ? qty*priceMap[item] : 0 }));
+
+  const topWeed = topItems(weed, WEED_P);
+  const topDrogy = topItems(drogy, DROGY_P);
+  const topZbrane = topItems(zbrane, ZBRANE_P);
+  const maxWeedQty = topWeed.reduce((m,x)=>Math.max(m,x.qty),1);
+  const maxDrogyQty = topDrogy.reduce((m,x)=>Math.max(m,x.qty),1);
+  const maxZbraneQty = topZbrane.reduce((m,x)=>Math.max(m,x.qty),1);
+
+  const miniStock = (items, maxQty) => items.length
+    ? items.map(({item,qty}) => `
+        <div class="mini-stock-row">
+          <span class="mini-stock-name">${item}</span>
+          <div class="mini-stock-bar-wrap"><div class="mini-stock-bar-fill" style="width:${Math.round(qty/maxQty*100)}%"></div></div>
+          <span class="mini-stock-qty">${qty}</span>
+        </div>`).join('')
+    : '<p style="color:var(--text-muted);font-size:0.78rem;padding:0.5rem 0">Sklad prázdný</p>';
+
+  // Poslední aktivity sloučené
+  const allRecent = [
+    ...recentZbrane.map(r => ({ icon:'🔫', sekce:'Zbraně', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[5]||'—', cas:r[0]||'' })),
+    ...recentWeed.map(r => ({ icon:'🌿', sekce:'Weed', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
+    ...recentDrogy.map(r => ({ icon:'💊', sekce:'Drogy', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
+    ...recentUcet.map(r => {
+      const sym=(r[3]||'')==='USD'?'$':'₱';
+      return { icon:'💱', sekce:'Finance', typ:r[1]||'', detail:`${sym}${r[2]||'?'} — ${r[4]||'—'}`, kdo:r[5]||'—', cas:r[0]||'' };
+    }),
+  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,12);
+
+  const activityHtml = allRecent.length ? allRecent.map(ev => {
+    const isIn = /VKLAD|PŘÍJEM/.test((ev.typ||'').toUpperCase());
+    const typColor = isIn ? 'color:#00D97A' : 'color:#FF5555';
+    return `<div class="activity-item">
+      <div class="activity-icon">${ev.icon}</div>
+      <div class="activity-body">
+        <div class="activity-main"><span style="${typColor};font-weight:600;font-size:0.72rem;letter-spacing:0.1em">${ev.typ}</span> &nbsp;${ev.detail}</div>
+        <div class="activity-meta">${ev.sekce} · ${ev.kdo} · <span style="color:var(--text-label)">${ev.cas}</span></div>
+      </div>
+    </div>`;
+  }).join('') : '<p style="color:var(--text-muted);font-size:0.8rem;padding:1rem 0;text-align:center">Zatím žádná aktivita</p>';
+
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Přehled</title>
+  ${baseStyles()}
+  </head><body>
+  ${renderNav(req, 'home')}
+  <main>
+
+    <!-- Hero banner -->
+    <div class="home-hero">
+      <div>
+        <div style="font-size:0.58rem;letter-spacing:0.45em;text-transform:uppercase;color:var(--crimson-light);margin-bottom:0.5rem;font-weight:500">Albion — Centrální systém</div>
+        <h1 style="font-family:'Cinzel',serif;font-size:2rem;font-weight:500;color:var(--text);letter-spacing:0.02em">Vítej zpět, <span style="color:var(--crimson-light)">${icName}</span></h1>
+        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--text-dim);font-size:1.05rem;margin-top:0.4rem">Organizace je aktivní. Níže najdeš aktuální přehled skladu a financí.</p>
+        <div class="quick-actions">
+          <a href="/sklad" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8h14M5 8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v.01M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/></svg>Správa skladu</a>
+          <a href="/audit" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>Audit log</a>
+          <a href="/nastenska" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Nástěnka</a>
+          <a href="/statistiky" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Statistiky</a>
+          <a href="/sazeni" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Sázení</a>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div id="live-clock" style="font-family:'Cinzel',serif;font-size:2rem;color:var(--silver-bright);letter-spacing:0.1em;line-height:1"></div>
+        <div id="live-date" style="font-size:0.68rem;letter-spacing:0.14em;color:var(--text-dim);text-transform:uppercase;margin-top:0.5rem"></div>
+        <div id="live-dow" style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--crimson-light);font-size:0.9rem;margin-top:0.2rem"></div>
+      </div>
+    </div>
+    <script>
+      function updateClock(){
+        const now=new Date();
+        document.getElementById('live-clock').textContent=now.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        document.getElementById('live-date').textContent=now.toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'});
+        document.getElementById('live-dow').textContent=now.toLocaleDateString('cs-CZ',{weekday:'long'});
+      }
+      updateClock();setInterval(updateClock,1000);
+    </script>
+
+    <!-- KPI stats strip -->
+    <div class="stats" style="grid-template-columns:repeat(5,1fr);margin-bottom:2rem">
+      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
+        <div class="stat-label">Zůstatek USD</div>
+        <div class="stat-value" style="color:var(--gold)">$${ucet.usd.toLocaleString('cs-CZ')}</div>
+        <div class="stat-sub">Americké dolary</div>
+      </div>
+      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
+        <div class="stat-label">Zůstatek Pesos</div>
+        <div class="stat-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
+        <div class="stat-sub">Mexické peso</div>
+      </div>
+      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
+        <div class="stat-label">Weed v skladu</div>
+        <div class="stat-value" style="color:#00C853">${totalWeed}</div>
+        <div class="stat-sub">${Object.keys(weed).filter(k=>weed[k]>0).length} odrůd</div>
+      </div>
+      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
+        <div class="stat-label">Drogy v skladu</div>
+        <div class="stat-value">${totalDrogy}</div>
+        <div class="stat-sub">${Object.keys(drogy).filter(k=>drogy[k]>0).length} typů</div>
+      </div>
+      <div class="stat" style="border-top-color:var(--gold);cursor:pointer" onclick="location.href='/sklad'">
+        <div class="stat-label">Hodnota skladu</div>
+        <div class="stat-value" style="font-size:1.3rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
+        <div class="stat-sub">Weed + Drogy + Zbraně</div>
+      </div>
+    </div>
+
+    <!-- 3-col layout: stock summaries + activity feed -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr;gap:1.5rem;align-items:start">
+
+      <!-- Weed -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🌿 Weed</span>
+          <span class="card-badge">${totalWeed} ks</span>
+        </div>
+        ${miniStock(topWeed, maxWeedQty)}
+        <a href="/sklad" style="display:block;margin-top:1.2rem;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;text-align:center;padding:0.5rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Spravovat →</a>
+      </div>
+
+      <!-- Drogy -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">💊 Drogy</span>
+          <span class="card-badge">${totalDrogy} ks</span>
+        </div>
+        ${miniStock(topDrogy, maxDrogyQty)}
+        <a href="/sklad" style="display:block;margin-top:1.2rem;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;text-align:center;padding:0.5rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Spravovat →</a>
+      </div>
+
+      <!-- Zbraně -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🔫 Zbraně</span>
+          <span class="card-badge">${totalZbrane} ks</span>
+        </div>
+        ${miniStock(topZbrane, maxZbraneQty)}
+        <a href="/sklad" style="display:block;margin-top:1.2rem;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;text-align:center;padding:0.5rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Spravovat →</a>
+      </div>
+
+      <!-- Activity feed -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Poslední aktivita</span>
+          <a href="/audit" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;padding:0.2rem 0.6rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Celý audit</a>
+        </div>
+        <div id="activity-feed">${activityHtml}</div>
+      </div>
+    </div>
+
+    <!-- Finance přehled -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem">
+      <div class="card">
+        <div class="card-header"><span class="card-title">💱 Poslední transakce</span><a href="/sklad" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;padding:0.2rem 0.6rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Přidat →</a></div>
+        ${recentUcet.length ? recentUcet.map(r => {
+          const isIn=r[1]==='PŘÍJEM';
+          const sym=(r[3]||'')==='USD'?'$':'₱';
+          return `<div class="sklad-row"><span style="display:flex;align-items:center;gap:0.5rem"><span style="width:6px;height:6px;border-radius:50%;background:${isIn?'#00FF88':'#FF5555'};flex-shrink:0"></span>${r[4]||'—'}</span><span style="${isIn?'color:#00CC66':'color:#FF5555'}">${sym}${r[2]} <em style="color:var(--text-muted)">${r[3]||''}</em></span></div>`;
+        }).join('') : '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Žádné záznamy</p>'}
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">📊 Bilance organizace</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem">
+          <div style="text-align:center;padding:1.5rem;background:var(--bg-mid);border:1px solid var(--border-hover)">
+            <div style="font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:0.5rem">USD Balance</div>
+            <div style="font-family:'Cinzel',serif;font-size:1.6rem;color:${ucet.usd>=0?'#00C853':'#FF5555'}">$${ucet.usd.toLocaleString('cs-CZ')}</div>
+          </div>
+          <div style="text-align:center;padding:1.5rem;background:var(--bg-mid);border:1px solid var(--border-hover)">
+            <div style="font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:0.5rem">PESOS Balance</div>
+            <div style="font-family:'Cinzel',serif;font-size:1.6rem;color:${ucet.pesos>=0?'#00C853':'#FF5555'}">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
+          </div>
+        </div>
+        <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)">
+          <div style="font-size:0.55rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.6rem">Celková hodnota skladu</div>
+          <div style="font-family:'Cinzel',serif;font-size:1.4rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">Weed + Drogy + Zbraně (prodejní ceny)</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+  <div class="toast" id="toast"></div>
+  <script>
+    // Live SSE activity update
+    const evtHome = new EventSource('/api/events');
+    evtHome.addEventListener('skladUpdate', (e) => {
+      const d = JSON.parse(e.data);
+      const label = d.sekce==='zbrane'?'🔫 Zbraně':d.sekce==='weed'?'🌿 Weed':'💊 Drogy';
+      showToast(label+' '+d.typ+' — '+(d.polozka||d.odruda||d.droga)+' ('+d.qty+' ks)');
+    });
+    evtHome.addEventListener('ucetUpdate', (e) => {
+      const d = JSON.parse(e.data);
+      showToast('💱 '+d.typ+' — '+(d.valuta==='USD'?'$':'₱')+d.castka);
+    });
+    evtHome.addEventListener('nastenska', (e) => {
+      const d = JSON.parse(e.data);
+      showToast('📢 Nové oznámení: '+d.title);
+    });
+    function showToast(msg, isError) {
+      let t=document.getElementById('toast');
+      if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.body.appendChild(t);}
+      t.textContent=msg;
+      t.className='toast show'+(isError?' error':'');
+      clearTimeout(t._timer);
+      t._timer=setTimeout(()=>t.className='toast',3500);
+    }
+    window.showToast=showToast;
+  </script>
+  </body></html>`;
+}
+
+// ── RENDER DASHBOARD (Sklad) ──────────────────────────────────────────────────
 function renderDashboard(req, data) {
   const { zbrane, weed, drogy, ucet, recentUcet } = data;
   const icName = req.session.icName;
@@ -1447,7 +1772,7 @@ function renderDashboard(req, data) {
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Dashboard</title>
   ${baseStyles()}
   </head><body>
-  ${renderNav(req, 'dashboard')}
+  ${renderNav(req, 'sklad')}
   <main>
     <div class="page-header">
       <div>
@@ -1570,8 +1895,48 @@ function renderDashboard(req, data) {
       </div>
     </div>
   </main>
+  <!-- ── CONFIRM MODAL ── -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <div class="modal-title" id="modalTitle">Potvrdit akci</div>
+      <div class="modal-subtitle" id="modalSubtitle">Opravdu chceš provést tuto operaci se skladem?</div>
+      <dl class="modal-detail" id="modalDetail"></dl>
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="closeModal()">Zrušit</button>
+        <button class="modal-btn-confirm" id="modalConfirmBtn">Potvrdit</button>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
   <script>
+    // ── MODAL ──────────────────────────────────────────────────────────────
+    let _pendingAction = null;
+    function showModal(title, subtitle, details, actionFn) {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalSubtitle').textContent = subtitle;
+      const dl = document.getElementById('modalDetail');
+      dl.innerHTML = details.map(([k,v]) => '<dt>'+k+'</dt><dd>'+v+'</dd>').join('');
+      _pendingAction = actionFn;
+      document.getElementById('confirmModal').classList.add('open');
+      document.getElementById('modalConfirmBtn').textContent = 'Potvrdit';
+    }
+    function closeModal() {
+      document.getElementById('confirmModal').classList.remove('open');
+      _pendingAction = null;
+    }
+    document.getElementById('modalConfirmBtn').addEventListener('click', async () => {
+      if (!_pendingAction) return;
+      document.getElementById('modalConfirmBtn').textContent = 'Odesílám…';
+      document.getElementById('modalConfirmBtn').disabled = true;
+      await _pendingAction();
+      document.getElementById('modalConfirmBtn').disabled = false;
+      closeModal();
+    });
+    document.getElementById('confirmModal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+    // ── END MODAL ──────────────────────────────────────────────────────────
     const ZBRANE=["Pump Shotgun","Pistol MK2","Pistol","Combat Pistol","Double Action Revolver","Navy Revolver","Vintage Pistol","Gusenberg","Dlouhé"];
     const NABOJE=["9mm","9mm Mk2",".75cal",".50cal","12-gauge"];
     const AKCE=["Malá C4","Velká C4","Přístupová karta","Pokročilá zvláštní karta","EMP zařízení","Řezací laser","Cable Cutter","Zvláštní karta"];
@@ -1599,9 +1964,16 @@ function renderDashboard(req, data) {
       const mnozstvi=document.getElementById('zbrane-mnozstvi').value;
       const kategorie=document.getElementById('zbrane-kat').value;
       const ucel=document.getElementById('zbrane-ucel').value;
-      const r=await post('/api/zbrane',{typ,polozka,mnozstvi,kategorie,ucel});
-      if(r.ok){showToast('OK Záznam uložen');setTimeout(()=>location.reload(),1500);}
-      else showToast(' '+r.error,true);
+      showModal(
+        typ==='VKLAD'?'Vložit do skladu':'Vybrat ze skladu',
+        typ==='VKLAD'?'Potvrzením přidáš tuto položku do skladu organizace.':'Potvrzením odeberete tuto položku ze skladu.',
+        [['Typ', typ],['Položka', polozka],['Množství', mnozstvi+' ks'],['Kategorie', kategorie],..( ucel?[['Účel', ucel]]:[])],
+        async () => {
+          const r=await post('/api/zbrane',{typ,polozka,mnozstvi,kategorie,ucel});
+          if(r.ok){showToast('✓ Záznam uložen');setTimeout(()=>location.reload(),1500);}
+          else showToast('✗ '+r.error,true);
+        }
+      );
     }
     function updateWeedInfo(){
       const odruda=document.getElementById('weed-odruda').value;
@@ -1619,27 +1991,50 @@ function renderDashboard(req, data) {
       const typ=document.getElementById('weed-typ').value;
       const odruda=document.getElementById('weed-odruda').value;
       const mnozstvi=document.getElementById('weed-mnozstvi').value;
-      const r=await post('/api/weed',{typ,odruda,mnozstvi});
-      if(r.ok){showToast('OK Weed uložen — Výroba: ~$'+r.celkVyroba+' | Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
-      else showToast(' '+r.error,true);
+      const c=WEED_CENY[odruda]||{vyroba:100,prodej:150};
+      showModal(
+        typ==='VKLAD'?'Vložit weed do skladu':'Vybrat weed ze skladu',
+        'Zkontroluj detaily operace a potvrd.',
+        [['Typ',typ],['Odrůda',odruda],['Množství',mnozstvi+' ks'],['Výroba celkem','~$'+(c.vyroba*mnozstvi)],['Prodej celkem','$'+(c.prodej*mnozstvi)]],
+        async () => {
+          const r=await post('/api/weed',{typ,odruda,mnozstvi});
+          if(r.ok){showToast('✓ Weed uložen — Výroba: ~$'+r.celkVyroba+' | Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
+          else showToast('✗ '+r.error,true);
+        }
+      );
     }
     async function submitDrogy(){
       const typ=document.getElementById('drogy-typ').value;
       const droga=document.getElementById('drogy-droga').value;
       const mnozstvi=document.getElementById('drogy-mnozstvi').value;
-      const r=await post('/api/drogy',{typ,droga,mnozstvi});
-      if(r.ok){showToast('OK Drogy uloženy');setTimeout(()=>location.reload(),1500);}
-      else showToast(' '+r.error,true);
+      showModal(
+        typ==='VKLAD'?'Vložit drogy do skladu':'Vybrat drogy ze skladu',
+        'Zkontroluj detaily operace a potvrd.',
+        [['Typ',typ],['Droga',droga],['Množství',mnozstvi+' ks']],
+        async () => {
+          const r=await post('/api/drogy',{typ,droga,mnozstvi});
+          if(r.ok){showToast('✓ Drogy uloženy');setTimeout(()=>location.reload(),1500);}
+          else showToast('✗ '+r.error,true);
+        }
+      );
     }
     async function submitUcet(){
       const typ=document.getElementById('ucet-typ').value;
       const castka=document.getElementById('ucet-castka').value;
       const valuta=document.getElementById('ucet-valuta').value;
       const poznamka=document.getElementById('ucet-poznamka').value;
-      if(!castka||!poznamka)return showToast(' Vyplň všechna pole',true);
-      const r=await post('/api/ucet',{typ,castka,valuta,poznamka});
-      if(r.ok){showToast('OK Transakce zaznamenána');setTimeout(()=>location.reload(),1500);}
-      else showToast(' '+r.error,true);
+      if(!castka||!poznamka)return showToast('✗ Vyplň všechna pole',true);
+      const sym=valuta==='USD'?'$':'₱';
+      showModal(
+        typ==='PŘÍJEM'?'Zaznamenat příjem':'Zaznamenat výdaj',
+        'Tato transakce bude zapsána do účetnictví organizace.',
+        [['Typ',typ],['Částka',sym+castka],['Valuta',valuta],['Poznámka',poznamka]],
+        async () => {
+          const r=await post('/api/ucet',{typ,castka,valuta,poznamka});
+          if(r.ok){showToast('✓ Transakce zaznamenána');setTimeout(()=>location.reload(),1500);}
+          else showToast('✗ '+r.error,true);
+        }
+      );
     }
   </script>
   </body></html>`;
@@ -1820,11 +2215,15 @@ function renderAudit(req) {
         <button class="typ-btn" onclick="filterAudit('Weed')" id="filter-weed" style="flex:none;padding:0.4rem 1rem">Weed</button>
         <button class="typ-btn" onclick="filterAudit('Drogy')" id="filter-drogy" style="flex:none;padding:0.4rem 1rem">Drogy</button>
         <button class="typ-btn" onclick="filterAudit('Účetnictví')" id="filter-ucet" style="flex:none;padding:0.4rem 1rem">Účetnictví</button>
+        <span style="margin-left:auto;font-size:0.62rem;letter-spacing:0.1em;color:var(--text-muted);display:flex;align-items:center;gap:0.5rem">
+          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--crimson-light)"></span>Web
+          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--silver)"></span>Discord bot
+        </span>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Čas</th><th>Sekce</th><th>Typ</th><th>Člen</th><th>Detail</th></tr></thead>
-          <tbody id="audit-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2.5rem">Načítám...</td></tr></tbody>
+          <thead><tr><th>Čas</th><th>Zdroj</th><th>Sekce</th><th>Typ</th><th>Člen</th><th>Detail</th></tr></thead>
+          <tbody id="audit-body"><tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2.5rem">Načítám...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1879,12 +2278,16 @@ function renderAudit(req) {
 
     function renderTable(events) {
       const tbody = document.getElementById('audit-body');
-      if (!events.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2.5rem">Žádné záznamy</td></tr>'; return; }
+      if (!events.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2.5rem">Žádné záznamy</td></tr>'; return; }
       tbody.innerHTML = events.map(e => {
         const typCls = e.typ === 'VKLAD' || e.typ === 'PŘÍJEM' ? 'vklad' : 'vyber';
+        const srcLabel = e.source === 'web'
+          ? '<span style="font-size:0.58rem;letter-spacing:0.1em;color:var(--crimson-light);border:1px solid var(--border-gold);padding:0.15rem 0.5rem">WEB</span>'
+          : '<span style="font-size:0.58rem;letter-spacing:0.1em;color:var(--silver);border:1px solid var(--border-silver);padding:0.15rem 0.5rem">BOT</span>';
         return \`<tr>
           <td style="white-space:nowrap;color:var(--text-muted);font-size:0.82rem">\${e.cas}</td>
-          <td style="font-weight:500">\${e.sekce}</td>
+          <td>\${srcLabel}</td>
+          <td style="font-weight:500">\${e.icon} \${e.sekce}</td>
           <td><span class="badge \${typCls}">\${e.typ}</span></td>
           <td style="color:var(--silver-bright);font-weight:500">\${e.uzivatel}</td>
           <td style="color:var(--text-dim)">\${e.detail}</td>
