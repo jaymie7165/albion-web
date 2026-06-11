@@ -430,190 +430,541 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/sazeni', requireAuth, (req, res) => res.send(renderSazeni(req)));
 
+
 // ── BASE STYLES ───────────────────────────────────────────────────────────────
 function baseStyles() {
   return `
     <link rel="icon" type="image/png" href="/logo.png">
     <link rel="apple-touch-icon" href="/logo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
 
-      /* ── TÉMA ── */
       :root{
-        --crimson:#8B1A1A;--crimson-light:#B22222;--crimson-glow:rgba(139,26,26,0.18);
-        --silver:#B8B8C2;--silver-bright:#D2D2DC;--silver-dim:rgba(184,184,200,0.12);
-        --gold:#C9A84C;--gold-dim:rgba(201,168,76,0.1);
-        --bg:#07070A;--bg-soft:#0C0C10;--bg-mid:#131318;--bg-card:#0E0E13;
-        --bg-card2:#111116;
-        --text:#EDEEF4;--text-dim:#B4B4C4;--text-muted:#46464E;--text-label:#646470;
-        --border:rgba(200,200,230,0.06);--border-hover:rgba(200,200,230,0.14);
-        --border-silver:rgba(180,180,210,0.22);--border-gold:rgba(201,168,76,0.14);
-        --input-bg:#131318;
-        --shadow:0 4px 28px rgba(0,0,0,0.75);
-        --shadow-card:0 2px 14px rgba(0,0,0,0.55);
+        --crimson:#8B1A1A;
+        --crimson-light:#C0282D;
+        --crimson-glow:rgba(192,40,45,0.15);
+        --crimson-bright:#E03030;
+        --silver:#A8A8B8;
+        --silver-bright:#D0D0E0;
+        --silver-dim:rgba(180,180,210,0.1);
+        --bg:#050508;
+        --bg-soft:#08080D;
+        --bg-mid:#0D0D14;
+        --bg-card:#0A0A10;
+        --bg-card2:#0F0F18;
+        --bg-card3:#111120;
+        --text:#ECEEF6;
+        --text-dim:#A0A0BC;
+        --text-muted:#404050;
+        --text-label:#5A5A6E;
+        --border:rgba(255,255,255,0.04);
+        --border-hover:rgba(255,255,255,0.10);
+        --border-silver:rgba(180,180,220,0.18);
+        --border-gold:rgba(201,168,76,0.15);
+        --gold:#C9A84C;
+        --gold-dim:rgba(201,168,76,0.08);
+        --input-bg:#0D0D14;
+        --shadow:0 8px 40px rgba(0,0,0,0.8);
+        --shadow-card:0 2px 20px rgba(0,0,0,0.6);
+        --red-glow:0 0 30px rgba(192,40,45,0.2);
+        --nav-h:68px;
       }
       body.light{
-        --bg:#E6E6EE;--bg-soft:#DCDCE6;--bg-mid:#D0D0DC;--bg-card:#F2F2F8;--bg-card2:#EAEAF2;
-        --silver:#606070;--silver-bright:#404050;--silver-dim:rgba(80,80,120,0.1);
-        --text:#16161E;--text-dim:#2C2C38;--text-muted:#888898;--text-label:#606070;
-        --border:rgba(0,0,0,0.07);--border-hover:rgba(0,0,0,0.16);--border-silver:rgba(80,80,120,0.2);
-        --input-bg:#DCDCE8;--shadow:0 4px 20px rgba(0,0,0,0.1);--shadow-card:0 2px 8px rgba(0,0,0,0.08);
+        --bg:#EEEEF6;--bg-soft:#E6E6F0;--bg-mid:#DCDCE8;--bg-card:#F4F4FA;--bg-card2:#ECECF4;--bg-card3:#E8E8F2;
+        --silver:#505064;--silver-bright:#303048;--silver-dim:rgba(50,50,80,0.08);
+        --text:#12121E;--text-dim:#2A2A3A;--text-muted:#9090A8;--text-label:#5A5A70;
+        --border:rgba(0,0,0,0.06);--border-hover:rgba(0,0,0,0.14);--border-silver:rgba(60,60,100,0.18);
+        --input-bg:#DCDCE8;--shadow:0 4px 20px rgba(0,0,0,0.12);--shadow-card:0 2px 10px rgba(0,0,0,0.08);
       }
 
-      body{background:var(--bg);color:var(--text);font-family:'Montserrat',sans-serif;font-weight:300;min-height:100vh;transition:background 0.3s,color 0.3s;animation:pageFadeIn 0.4s ease}
-      @keyframes pageFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+      html{scroll-behavior:smooth}
+      body{
+        background:var(--bg);
+        color:var(--text);
+        font-family:'Inter',sans-serif;
+        font-weight:300;
+        min-height:100vh;
+        transition:background 0.4s,color 0.4s;
+        animation:pageFadeIn 0.5s cubic-bezier(0.22,1,0.36,1);
+      }
+      @keyframes pageFadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+      /* ── SCROLLBAR ── */
+      ::-webkit-scrollbar{width:6px;height:6px}
+      ::-webkit-scrollbar-track{background:var(--bg-soft)}
+      ::-webkit-scrollbar-thumb{background:rgba(192,40,45,0.4);border-radius:3px}
+      ::-webkit-scrollbar-thumb:hover{background:rgba(192,40,45,0.7)}
 
       /* ── NAV ── */
-      nav{background:var(--bg-soft);border-bottom:1px solid var(--border-silver);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;height:64px;transition:background 0.3s;backdrop-filter:blur(12px)}
-      nav::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--crimson-light),transparent);opacity:0.4;pointer-events:none}
-      .nav-logo{font-family:'Cinzel',serif;letter-spacing:0.35em;font-size:1.1rem;text-decoration:none;color:var(--text);display:flex;align-items:center;gap:0.8rem;transition:opacity 0.2s}
-      .nav-logo:hover{opacity:0.85}
-      .nav-logo-img{width:28px;height:28px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 0 6px rgba(139,26,26,0.5))}
-      .nav-logo-text .b-red{color:var(--crimson-light);text-shadow:0 0 12px rgba(178,34,34,0.6)}
-      .nav-logo span{color:var(--silver-bright)}
+      nav{
+        background:rgba(5,5,8,0.85);
+        border-bottom:1px solid var(--border-silver);
+        padding:0 2rem;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        position:sticky;
+        top:0;
+        z-index:200;
+        height:var(--nav-h);
+        backdrop-filter:blur(20px) saturate(180%);
+        -webkit-backdrop-filter:blur(20px) saturate(180%);
+        transition:background 0.4s;
+      }
+      nav::after{
+        content:'';
+        position:absolute;
+        bottom:0;left:0;right:0;
+        height:1px;
+        background:linear-gradient(90deg,transparent,var(--crimson-light) 30%,var(--crimson-light) 70%,transparent);
+        opacity:0.25;
+        pointer-events:none;
+      }
+      body.light nav{background:rgba(238,238,246,0.9)}
+
+      .nav-logo{
+        font-family:'Cinzel',serif;
+        letter-spacing:0.4em;
+        font-size:1.05rem;
+        text-decoration:none;
+        color:var(--text);
+        display:flex;
+        align-items:center;
+        gap:0.9rem;
+        flex-shrink:0;
+        transition:opacity 0.2s;
+      }
+      .nav-logo:hover{opacity:0.8}
+      .nav-logo-img{
+        width:30px;height:30px;
+        object-fit:contain;
+        filter:drop-shadow(0 0 8px rgba(192,40,45,0.55));
+        transition:filter 0.3s;
+      }
+      .nav-logo:hover .nav-logo-img{filter:drop-shadow(0 0 14px rgba(192,40,45,0.85))}
+      .nav-logo-text .b-red{
+        color:var(--crimson-light);
+        text-shadow:0 0 16px rgba(192,40,45,0.5);
+      }
+
       .nav-menu{display:flex;gap:0;list-style:none;height:100%}
-      .nav-menu a{display:flex;align-items:center;gap:0.35rem;padding:0 0.9rem;font-size:0.58rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);text-decoration:none;height:100%;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap}
-      .nav-menu a:hover{color:var(--text-dim);background:rgba(200,200,230,0.03)}
-      .nav-menu a.active{color:var(--silver-bright);border-bottom-color:var(--crimson);background:rgba(139,26,26,0.05)}
-      .nav-menu a .nav-emoji{font-size:0.85rem;opacity:0.85}
+      .nav-menu li{height:100%}
+      .nav-menu a{
+        display:flex;align-items:center;gap:0.4rem;
+        padding:0 1rem;
+        height:100%;
+        font-size:0.6rem;
+        letter-spacing:0.14em;
+        text-transform:uppercase;
+        color:var(--text-muted);
+        text-decoration:none;
+        border-bottom:2px solid transparent;
+        transition:color 0.2s,border-color 0.2s,background 0.2s;
+        white-space:nowrap;
+        position:relative;
+      }
+      .nav-menu a::before{
+        content:'';
+        position:absolute;
+        inset:0;
+        background:var(--crimson-glow);
+        opacity:0;
+        transition:opacity 0.2s;
+      }
+      .nav-menu a:hover{color:var(--text-dim)}
+      .nav-menu a:hover::before{opacity:0.5}
+      .nav-menu a.active{
+        color:var(--silver-bright);
+        border-bottom-color:var(--crimson-light);
+        background:rgba(192,40,45,0.06);
+      }
+      .nav-menu a .nav-icon{font-size:0.9rem}
       .nav-menu a .nav-label{display:flex;flex-direction:column;line-height:1.2}
-      .nav-menu a .nav-desc{font-size:0.44rem;letter-spacing:0.08em;color:var(--text-muted);opacity:0.7;margin-top:0.1rem;font-weight:300}
-      .nav-right{display:flex;align-items:center;gap:0.8rem}
-      .nav-user{font-size:0.68rem;color:var(--text-muted);letter-spacing:0.05em}
-      .nav-user strong{color:var(--text);font-weight:400}
-      .nav-logout{font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;padding:0.3rem 0.7rem;border:1px solid rgba(139,26,26,0.3);transition:all 0.2s}
-      .nav-logout:hover{background:var(--crimson-glow)}
-      .theme-toggle{background:none;border:1px solid var(--border-hover);color:var(--text-muted);width:32px;height:32px;cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;border-radius:2px}
+      .nav-menu a .nav-desc{
+        font-size:0.46rem;letter-spacing:0.06em;
+        color:var(--text-muted);opacity:0.65;
+        margin-top:0.1rem;font-weight:300;
+      }
+
+      .nav-right{display:flex;align-items:center;gap:0.75rem;flex-shrink:0}
+      .nav-user{font-size:0.66rem;color:var(--text-muted);letter-spacing:0.06em;white-space:nowrap}
+      .nav-user strong{color:var(--silver-bright);font-weight:400}
+      .nav-logout{
+        font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;
+        color:var(--crimson-light);text-decoration:none;
+        padding:0.35rem 0.8rem;
+        border:1px solid rgba(192,40,45,0.25);
+        transition:all 0.2s;
+      }
+      .nav-logout:hover{background:var(--crimson-glow);border-color:var(--crimson-light)}
+      .theme-toggle{
+        background:none;border:1px solid var(--border-hover);
+        color:var(--text-muted);width:32px;height:32px;cursor:pointer;
+        font-size:0.85rem;display:flex;align-items:center;justify-content:center;
+        transition:all 0.2s;
+      }
       .theme-toggle:hover{border-color:var(--silver);color:var(--silver)}
-      .notif-bell{position:relative;cursor:pointer;background:none;border:none;color:var(--text-muted);font-size:1rem;padding:0.3rem;transition:color 0.2s}
-      .notif-bell:hover{color:var(--silver-bright)}
-      .notif-badge{position:absolute;top:-2px;right:-4px;background:var(--crimson-light);color:white;font-size:0.5rem;min-width:14px;height:14px;border-radius:7px;display:flex;align-items:center;justify-content:center;padding:0 3px;display:none}
+      .notif-bell{
+        position:relative;cursor:pointer;background:none;border:none;
+        color:var(--text-muted);font-size:1rem;padding:0.3rem;transition:color 0.2s;
+      }
+      .notif-bell:hover{color:var(--crimson-bright)}
+      .notif-badge{
+        position:absolute;top:-3px;right:-5px;
+        background:var(--crimson-light);color:white;
+        font-size:0.48rem;min-width:14px;height:14px;
+        border-radius:7px;display:none;align-items:center;justify-content:center;padding:0 3px;
+      }
       .notif-badge.visible{display:flex}
 
       /* ── LAYOUT ── */
-      main{max-width:1440px;margin:0 auto;padding:2.5rem 2rem}
-      .page-header{margin-bottom:2.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-silver);position:relative}
-      .page-header::before{content:'';position:absolute;bottom:-1px;left:0;width:60px;height:2px;background:var(--crimson-light)}
-      .page-label{font-size:0.58rem;letter-spacing:0.5em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem;opacity:0.9}
-      .page-title{font-family:'Cinzel',serif;font-size:2rem;color:var(--text);font-weight:400}
-      .page-sub{font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--text-muted);margin-top:0.5rem;font-size:1rem}
+      main{max-width:1480px;margin:0 auto;padding:2.5rem 2rem 4rem}
+
+      /* ── PAGE HEADER ── */
+      .page-header{
+        margin-bottom:2.5rem;
+        padding-bottom:1.5rem;
+        border-bottom:1px solid var(--border-silver);
+        position:relative;
+        display:flex;
+        align-items:flex-end;
+        justify-content:space-between;
+        gap:2rem;
+      }
+      .page-header::after{
+        content:'';
+        position:absolute;
+        bottom:-1px;left:0;
+        width:80px;height:2px;
+        background:linear-gradient(90deg,var(--crimson-light),transparent);
+      }
+      .page-label{
+        font-size:0.55rem;letter-spacing:0.55em;text-transform:uppercase;
+        color:var(--crimson-light);margin-bottom:0.7rem;opacity:0.8;
+      }
+      .page-title{
+        font-family:'Cinzel',serif;
+        font-size:2rem;color:var(--text);font-weight:400;letter-spacing:0.03em;
+      }
+      .page-sub{
+        font-family:'Cormorant Garamond',serif;
+        font-style:italic;color:var(--text-muted);
+        margin-top:0.5rem;font-size:1.05rem;
+      }
 
       /* ── CARDS ── */
-      .card{background:var(--bg-card);border:1px solid var(--border);padding:1.5rem;transition:background 0.3s,border 0.3s,box-shadow 0.3s;box-shadow:var(--shadow-card)}
-      .card:hover{border-color:var(--border-silver);box-shadow:0 4px 28px rgba(0,0,0,0.6),0 0 0 1px rgba(180,180,210,0.08)}
-      .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
-      .card-title{font-family:'Cinzel',serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim)}
-      .card-badge{font-size:0.57rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver-bright);background:var(--silver-dim);padding:0.25rem 0.65rem;border:1px solid var(--border-silver)}
+      .card{
+        background:var(--bg-card);
+        border:1px solid var(--border);
+        padding:1.6rem;
+        transition:border-color 0.3s,box-shadow 0.3s;
+        box-shadow:var(--shadow-card);
+        position:relative;
+      }
+      .card::before{
+        content:'';position:absolute;top:0;left:0;right:0;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);
+        pointer-events:none;
+      }
+      .card:hover{
+        border-color:var(--border-silver);
+        box-shadow:var(--shadow-card),var(--red-glow);
+      }
+      .card-header{
+        display:flex;align-items:center;justify-content:space-between;
+        margin-bottom:1.4rem;padding-bottom:1rem;
+        border-bottom:1px solid var(--border);
+      }
+      .card-title{
+        font-family:'Cinzel',serif;
+        font-size:0.82rem;letter-spacing:0.12em;color:var(--text-dim);
+      }
+      .card-badge{
+        font-size:0.54rem;letter-spacing:0.22em;text-transform:uppercase;
+        color:var(--silver);background:var(--silver-dim);
+        padding:0.2rem 0.65rem;border:1px solid var(--border-silver);
+      }
 
       /* ── FORMS ── */
-      .form-section{margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)}
-      .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:0.8rem}
+      .form-section{margin-top:1.5rem;padding-top:1.4rem;border-top:1px solid var(--border)}
+      .form-row{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:0.75rem}
       .form-group{display:flex;flex-direction:column;gap:0.3rem}
-      label{font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-label)}
-      select,input[type=text],input[type=number],textarea{background:var(--input-bg);border:1px solid var(--border-hover);color:var(--text);padding:0.65rem 0.85rem;font-family:'Montserrat',sans-serif;font-size:0.82rem;width:100%;outline:none;transition:border-color 0.2s,box-shadow 0.2s}
-      textarea{resize:vertical;min-height:80px}
-      select:focus,input:focus,textarea:focus{border-color:var(--crimson-light);box-shadow:0 0 0 2px var(--crimson-glow)}
+      label{
+        font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;
+        color:var(--text-label);
+      }
+      select,input[type=text],input[type=number],textarea{
+        background:var(--input-bg);
+        border:1px solid var(--border-hover);
+        color:var(--text);
+        padding:0.7rem 0.9rem;
+        font-family:'Inter',sans-serif;
+        font-size:0.82rem;
+        width:100%;outline:none;
+        transition:border-color 0.2s,box-shadow 0.2s;
+        appearance:none;-webkit-appearance:none;
+      }
+      textarea{resize:vertical;min-height:90px}
+      select:focus,input:focus,textarea:focus{
+        border-color:var(--crimson-light);
+        box-shadow:0 0 0 2px var(--crimson-glow);
+      }
       select option{background:var(--bg-mid)}
-      .btn-submit{background:linear-gradient(135deg,var(--crimson),var(--crimson-light));color:#F5F3EF;border:none;padding:0.75rem 1.5rem;font-family:'Montserrat',sans-serif;font-size:0.68rem;letter-spacing:0.25em;text-transform:uppercase;cursor:pointer;width:100%;margin-top:0.5rem;transition:opacity 0.2s,transform 0.1s;box-shadow:0 2px 12px rgba(139,26,26,0.3)}
-      .btn-submit:hover{opacity:0.9}
+      .btn-submit{
+        background:linear-gradient(135deg,var(--crimson) 0%,var(--crimson-light) 100%);
+        color:#F5F3EF;border:none;
+        padding:0.8rem 1.5rem;
+        font-family:'Inter',sans-serif;
+        font-size:0.66rem;letter-spacing:0.28em;text-transform:uppercase;
+        cursor:pointer;width:100%;margin-top:0.5rem;
+        transition:opacity 0.2s,transform 0.15s,box-shadow 0.2s;
+        box-shadow:0 2px 16px rgba(139,26,26,0.35);
+      }
+      .btn-submit:hover{opacity:0.9;box-shadow:0 4px 24px rgba(192,40,45,0.5);transform:translateY(-1px)}
       .btn-submit:active{transform:scale(0.99)}
-      .typ-toggle{display:flex;gap:0.4rem;margin-bottom:1rem}
-      .typ-btn{flex:1;padding:0.5rem;background:transparent;border:1px solid var(--border-hover);color:var(--text-muted);font-family:'Montserrat',sans-serif;font-size:0.62rem;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
+      .typ-toggle{display:flex;gap:0.35rem;margin-bottom:1rem}
+      .typ-btn{
+        flex:1;padding:0.5rem;background:transparent;
+        border:1px solid var(--border-hover);
+        color:var(--text-muted);font-family:'Inter',sans-serif;
+        font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;cursor:pointer;
+        transition:all 0.2s;
+      }
       .typ-btn:hover{color:var(--text-dim);border-color:var(--border-silver)}
-      .typ-btn.active-vklad{background:rgba(0,255,136,0.08);border-color:rgba(0,255,136,0.3);color:#00FF88}
-      .typ-btn.active-vyber{background:rgba(255,68,68,0.08);border-color:rgba(255,68,68,0.3);color:#FF4444}
-      .info-box{background:var(--gold-dim);border:1px solid var(--border-gold);padding:0.8rem 1rem;font-size:0.78rem;color:var(--text-dim);margin-top:0.8rem;display:none}
+      .typ-btn.active-vklad{background:rgba(0,255,136,0.07);border-color:rgba(0,255,136,0.3);color:#00FF88}
+      .typ-btn.active-vyber{background:rgba(255,68,68,0.07);border-color:rgba(255,68,68,0.3);color:#FF5555}
+      .info-box{
+        background:var(--gold-dim);border:1px solid var(--border-gold);
+        padding:0.8rem 1rem;font-size:0.76rem;color:var(--text-dim);margin-top:0.8rem;display:none;
+      }
 
-      /* ── STATS TOP ── */
+      /* ── TOP STATS STRIP ── */
       .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:2rem}
-      .stat{background:var(--bg-card);border:1px solid var(--border);border-top:2px solid var(--crimson);padding:1.5rem;transition:all 0.3s;position:relative;overflow:hidden;box-shadow:var(--shadow-card);cursor:default}
-      .stat::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--crimson-light),transparent)}
-      .stat:hover{border-color:var(--border-silver);transform:translateY(-2px);box-shadow:0 6px 30px rgba(0,0,0,0.65)}
-      .stat::before{content:'';position:absolute;top:0;right:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,rgba(139,26,26,0.03));pointer-events:none}
-      .stat-label{font-size:0.57rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--text-label);margin-bottom:0.6rem}
-      .stat-value{font-family:'Cinzel',serif;font-size:1.75rem;color:var(--text)}
-      .stat-sub{font-size:0.65rem;color:var(--silver);margin-top:0.4rem;opacity:0.9}
+      .stat{
+        background:var(--bg-card);border:1px solid var(--border);
+        padding:1.5rem 1.6rem;
+        transition:all 0.3s;
+        position:relative;overflow:hidden;
+        box-shadow:var(--shadow-card);
+        cursor:default;
+      }
+      .stat::after{
+        content:'';position:absolute;top:0;left:0;right:0;height:2px;
+        background:linear-gradient(90deg,var(--crimson),var(--crimson-light) 50%,transparent);
+      }
+      .stat:hover{
+        border-color:var(--border-silver);
+        transform:translateY(-3px);
+        box-shadow:var(--shadow-card),var(--red-glow);
+      }
+      .stat-label{font-size:0.54rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--text-label);margin-bottom:0.6rem}
+      .stat-value{font-family:'Cinzel',serif;font-size:1.8rem;color:var(--text);line-height:1}
+      .stat-sub{font-size:0.62rem;color:var(--silver);margin-top:0.5rem;opacity:0.85}
 
       /* ── SKLAD ── */
       .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem}
-      .sklad-row{display:flex;justify-content:space-between;align-items:center;padding:0.55rem 0;border-bottom:1px solid var(--border);font-size:0.82rem}
+      .sklad-row{
+        display:flex;justify-content:space-between;align-items:center;
+        padding:0.6rem 0;border-bottom:1px solid var(--border);
+        font-size:0.8rem;
+        transition:background 0.15s;
+      }
       .sklad-row:last-child{border-bottom:none}
-      .sklad-row em{color:var(--gold);font-style:normal;margin-left:0.5rem;font-size:0.72rem;opacity:0.8}
+      .sklad-row:hover{background:rgba(255,255,255,0.02);margin:0 -0.5rem;padding-left:0.5rem;padding-right:0.5rem}
+      .sklad-row em{color:var(--gold);font-style:normal;margin-left:0.5rem;font-size:0.7rem;opacity:0.85}
 
       /* ── TOAST ── */
-      .toast{position:fixed;bottom:2rem;right:2rem;background:var(--bg-card2);border:1px solid var(--border-hover);border-left:3px solid #00FF88;padding:1rem 1.5rem;font-size:0.82rem;transform:translateY(100px);opacity:0;transition:all 0.3s;z-index:999;max-width:320px;box-shadow:var(--shadow)}
-      .toast.show{transform:translateY(0);opacity:1}
-      .toast.error{border-left-color:#FF4444}
+      .toast{
+        position:fixed;bottom:1.5rem;right:1.5rem;
+        background:var(--bg-card3);
+        border:1px solid var(--border-hover);
+        border-left:3px solid #00FF88;
+        padding:0.9rem 1.4rem;font-size:0.8rem;
+        transform:translateY(120px) scale(0.95);opacity:0;
+        transition:all 0.35s cubic-bezier(0.22,1,0.36,1);
+        z-index:999;max-width:340px;
+        box-shadow:var(--shadow);
+      }
+      .toast.show{transform:translateY(0) scale(1);opacity:1}
+      .toast.error{border-left-color:#FF5555}
 
       /* ── TABULKY ── */
       .table-wrap{overflow-x:auto}
-      table{width:100%;border-collapse:collapse;font-size:0.8rem}
-      th{font-size:0.57rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--silver-bright);padding:0.75rem 0.9rem;text-align:left;border-bottom:1px solid var(--border-silver);opacity:0.9}
-      td{padding:0.7rem 0.9rem;border-bottom:1px solid var(--border);color:var(--text-dim)}
+      table{width:100%;border-collapse:collapse;font-size:0.78rem}
+      th{
+        font-size:0.54rem;letter-spacing:0.24em;text-transform:uppercase;
+        color:var(--silver);padding:0.8rem 1rem;text-align:left;
+        border-bottom:1px solid var(--border-silver);background:rgba(255,255,255,0.015);
+      }
+      td{padding:0.75rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim)}
       tr:last-child td{border-bottom:none}
-      tr:hover td{background:rgba(201,168,76,0.03)}
-      .badge{font-size:0.58rem;padding:0.2rem 0.6rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:1px}
-      .badge.vklad{background:rgba(0,255,136,0.08);color:#00FF88;border:1px solid rgba(0,255,136,0.2)}
-      .badge.vyber{background:rgba(255,68,68,0.08);color:#FF4444;border:1px solid rgba(255,68,68,0.2)}
-      .badge.prijem{background:rgba(0,255,136,0.08);color:#00FF88;border:1px solid rgba(0,255,136,0.2)}
-      .badge.vydaj{background:rgba(255,68,68,0.08);color:#FF4444;border:1px solid rgba(255,68,68,0.2)}
+      tr:hover td{background:rgba(192,40,45,0.03);color:var(--text)}
+      .badge{
+        font-size:0.56rem;padding:0.2rem 0.6rem;
+        letter-spacing:0.12em;text-transform:uppercase;
+      }
+      .badge.vklad{background:rgba(0,255,136,0.07);color:#00FF88;border:1px solid rgba(0,255,136,0.2)}
+      .badge.vyber{background:rgba(255,85,85,0.07);color:#FF5555;border:1px solid rgba(255,85,85,0.2)}
+      .badge.prijem{background:rgba(0,255,136,0.07);color:#00FF88;border:1px solid rgba(0,255,136,0.2)}
+      .badge.vydaj{background:rgba(255,85,85,0.07);color:#FF5555;border:1px solid rgba(255,85,85,0.2)}
 
       /* ── NÁSTĚNKA ── */
       .nastenska-list{display:flex;flex-direction:column;gap:1rem}
-      .nastenska-item{background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--border-silver);padding:1.4rem 1.6rem;transition:all 0.3s}
+      .nastenska-item{
+        background:var(--bg-card);border:1px solid var(--border);
+        border-left:3px solid var(--border-silver);
+        padding:1.4rem 1.6rem;transition:all 0.25s;
+      }
       .nastenska-item:hover{border-left-color:var(--silver);background:var(--bg-card2)}
-      .nastenska-item.new{border-left-color:var(--crimson-light);animation:pulse 2s ease}
-      @keyframes pulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 20px rgba(178,34,34,0.25)}}
-      .nastenska-meta{font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5rem}
+      .nastenska-item.new{border-left-color:var(--crimson-light);animation:pulseCard 2s ease}
+      @keyframes pulseCard{0%,100%{box-shadow:none}50%{box-shadow:var(--red-glow)}}
+      .nastenska-meta{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5rem}
       .nastenska-title{font-family:'Cinzel',serif;font-size:0.95rem;margin-bottom:0.5rem;color:var(--text);font-weight:400}
-      .nastenska-content{font-size:0.85rem;color:var(--text-dim);line-height:1.75;white-space:pre-wrap}
-      .new-badge{display:inline-block;font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;background:var(--crimson);color:white;padding:0.15rem 0.5rem;margin-left:0.5rem;vertical-align:middle}
+      .nastenska-content{font-size:0.84rem;color:var(--text-dim);line-height:1.8;white-space:pre-wrap}
+      .new-badge{
+        display:inline-block;font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;
+        background:var(--crimson-light);color:white;padding:0.15rem 0.5rem;margin-left:0.5rem;vertical-align:middle;
+      }
 
       /* ── KODEX ── */
       .kodex-section{margin-bottom:2.5rem}
-      .kodex-number{font-family:'Cinzel',serif;font-size:3.5rem;color:var(--silver);opacity:0.1;float:left;line-height:1;margin-right:1.2rem;margin-top:-0.3rem;font-weight:700}
-      .kodex-rule{font-size:0.85rem;line-height:1.95;color:var(--text-dim);overflow:hidden}
+      .kodex-number{font-family:'Cinzel',serif;font-size:3.5rem;color:var(--silver);opacity:0.08;float:left;line-height:1;margin-right:1.2rem;margin-top:-0.3rem;font-weight:700}
+      .kodex-rule{font-size:0.84rem;line-height:2;color:var(--text-dim);overflow:hidden}
       .kodex-rule strong{color:var(--text);font-weight:500}
       .kodex-divider{height:1px;background:var(--border);margin:1.8rem 0}
 
       /* ── STATISTIKY ── */
       .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5rem}
-      .stat-card{background:var(--bg-card);border:1px solid var(--border);padding:1.8rem;transition:all 0.3s;box-shadow:var(--shadow-card)}
-      .stat-card:hover{border-color:var(--border-silver);box-shadow:0 4px 20px rgba(0,0,0,0.5)}
-      .stat-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--border-silver)}
-      .stat-card-name{font-family:'Cinzel',serif;font-size:1rem;color:var(--text);font-weight:400}
-      .stat-card-discord{font-size:0.62rem;letter-spacing:0.1em;color:var(--text-muted);margin-top:0.2rem}
-      .stat-row{display:flex;justify-content:space-between;font-size:0.78rem;padding:0.3rem 0;color:var(--text-dim)}
+      .stat-card{
+        background:var(--bg-card);border:1px solid var(--border);
+        padding:1.8rem;transition:all 0.3s;box-shadow:var(--shadow-card);
+      }
+      .stat-card:hover{border-color:var(--border-silver);box-shadow:var(--shadow-card),var(--red-glow)}
+      .stat-card-header{
+        display:flex;justify-content:space-between;align-items:flex-start;
+        margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--border-silver);
+      }
+      .stat-card-name{font-family:'Cinzel',serif;font-size:0.95rem;color:var(--text);font-weight:400}
+      .stat-card-discord{font-size:0.6rem;letter-spacing:0.1em;color:var(--text-muted);margin-top:0.2rem}
+      .stat-row{display:flex;justify-content:space-between;font-size:0.77rem;padding:0.3rem 0;color:var(--text-dim)}
       .stat-row strong{color:var(--text);font-weight:400}
-      .stat-section-label{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--silver);margin-top:0.9rem;margin-bottom:0.3rem;opacity:0.85;padding-top:0.6rem;border-top:1px solid var(--border)}
+      .stat-section-label{
+        font-size:0.56rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);
+        margin-top:0.9rem;margin-bottom:0.3rem;opacity:0.85;
+        padding-top:0.6rem;border-top:1px solid var(--border);
+      }
       .stat-section-label:first-of-type{border-top:none;margin-top:0}
       .stat-item-group{margin-left:0.5rem}
 
       /* ── LORE / HIERARCHY ── */
       .lore-grid{display:grid;grid-template-columns:1fr 320px;gap:3rem;align-items:start}
       .chapters{display:flex;flex-direction:column;gap:3rem}
-      .chapter{border-left:2px solid var(--border-silver);padding-left:2rem;position:relative}
-      .chapter::before{content:'';position:absolute;left:-5px;top:0;width:8px;height:8px;background:var(--silver);opacity:0.5;transform:rotate(45deg)}
-      .chapter-meta{font-size:0.58rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem;opacity:0.85}
+      .chapter{
+        border-left:2px solid var(--border-silver);
+        padding-left:2rem;position:relative;
+      }
+      .chapter::before{
+        content:'';position:absolute;left:-5px;top:2px;
+        width:8px;height:8px;
+        background:var(--crimson-light);opacity:0.6;
+        transform:rotate(45deg);
+      }
+      .chapter-meta{font-size:0.56rem;letter-spacing:0.38em;text-transform:uppercase;color:var(--crimson-light);margin-bottom:0.8rem;opacity:0.8}
       .chapter-title{font-family:'Cinzel',serif;font-size:1.3rem;color:var(--text);margin-bottom:1rem;font-weight:400}
       .chapter-text{font-family:'Cormorant Garamond',serif;font-size:1.08rem;line-height:2;color:var(--text-dim)}
-      .sidebar{background:var(--bg-card);border:1px solid var(--border-silver);padding:2rem;position:sticky;top:84px;box-shadow:var(--shadow-card)}
-      .sidebar-title{font-family:'Cinzel',serif;font-size:0.75rem;letter-spacing:0.25em;text-transform:uppercase;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);color:var(--silver)}
-      .toc-item{font-size:0.75rem;padding:0.6rem 0;border-bottom:1px solid var(--border);color:var(--text-dim);display:flex;gap:0.8rem;align-items:center}
+      .sidebar{
+        background:var(--bg-card);border:1px solid var(--border-silver);
+        padding:2rem;position:sticky;top:calc(var(--nav-h) + 1.5rem);
+        box-shadow:var(--shadow-card);
+      }
+      .sidebar-title{
+        font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.3em;text-transform:uppercase;
+        margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);color:var(--silver);
+      }
+      .toc-item{
+        font-size:0.74rem;padding:0.6rem 0;border-bottom:1px solid var(--border);
+        color:var(--text-dim);display:flex;gap:0.8rem;align-items:center;
+        transition:color 0.2s;cursor:default;
+      }
       .toc-item:last-child{border-bottom:none}
-      .toc-num{color:var(--silver-bright);font-weight:500;min-width:1.5rem;font-family:'Cinzel',serif;font-size:0.8rem}
+      .toc-item:hover{color:var(--text)}
+      .toc-num{color:var(--crimson-light);font-weight:500;min-width:1.5rem;font-family:'Cinzel',serif;font-size:0.78rem}
       .rank-list{display:flex;flex-direction:column;gap:0}
-      .rank-item{display:flex;align-items:flex-start;gap:1.5rem;padding:1.4rem 1.6rem;background:var(--bg-card);border:1px solid var(--border);border-top:none;transition:all 0.2s}
-      .rank-item:first-child{border-top:1px solid var(--border);border-top-color:var(--border-silver)}
-      .rank-item:hover{background:var(--bg-card2);border-left-color:var(--silver)}
-      .rank-item.founder{border-top:2px solid var(--silver);background:linear-gradient(135deg,var(--bg-card),var(--bg-card2))}
-      .rank-num{font-family:'Cinzel',serif;font-size:1.4rem;color:var(--silver);opacity:0.5;min-width:2rem;line-height:1}
-      .rank-info h3{font-family:'Cinzel',serif;font-size:0.88rem;color:var(--text);margin-bottom:0.2rem;font-weight:400}
-      .rank-info .rank-member{font-size:0.75rem;color:var(--silver-bright);margin-bottom:0.4rem;opacity:0.95}
-      .rank-info p{font-size:0.78rem;color:var(--text-muted);line-height:1.7}
-      .rank-rights{margin-top:0.6rem;display:flex;flex-wrap:wrap;gap:0.3rem}
-      .rank-right-tag{font-size:0.58rem;letter-spacing:0.1em;padding:0.2rem 0.55rem;background:var(--silver-dim);border:1px solid var(--border-silver);color:var(--silver-bright);white-space:nowrap}
+      .rank-item{
+        display:flex;align-items:flex-start;gap:1.5rem;
+        padding:1.6rem 1.8rem;
+        background:var(--bg-card);border:1px solid var(--border);
+        border-top:none;transition:all 0.25s;
+        position:relative;
+      }
+      .rank-item:first-child{border-top:1px solid var(--border-silver)}
+      .rank-item:hover{
+        background:var(--bg-card2);
+        border-left:3px solid var(--crimson-light);
+        padding-left:calc(1.8rem - 2px);
+      }
+      .rank-item.founder{
+        border-top:2px solid var(--crimson-light)!important;
+        background:linear-gradient(135deg,var(--bg-card),var(--bg-card2));
+      }
+      .rank-num{font-family:'Cinzel',serif;font-size:1.5rem;color:var(--crimson-light);opacity:0.35;min-width:2.5rem;line-height:1}
+      .rank-item.founder .rank-num{opacity:0.8}
+      .rank-info h3{font-family:'Cinzel',serif;font-size:0.9rem;color:var(--text);margin-bottom:0.2rem;font-weight:400}
+      .rank-info .rank-member{font-size:0.76rem;color:var(--silver-bright);margin-bottom:0.4rem}
+      .rank-info p{font-size:0.78rem;color:var(--text-muted);line-height:1.75}
+      .rank-rights{margin-top:0.7rem;display:flex;flex-wrap:wrap;gap:0.3rem}
+      .rank-right-tag{
+        font-size:0.56rem;letter-spacing:0.1em;padding:0.2rem 0.6rem;
+        background:var(--silver-dim);border:1px solid var(--border-silver);
+        color:var(--silver);white-space:nowrap;
+      }
+
+      /* ── SÁZENÍ EXTRA ── */
+      .sazeni-hero{
+        background:linear-gradient(135deg,rgba(0,80,30,0.14),rgba(0,40,15,0.06));
+        border:1px solid rgba(0,200,80,0.1);
+        padding:2rem;margin-bottom:2rem;position:relative;overflow:hidden;
+      }
+      .sazeni-hero::after{
+        content:'🌱';position:absolute;right:2.5rem;top:50%;
+        transform:translateY(-50%);font-size:5rem;opacity:0.06;pointer-events:none;
+      }
+      .cost-table{width:100%;border-collapse:collapse;margin:1rem 0}
+      .cost-table th{font-size:0.54rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--silver);padding:0.75rem 1rem;text-align:left;border-bottom:1px solid var(--border-silver)}
+      .cost-table td{padding:0.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.82rem}
+      .cost-table tr:last-child td{border-bottom:none;font-weight:500;color:var(--text)}
+      .cost-table .total-row td{border-top:2px solid rgba(0,200,80,0.2);color:var(--text);font-family:'Cinzel',serif}
+      .cost-amount{color:var(--gold);font-weight:500}
+      .kalk-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem}
+      .kalk-block{background:var(--bg-mid);border:1px solid var(--border-hover);padding:1.5rem;position:relative}
+      .kalk-block-label{font-size:0.56rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem}
+      .kalk-block-label::before{content:'';display:inline-block;width:3px;height:13px;background:var(--crimson-light)}
+      .kalk-input{
+        background:var(--input-bg);border:1px solid var(--border-hover);
+        color:var(--text);padding:0.9rem 1rem;
+        font-family:'Cinzel',serif;font-size:1.4rem;
+        width:100%;outline:none;transition:border-color 0.2s,box-shadow 0.2s;text-align:center;
+      }
+      .kalk-input:focus{border-color:rgba(0,200,80,0.4);box-shadow:0 0 0 2px rgba(0,200,80,0.08)}
+      .kalk-result{margin-top:1rem;padding:1rem;background:rgba(0,200,80,0.05);border:1px solid rgba(0,200,80,0.14);text-align:center}
+      .kalk-result-num{font-family:'Cinzel',serif;font-size:2rem;color:#00C853;line-height:1.1}
+      .kalk-result-label{font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-top:0.3rem}
+      .kalk-arrow{text-align:center;font-size:1.5rem;display:flex;align-items:center;justify-content:center;color:var(--text-muted);opacity:0.35}
+      .breakdown-row{display:flex;justify-content:space-between;padding:0.4rem 0;font-size:0.8rem;color:var(--text-dim);border-bottom:1px solid var(--border)}
+      .breakdown-row:last-child{border-bottom:none;color:var(--text);padding-top:0.7rem;margin-top:0.3rem}
+      .breakdown-row .green{color:#00C853}
+      .bd-label{display:flex;align-items:center;gap:0.4rem}
+      .slider-wrap{margin:1.5rem 0}
+      .slider{-webkit-appearance:none;width:100%;height:4px;background:linear-gradient(90deg,rgba(0,200,80,0.5) var(--pct,50%),var(--border-hover) var(--pct,50%));outline:none}
+      .slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:var(--crimson-light);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 8px rgba(192,40,45,0.4)}
+      .slider-labels{display:flex;justify-content:space-between;font-size:0.58rem;color:var(--text-muted);letter-spacing:0.1em;margin-top:0.4rem}
+      .profit-bar{height:5px;background:var(--border);margin-top:1rem;position:relative;overflow:hidden}
+      .profit-fill{height:100%;background:linear-gradient(90deg,rgba(0,200,80,0.5),#00C853);transition:width 0.4s}
+
+      @media(max-width:1200px){.nav-menu a .nav-desc{display:none}}
+      @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
+      @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}main{padding:1.5rem 1rem}}
     </style>
   `;
 }
@@ -627,14 +978,14 @@ function renderNav(req, active) {
         <span class="nav-logo-text">AL<span class="b-red">B</span>ION</span>
       </a>
       <ul class="nav-menu">
-        <li><a href="/dashboard" class="${active==='dashboard'?'active':''}"><span class="nav-emoji">🏛️</span><span class="nav-label">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></span></a></li>
-        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}"><span class="nav-emoji">📢</span><span class="nav-label">Nástěnka<span class="nav-desc">Oznámení & Discord</span></span></a></li>
-        <li><a href="/kodex" class="${active==='kodex'?'active':''}"><span class="nav-emoji">📜</span><span class="nav-label">Kodex<span class="nav-desc">Pravidla organizace</span></span></a></li>
-        <li><a href="/audit" class="${active==='audit'?'active':''}"><span class="nav-emoji">🔍</span><span class="nav-label">Audit<span class="nav-desc">Záznamy akcí</span></span></a></li>
-        <li><a href="/statistiky" class="${active==='statistiky'?'active':''}"><span class="nav-emoji">📊</span><span class="nav-label">Statistiky<span class="nav-desc">Přehled členů</span></span></a></li>
-        <li><a href="/lore" class="${active==='lore'?'active':''}"><span class="nav-emoji">📖</span><span class="nav-label">Historie<span class="nav-desc">Příběh Albionu</span></span></a></li>
-        <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}"><span class="nav-emoji">👑</span><span class="nav-label">Hierarchie<span class="nav-desc">Ranky & pozice</span></span></a></li>
-        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}"><span class="nav-emoji">🌱</span><span class="nav-label">Sázení<span class="nav-desc">Weed kalkulačka</span></span></a></li>
+        <li><a href="/dashboard" class="${active==='dashboard'?'active':''}"><span class="nav-icon">🏛</span><span class="nav-label">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></span></a></li>
+        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}"><span class="nav-icon">📢</span><span class="nav-label">Nástěnka<span class="nav-desc">Oznámení & Discord</span></span></a></li>
+        <li><a href="/kodex" class="${active==='kodex'?'active':''}"><span class="nav-icon">📜</span><span class="nav-label">Kodex<span class="nav-desc">Pravidla organizace</span></span></a></li>
+        <li><a href="/audit" class="${active==='audit'?'active':''}"><span class="nav-icon">🔍</span><span class="nav-label">Audit<span class="nav-desc">Záznamy akcí</span></span></a></li>
+        <li><a href="/statistiky" class="${active==='statistiky'?'active':''}"><span class="nav-icon">📊</span><span class="nav-label">Statistiky<span class="nav-desc">Přehled členů</span></span></a></li>
+        <li><a href="/lore" class="${active==='lore'?'active':''}"><span class="nav-icon">📖</span><span class="nav-label">Historie<span class="nav-desc">Příběh Albionu</span></span></a></li>
+        <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}"><span class="nav-icon">👑</span><span class="nav-label">Hierarchie<span class="nav-desc">Ranky & pozice</span></span></a></li>
+        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}"><span class="nav-icon">🌱</span><span class="nav-label">Sázení<span class="nav-desc">Weed kalkulačka</span></span></a></li>
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">🔔<span class="notif-badge" id="notifBadge">0</span></button>
@@ -690,7 +1041,7 @@ function renderDashboard(req, data) {
 
   const formatSklad = (obj, ceny) => {
     const entries = Object.entries(obj).filter(([,q]) => q > 0);
-    if (!entries.length) return '<p style="color:var(--text-muted);font-size:0.8rem">Sklad je prázdný</p>';
+    if (!entries.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Sklad je prázdný</p>';
     return entries.map(([item, qty]) => {
       const hodnota = ceny && ceny[item] ? qty * ceny[item].prodej : null;
       return `<div class="sklad-row"><span>${item}</span><span>${qty} ks${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
@@ -698,12 +1049,12 @@ function renderDashboard(req, data) {
   };
 
   const formatUcet = (rows) => {
-    if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem">Žádné záznamy</p>';
+    if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Žádné záznamy</p>';
     return rows.map(r => {
       const [cas, typ, castka, valuta, pozn] = r;
-      const icon = typ === 'PŘÍJEM' ? '💚' : '🔴';
+      const isIn = typ === 'PŘÍJEM';
       const symbol = valuta === 'USD' ? '$' : '₱';
-      return `<div class="sklad-row"><span>${icon} ${pozn||'—'}</span><span>${symbol}${castka} <em>${valuta}</em></span></div>`;
+      return `<div class="sklad-row"><span style="display:flex;align-items:center;gap:0.5rem"><span style="width:6px;height:6px;border-radius:50%;background:${isIn?'#00FF88':'#FF5555'};flex-shrink:0"></span>${pozn||'—'}</span><span style="${isIn?'color:#00CC66':'color:#FF5555'}">${symbol}${castka} <em style="color:var(--text-muted)">${valuta}</em></span></div>`;
     }).join('');
   };
 
@@ -712,15 +1063,15 @@ function renderDashboard(req, data) {
   </head><body>
   ${renderNav(req, 'dashboard')}
   <main>
-    <div style="margin-bottom:2rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-gold);position:relative;display:flex;align-items:flex-end;justify-content:space-between">
+    <div class="page-header">
       <div>
-        <div style="font-size:0.58rem;letter-spacing:0.5em;text-transform:uppercase;color:var(--gold);margin-bottom:0.6rem;opacity:0.8">Albion — Systém</div>
-        <h2 style="font-family:'Cinzel',serif;font-size:1.5rem;font-weight:400">Vítej, ${icName}</h2>
-        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--text-muted);margin-top:0.3rem;font-size:1rem">Přehled skladu a účetnictví organizace</p>
+        <div class="page-label">Albion — Systém</div>
+        <h1 class="page-title">Vítej, ${icName}</h1>
+        <p class="page-sub">Přehled skladu a účetnictví organizace</p>
       </div>
-      <div style="text-align:right">
-        <div id="live-clock" style="font-family:'Cinzel',serif;font-size:1.2rem;color:var(--silver-bright);letter-spacing:0.1em"></div>
-        <div id="live-date" style="font-size:0.62rem;letter-spacing:0.2em;color:var(--text-muted);text-transform:uppercase;margin-top:0.2rem"></div>
+      <div style="text-align:right;flex-shrink:0">
+        <div id="live-clock" style="font-family:'Cinzel',serif;font-size:1.3rem;color:var(--silver-bright);letter-spacing:0.1em"></div>
+        <div id="live-date" style="font-size:0.6rem;letter-spacing:0.2em;color:var(--text-muted);text-transform:uppercase;margin-top:0.3rem"></div>
       </div>
     </div>
     <script>
@@ -755,7 +1106,7 @@ function renderDashboard(req, data) {
             <div class="form-group"><label>Množství</label><input type="number" id="zbrane-mnozstvi" min="1" value="1"></div>
             <div class="form-group" id="zbrane-ucel-wrap" style="display:none"><label>Účel výběru</label><input type="text" id="zbrane-ucel" placeholder="Mise, ochrana..."></div>
           </div>
-          <button class="btn-submit" onclick="submitZbrane()">Potvrdit</button>
+          <button class="btn-submit" onclick="submitZbrane()">Potvrdit akci</button>
         </div>
       </div>
       <div class="card">
@@ -772,7 +1123,7 @@ function renderDashboard(req, data) {
             <div class="form-group"><label>Množství</label><input type="number" id="weed-mnozstvi" min="1" value="1"></div>
           </div>
           <div class="info-box" id="weed-info"></div>
-          <button class="btn-submit" onclick="submitWeed()">Potvrdit</button>
+          <button class="btn-submit" onclick="submitWeed()">Potvrdit akci</button>
         </div>
       </div>
       <div class="card">
@@ -788,7 +1139,7 @@ function renderDashboard(req, data) {
             <div class="form-group"><label>Droga</label><select id="drogy-droga"><option>Kapky</option><option>Kokain</option><option>Extáze</option><option>Metamfetamin</option><option>Benzo</option><option>Joyka</option><option>Heroin</option><option>Speed</option><option>LSD</option></select></div>
             <div class="form-group"><label>Množství</label><input type="number" id="drogy-mnozstvi" min="1" value="1"></div>
           </div>
-          <button class="btn-submit" onclick="submitDrogy()">Potvrdit</button>
+          <button class="btn-submit" onclick="submitDrogy()">Potvrdit akci</button>
         </div>
       </div>
       <div class="card">
@@ -796,13 +1147,13 @@ function renderDashboard(req, data) {
         ${formatUcet(recentUcet)}
         <div class="form-section">
           <div class="typ-toggle">
-            <button class="typ-btn active-vklad" onclick="setTyp('ucet','PŘÍJEM',this)">💚 Příjem</button>
-            <button class="typ-btn" onclick="setTyp('ucet','VÝDAJ',this)">🔴 Výdaj</button>
+            <button class="typ-btn active-vklad" onclick="setTyp('ucet','PŘÍJEM',this)">↑ Příjem</button>
+            <button class="typ-btn" onclick="setTyp('ucet','VÝDAJ',this)">↓ Výdaj</button>
           </div>
           <input type="hidden" id="ucet-typ" value="PŘÍJEM">
           <div class="form-row">
             <div class="form-group"><label>Částka</label><input type="number" id="ucet-castka" min="1" placeholder="1000"></div>
-            <div class="form-group"><label>Valuta</label><select id="ucet-valuta"><option value="USD">💵 USD</option><option value="PESOS">💴 Pesos</option></select></div>
+            <div class="form-group"><label>Valuta</label><select id="ucet-valuta"><option value="USD">USD</option><option value="PESOS">Pesos</option></select></div>
           </div>
           <div class="form-group" style="margin-bottom:0.5rem"><label>Poznámka</label><input type="text" id="ucet-poznamka" placeholder="Prodej zboží, plat..."></div>
           <button class="btn-submit" onclick="submitUcet()">Potvrdit transakci</button>
@@ -850,7 +1201,7 @@ function renderDashboard(req, data) {
       if(!c)return;
       const box=document.getElementById('weed-info');
       box.style.display='block';
-      box.innerHTML='💸 Výroba: ~$'+(c.vyroba*qty)+' &nbsp;|&nbsp; 💰 Doporučená prodejní: $'+(c.prodej*qty);
+      box.innerHTML='Výroba: ~$'+(c.vyroba*qty)+'&ensp;|&ensp;Prodej: $'+(c.prodej*qty);
     }
     document.getElementById('weed-odruda').addEventListener('change',updateWeedInfo);
     document.getElementById('weed-mnozstvi').addEventListener('input',updateWeedInfo);
@@ -860,7 +1211,7 @@ function renderDashboard(req, data) {
       const odruda=document.getElementById('weed-odruda').value;
       const mnozstvi=document.getElementById('weed-mnozstvi').value;
       const r=await post('/api/weed',{typ,odruda,mnozstvi});
-      if(r.ok){showToast('✅ Weed uložen. Výroba: ~$'+r.celkVyroba+' | Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
+      if(r.ok){showToast('✅ Weed uložen — Výroba: ~$'+r.celkVyroba+' | Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
       else showToast('❌ '+r.error,true);
     }
     async function submitDrogy(){
@@ -893,40 +1244,40 @@ function renderNastenska(req) {
   ${renderNav(req, 'nastenska')}
   <main>
     <div class="page-header">
-      <div class="page-label">Organizace Albion</div>
-      <div class="page-title">📢 Nástěnka</div>
-      <div class="page-sub">Oznámení z Discord kanálu — synchronizováno v reálném čase</div>
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Nástěnka</h1>
+        <p class="page-sub">Oznámení z Discord kanálu — synchronizováno v reálném čase</p>
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start">
       <div>
         <div id="nastenska-list" class="nastenska-list">
-          <div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:2rem">Načítám oznámení...</div>
+          <div style="color:var(--text-muted);font-size:0.84rem;text-align:center;padding:3rem">Načítám oznámení...</div>
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><span class="card-title">✏️ Nové oznámení</span></div>
+        <div class="card-header"><span class="card-title">Nové oznámení</span></div>
         <div class="form-group" style="margin-bottom:0.8rem"><label>Název</label><input type="text" id="ann-title" placeholder="Důležité oznámení..."></div>
-        <div class="form-group" style="margin-bottom:1rem"><label>Obsah</label><textarea id="ann-content" placeholder="Napište oznámení... Bude odesláno na Discord i zobrazeno zde." rows="5"></textarea></div>
-        <button class="btn-submit" onclick="sendAnnouncement()">📢 Zveřejnit</button>
-        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:0.8rem;text-align:center">Oznámení se odešle i do Discord kanálu</p>
+        <div class="form-group" style="margin-bottom:1rem"><label>Obsah</label><textarea id="ann-content" placeholder="Napište oznámení..." rows="5"></textarea></div>
+        <button class="btn-submit" onclick="sendAnnouncement()">Zveřejnit</button>
+        <p style="font-size:0.68rem;color:var(--text-muted);margin-top:0.8rem;text-align:center">Oznámení se odešle i do Discord kanálu</p>
       </div>
     </div>
   </main>
   <script>
     const LAST_ID_KEY = 'albion_last_ann_id';
     let lastSeenId = localStorage.getItem(LAST_ID_KEY) || '0';
-    let loadedIds = new Set();
 
     async function loadAnnouncements() {
       const res = await fetch('/api/nastenska');
       const data = await res.json();
       const list = document.getElementById('nastenska-list');
       if (!data.messages || !data.messages.length) {
-        list.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:2rem">Žádná oznámení</div>';
+        list.innerHTML = '<div style="color:var(--text-muted);font-size:0.84rem;text-align:center;padding:3rem">Žádná oznámení</div>';
         return;
       }
       const newest = data.messages[0]?.id || '0';
-      const hasNew = newest > lastSeenId && lastSeenId !== '0';
       list.innerHTML = data.messages.map((m, i) => {
         const isNew = m.id > lastSeenId && lastSeenId !== '0' && i === 0;
         const dt = new Date(m.timestamp).toLocaleString('cs-CZ', {timeZone:'Europe/Prague'});
@@ -954,7 +1305,6 @@ function renderNastenska(req) {
       } else showToast('❌ ' + (data.error || 'Chyba'), true);
     }
 
-    // SSE — refresh nástěnky při novém oznámení
     const evtSrc = new EventSource('/api/events');
     evtSrc.addEventListener('nastenska', () => { lastSeenId = '0'; setTimeout(loadAnnouncements, 1000); });
 
@@ -985,25 +1335,26 @@ function renderKodex(req) {
   ${renderNav(req, 'kodex')}
   <main>
     <div class="page-header">
-      <div class="page-label">Organizace Albion</div>
-      <div class="page-title">Kodex</div>
-      <div class="page-sub">Principy a zásady, které definují každého člena Albionu</div>
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Kodex</h1>
+        <p class="page-sub">Principy a zásady, které definují každého člena Albionu</p>
+      </div>
     </div>
     <div class="lore-grid">
       <div class="chapters">
-        ${articles.map((a, i) => `
+        ${articles.map(a => `
         <div class="chapter">
           <div class="chapter-meta">Článek ${a.num}</div>
           <div class="chapter-title">${a.title}</div>
           <div class="chapter-text">${a.text}</div>
         </div>
-        ${i < articles.length - 1 ? '' : ''}
         `).join('')}
       </div>
       <div class="sidebar">
         <div class="sidebar-title">Obsah</div>
         ${articles.map(a => `<div class="toc-item"><span class="toc-num">${a.num}</span><span>${a.title}</span></div>`).join('')}
-        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-size:0.72rem;color:var(--text-muted);line-height:1.9;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.9rem">
+        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.92rem;color:var(--text-muted);line-height:1.9">
           Kodex Albionu je závazný pro každého člena bez výjimky.
         </div>
       </div>
@@ -1020,28 +1371,30 @@ function renderAudit(req) {
   ${renderNav(req, 'audit')}
   <main>
     <div class="page-header">
-      <div class="page-label">Organizace Albion</div>
-      <div class="page-title">Audit</div>
-      <div class="page-sub">Kompletní záznam všech akcí — posledních 200 záznamů</div>
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Audit</h1>
+        <p class="page-sub">Kompletní záznam všech akcí — posledních 200 záznamů</p>
+      </div>
     </div>
 
     <div id="ucet-souhrn-wrap" style="display:none;margin-bottom:2rem">
-      <div style="font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem;opacity:0.8">Účetnictví — souhrn per člen</div>
+      <div style="font-size:0.55rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem;opacity:0.85">Účetnictví — souhrn per člen</div>
       <div id="ucet-souhrn-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem"></div>
     </div>
 
     <div class="card">
       <div style="display:flex;gap:0.4rem;margin-bottom:1.5rem;flex-wrap:wrap">
-        <button class="typ-btn active-vklad" onclick="filterAudit('vse')" id="filter-vse" style="flex:none;padding:0.4rem 0.9rem">Vše</button>
-        <button class="typ-btn" onclick="filterAudit('Zbraně')" id="filter-zbrane" style="flex:none;padding:0.4rem 0.9rem">🔫 Zbraně</button>
-        <button class="typ-btn" onclick="filterAudit('Weed')" id="filter-weed" style="flex:none;padding:0.4rem 0.9rem">🌿 Weed</button>
-        <button class="typ-btn" onclick="filterAudit('Drogy')" id="filter-drogy" style="flex:none;padding:0.4rem 0.9rem">💊 Drogy</button>
-        <button class="typ-btn" onclick="filterAudit('Účetnictví')" id="filter-ucet" style="flex:none;padding:0.4rem 0.9rem">💱 Účetnictví</button>
+        <button class="typ-btn active-vklad" onclick="filterAudit('vse')" id="filter-vse" style="flex:none;padding:0.4rem 1rem">Vše</button>
+        <button class="typ-btn" onclick="filterAudit('Zbraně')" id="filter-zbrane" style="flex:none;padding:0.4rem 1rem">🔫 Zbraně</button>
+        <button class="typ-btn" onclick="filterAudit('Weed')" id="filter-weed" style="flex:none;padding:0.4rem 1rem">🌿 Weed</button>
+        <button class="typ-btn" onclick="filterAudit('Drogy')" id="filter-drogy" style="flex:none;padding:0.4rem 1rem">💊 Drogy</button>
+        <button class="typ-btn" onclick="filterAudit('Účetnictví')" id="filter-ucet" style="flex:none;padding:0.4rem 1rem">💱 Účetnictví</button>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Čas</th><th>Sekce</th><th>Typ</th><th>Člen</th><th>Detail</th></tr></thead>
-          <tbody id="audit-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem">Načítám...</td></tr></tbody>
+          <tbody id="audit-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2.5rem">Načítám...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1073,20 +1426,20 @@ function renderAudit(req) {
         return \`<div class="card" style="padding:1.2rem">
           <div style="font-family:'Cinzel',serif;font-size:0.85rem;margin-bottom:0.8rem;color:var(--text)">\${uz}</div>
           \${s.prijem_usd || s.vydaj_usd ? \`
-          <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.25rem 0">
+          <div style="display:flex;justify-content:space-between;font-size:0.77rem;padding:0.25rem 0">
             <span style="color:var(--text-muted)">USD příjmy / výdaje</span>
             <span><strong style="color:#00CC66">$\${s.prijem_usd.toLocaleString('cs-CZ')}</strong> / <strong style="color:#FF5555">$\${s.vydaj_usd.toLocaleString('cs-CZ')}</strong></span>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:0.75rem;padding:0.2rem 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;font-size:0.74rem;padding:0.2rem 0;border-bottom:1px solid var(--border)">
             <span style="color:var(--text-muted)">Net USD</span>
             <strong style="color:\${netUsd>=0?'#00CC66':'#FF5555'}">\${netUsd>=0?'+':''}\$\${netUsd.toLocaleString('cs-CZ')}</strong>
           </div>\` : ''}
           \${s.prijem_pesos || s.vydaj_pesos ? \`
-          <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.25rem 0">
+          <div style="display:flex;justify-content:space-between;font-size:0.77rem;padding:0.25rem 0">
             <span style="color:var(--text-muted)">Pesos příjmy / výdaje</span>
             <span><strong style="color:#00CC66">₱\${s.prijem_pesos.toLocaleString('cs-CZ')}</strong> / <strong style="color:#FF5555">₱\${s.vydaj_pesos.toLocaleString('cs-CZ')}</strong></span>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:0.75rem;padding:0.2rem 0">
+          <div style="display:flex;justify-content:space-between;font-size:0.74rem;padding:0.2rem 0">
             <span style="color:var(--text-muted)">Net Pesos</span>
             <strong style="color:\${netPesos>=0?'#00CC66':'#FF5555'}">\${netPesos>=0?'+':''}₱\${netPesos.toLocaleString('cs-CZ')}</strong>
           </div>\` : ''}
@@ -1095,31 +1448,28 @@ function renderAudit(req) {
     }
 
     function renderTable(events) {
-      const body = document.getElementById('audit-body');
-      if (!events.length) {
-        body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2rem">Žádné záznamy</td></tr>';
-        return;
-      }
-      body.innerHTML = events.map(e => {
-        const typClass = (e.typ === 'VKLAD' || e.typ === 'PŘÍJEM') ? 'vklad' : 'vyber';
+      const tbody = document.getElementById('audit-body');
+      if (!events.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:2.5rem">Žádné záznamy</td></tr>'; return; }
+      tbody.innerHTML = events.map(e => {
+        const typCls = e.typ === 'VKLAD' || e.typ === 'PŘÍJEM' ? 'vklad' : 'vyber';
         return \`<tr>
-          <td style="font-size:0.72rem;white-space:nowrap;color:var(--text-muted)">\${e.cas}</td>
-          <td style="white-space:nowrap">\${e.icon} \${e.sekce}</td>
-          <td><span class="badge \${typClass}">\${e.typ}</span></td>
-          <td style="color:var(--text);font-weight:400">\${e.uzivatel}</td>
-          <td style="font-size:0.75rem">\${e.detail}</td>
+          <td style="white-space:nowrap;color:var(--text-muted);font-size:0.72rem">\${e.cas}</td>
+          <td>\${e.icon} \${e.sekce}</td>
+          <td><span class="badge \${typCls}">\${e.typ}</span></td>
+          <td style="color:var(--silver-bright)">\${e.uzivatel}</td>
+          <td style="color:var(--text-muted)">\${e.detail}</td>
         </tr>\`;
       }).join('');
     }
 
     function filterAudit(sekce) {
       activeFilter = sekce;
-      document.querySelectorAll('[id^="filter-"]').forEach(b => b.className = 'typ-btn');
-      const btnId = sekce === 'vse' ? 'filter-vse' : sekce === 'Zbraně' ? 'filter-zbrane' : sekce === 'Weed' ? 'filter-weed' : sekce === 'Drogy' ? 'filter-drogy' : 'filter-ucet';
-      document.getElementById(btnId).className = 'typ-btn active-vklad';
+      document.querySelectorAll('[id^=filter-]').forEach(b => b.className = 'typ-btn');
+      const btnId = sekce === 'vse' ? 'filter-vse' : 'filter-' + sekce.toLowerCase().replace('ě','e').replace('í','i');
+      const btn = document.getElementById(btnId);
+      if (btn) btn.className = 'typ-btn active-vklad';
       const filtered = sekce === 'vse' ? allEvents : allEvents.filter(e => e.sekce === sekce);
       renderTable(filtered);
-      // Souhrn účetnictví zobrazit jen pokud filter je "Účetnictví" nebo "vše"
       document.getElementById('ucet-souhrn-wrap').style.display = (sekce === 'vse' || sekce === 'Účetnictví') ? 'block' : 'none';
     }
 
@@ -1138,24 +1488,26 @@ function renderStatistiky(req) {
   ${renderNav(req, 'statistiky')}
   <main>
     <div class="page-header">
-      <div class="page-label">Organizace Albion</div>
-      <div class="page-title">Statistiky členů</div>
-      <div class="page-sub">Detailní přehled příspěvků každého člena organizace</div>
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Statistiky členů</h1>
+        <p class="page-sub">Detailní přehled příspěvků každého člena organizace</p>
+      </div>
     </div>
     <div id="stats-container" class="stats-grid">
-      <div style="color:var(--text-muted);font-size:0.85rem">Načítám statistiky...</div>
+      <div style="color:var(--text-muted);font-size:0.84rem">Načítám statistiky...</div>
     </div>
   </main>
   <script>
-    function renderItemGroup(obj, labelVklad, labelVyber) {
+    function renderItemGroup(obj) {
       const keys = [...new Set([...Object.keys(obj.vklad||{}), ...Object.keys(obj.vyber||{})])];
-      if (!keys.length) return '<div style="font-size:0.75rem;color:var(--text-muted);padding:0.2rem 0 0.4rem">— žádné záznamy —</div>';
+      if (!keys.length) return '<div style="font-size:0.74rem;color:var(--text-muted);padding:0.2rem 0 0.4rem">— žádné záznamy —</div>';
       return keys.map(k => {
         const v = obj.vklad[k] || 0;
         const b = obj.vyber[k] || 0;
         return \`<div class="stat-row stat-item-group">
-          <span style="color:var(--text-dim)">\${k}</span>
-          <span style="display:flex;gap:0.6rem">
+          <span>\${k}</span>
+          <span style="display:flex;gap:0.5rem">
             \${v ? \`<strong style="color:#00CC66">+\${v}</strong>\` : ''}
             \${b ? \`<strong style="color:#FF5555">-\${b}</strong>\` : ''}
           </span>
@@ -1169,43 +1521,35 @@ function renderStatistiky(req) {
       const container = document.getElementById('stats-container');
       const stats = data.stats || {};
       const users = Object.keys(stats);
-      if (!users.length) {
-        container.innerHTML = '<div style="color:var(--text-muted)">Žádná data</div>';
-        return;
-      }
+      if (!users.length) { container.innerHTML = '<div style="color:var(--text-muted)">Žádná data</div>'; return; }
       container.innerHTML = users.map(icName => {
         const s = stats[icName];
-        const discord = s.discordUsername;
-
         const hasZbrane = Object.keys({...s.zbrane.vklad,...s.zbrane.vyber}).length > 0;
         const hasNaboje = Object.keys({...s.naboje.vklad,...s.naboje.vyber}).length > 0;
         const hasAkce   = Object.keys({...s.akce.vklad,...s.akce.vyber}).length > 0;
         const hasWeed   = Object.keys({...s.weed.vklad,...s.weed.vyber}).length > 0;
         const hasDrogy  = Object.keys({...s.drogy.vklad,...s.drogy.vyber}).length > 0;
         const hasUcet   = s.ucet.prijem_usd || s.ucet.vydaj_usd || s.ucet.prijem_pesos || s.ucet.vydaj_pesos;
-
         return \`<div class="stat-card">
           <div class="stat-card-header">
             <div>
-              <div class="stat-card-name">👤 \${icName}</div>
-              \${discord ? \`<div class="stat-card-discord">Discord: \${discord}</div>\` : ''}
+              <div class="stat-card-name">\${icName}</div>
+              \${s.discordUsername ? \`<div class="stat-card-discord">\${s.discordUsername}</div>\` : ''}
             </div>
           </div>
-
-          \${hasZbrane ? \`<div class="stat-section-label">🔫 Zbraně</div>\${renderItemGroup(s.zbrane,'Vloženo','Vybráno')}\` : ''}
-          \${hasNaboje ? \`<div class="stat-section-label">🔴 Střelivo</div>\${renderItemGroup(s.naboje,'','')}\` : ''}
-          \${hasAkce   ? \`<div class="stat-section-label">⚡ Akce & Vybavení</div>\${renderItemGroup(s.akce,'','')}\` : ''}
-          \${hasWeed   ? \`<div class="stat-section-label">🌿 Weed</div>\${renderItemGroup(s.weed,'','')}\` : ''}
-          \${hasDrogy  ? \`<div class="stat-section-label">💊 Drogy</div>\${renderItemGroup(s.drogy,'','')}\` : ''}
-          \${hasUcet   ? \`<div class="stat-section-label">💱 Účetnictví</div>
+          \${hasZbrane ? \`<div class="stat-section-label">🔫 Zbraně</div>\${renderItemGroup(s.zbrane)}\` : ''}
+          \${hasNaboje ? \`<div class="stat-section-label">🔴 Střelivo</div>\${renderItemGroup(s.naboje)}\` : ''}
+          \${hasAkce   ? \`<div class="stat-section-label">⚡ Akce</div>\${renderItemGroup(s.akce)}\` : ''}
+          \${hasWeed   ? \`<div class="stat-section-label">🌿 Weed</div>\${renderItemGroup(s.weed)}\` : ''}
+          \${hasDrogy  ? \`<div class="stat-section-label">💊 Drogy</div>\${renderItemGroup(s.drogy)}\` : ''}
+          \${hasUcet ? \`<div class="stat-section-label">💱 Účetnictví</div>
             \${s.ucet.prijem_usd  ? \`<div class="stat-row"><span>Příjmy USD</span><strong style="color:#00CC66">$\${s.ucet.prijem_usd.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.vydaj_usd   ? \`<div class="stat-row"><span>Výdaje USD</span><strong style="color:#FF5555">$\${s.ucet.vydaj_usd.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.prijem_pesos? \`<div class="stat-row"><span>Příjmy Pesos</span><strong style="color:#00CC66">₱\${s.ucet.prijem_pesos.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.vydaj_pesos ? \`<div class="stat-row"><span>Výdaje Pesos</span><strong style="color:#FF5555">₱\${s.ucet.vydaj_pesos.toLocaleString('cs-CZ')}</strong></div>\` : ''}
           \` : ''}
-
           \${!hasZbrane && !hasNaboje && !hasAkce && !hasWeed && !hasDrogy && !hasUcet
-            ? '<div style="font-size:0.78rem;color:var(--text-muted);padding:0.5rem 0">Zatím žádná aktivita</div>'
+            ? '<div style="font-size:0.77rem;color:var(--text-muted);padding:0.5rem 0">Zatím žádná aktivita</div>'
             : ''}
         </div>\`;
       }).join('');
@@ -1223,9 +1567,11 @@ function renderLore(req) {
   ${renderNav(req, 'lore')}
   <main>
     <div class="page-header">
-      <div class="page-label">Organizace Albion</div>
-      <div class="page-title">Historie & Původ</div>
-      <div class="page-sub">Kronika organizace — od počátků po současnost</div>
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Historie & Původ</h1>
+        <p class="page-sub">Kronika organizace — od počátků po současnost</p>
+      </div>
     </div>
     <div class="lore-grid">
       <div class="chapters">
@@ -1238,7 +1584,6 @@ Právě během tohoto období se kolem něj začala formovat skupina lidí s pod
 
 Název Albion navrhl sám Sinclair. Původně měl představovat odkaz na jeho britské kořeny a připomínku místa, odkud přišel. Postupem času však získal širší význam — přestal označovat původ zakladatelů a začal symbolizovat samotnou organizaci a její identitu.</div>
         </div>
-
         <div class="chapter">
           <div class="chapter-meta">Kapitola 1</div>
           <div class="chapter-title">Formování organizace</div>
@@ -1248,7 +1593,6 @@ Od samého začátku bylo jasné, že Albion nechce fungovat jako pouliční gan
 
 Organizace si postupně získávala další členy — ne na základě původu nebo národnosti, ale na základě charakteru a schopností. Každý nově příchozí musel prokázat, že dokáže přinést určitou hodnotu nejen sobě, ale i celé skupině.</div>
         </div>
-
         <div class="chapter">
           <div class="chapter-meta">Kapitola 2</div>
           <div class="chapter-title">Působení v Los Santos</div>
@@ -1258,7 +1602,6 @@ Organizace si postupně získávala další členy — ne na základě původu n
 
 Přestože organizace vystupovala navenek jako skupina zaměstnanců v různých prostorech, její skutečná síla spočívala především v propojení lidí s různými zkušenostmi a schopnostmi. Každý nový kontakt rozšiřoval možnosti celé skupiny a posiloval její postavení ve městě.</div>
         </div>
-
         <div class="chapter">
           <div class="chapter-meta">Kapitola 3</div>
           <div class="chapter-title">Současnost</div>
@@ -1271,11 +1614,11 @@ Albion tak zůstává organizací postavenou na ambicích, loajalitě a společn
       </div>
       <div class="sidebar">
         <div class="sidebar-title">Kapitoly</div>
-        <div class="toc-item"><span class="toc-num">—</span><span>Počátky · Vznik organizace</span></div>
+        <div class="toc-item"><span class="toc-num">—</span><span>Počátky · Vznik</span></div>
         <div class="toc-item"><span class="toc-num">01</span><span>Formování organizace</span></div>
         <div class="toc-item"><span class="toc-num">02</span><span>Působení v Los Santos</span></div>
         <div class="toc-item"><span class="toc-num">03</span><span>Současnost</span></div>
-        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.95rem;color:var(--text-muted);line-height:1.85">
+        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.94rem;color:var(--text-muted);line-height:1.85">
           „Nechtějí být známí tím, jak hlasitě o sobě dávají vědět, ale tím, čeho dokážou dosáhnout."
         </div>
       </div>
@@ -1290,27 +1633,27 @@ function renderHierarchy(req) {
     {
       rank: 'Founder', num: '01', member: 'Christopher Anthony Sinclair', isFounder: true,
       desc: 'Zakladatel Albionu a osoba určující dlouhodobé směřování organizace. Má konečné slovo při zásadních rozhodnutích, přijímání nových členů, navazování významných partnerství a určování budoucnosti organizace.',
-      rights: ['Absolutní rozhodovací pravomoc','Jmenování a odvolávání členů','Schvalování významných projektů','Správa financí a majetku organizace'],
+      rights: ['Absolutní rozhodovací pravomoc','Jmenování a odvolávání členů','Schvalování projektů','Správa financí'],
     },
     {
       rank: 'Council', num: '02', member: 'Monica Williams', isFounder: false,
-      desc: 'Nejužší vedení organizace. Tvoří jej lidé, kteří si získali nejvyšší důvěru zakladatele. Podílejí se na vedení organizace, rozhodování o důležitých záležitostech a koordinaci jednotlivých aktivit. Počet míst je omezený.',
-      rights: ['Přístup k interním informacím','Účast na strategických rozhodnutích','Návrhy na přijetí nových členů','Dohled nad chodem organizace'],
+      desc: 'Nejužší vedení organizace. Tvoří jej lidé, kteří si získali nejvyšší důvěru zakladatele. Podílejí se na vedení organizace, rozhodování o důležitých záležitostech a koordinaci aktivit.',
+      rights: ['Přístup k interním informacím','Strategická rozhodnutí','Návrhy nových členů','Dohled nad chodem'],
     },
     {
       rank: 'Senior Member', num: '03', member: 'Henry Williams', isFounder: false,
-      desc: 'Zkušení a prověření členové. Jedná se o dlouhodobé členy Albionu, kteří již prokázali svou loajalitu a schopnosti. Často zastupují organizaci při obchodních jednáních a podílejí se na rozvoji projektů.',
-      rights: ['Přístup k většině interních informací','Možnost doporučovat nové členy','Vedení menších projektů','Reprezentace organizace'],
+      desc: 'Zkušení a prověření členové. Jedná se o dlouhodobé členy Albionu, kteří prokázali loajalitu a schopnosti. Zastupují organizaci při obchodních jednáních a podílejí se na rozvoji projektů.',
+      rights: ['Přístup k interním informacím','Doporučování nových členů','Vedení projektů','Reprezentace'],
     },
     {
       rank: 'Member', num: '04', member: null, isFounder: false,
       desc: 'Plnohodnotný člen Albionu. Člověk, který prošel zkušebním obdobím a stal se oficiální součástí organizace. Od člena se očekává aktivita, reprezentace organizace a dodržování kodexu.',
-      rights: ['Přístup do interních prostor organizace','Účast na schůzkách','Zapojení do projektů a aktivit'],
+      rights: ['Přístup do interních prostor','Účast na schůzkách','Zapojení do projektů'],
     },
     {
       rank: 'Associate', num: '05', member: null, isFounder: false,
-      desc: 'Kandidát na členství. Osoba, která s Albionem spolupracuje a buduje si důvěru organizace. Associate ještě není považován za plnohodnotného člena a nemá přístup ke všem informacím. Tato hodnost slouží jako zkušební období.',
-      rights: ['Omezený přístup k organizaci','Účast na vybraných aktivitách','Možnost získat plné členství'],
+      desc: 'Kandidát na členství. Osoba, která s Albionem spolupracuje a buduje si důvěru. Associate ještě není plnohodnotným členem a nemá přístup ke všem informacím. Tato hodnost je zkušební fází.',
+      rights: ['Omezený přístup','Vybrané aktivity','Možnost získat plné členství'],
     },
   ];
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Hierarchie</title>
@@ -1319,9 +1662,11 @@ function renderHierarchy(req) {
   ${renderNav(req, 'hierarchy')}
   <main>
     <div class="page-header">
-      <div class="page-label">Organizace Albion</div>
-      <div class="page-title">Hierarchie</div>
-      <div class="page-sub">Struktura a řád organizace Albion</div>
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Hierarchie</h1>
+        <p class="page-sub">Struktura a řád organizace Albion</p>
+      </div>
     </div>
     <div class="rank-list">
       ${ranks.map(r => `
@@ -1356,154 +1701,183 @@ function renderAuth(page, error, data) {
     password_short: 'Heslo musí mít alespoň 6 znaků.',
     exists: 'Účet již existuje.',
   };
-  const errMsg = error && errors[error] ? `<div class="alert">${errors[error]}</div>` : '';
-  const successMsg = page === 'login' && data === undefined && error === undefined ? '' :
-    (page === 'login' && typeof error === 'undefined' ? '' : '');
-  const successReg = page === 'login' ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='alert success';a.textContent='Registrace proběhla. Přihlaš se.';document.querySelector('.box').prepend(a);}<\/script>` : '';
+  const errMsg = error && errors[error] ? `<div class="auth-alert">${errors[error]}</div>` : '';
+  const successReg = page === 'login' ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Registrace proběhla úspěšně. Přihlaš se.';document.querySelector('.auth-box').prepend(a);}<\/script>` : '';
 
   const style = `
     <link rel="icon" type="image/png" href="/logo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@300;400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&display=swap" rel="stylesheet">
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
-      body{background:#07070A;color:#F5F3EF;font-family:'Montserrat',sans-serif;font-weight:300;min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-      body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(139,26,26,0.12) 0%,transparent 60%);pointer-events:none}
-      body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(139,26,26,0.06) 0%,transparent 60%);pointer-events:none}
-      .box{width:100%;max-width:420px;padding:3rem 2.5rem;background:rgba(14,14,19,0.95);border:1px solid rgba(180,180,210,0.12);backdrop-filter:blur(12px);box-shadow:0 8px 60px rgba(0,0,0,0.8),0 0 0 1px rgba(139,26,26,0.08);position:relative;z-index:1}
-      .box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(178,34,34,0.6),transparent)}
-      .logo{text-align:center;margin-bottom:2.5rem}
-      .logo-img{width:64px;height:64px;object-fit:contain;margin-bottom:1rem;filter:drop-shadow(0 0 20px rgba(139,26,26,0.5));animation:logoFloat 3s ease-in-out infinite}
-      @keyframes logoFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.02)}}
-      .logo h1{font-family:'Cinzel',serif;font-size:2rem;letter-spacing:0.4em}
-      .logo h1 .b-red{color:#B22222;text-shadow:0 0 14px rgba(178,34,34,0.7)}
-      .logo p{font-size:0.68rem;letter-spacing:0.25em;text-transform:uppercase;color:#444;margin-top:0.5rem}
-      .btn{display:block;width:100%;padding:0.9rem;background:linear-gradient(135deg,#8B1A1A,#B22222);color:#F5F3EF;border:none;font-family:'Montserrat',sans-serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;text-decoration:none;text-align:center;margin-top:1rem;transition:all 0.2s;box-shadow:0 2px 16px rgba(139,26,26,0.3)}
-      .btn:hover{opacity:0.9;box-shadow:0 4px 24px rgba(139,26,26,0.5);transform:translateY(-1px)}
-      .btn:active{transform:translateY(0)}
-      .btn.secondary{background:transparent;border:1px solid rgba(180,180,210,0.15);color:#666;box-shadow:none}
-      .btn.secondary:hover{color:#F5F3EF;border-color:rgba(180,180,210,0.35);background:rgba(180,180,210,0.05);box-shadow:none;transform:none}
-      input{display:block;width:100%;padding:0.85rem 1rem;background:#131318;border:1px solid rgba(180,180,210,0.1);color:#F5F3EF;font-family:'Montserrat',sans-serif;font-size:0.85rem;margin-bottom:1rem;outline:none;transition:border-color 0.2s,box-shadow 0.2s}
-      input:focus{border-color:#8B1A1A;box-shadow:0 0 0 3px rgba(139,26,26,0.1)}
-      label{display:block;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:#555;margin-bottom:0.4rem}
-      .alert{padding:0.8rem 1rem;background:rgba(139,26,26,0.15);border-left:3px solid #8B1A1A;font-size:0.8rem;margin-bottom:1.5rem;border:1px solid rgba(139,26,26,0.25);border-left:3px solid #8B1A1A}
-      .alert.success{background:rgba(0,255,136,0.06);border-left-color:#00FF88;border-color:rgba(0,255,136,0.2);color:#00FF88}
-      .divider{text-align:center;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:#333;margin:1.5rem 0;position:relative}
-      .divider::before,.divider::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:rgba(180,180,210,0.08)}
-      .divider::before{left:0}.divider::after{right:0}
-      .sep{height:1px;background:rgba(180,180,210,0.07);margin:1.5rem 0}
+      body{
+        background:#050508;color:#ECEEF6;
+        font-family:'Inter',sans-serif;font-weight:300;
+        min-height:100vh;display:flex;align-items:center;justify-content:center;
+        position:relative;overflow:hidden;
+      }
+      /* Ambient light layers */
+      body::before{
+        content:'';position:fixed;inset:0;
+        background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(192,40,45,0.14) 0%,transparent 70%);
+        pointer-events:none;
+      }
+      body::after{
+        content:'';position:fixed;inset:0;
+        background:radial-gradient(ellipse 60% 40% at 50% 110%,rgba(192,40,45,0.07) 0%,transparent 70%);
+        pointer-events:none;
+      }
+      /* Animated subtle grid */
+      .bg-grid{
+        position:fixed;inset:0;
+        background-image:linear-gradient(rgba(255,255,255,0.02) 1px,transparent 1px),
+          linear-gradient(90deg,rgba(255,255,255,0.02) 1px,transparent 1px);
+        background-size:60px 60px;
+        pointer-events:none;
+        animation:gridDrift 30s linear infinite;
+      }
+      @keyframes gridDrift{from{background-position:0 0}to{background-position:60px 60px}}
+      .auth-box{
+        width:100%;max-width:420px;
+        padding:3rem 2.5rem;
+        background:rgba(10,10,16,0.95);
+        border:1px solid rgba(180,180,220,0.12);
+        backdrop-filter:blur(20px);
+        box-shadow:0 16px 80px rgba(0,0,0,0.85),0 0 0 1px rgba(192,40,45,0.06);
+        position:relative;z-index:1;
+        animation:boxIn 0.5s cubic-bezier(0.22,1,0.36,1);
+      }
+      @keyframes boxIn{from{opacity:0;transform:translateY(16px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+      .auth-box::before{
+        content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(192,40,45,0.7),transparent);
+      }
+      .auth-logo{text-align:center;margin-bottom:2.5rem}
+      .auth-logo-img{
+        width:68px;height:68px;object-fit:contain;margin-bottom:1rem;
+        filter:drop-shadow(0 0 24px rgba(192,40,45,0.55));
+        animation:logoFloat 4s ease-in-out infinite;
+      }
+      @keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+      .auth-logo h1{font-family:'Cinzel',serif;font-size:2rem;letter-spacing:0.4em;font-weight:400}
+      .auth-logo .b-red{color:#C0282D;text-shadow:0 0 18px rgba(192,40,45,0.65)}
+      .auth-logo p{font-size:0.64rem;letter-spacing:0.3em;text-transform:uppercase;color:#3A3A50;margin-top:0.5rem}
+      .auth-btn{
+        display:block;width:100%;padding:0.9rem;
+        background:linear-gradient(135deg,#8B1A1A,#C0282D);
+        color:#F5F3EF;border:none;
+        font-family:'Inter',sans-serif;font-size:0.72rem;
+        letter-spacing:0.22em;text-transform:uppercase;
+        cursor:pointer;text-decoration:none;text-align:center;
+        margin-top:0.8rem;
+        transition:all 0.2s;
+        box-shadow:0 2px 20px rgba(139,26,26,0.35);
+      }
+      .auth-btn:hover{box-shadow:0 4px 30px rgba(192,40,45,0.55);transform:translateY(-1px)}
+      .auth-btn:active{transform:translateY(0)}
+      .auth-btn.secondary{
+        background:transparent;border:1px solid rgba(180,180,220,0.12);
+        color:#404050;box-shadow:none;
+      }
+      .auth-btn.secondary:hover{color:#ECEEF6;border-color:rgba(180,180,220,0.3);background:rgba(180,180,220,0.04);box-shadow:none;transform:none}
+      .auth-input{
+        display:block;width:100%;
+        padding:0.85rem 1rem;
+        background:#0D0D14;border:1px solid rgba(180,180,220,0.1);
+        color:#ECEEF6;font-family:'Inter',sans-serif;font-size:0.84rem;
+        margin-bottom:0.8rem;outline:none;
+        transition:border-color 0.2s,box-shadow 0.2s;
+      }
+      .auth-input:focus{border-color:#C0282D;box-shadow:0 0 0 2px rgba(192,40,45,0.12)}
+      .auth-label{display:block;font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:#3A3A50;margin-bottom:0.4rem}
+      .auth-alert{
+        padding:0.8rem 1rem;
+        background:rgba(192,40,45,0.1);
+        border:1px solid rgba(192,40,45,0.25);
+        border-left:3px solid #C0282D;
+        font-size:0.78rem;margin-bottom:1.5rem;color:#EEA0A0;
+      }
+      .auth-success{background:rgba(0,255,136,0.06);border-color:rgba(0,255,136,0.2);border-left-color:#00FF88;color:#00CC66}
+      .auth-divider{
+        text-align:center;font-size:0.62rem;letter-spacing:0.2em;
+        text-transform:uppercase;color:#222230;margin:1.4rem 0;
+        position:relative;
+      }
+      .auth-divider::before,.auth-divider::after{
+        content:'';position:absolute;top:50%;width:42%;height:1px;
+        background:rgba(180,180,220,0.07);
+      }
+      .auth-divider::before{left:0}.auth-divider::after{right:0}
+      .auth-sep{height:1px;background:rgba(180,180,220,0.06);margin:1.2rem 0}
     </style>
   `;
 
-  if (page === 'login') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Přihlášení do systému</p></div>${errMsg}<a href="/auth/discord?action=login" class="btn">🔐 Přihlásit se přes Discord</a><div class="divider">nebo</div><a href="/register" class="btn secondary">Nemáš účet? Zaregistruj se</a></div>${successReg}</body></html>`;
-  if (page === 'register') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.8rem;color:#555;line-height:1.7;margin-bottom:1.5rem">Pro registraci musíš být členem Discord serveru Albion.</p><a href="/auth/discord?action=register" class="btn">🔗 Pokračovat přes Discord</a><div class="sep"></div><a href="/login" class="btn secondary">Zpět na přihlášení</a></div></body></html>`;
-  if (page === 'register_complete') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Dokončení registrace</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.8rem;color:#555;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label>Tvoje IC jméno (ve hře)</label><input type="text" name="ic_name" placeholder="Christopher Sinclair" required><label>Heslo</label><input type="password" name="password" placeholder="Alespoň 6 znaků" required><label>Heslo znovu</label><input type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="btn">✅ Dokončit registraci</button></form></div></body></html>`;
-  if (page === 'login_password') return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Albion — Heslo</title>${style}</head><body><div class="box"><div class="logo"><img src="/logo.png" class="logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1><p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.8rem;color:#555;margin-bottom:1.5rem">Discord: <strong style="color:#F5F3EF">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label>Heslo</label><input type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="btn">🔓 Přihlásit se</button></form></div></body></html>`;
+  const logoHtml = `<div class="auth-logo"><img src="/logo.png" class="auth-logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1>`;
+
+  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Přihlášení do systému</p></div>${errMsg}<a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a><div class="auth-divider">nebo</div><a href="/register" class="auth-btn secondary">Registrovat se</a></div>${successReg}</body></html>`;
+  if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;line-height:1.75;margin-bottom:1.5rem">Pro registraci musíš být členem Discord serveru Albion.</p><a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a><div class="auth-sep"></div><a href="/login" class="auth-btn secondary">Zpět na přihlášení</a></div></body></html>`;
+  if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Discord: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required><label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="auth-btn">Dokončit registraci</button></form></div></body></html>`;
+  if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Discord: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="auth-btn">Přihlásit se</button></form></div></body></html>`;
   return '<h1>404</h1>';
 }
 
 // ── RENDER SÁZENÍ ─────────────────────────────────────────────────────────────
 function renderSazeni(req) {
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Sázení trávy</title>
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Sázení</title>
   ${baseStyles()}
-  <style>
-    /* ── SÁZENÍ EXTRA STYLES ── */
-    .sazeni-hero{background:linear-gradient(135deg,rgba(0,60,20,0.18),rgba(0,30,10,0.08));border:1px solid rgba(0,200,80,0.12);padding:2rem;margin-bottom:2rem;position:relative;overflow:hidden}
-    .sazeni-hero::before{content:'🌱';position:absolute;right:2rem;top:50%;transform:translateY(-50%);font-size:5rem;opacity:0.08;pointer-events:none}
-    .cost-table{width:100%;border-collapse:collapse;margin:1rem 0}
-    .cost-table th{font-size:0.57rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--silver-bright);padding:0.75rem 1rem;text-align:left;border-bottom:1px solid var(--border-silver)}
-    .cost-table td{padding:0.7rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.82rem}
-    .cost-table tr:last-child td{border-bottom:none;font-weight:500;color:var(--text)}
-    .cost-table .total-row td{border-top:2px solid rgba(0,200,80,0.25);color:var(--text);font-family:'Cinzel',serif}
-    .cost-table .item-icon{margin-right:0.4rem}
-    .cost-amount{color:var(--gold);font-weight:500}
-    .cost-multi{color:var(--text-muted);font-size:0.75rem;margin-left:0.3rem}
-
-    /* ── KALKULAČKA CARD ── */
-    .kalk-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem}
-    .kalk-block{background:var(--bg-mid);border:1px solid var(--border-hover);padding:1.5rem;position:relative}
-    .kalk-block-label{font-size:0.58rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem}
-    .kalk-block-label::before{content:'';display:inline-block;width:3px;height:14px;background:var(--crimson-light)}
-    .kalk-input-wrap{display:flex;align-items:center;gap:0.5rem}
-    .kalk-input{background:var(--input-bg);border:1px solid var(--border-hover);color:var(--text);padding:0.9rem 1rem;font-family:'Cinzel',serif;font-size:1.4rem;width:100%;outline:none;transition:border-color 0.2s,box-shadow 0.2s;text-align:center}
-    .kalk-input:focus{border-color:rgba(0,200,80,0.4);box-shadow:0 0 0 2px rgba(0,200,80,0.08)}
-    .kalk-unit{font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap}
-    .kalk-result{margin-top:1rem;padding:1rem;background:rgba(0,200,80,0.06);border:1px solid rgba(0,200,80,0.15);text-align:center}
-    .kalk-result-num{font-family:'Cinzel',serif;font-size:2rem;color:#00C853;line-height:1.1}
-    .kalk-result-label{font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);margin-top:0.3rem}
-    .kalk-arrow{text-align:center;font-size:1.5rem;display:flex;align-items:center;justify-content:center;color:var(--text-muted);opacity:0.4}
-    .breakdown-row{display:flex;justify-content:space-between;padding:0.4rem 0;font-size:0.8rem;color:var(--text-dim);border-bottom:1px solid var(--border)}
-    .breakdown-row:last-child{border-bottom:none;color:var(--text);font-weight:500;padding-top:0.7rem;margin-top:0.3rem}
-    .breakdown-row .green{color:#00C853}
-    .bd-label{display:flex;align-items:center;gap:0.4rem}
-
-    /* ── SLIDER ── */
-    .slider-wrap{margin:1.5rem 0}
-    .slider{-webkit-appearance:none;width:100%;height:4px;background:linear-gradient(90deg,rgba(0,200,80,0.5) var(--pct,50%),var(--border-hover) var(--pct,50%));outline:none;border-radius:2px}
-    .slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--crimson-light);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 6px rgba(0,200,80,0.3)}
-    .slider-labels{display:flex;justify-content:space-between;font-size:0.6rem;color:var(--text-muted);letter-spacing:0.1em;margin-top:0.4rem}
-
-    /* ── PROFIT INDICATOR ── */
-    .profit-bar{height:6px;background:var(--border);margin-top:1rem;position:relative;overflow:hidden}
-    .profit-fill{height:100%;background:linear-gradient(90deg,rgba(0,200,80,0.6),#00C853);transition:width 0.4s}
-
-    @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}}
-  </style>
   </head><body>
   ${renderNav(req, 'sazeni')}
   <main>
     <div class="page-header">
-      <div class="page-label">Albion — Produkce</div>
-      <div class="page-title">Sázení trávy</div>
-      <div class="page-sub">Kalkulačka nákladů na pěstování cannabisu</div>
+      <div>
+        <div class="page-label">Albion — Produkce</div>
+        <h1 class="page-title">Sázení trávy</h1>
+        <p class="page-sub">Kalkulačka nákladů na pěstování cannabisu</p>
+      </div>
     </div>
 
-    <!-- HERO INFO -->
     <div class="sazeni-hero">
-      <div style="font-size:0.58rem;letter-spacing:0.35em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.5rem">Informace o produkci</div>
+      <div style="font-size:0.55rem;letter-spacing:0.38em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.5rem">Informace o produkci</div>
       <div style="font-family:'Cinzel',serif;font-size:1.1rem;margin-bottom:0.5rem">Náklady na jednu kytku</div>
-      <div style="font-size:0.82rem;color:var(--text-dim);line-height:1.8">
-        Níže vidíš přesný rozpis všeho, co potřebuješ na vypěstování jedné rostliny trávy. Kalkulačka ti pomůže spočítat náklady na libovolný počet kytek nebo zjistit, kolik jich zvládneš za daný rozpočet.
+      <div style="font-size:0.8rem;color:var(--text-dim);line-height:1.85">
+        Přesný rozpis všeho, co potřebuješ na vypěstování jedné rostliny trávy. Kalkulačka spočítá náklady na libovolný počet kytek nebo zjistí, kolik jich zvládneš za daný rozpočet.
       </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
-
-      <!-- COST BREAKDOWN -->
       <div class="card">
-        <div class="card-header"><span class="card-title">📋 Rozpis nákladů / 1 kytka</span><span class="card-badge">Fixní ceny</span></div>
+        <div class="card-header"><span class="card-title">Rozpis nákladů / 1 kytka</span><span class="card-badge">Fixní ceny</span></div>
         <table class="cost-table">
           <thead><tr><th>Položka</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>
           <tbody>
-            <tr><td><span class="item-icon">💧</span>Konev s vodou</td><td>1×</td><td class="cost-amount">$20</td><td class="cost-amount">$20</td></tr>
-            <tr><td><span class="item-icon">🌱</span>Semínko</td><td>1×</td><td class="cost-amount">$50</td><td class="cost-amount">$50</td></tr>
-            <tr><td><span class="item-icon">🧪</span>Hnojivo</td><td>1×</td><td class="cost-amount">$25</td><td class="cost-amount">$25</td></tr>
-            <tr><td><span class="item-icon">💊</span>Kvalitní hnojivo</td><td>4×</td><td class="cost-amount">$50</td><td class="cost-amount">$200</td></tr>
-            <tr><td><span class="item-icon">🫙</span>Výživná voda</td><td>4×</td><td class="cost-amount">$40</td><td class="cost-amount">$160</td></tr>
-            <tr class="total-row"><td colspan="3" style="font-size:0.75rem;letter-spacing:0.15em">CELKEM NA KYTKU</td><td class="cost-amount" style="font-size:1.1rem">$455</td></tr>
+            <tr><td>💧 Konev s vodou</td><td>1×</td><td class="cost-amount">$20</td><td class="cost-amount">$20</td></tr>
+            <tr><td>🌱 Semínko</td><td>1×</td><td class="cost-amount">$50</td><td class="cost-amount">$50</td></tr>
+            <tr><td>🧪 Hnojivo</td><td>1×</td><td class="cost-amount">$25</td><td class="cost-amount">$25</td></tr>
+            <tr><td>💊 Kvalitní hnojivo</td><td>4×</td><td class="cost-amount">$50</td><td class="cost-amount">$200</td></tr>
+            <tr><td>🫙 Výživná voda</td><td>4×</td><td class="cost-amount">$40</td><td class="cost-amount">$160</td></tr>
+            <tr class="total-row"><td colspan="3" style="font-size:0.72rem;letter-spacing:0.15em">CELKEM NA KYTKU</td><td class="cost-amount" style="font-size:1.1rem">$455</td></tr>
           </tbody>
         </table>
-        <div style="margin-top:1rem;padding:0.8rem 1rem;background:rgba(201,168,76,0.06);border:1px solid var(--border-gold);font-size:0.78rem;color:var(--text-muted)">
-          💡 Cena <strong style="color:var(--gold)">$455</strong> je náklad na <strong style="color:var(--text)">jednu rostlinu</strong>. Při prodeji za $150/ks je zisk <strong style="color:#00C853">−$305</strong> (ztráta bez započtení finálního prodeje celé sklizně).
+        <div style="margin-top:1rem;padding:0.8rem 1rem;background:var(--gold-dim);border:1px solid var(--border-gold);font-size:0.76rem;color:var(--text-dim)">
+          Cena <strong style="color:var(--gold)">$455</strong> je náklad na jednu rostlinu.
         </div>
       </div>
 
-      <!-- RYCHLÁ KALKULAČKA -->
       <div class="card">
-        <div class="card-header"><span class="card-title">🧮 Rychlá kalkulačka</span><span class="card-badge">Interaktivní</span></div>
+        <div class="card-header"><span class="card-title">Rychlá kalkulačka</span><span class="card-badge">Interaktivní</span></div>
         <div class="kalk-grid">
           <div class="kalk-block">
             <div class="kalk-block-label">Počet kytek</div>
             <input type="number" class="kalk-input" id="inputKytky" min="1" max="9999" value="10" oninput="calcFromKytky(this.value)">
-            <div class="kalk-result" id="resultCena">
-              <div class="kalk-result-num" id="outCena">$4,550</div>
+            <div class="kalk-result">
+              <div class="kalk-result-num" id="outCena">$4 550</div>
               <div class="kalk-result-label">celkový náklad</div>
             </div>
           </div>
           <div class="kalk-arrow">⇄</div>
           <div class="kalk-block">
             <div class="kalk-block-label">Dostupný budget</div>
-            <input type="number" class="kalk-input" id="inputBudget" min="0" value="4550" oninput="calcFromBudget(this.value)" style="border-color:rgba(0,200,80,0.2)">
-            <div class="kalk-result" id="resultKytky" style="background:rgba(0,200,80,0.06);border-color:rgba(0,200,80,0.2)">
+            <input type="number" class="kalk-input" id="inputBudget" min="0" value="4550" oninput="calcFromBudget(this.value)" style="border-color:rgba(0,200,80,0.18)">
+            <div class="kalk-result" style="background:rgba(0,200,80,0.05);border-color:rgba(0,200,80,0.14)">
               <div class="kalk-result-num" id="outKytky" style="color:#00C853">10</div>
               <div class="kalk-result-label">kytek lze zasadit</div>
             </div>
@@ -1511,35 +1885,32 @@ function renderSazeni(req) {
         </div>
         <div class="slider-wrap">
           <input type="range" class="slider" id="kytkySlider" min="1" max="200" value="10" oninput="sliderChange(this.value)" style="--pct:4.5%">
-          <div class="slider-labels"><span>1 kytka</span><span>50</span><span>100</span><span>150</span><span>200 kytek</span></div>
+          <div class="slider-labels"><span>1</span><span>50</span><span>100</span><span>150</span><span>200 kytek</span></div>
         </div>
       </div>
     </div>
 
-    <!-- DETAILNÍ ROZPAD -->
     <div class="card" style="margin-top:1.5rem">
-      <div class="card-header"><span class="card-title">📊 Detailní rozpad nákladů</span><span class="card-badge" id="bdKytkyLabel">10 kytek</span></div>
+      <div class="card-header"><span class="card-title">Detailní rozpad nákladů</span><span class="card-badge" id="bdKytkyLabel">10 kytek</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">
         <div>
-          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Položky celkem</div>
+          <div style="font-size:0.55rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Položky celkem</div>
           <div class="breakdown-row"><div class="bd-label">💧 Konev s vodou <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-konev-qty">(10×)</span></div><div class="green" id="bd-konev">$200</div></div>
           <div class="breakdown-row"><div class="bd-label">🌱 Semínko <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-seminko-qty">(10×)</span></div><div class="green" id="bd-seminko">$500</div></div>
           <div class="breakdown-row"><div class="bd-label">🧪 Hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-hnojivo-qty">(10×)</span></div><div class="green" id="bd-hnojivo">$250</div></div>
-          <div class="breakdown-row"><div class="bd-label">💊 Kvalitní hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-khnojivo-qty">(40×)</span></div><div class="green" id="bd-khnojivo">$2,000</div></div>
-          <div class="breakdown-row"><div class="bd-label">🫙 Výživná voda <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-voda-qty">(40×)</span></div><div class="green" id="bd-voda">$1,600</div></div>
-          <div class="breakdown-row"><div class="bd-label" style="font-family:'Cinzel',serif">CELKEM</div><div style="font-family:'Cinzel',serif;color:var(--gold)" id="bd-total">$4,550</div></div>
+          <div class="breakdown-row"><div class="bd-label">💊 Kvalitní hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-khnojivo-qty">(40×)</span></div><div class="green" id="bd-khnojivo">$2 000</div></div>
+          <div class="breakdown-row"><div class="bd-label">🫙 Výživná voda <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-voda-qty">(40×)</span></div><div class="green" id="bd-voda">$1 600</div></div>
+          <div class="breakdown-row"><div class="bd-label" style="font-family:'Cinzel',serif">CELKEM</div><div style="font-family:'Cinzel',serif;color:var(--gold)" id="bd-total">$4 550</div></div>
         </div>
         <div>
-          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Přehled investice</div>
-          <div class="breakdown-row"><div class="bd-label">💰 Celkový náklad</div><div style="color:var(--gold)" id="ov-naklad">$4,550</div></div>
-          <div class="breakdown-row"><div class="bd-label">🌿 Počet kytek</div><div id="ov-kytky">10</div></div>
-          <div class="breakdown-row"><div class="bd-label">📦 Náklad / kytka</div><div>$455</div></div>
-          <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border-silver)">
-            <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--silver);margin-bottom:0.6rem">Investice na položku</div>
-            <div class="profit-bar"><div class="profit-fill" id="profitFill" style="width:50%"></div></div>
-            <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem">
-              <span>Největší náklad: <strong style="color:var(--text)" id="biggestItem">Kvalitní hnojivo (44%)</strong></span>
-            </div>
+          <div style="font-size:0.55rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Přehled investice</div>
+          <div class="breakdown-row"><div class="bd-label">Celkový náklad</div><div style="color:var(--gold)" id="ov-naklad">$4 550</div></div>
+          <div class="breakdown-row"><div class="bd-label">Počet kytek</div><div id="ov-kytky">10</div></div>
+          <div class="breakdown-row"><div class="bd-label">Náklad / kytka</div><div>$455</div></div>
+          <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)">
+            <div style="font-size:0.55rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);margin-bottom:0.6rem">Největší položka</div>
+            <div class="profit-bar"><div class="profit-fill" id="profitFill" style="width:44%"></div></div>
+            <div style="font-size:0.64rem;color:var(--text-muted);margin-top:0.4rem">Kvalitní hnojivo (44% nákladů)</div>
           </div>
         </div>
       </div>
@@ -1549,11 +1920,11 @@ function renderSazeni(req) {
   <script>
     const COST_PER = 455;
     const ITEMS = [
-      { id:'konev',   label:'Konev s vodou',   qty:1, unit:20 },
-      { id:'seminko', label:'Semínko',          qty:1, unit:50 },
-      { id:'hnojivo', label:'Hnojivo',          qty:1, unit:25 },
-      { id:'khnojivo',label:'Kvalitní hnojivo', qty:4, unit:50 },
-      { id:'voda',    label:'Výživná voda',     qty:4, unit:40 },
+      { id:'konev',    qty:1, unit:20 },
+      { id:'seminko',  qty:1, unit:50 },
+      { id:'hnojivo',  qty:1, unit:25 },
+      { id:'khnojivo', qty:4, unit:50 },
+      { id:'voda',     qty:4, unit:40 },
     ];
 
     function fmt(n) { return '$' + Math.round(n).toLocaleString('cs-CZ'); }
@@ -1561,54 +1932,26 @@ function renderSazeni(req) {
     function updateAll(kytky) {
       kytky = Math.max(1, Math.floor(kytky));
       const total = kytky * COST_PER;
-
-      // rychlá kalk
       document.getElementById('outCena').textContent = fmt(total);
       document.getElementById('outKytky').textContent = kytky.toLocaleString('cs-CZ');
-
-      // breakdown
       document.getElementById('bdKytkyLabel').textContent = kytky + ' kytek';
       ITEMS.forEach(it => {
-        const totalQty = it.qty * kytky;
-        const totalCost = totalQty * it.unit;
-        document.getElementById('bd-' + it.id).textContent = fmt(totalCost);
-        document.getElementById('bd-' + it.id + '-qty').textContent = '(' + totalQty + '×)';
+        const tq = it.qty * kytky;
+        document.getElementById('bd-' + it.id).textContent = fmt(tq * it.unit);
+        document.getElementById('bd-' + it.id + '-qty').textContent = '(' + tq + '×)';
       });
       document.getElementById('bd-total').textContent = fmt(total);
       document.getElementById('ov-naklad').textContent = fmt(total);
       document.getElementById('ov-kytky').textContent = kytky.toLocaleString('cs-CZ');
-
-      // slider
       const slider = document.getElementById('kytkySlider');
-      const clampedSlider = Math.min(kytky, 200);
-      slider.value = clampedSlider;
-      const pct = ((clampedSlider - 1) / 199 * 100).toFixed(1);
-      slider.style.setProperty('--pct', pct + '%');
-
-      // profit bar (biggest = khnojivo = 200/455 = 44%)
-      document.getElementById('profitFill').style.width = '44%';
+      const clamped = Math.min(kytky, 200);
+      slider.value = clamped;
+      slider.style.setProperty('--pct', ((clamped - 1) / 199 * 100).toFixed(1) + '%');
     }
 
-    function calcFromKytky(v) {
-      const k = parseInt(v) || 1;
-      const budget = k * COST_PER;
-      document.getElementById('inputBudget').value = budget;
-      updateAll(k);
-    }
-
-    function calcFromBudget(v) {
-      const b = parseFloat(v) || 0;
-      const k = Math.floor(b / COST_PER);
-      document.getElementById('inputKytky').value = Math.max(1, k);
-      updateAll(Math.max(1, k));
-    }
-
-    function sliderChange(v) {
-      document.getElementById('inputKytky').value = v;
-      calcFromKytky(v);
-    }
-
-    // init
+    function calcFromKytky(v) { const k=parseInt(v)||1; document.getElementById('inputBudget').value=k*COST_PER; updateAll(k); }
+    function calcFromBudget(v) { const k=Math.max(1,Math.floor((parseFloat(v)||0)/COST_PER)); document.getElementById('inputKytky').value=k; updateAll(k); }
+    function sliderChange(v) { document.getElementById('inputKytky').value=v; calcFromKytky(v); }
     updateAll(10);
   </script>
   </body></html>`;
