@@ -524,62 +524,62 @@ function baseStyles() {
         --crimson-glow:rgba(192,40,45,0.10);
       }
       body.red{
-        --bg:#0A0005;
-        --bg-soft:#100008;
-        --bg-mid:#16000C;
-        --bg-card:#0E0008;
-        --bg-card2:#130010;
-        --bg-card3:#180014;
-        --crimson:#B01020;
-        --crimson-light:#E0202A;
-        --crimson-glow:rgba(220,30,40,0.18);
-        --crimson-bright:#FF3040;
-        --silver:#D080A0;
-        --silver-bright:#FFB8CC;
-        --silver-dim:rgba(220,100,140,0.08);
-        --text:#FFE8F0;
-        --text-dim:#E0A0B8;
-        --text-muted:#6A3045;
-        --text-label:#7A3050;
-        --border:rgba(220,30,60,0.09);
-        --border-hover:rgba(220,30,60,0.18);
-        --border-silver:rgba(220,80,120,0.20);
-        --border-gold:rgba(220,100,60,0.22);
-        --gold:#D0604C;
-        --gold-dim:rgba(220,80,60,0.09);
-        --input-bg:#120008;
-        --shadow:0 8px 40px rgba(0,0,0,0.9);
-        --shadow-card:0 2px 24px rgba(0,0,0,0.7);
-        --red-glow:0 0 32px rgba(220,30,40,0.30);
+        --bg:#070005;
+        --bg-soft:#0D0008;
+        --bg-mid:#13000E;
+        --bg-card:#0B0007;
+        --bg-card2:#12000D;
+        --bg-card3:#180012;
+        --crimson:#C01020;
+        --crimson-light:#E8202C;
+        --crimson-glow:rgba(232,32,44,0.15);
+        --crimson-bright:#FF2840;
+        --silver:#E8C0C8;
+        --silver-bright:#FFE8F0;
+        --silver-dim:rgba(240,180,200,0.08);
+        --text:#FFE8EE;
+        --text-dim:#D0909A;
+        --text-muted:#5A2030;
+        --text-label:#6A2838;
+        --border:rgba(200,20,50,0.10);
+        --border-hover:rgba(220,30,60,0.20);
+        --border-silver:rgba(220,100,130,0.22);
+        --border-gold:rgba(220,110,70,0.22);
+        --gold:#CC5840;
+        --gold-dim:rgba(200,80,60,0.09);
+        --input-bg:#0F0008;
+        --shadow:0 8px 40px rgba(0,0,0,0.95);
+        --shadow-card:0 2px 24px rgba(0,0,0,0.80);
+        --red-glow:0 0 40px rgba(220,30,40,0.35);
       }
       body.silver{
-        --bg:#08080F;
-        --bg-soft:#0C0C14;
-        --bg-mid:#10101A;
-        --bg-card:#0A0A12;
-        --bg-card2:#0F0F18;
-        --bg-card3:#14141E;
-        --crimson:#8090B0;
-        --crimson-light:#A0B4D8;
-        --crimson-glow:rgba(160,180,220,0.12);
-        --crimson-bright:#C0D0F0;
-        --silver:#C8D0E8;
-        --silver-bright:#E8EEFF;
-        --silver-dim:rgba(200,210,240,0.08);
-        --text:#E8EEFF;
-        --text-dim:#A0AACC;
-        --text-muted:#484860;
-        --text-label:#585870;
-        --border:rgba(180,190,230,0.07);
-        --border-hover:rgba(180,190,230,0.14);
-        --border-silver:rgba(180,190,230,0.20);
-        --border-gold:rgba(180,180,210,0.22);
-        --gold:#9090C0;
-        --gold-dim:rgba(140,140,200,0.09);
-        --input-bg:#0C0C16;
-        --shadow:0 8px 40px rgba(0,0,0,0.88);
-        --shadow-card:0 2px 24px rgba(0,0,0,0.68);
-        --red-glow:0 0 32px rgba(160,180,220,0.20);
+        --bg:#0A0C10;
+        --bg-soft:#0E1018;
+        --bg-mid:#121520;
+        --bg-card:#0C0F18;
+        --bg-card2:#10141E;
+        --bg-card3:#151A26;
+        --crimson:#7090B8;
+        --crimson-light:#90B0D8;
+        --crimson-glow:rgba(144,176,216,0.12);
+        --crimson-bright:#B8D0F0;
+        --silver:#C0CCE4;
+        --silver-bright:#E4ECFF;
+        --silver-dim:rgba(192,204,228,0.09);
+        --text:#DDE6FA;
+        --text-dim:#8894B8;
+        --text-muted:#3A4060;
+        --text-label:#4A5070;
+        --border:rgba(160,176,220,0.09);
+        --border-hover:rgba(160,176,220,0.18);
+        --border-silver:rgba(180,196,240,0.22);
+        --border-gold:rgba(180,190,220,0.20);
+        --gold:#8090C8;
+        --gold-dim:rgba(128,144,200,0.09);
+        --input-bg:#0C0F18;
+        --shadow:0 8px 40px rgba(0,0,0,0.90);
+        --shadow-card:0 2px 24px rgba(0,0,0,0.72);
+        --red-glow:0 0 36px rgba(144,176,216,0.22);
       }
 
       html{scroll-behavior:smooth}
@@ -729,32 +729,14 @@ function baseStyles() {
         transition:all 0.2s;
       }
       .nav-logout:hover{background:var(--crimson-glow);border-color:var(--crimson-light)}
-      .theme-toggle{
-        background:none;border:1px solid var(--border-hover);
-        color:var(--text-muted);height:32px;cursor:pointer;
-        display:flex;align-items:center;justify-content:center;gap:0.4rem;
-        padding:0 0.7rem;
-        transition:all 0.2s;position:relative;
+      .theme-switcher{display:flex;align-items:center;gap:6px}
+      .theme-dot-btn{
+        width:14px;height:14px;border-radius:50%;border:2px solid transparent;
+        cursor:pointer;transition:transform 0.18s,border-color 0.18s,box-shadow 0.18s;
+        flex-shrink:0;outline:none;padding:0;
       }
-      .theme-toggle svg{width:15px;height:15px;transition:transform 0.3s;flex-shrink:0}
-      .theme-toggle:hover{border-color:var(--silver);color:var(--silver)}
-      .theme-toggle:hover svg{transform:rotate(20deg)}
-      .theme-label{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:500}
-      .theme-menu{
-        position:absolute;top:calc(100% + 6px);right:0;
-        background:var(--bg-card2);border:1px solid var(--border-hover);
-        box-shadow:var(--shadow);z-index:500;min-width:130px;
-        display:none;flex-direction:column;
-      }
-      .theme-menu.open{display:flex}
-      .theme-option{
-        padding:0.55rem 1rem;font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;
-        color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:0.6rem;
-        transition:background 0.15s,color 0.15s;border:none;background:none;width:100%;text-align:left;
-      }
-      .theme-option:hover{background:var(--crimson-glow);color:var(--text)}
-      .theme-option.active{color:var(--crimson-light)}
-      .theme-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+      .theme-dot-btn:hover{transform:scale(1.25)}
+      .theme-dot-btn.active{border-color:var(--text);box-shadow:0 0 0 1px var(--bg),0 0 6px rgba(255,255,255,0.25)}
       .notif-bell{
         position:relative;cursor:pointer;background:none;border:none;
         color:var(--text-muted);padding:0.3rem;transition:color 0.2s;
@@ -1213,45 +1195,6 @@ function baseStyles() {
       @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
       @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}main{padding:1.5rem 1rem}}
 
-      /* ── GALERIE OBRÁZKŮ ── */
-      .img-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-top:1rem}
-      .img-card{
-        position:relative;overflow:hidden;cursor:pointer;
-        background:var(--bg-card);border:1px solid var(--border);
-        transition:all 0.25s;aspect-ratio:1;
-      }
-      .img-card:hover{border-color:var(--crimson-light);box-shadow:var(--red-glow);transform:scale(1.02)}
-      .img-card img{width:100%;height:100%;object-fit:cover;opacity:0.75;transition:opacity 0.25s,transform 0.4s}
-      .img-card:hover img{opacity:1;transform:scale(1.07)}
-      .img-card-label{
-        position:absolute;bottom:0;left:0;right:0;
-        padding:0.5rem 0.7rem;
-        background:linear-gradient(0deg,rgba(0,0,0,0.85),transparent);
-        font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:#fff;font-weight:500;
-      }
-      .img-tabs{display:flex;gap:0.4rem;margin-bottom:1.2rem;flex-wrap:wrap}
-      .img-tab{
-        padding:0.4rem 1rem;font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;
-        background:transparent;border:1px solid var(--border-hover);color:var(--text-muted);cursor:pointer;transition:all 0.2s;
-      }
-      .img-tab.active{background:var(--crimson-glow);border-color:var(--crimson-light);color:var(--text)}
-      .img-tab:hover{color:var(--silver-bright);border-color:var(--border-silver)}
-      /* Lightbox */
-      .lightbox{
-        position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:1000;
-        display:none;align-items:center;justify-content:center;
-        animation:fadeIn 0.2s;
-      }
-      .lightbox.open{display:flex}
-      .lightbox img{max-width:90vw;max-height:90vh;object-fit:contain;box-shadow:0 0 80px rgba(0,0,0,0.9)}
-      .lightbox-close{
-        position:fixed;top:1.5rem;right:1.5rem;
-        background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);
-        color:#fff;width:40px;height:40px;cursor:pointer;font-size:1.2rem;
-        display:flex;align-items:center;justify-content:center;transition:background 0.2s;
-      }
-      .lightbox-close:hover{background:rgba(192,40,45,0.5)}
-      @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     </style>
   `;
 }
@@ -1267,64 +1210,43 @@ function renderNav(req, active) {
       <ul class="nav-menu">
         <li><a href="/dashboard" class="${active==='dashboard'?'active':''}">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></a></li>
         <li><a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka<span class="nav-desc">Oznámení & Aplikace</span></a></li>
-        <li><a href="/kodex" class="${active==='kodex'?'active':''}">Kodex<span class="nav-desc">Pravidla organizace</span></a></li>
         <li><a href="/audit" class="${active==='audit'?'active':''}">Audit<span class="nav-desc">Záznamy akcí</span></a></li>
         <li><a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky<span class="nav-desc">Přehled členů</span></a></li>
-        <li><a href="/lore" class="${active==='lore'?'active':''}">Historie<span class="nav-desc">Příběh Albionu</span></a></li>
-        <li><a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie<span class="nav-desc">Ranky & pozice</span></a></li>
+        <li><a href="/kodex" class="${active==='kodex'?'active':''}">Kodex<span class="nav-desc">Pravidla & Hierarchie</span></a></li>
         <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">Sázení<span class="nav-desc">Weed kalkulačka</span></a></li>
-        <li><a href="/galerie" class="${active==='galerie'?'active':''}">Galerie<span class="nav-desc">Zbraně · Drogy · Weed</span></a></li>
+
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge" id="notifBadge">0</span>
         </button>
-        <button class="theme-toggle" id="themeBtn" onclick="toggleThemeMenu(event)" title="Přepnout téma">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-          <span class="theme-label" id="themeLabel">Téma</span>
-          <div class="theme-menu" id="themeMenu">
-            <button class="theme-option" onclick="setTheme('dark',event)"><span class="theme-dot" style="background:#8B1A1A"></span>Tmavé</button>
-            <button class="theme-option" onclick="setTheme('light',event)"><span class="theme-dot" style="background:#A080C0"></span>Světlé</button>
-            <button class="theme-option" onclick="setTheme('red',event)"><span class="theme-dot" style="background:#E02030"></span>Červené</button>
-            <button class="theme-option" onclick="setTheme('silver',event)"><span class="theme-dot" style="background:#A0B4D8"></span>Stříbrné</button>
-          </div>
-        </button>
+        <div class="theme-switcher" title="Přepnout téma">
+          <button class="theme-dot-btn" id="td-dark"   style="background:#8B1A1A" onclick="setTheme('dark')"   title="Tmavé"></button>
+          <button class="theme-dot-btn" id="td-red"    style="background:#DC1428" onclick="setTheme('red')"    title="Červené"></button>
+          <button class="theme-dot-btn" id="td-silver" style="background:#C8D0E8" onclick="setTheme('silver')" title="Stříbrné"></button>
+          <button class="theme-dot-btn" id="td-light"  style="background:#2A2850" onclick="setTheme('light')"  title="Světlé"></button>
+        </div>
         <span class="nav-user">přihlášen jako <strong>${ic}</strong></span>
         <a href="/logout" class="nav-logout">Odhlásit</a>
       </div>
     </nav>
     <script>
       const THEMES = ['dark','light','red','silver'];
-      const THEME_LABELS = {dark:'Tmavé',light:'Světlé',red:'Červené',silver:'Stříbrné'};
       let currentTheme = localStorage.getItem('albion_theme') || 'dark';
       function applyTheme(t) {
         THEMES.forEach(c => document.body.classList.remove(c));
         if (t !== 'dark') document.body.classList.add(t);
         currentTheme = t;
         localStorage.setItem('albion_theme', t);
-        const lbl = document.getElementById('themeLabel');
-        if (lbl) lbl.textContent = THEME_LABELS[t] || 'Téma';
-        document.querySelectorAll('.theme-option').forEach(b => {
-          b.classList.toggle('active', b.textContent.trim() === (THEME_LABELS[t] || ''));
+        THEMES.forEach(th => {
+          const btn = document.getElementById('td-' + th);
+          if (btn) btn.classList.toggle('active', th === t);
         });
       }
       applyTheme(currentTheme);
-      function toggleThemeMenu(e) {
-        e.stopPropagation();
-        const m = document.getElementById('themeMenu');
-        if (m) m.classList.toggle('open');
-      }
-      function setTheme(t, e) {
-        if (e) e.stopPropagation();
-        applyTheme(t);
-        const m = document.getElementById('themeMenu');
-        if (m) m.classList.remove('open');
-      }
-      document.addEventListener('click', () => {
-        const m = document.getElementById('themeMenu');
-        if (m) m.classList.remove('open');
-      });
+      function setTheme(t) { applyTheme(t); }
+      document.addEventListener('click', () => {});
       let newCount = 0;
       const evtSource = new EventSource('/api/events');
       evtSource.addEventListener('nastenska', (e) => {
@@ -1362,12 +1284,34 @@ function renderDashboard(req, data) {
   const { zbrane, weed, drogy, ucet, recentUcet } = data;
   const icName = req.session.icName;
 
+  const ITEM_EMOJI = {
+    // Zbraně
+    "Pump Shotgun": "🔫", "Pistol MK2": "🔫", "Pistol": "🔫",
+    "Combat Pistol": "🔫", "Double Action Revolver": "🔫",
+    "Navy Revolver": "🔫", "Vintage Pistol": "🔫",
+    "Gusenberg": "🔫", "Dlouhé": "🪖",
+    // Střelivo
+    "9mm": "🔹", "9mm Mk2": "🔹", ".75cal": "🔶", ".50cal": "🔶", "12-gauge": "🔶",
+    // Akce
+    "Malá C4": "💣", "Velká C4": "💣",
+    "Přístupová karta": "🪪", "Pokročilá zvláštní karta": "🪪", "Zvláštní karta": "🪪",
+    "EMP zařízení": "⚡", "Řezací laser": "🔆", "Cable Cutter": "✂️",
+    // Weed
+    "Žlutý kanabis": "🌿", "Zelený kanabis": "🌿", "Kanabis": "🌿",
+    "Červený kanabis": "🌿", "Modrý kanabis": "🌿",
+    // Drogy
+    "Kapky": "💧", "Kokain": "🤍", "Extáze": "💊",
+    "Metamfetamin": "💎", "Benzo": "💊", "Joyka": "🔵",
+    "Heroin": "🟤", "Speed": "⚡", "LSD": "🌈",
+  };
+
   const formatSklad = (obj, ceny) => {
     const entries = Object.entries(obj).filter(([,q]) => q > 0);
     if (!entries.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Sklad je prázdný</p>';
     return entries.map(([item, qty]) => {
       const hodnota = ceny && ceny[item] ? qty * ceny[item].prodej : null;
-      return `<div class="sklad-row"><span>${item}</span><span>${qty} ks${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
+      const emoji = ITEM_EMOJI[item] || '📦';
+      return `<div class="sklad-row"><span>${emoji} ${item}</span><span>${qty} ks${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
     }).join('');
   };
 
@@ -1420,7 +1364,7 @@ function renderDashboard(req, data) {
       <div class="stat" style="border-top-color:var(--gold)">
         <div class="stat-label">Hodnota skladu</div>
         <div class="stat-value" style="font-size:1.4rem;color:var(--gold)">
-          ${(() => {
+          $${(() => {
             const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
             const DROGY_P = {"Kapky":200,"Kokain":500,"Extáze":350,"Metamfetamin":450,"Benzo":300,"Joyka":250,"Heroin":600,"Speed":280,"LSD":400};
             const ZBRANE_P = {"Pump Shotgun":8000,"Pistol MK2":12000,"Pistol":5000,"Combat Pistol":7000,"Double Action Revolver":15000,"Navy Revolver":14000,"Vintage Pistol":6000,"Gusenberg":18000,"Dlouhé":25000,"9mm":100,"9mm Mk2":150,".75cal":300,".50cal":250,"12-gauge":200};
@@ -2345,89 +2289,5 @@ function renderSazeni(req) {
   </body></html>`;
 }
 
-
-// ── RENDER GALERIE ────────────────────────────────────────────────────────────
-function renderGalerie(req) {
-  // Používáme volně dostupné obrázky z Unsplash / Picsum - v produkci nahradit vlastními
-  const categories = {
-    weed: [
-      { label: 'Kanabis',         url: 'https://images.unsplash.com/photo-1603909223429-69bb7101f420?w=400&q=75&fit=crop' },
-      { label: 'Zelená odrůda',   url: 'https://images.unsplash.com/photo-1616671276441-2f2c277b8bf6?w=400&q=75&fit=crop' },
-      { label: 'Žlutá odrůda',    url: 'https://images.unsplash.com/photo-1598511757337-fe2cafc31ba0?w=400&q=75&fit=crop' },
-      { label: 'Červená odrůda',  url: 'https://images.unsplash.com/photo-1564419320461-6870880221ad?w=400&q=75&fit=crop' },
-      { label: 'Modrá odrůda',    url: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab12?w=400&q=75&fit=crop' },
-      { label: 'Sklizeň',         url: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=400&q=75&fit=crop' },
-    ],
-    drogy: [
-      { label: 'Kokain',          url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&q=75&fit=crop' },
-      { label: 'Pilulky',         url: 'https://images.unsplash.com/photo-1550572017-26b5655df0e6?w=400&q=75&fit=crop' },
-      { label: 'Krystaly',        url: 'https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=400&q=75&fit=crop' },
-      { label: 'Heroin',          url: 'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&q=75&fit=crop' },
-      { label: 'LSD',             url: 'https://images.unsplash.com/photo-1506459225024-1428097a7e18?w=400&q=75&fit=crop' },
-      { label: 'Extáze',          url: 'https://images.unsplash.com/photo-1603107253654-d7f57ce71e03?w=400&q=75&fit=crop' },
-    ],
-    zbrane: [
-      { label: 'Pistole',         url: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=400&q=75&fit=crop' },
-      { label: 'Revolver',        url: 'https://images.unsplash.com/photo-1504309092620-4d0ec726efa4?w=400&q=75&fit=crop' },
-      { label: 'Pump Shotgun',    url: 'https://images.unsplash.com/photo-1516222338250-863216ce01ea?w=400&q=75&fit=crop' },
-      { label: 'Střelivo',        url: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&q=75&fit=crop' },
-      { label: 'Bojová pistole',  url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=75&fit=crop' },
-      { label: 'Zásobníky',       url: 'https://images.unsplash.com/photo-1625591339971-4b6a9cb94fd4?w=400&q=75&fit=crop' },
-    ],
-  };
-
-  const buildCards = (items) => items.map(i =>
-    `<div class="img-card" onclick="openLightbox('${i.url.replace(/w=400/, 'w=1200')}')">
-      <img src="${i.url}" alt="${i.label}" loading="lazy">
-      <div class="img-card-label">${i.label}</div>
-    </div>`
-  ).join('');
-
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Galerie</title>
-  ${baseStyles()}
-  </head><body>
-  ${renderNav(req, 'galerie')}
-  <main>
-    <div class="page-header">
-      <div>
-        <div class="page-label">Albion — Materiály</div>
-        <h1 class="page-title">Galerie</h1>
-        <p class="page-sub">Vizuální přehled komodit organizace</p>
-      </div>
-    </div>
-    <div class="img-tabs">
-      <button class="img-tab active" onclick="showCat('weed',this)">🌿 Weed</button>
-      <button class="img-tab" onclick="showCat('drogy',this)">💊 Drogy</button>
-      <button class="img-tab" onclick="showCat('zbrane',this)">🔫 Zbraně</button>
-    </div>
-    <div id="cat-weed"   class="img-gallery">${buildCards(categories.weed)}</div>
-    <div id="cat-drogy"  class="img-gallery" style="display:none">${buildCards(categories.drogy)}</div>
-    <div id="cat-zbrane" class="img-gallery" style="display:none">${buildCards(categories.zbrane)}</div>
-  </main>
-  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
-    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
-    <img id="lightbox-img" src="" alt="">
-  </div>
-  <script>
-    function showCat(cat, btn) {
-      ['weed','drogy','zbrane'].forEach(c => {
-        document.getElementById('cat-' + c).style.display = c === cat ? 'grid' : 'none';
-      });
-      document.querySelectorAll('.img-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
-    function openLightbox(url) {
-      document.getElementById('lightbox-img').src = url;
-      document.getElementById('lightbox').classList.add('open');
-    }
-    function closeLightbox() {
-      document.getElementById('lightbox').classList.remove('open');
-    }
-    document.addEventListener('keydown', e => { if(e.key === 'Escape') closeLightbox(); });
-  </script>
-  </body></html>`;
-}
-
-app.get('/galerie', requireAuth, (req, res) => res.send(renderGalerie(req)));
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
