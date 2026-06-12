@@ -38,6 +38,7 @@ const CONFIG = {
     "Modrý kanabis":  { vyroba: 100, prodej: 150 },
   },
   drogyTypy: ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"],
+  chemkyTypy: ["Acetylaceton","Aceton","Anhydrid kyseliny octové","Chlorid sodný","Diethylether","Ethanol","Fosforečnan draselný","Hydroxid sodný","Hydrogensíran sodný","Jód","Kyselina chlorovodíková","Kyselina fosforečná","Kyselina octová","Kyselina sírová","Lithium","Peroxid vodíku","Pseudoefedrin","Síran amonný","Toluen","Xylén"],
   drogyCeny: {
     "Kapky":       { prodej: 200 },
     "Kokain":      { prodej: 500 },
@@ -234,6 +235,20 @@ app.post('/api/ucet', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/chemky', requireAuth, async (req, res) => {
+  const { typ, chemikalie, mnozstvi } = req.body;
+  const qty = parseInt(mnozstvi);
+  if (!chemikalie || !qty || qty <= 0) return res.json({ ok: false, error: 'Chybné údaje' });
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+  await sheets.appendRow('Chemky', [cas, typ, chemikalie, qty, uzivatel]);
+  await discord.notifyChemky(typ, chemikalie, qty, uzivatel);
+  await discord.notifyAudit('Chemky', uzivatel, discordUser, `${typ} — ${chemikalie} (${qty} ks)`);
+  broadcastSSE('skladUpdate', { sekce: 'chemky', typ, chemikalie, qty, uzivatel, cas });
+  res.json({ ok: true });
+});
+
 // ── API — NÁSTĚNKA ────────────────────────────────────────────────────────────
 app.get('/api/nastenska', requireAuth, async (req, res) => {
   try {
@@ -266,14 +281,13 @@ app.post('/api/nastenska', requireAuth, async (req, res) => {
 // ── API — STATISTIKY ──────────────────────────────────────────────────────────
 app.get('/api/stats', requireAuth, async (req, res) => {
   try {
-    const [zbraneRows, weedRows, drogyRows, ucetRows] = await Promise.all([
+    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
       sheets.getRows('Zbraně').catch(() => []),
       sheets.getRows('Weed').catch(() => []),
       sheets.getRows('Drogy').catch(() => []),
       sheets.getRows('Účetnictví').catch(() => []),
+      sheets.getRows('Chemky').catch(() => []),
     ]);
-
-    // Sestavit normalizační mapu: cokoliv → ic_name
     const allUsers = db.prepare('SELECT * FROM users').all();
     const nameMapStats = {};
     allUsers.forEach(u => {
@@ -308,6 +322,7 @@ app.get('/api/stats', requireAuth, async (req, res) => {
         akce:   { vklad: {}, vyber: {} },
         weed:   { vklad: {}, vyber: {} },
         drogy:  { vklad: {}, vyber: {} },
+        chemky: { vklad: {}, vyber: {} },
         ucet:   { prijem_usd: 0, vydaj_usd: 0, prijem_pesos: 0, vydaj_pesos: 0 },
       };
     };
@@ -354,6 +369,18 @@ app.get('/api/stats', requireAuth, async (req, res) => {
       else addItemQty(stats[uzivatel].drogy.vyber, droga, qty);
     }
 
+    for (let i = 1; i < chemkyRows.length; i++) {
+      const r = chemkyRows[i];
+      const uzivatelRaw = r[4]; if (!uzivatelRaw) continue;
+      const uzivatel = normalizeUser(uzivatelRaw);
+      ensureUser(uzivatel);
+      const typ = (r[1]||'').toUpperCase();
+      const chem = r[2] || '?';
+      const qty = parseInt(r[3]) || 0;
+      if (typ === 'VKLAD') addItemQty(stats[uzivatel].chemky.vklad, chem, qty);
+      else addItemQty(stats[uzivatel].chemky.vyber, chem, qty);
+    }
+
     for (let i = 1; i < ucetRows.length; i++) {
       const r = ucetRows[i];
       const uzivatelRaw = r[5]; if (!uzivatelRaw) continue;
@@ -377,11 +404,12 @@ app.get('/api/stats', requireAuth, async (req, res) => {
 // ── API — AUDIT ───────────────────────────────────────────────────────────────
 app.get('/api/audit', requireAuth, async (req, res) => {
   try {
-    const [zbraneRows, weedRows, drogyRows, ucetRows] = await Promise.all([
+    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
       sheets.getRows('Zbraně').catch(() => []),
       sheets.getRows('Weed').catch(() => []),
       sheets.getRows('Drogy').catch(() => []),
       sheets.getRows('Účetnictví').catch(() => []),
+      sheets.getRows('Chemky').catch(() => []),
     ]);
 
     // Normalizace jmen — mapujeme vše co bot může napsat na ic_name
@@ -452,6 +480,11 @@ app.get('/api/audit', requireAuth, async (req, res) => {
           const qty = r[3] || '?';
           detail = `${r[2] || '?'} (${qty} ks)`;
           rawUzivatel = (r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '—');
+        } else if (sekce === 'Chemky') {
+          // Web: [cas, typ, chemikalie, qty, uzivatel]
+          const qty = r[3] || '?';
+          detail = `${r[2] || '?'} (${qty} ks)`;
+          rawUzivatel = r[4] || '—';
         } else if (sekce === 'Účetnictví') {
           // Web: [cas, typ, castka, valuta, poznamka, uzivatel]
           const sym = (r[3]||'') === 'USD' ? 'SAD ' : '₱';
@@ -490,6 +523,7 @@ app.get('/api/audit', requireAuth, async (req, res) => {
     addRows(zbraneRows, 'Zbraně', '🔫');
     addRows(weedRows, 'Weed', '🌿');
     addRows(drogyRows, 'Drogy', '💊');
+    addRows(chemkyRows, 'Chemky', '⚗️');
     addRows(ucetRows, 'Účetnictví', '💱');
 
     // Souhrn účetnictví per uživatel (normalizovaný)
@@ -537,19 +571,21 @@ app.get('/api/debug-sheets', requireAuth, async (req, res) => {
 
 app.get('/home', requireAuth, async (req, res) => {
   try {
-    const [zbrane, weed, drogy, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy] = await Promise.all([
+    const [zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky] = await Promise.all([
       sheets.getStockSummary('Zbraně').catch(() => ({})),
       sheets.getStockSummary('Weed').catch(() => ({})),
       sheets.getStockSummary('Drogy').catch(() => ({})),
+      sheets.getStockSummary('Chemky').catch(() => ({})),
       sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 })),
       sheets.getRecentRows('Účetnictví', 5).catch(() => []),
       sheets.getRecentRows('Zbraně', 3).catch(() => []),
       sheets.getRecentRows('Weed', 3).catch(() => []),
       sheets.getRecentRows('Drogy', 3).catch(() => []),
+      sheets.getRecentRows('Chemky', 3).catch(() => []),
     ]);
-    res.send(renderHome(req, { zbrane, weed, drogy, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy }));
+    res.send(renderHome(req, { zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky }));
   } catch (e) {
-    res.send(renderHome(req, { zbrane: {}, weed: {}, drogy: {}, ucet: { usd: 0, pesos: 0 }, recentUcet: [], recentZbrane: [], recentWeed: [], recentDrogy: [] }));
+    res.send(renderHome(req, { zbrane: {}, weed: {}, drogy: {}, chemky: {}, ucet: { usd: 0, pesos: 0 }, recentUcet: [], recentZbrane: [], recentWeed: [], recentDrogy: [], recentChemky: [] }));
   }
 });
 
@@ -558,16 +594,17 @@ app.get('/dashboard', requireAuth, async (req, res) => res.redirect('/home'));
 
 app.get('/sklad', requireAuth, async (req, res) => {
   try {
-    const [zbrane, weed, drogy, ucet, recentUcet] = await Promise.all([
+    const [zbrane, weed, drogy, chemky, ucet, recentUcet] = await Promise.all([
       sheets.getStockSummary('Zbraně').catch(() => ({})),
       sheets.getStockSummary('Weed').catch(() => ({})),
       sheets.getStockSummary('Drogy').catch(() => ({})),
+      sheets.getStockSummary('Chemky').catch(() => ({})),
       sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 })),
       sheets.getRecentRows('Účetnictví', 5).catch(() => []),
     ]);
-    res.send(renderDashboard(req, { zbrane, weed, drogy, ucet, recentUcet }));
+    res.send(renderDashboard(req, { zbrane, weed, drogy, chemky, ucet, recentUcet }));
   } catch (e) {
-    res.send(renderDashboard(req, { zbrane: {}, weed: {}, drogy: {}, ucet: { usd: 0, pesos: 0 }, recentUcet: [] }));
+    res.send(renderDashboard(req, { zbrane: {}, weed: {}, drogy: {}, chemky: {}, ucet: { usd: 0, pesos: 0 }, recentUcet: [] }));
   }
 });
 
@@ -1528,12 +1565,74 @@ function baseStyles() {
       @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
       @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}.profit-grid{grid-template-columns:repeat(2,1fr)}main{padding:1.5rem 1rem}}
 
+      /* ── NAV DROPDOWN ── */
+      .nav-dropdown{position:relative;height:100%}
+      .nav-drop-trigger{
+        display:flex;align-items:center;flex-direction:column;justify-content:center;
+        padding:0 1.1rem;height:100%;
+        font-size:0.68rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:500;
+        color:var(--text-muted);text-decoration:none;
+        border-bottom:2px solid transparent;
+        transition:color 0.2s,border-color 0.2s,background 0.2s;
+        white-space:nowrap;position:relative;gap:0.2rem;cursor:pointer;
+      }
+      .nav-drop-trigger::before{
+        content:'';position:absolute;inset:0;
+        background:var(--crimson-glow);opacity:0;transition:opacity 0.2s;
+      }
+      .nav-drop-trigger:hover,.nav-dropdown:hover .nav-drop-trigger{color:var(--silver-bright)}
+      .nav-drop-trigger:hover::before,.nav-dropdown:hover .nav-drop-trigger::before{opacity:0.55}
+      .nav-drop-trigger.active{color:var(--text);border-bottom-color:var(--crimson-light);background:var(--crimson-glow)}
+      .nav-drop-arrow{width:9px;height:6px;margin-top:2px;opacity:0.4;transition:transform 0.2s,opacity 0.2s;flex-shrink:0}
+      .nav-dropdown.open .nav-drop-arrow{transform:rotate(180deg);opacity:0.7}
+      .nav-dropdown-menu{
+        position:absolute;top:100%;left:50%;transform:translateX(-50%);
+        background:rgba(4,3,2,0.98);
+        border:1px solid rgba(160,0,0,0.25);
+        border-top:1px solid rgba(180,0,0,0.5);
+        min-width:190px;
+        box-shadow:0 8px 40px rgba(0,0,0,0.95),0 2px 0 rgba(160,0,0,0.3);
+        backdrop-filter:blur(40px);
+        opacity:0;pointer-events:none;
+        transform:translateX(-50%) translateY(-6px);
+        transition:opacity 0.18s,transform 0.18s;
+        z-index:300;
+      }
+      body.light .nav-dropdown-menu{
+        background:rgba(242,236,224,0.98);
+        border-color:rgba(60,40,15,0.15);
+        box-shadow:0 8px 30px rgba(40,25,10,0.15);
+      }
+      body.crystal .nav-dropdown-menu{
+        background:rgba(4,10,18,0.98);
+        border-color:rgba(126,200,227,0.22);
+      }
+      .nav-dropdown.open .nav-dropdown-menu{
+        opacity:1;pointer-events:all;
+        transform:translateX(-50%) translateY(0);
+      }
+      .nav-dropdown-menu a{
+        display:block;padding:0.7rem 1.2rem;
+        font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:500;
+        color:var(--text-muted);text-decoration:none;
+        border-bottom:1px solid var(--border);
+        transition:color 0.15s,background 0.15s,padding-left 0.15s;
+        white-space:nowrap;
+      }
+      .nav-dropdown-menu a:last-child{border-bottom:none}
+      .nav-dropdown-menu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:1.5rem}
+      .nav-dropdown-menu a.active{color:var(--crimson-light);background:rgba(160,0,0,0.08)}
+
     </style>
   `;
 }
 
 function renderNav(req, active) {
   const ic = req.session.icName;
+  const skladPages = ['sklad'];
+  const infoPages  = ['nastenska','kodex','lore','hierarchy','sazeni'];
+  const dataPages  = ['audit','statistiky'];
+
   return `
     <nav>
       <a href="/dashboard" class="nav-logo">
@@ -1541,13 +1640,45 @@ function renderNav(req, active) {
         <span class="nav-logo-text">AL<span class="b-red">B</span>ION</span>
       </a>
       <ul class="nav-menu">
-        <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Dashboard & Souhrn</span></a></li>
-        <li><a href="/sklad" class="${active==='sklad'?'active':''}">Sklad<span class="nav-desc">Zbraně · Weed · Drogy</span></a></li>
-        <li><a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka<span class="nav-desc">Oznámení & Aplikace</span></a></li>
-        <li><a href="/audit" class="${active==='audit'?'active':''}">Audit<span class="nav-desc">Záznamy akcí</span></a></li>
-        <li><a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky<span class="nav-desc">Přehled členů</span></a></li>
-        <li><a href="/kodex" class="${active==='kodex'?'active':''}">Kodex<span class="nav-desc">Pravidla & Hierarchie</span></a></li>
-        <li><a href="/sazeni" class="${active==='sazeni'?'active':''}">Sázení<span class="nav-desc">Weed kalkulačka</span></a></li>
+        <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Dashboard</span></a></li>
+
+        <li class="nav-dropdown ${skladPages.includes(active)?'open':''}">
+          <a href="/sklad" class="nav-drop-trigger ${skladPages.includes(active)?'active':''}">
+            Sklad
+            <span class="nav-desc">Zbrane · Weed · Drogy · Chemky</span>
+            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
+          </a>
+          <div class="nav-dropdown-menu">
+            <a href="/sklad" class="${active==='sklad'?'active':''}">⚙️ Správa skladu</a>
+            <a href="/sazeni" class="${active==='sazeni'?'active':''}">🌱 Weed sázení</a>
+          </div>
+        </li>
+
+        <li class="nav-dropdown ${dataPages.includes(active)?'open':''}">
+          <a href="/audit" class="nav-drop-trigger ${dataPages.includes(active)?'active':''}">
+            Záznamy
+            <span class="nav-desc">Audit · Statistiky</span>
+            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
+          </a>
+          <div class="nav-dropdown-menu">
+            <a href="/audit" class="${active==='audit'?'active':''}">🔍 Audit</a>
+            <a href="/statistiky" class="${active==='statistiky'?'active':''}">📊 Statistiky</a>
+          </div>
+        </li>
+
+        <li class="nav-dropdown ${infoPages.includes(active)?'open':''}">
+          <a href="#" class="nav-drop-trigger ${infoPages.includes(active)?'active':''}">
+            Organizace
+            <span class="nav-desc">Nástěnka · Kodex · Lore</span>
+            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
+          </a>
+          <div class="nav-dropdown-menu">
+            <a href="/nastenska" class="${active==='nastenska'?'active':''}">📢 Nástěnka</a>
+            <a href="/kodex" class="${active==='kodex'?'active':''}">📜 Kodex</a>
+            <a href="/lore" class="${active==='lore'?'active':''}">📖 Historie</a>
+            <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">🏛️ Hierarchie</a>
+          </div>
+        </li>
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
@@ -1564,6 +1695,27 @@ function renderNav(req, active) {
       </div>
     </nav>
     <script>
+      // ── DROPDOWN NAV ──
+      document.querySelectorAll('.nav-dropdown').forEach(dd => {
+        const trigger = dd.querySelector('.nav-drop-trigger');
+        trigger.addEventListener('click', (e) => {
+          // Only intercept the click if it's on the trigger itself (not a child link with href)
+          const href = trigger.getAttribute('href');
+          if (href && href !== '#') return; // let normal navigation happen
+          e.preventDefault();
+          dd.classList.toggle('open');
+        });
+        // hover open
+        dd.addEventListener('mouseenter', () => dd.classList.add('open'));
+        dd.addEventListener('mouseleave', () => dd.classList.remove('open'));
+      });
+      // Close dropdowns on outside click
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.nav-dropdown')) {
+          document.querySelectorAll('.nav-dropdown').forEach(dd => dd.classList.remove('open'));
+        }
+      });
+
       const THEMES = ['dark','light','crystal'];
       let currentTheme = localStorage.getItem('albion_theme') || 'dark';
       function applyTheme(t) {
@@ -1591,8 +1743,8 @@ function renderNav(req, active) {
       });
       evtSource.addEventListener('skladUpdate', (e) => {
         const d = JSON.parse(e.data);
-        const label = d.sekce === 'zbrane' ? '[Zbraně]' : d.sekce === 'weed' ? '[Weed]' : '[Drogy]';
-        showToast(label + ' ' + (d.polozka || d.odruda || d.droga) + ' — ' + d.uzivatel);
+        const label = d.sekce === 'zbrane' ? '[Zbraně]' : d.sekce === 'weed' ? '[Weed]' : d.sekce === 'chemky' ? '[Chemky]' : '[Drogy]';
+        showToast(label + ' ' + (d.polozka || d.odruda || d.droga || d.chemikalie) + ' — ' + d.uzivatel);
       });
       evtSource.addEventListener('ucetUpdate', (e) => {
         const d = JSON.parse(e.data);
@@ -1613,7 +1765,7 @@ function renderNav(req, active) {
 
 // ── RENDER HOME (Main Dashboard) ─────────────────────────────────────────────
 function renderHome(req, data) {
-  const { zbrane, weed, drogy, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy } = data;
+  const { zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky } = data;
   const icName = req.session.icName;
 
   // ── Výpočet hodnoty skladu
@@ -1666,6 +1818,7 @@ function renderHome(req, data) {
     ...recentZbrane.map(r => ({ icon:'🔫', sekce:'Zbraně', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[5]||'—', cas:r[0]||'' })),
     ...recentWeed.map(r => ({ icon:'🌿', sekce:'Weed', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
     ...recentDrogy.map(r => ({ icon:'💊', sekce:'Drogy', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
+    ...(recentChemky||[]).map(r => ({ icon:'⚗️', sekce:'Chemky', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[4]||'—', cas:r[0]||'' })),
     ...recentUcet.map(r => {
       const sym=(r[3]||'')==='USD'?'SAD ':'₱';
       return { icon:'💱', sekce:'Finance', typ:r[1]||'', detail:`${sym}${r[2]||'?'} — ${r[4]||'—'}`, kdo:r[5]||'—', cas:r[0]||'' };
@@ -1849,7 +2002,7 @@ function renderHome(req, data) {
     /* ── KPI STRIP ── */
     .kpi-strip{
       display:grid;
-      grid-template-columns:repeat(5,1fr);
+      grid-template-columns:repeat(6,1fr);
       gap:1px;
       background:var(--border-silver);
       border:1px solid var(--border-silver);
@@ -2133,8 +2286,14 @@ function renderHome(req, data) {
       <div class="kpi" style="--kpi-color:#FF6B6B" onclick="location.href='/sklad'">
         <div class="kpi-label">Drogy v skladu</div>
         <div class="kpi-value" style="color:#FF6B6B">${totalDrogy}</div>
-        <div class="kpi-sub">${Object.keys(drogy).filter(k=>drogy[k]>0).length} typů · $${drogyVal.toLocaleString('cs-CZ')}</div>
+        <div class="kpi-sub">${Object.keys(drogy).filter(k=>drogy[k]>0).length} typů</div>
         <div class="kpi-icon">💊</div>
+      </div>
+      <div class="kpi" style="--kpi-color:#7EC8E3" onclick="location.href='/sklad'">
+        <div class="kpi-label">Chemikálie</div>
+        <div class="kpi-value" style="color:#7EC8E3">${Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div>
+        <div class="kpi-sub">${Object.keys(chemky||{}).filter(k=>chemky[k]>0).length} druhů v skladu</div>
+        <div class="kpi-icon">⚗️</div>
       </div>
       <div class="kpi" style="--kpi-color:var(--gold)" onclick="location.href='/sklad'">
         <div class="kpi-label">Hodnota skladu</div>
@@ -2374,7 +2533,7 @@ function renderHome(req, data) {
 
 // ── RENDER DASHBOARD (Sklad) ──────────────────────────────────────────────────
 function renderDashboard(req, data) {
-  const { zbrane, weed, drogy, ucet, recentUcet } = data;
+  const { zbrane, weed, drogy, chemky, ucet, recentUcet } = data;
   const icName = req.session.icName;
 
   const ITEM_EMOJI = {
@@ -2449,11 +2608,12 @@ function renderDashboard(req, data) {
       }
       updateClock();setInterval(updateClock,1000);
     </script>
-    <div class="stats" style="grid-template-columns:repeat(5,1fr)">
+    <div class="stats" style="grid-template-columns:repeat(6,1fr)">
       <div class="stat"><div class="stat-label">Zůstatek SAD</div><div class="stat-value">${ucet.usd.toLocaleString('cs-CZ')}</div><div class="stat-sub">San Andreas Dollar</div></div>
       <div class="stat"><div class="stat-label">Zůstatek Pesos</div><div class="stat-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div><div class="stat-sub">Mexické peso</div></div>
       <div class="stat"><div class="stat-label">Položky Weed</div><div class="stat-value">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
       <div class="stat"><div class="stat-label">Položky Drogy</div><div class="stat-value">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
+      <div class="stat" style="border-top-color:#7EC8E3"><div class="stat-label">Chemikálie</div><div class="stat-value" style="color:#7EC8E3">${Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">${Object.keys(chemky||{}).filter(k=>chemky[k]>0).length} druhů</div></div>
       <div class="stat" style="border-top-color:var(--gold)">
         <div class="stat-label">Hodnota skladu</div>
         <div class="stat-value" style="font-size:1.4rem;color:var(--gold)">
@@ -2471,7 +2631,7 @@ function renderDashboard(req, data) {
         <div class="stat-sub">Weed + Drogy + Zbraně</div>
       </div>
     </div>
-    <div class="grid">
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
       <div class="card">
         <div class="card-header"><span class="card-title">Zbraně & Střelivo</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(zbrane, null)}
@@ -2540,6 +2700,22 @@ function renderDashboard(req, data) {
           </div>
           <div class="form-group" style="margin-bottom:0.5rem"><label>Poznámka</label><input type="text" id="ucet-poznamka" placeholder="Prodej zboží, plat..."></div>
           <button class="btn-submit" onclick="submitUcet()">Potvrdit transakci</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">⚗️ Chemikálie</span><span class="card-badge">Sklad</span></div>
+        ${formatSklad(chemky||{}, null)}
+        <div class="form-section">
+          <div class="typ-toggle">
+            <button class="typ-btn active-vklad" onclick="setTyp('chemky','VKLAD',this)">Uložit</button>
+            <button class="typ-btn" onclick="setTyp('chemky','VÝBĚR',this)">Vybrat</button>
+          </div>
+          <input type="hidden" id="chemky-typ" value="VKLAD">
+          <div class="form-row">
+            <div class="form-group"><label>Chemikálie</label><select id="chemky-chemikalie"><option>Acetylaceton</option><option>Aceton</option><option>Anhydrid kyseliny octové</option><option>Chlorid sodný</option><option>Diethylether</option><option>Ethanol</option><option>Fosforečnan draselný</option><option>Hydroxid sodný</option><option>Hydrogensíran sodný</option><option>Jód</option><option>Kyselina chlorovodíková</option><option>Kyselina fosforečná</option><option>Kyselina octová</option><option>Kyselina sírová</option><option>Lithium</option><option>Peroxid vodíku</option><option>Pseudoefedrin</option><option>Síran amonný</option><option>Toluen</option><option>Xylén</option></select></div>
+            <div class="form-group"><label>Množství</label><input type="number" id="chemky-mnozstvi" min="1" value="1"></div>
+          </div>
+          <button class="btn-submit" onclick="submitChemky()">Potvrdit akci</button>
         </div>
       </div>
     </div>
@@ -2681,6 +2857,21 @@ function renderDashboard(req, data) {
         async () => {
           const r=await post('/api/ucet',{typ,castka,valuta,poznamka});
           if(r.ok){showToast('✓ Transakce zaznamenána');setTimeout(()=>location.reload(),1500);}
+          else showToast('✗ '+r.error,true);
+        }
+      );
+    }
+    async function submitChemky(){
+      const typ=document.getElementById('chemky-typ').value;
+      const chemikalie=document.getElementById('chemky-chemikalie').value;
+      const mnozstvi=document.getElementById('chemky-mnozstvi').value;
+      showModal(
+        typ==='VKLAD'?'Vložit chemikálii do skladu':'Vybrat chemikálii ze skladu',
+        'Zkontroluj detaily operace a potvrd.',
+        [['Typ',typ],['Chemikálie',chemikalie],['Množství',mnozstvi+' ks']],
+        async () => {
+          const r=await post('/api/chemky',{typ,chemikalie,mnozstvi});
+          if(r.ok){showToast('✓ Chemikálie uložena');setTimeout(()=>location.reload(),1500);}
           else showToast('✗ '+r.error,true);
         }
       );
@@ -2863,6 +3054,7 @@ function renderAudit(req) {
         <button class="typ-btn" onclick="filterAudit('Zbraně')" id="filter-zbrane" style="flex:none;padding:0.4rem 1rem">Zbraně</button>
         <button class="typ-btn" onclick="filterAudit('Weed')" id="filter-weed" style="flex:none;padding:0.4rem 1rem">Weed</button>
         <button class="typ-btn" onclick="filterAudit('Drogy')" id="filter-drogy" style="flex:none;padding:0.4rem 1rem">Drogy</button>
+        <button class="typ-btn" onclick="filterAudit('Chemky')" id="filter-chemky" style="flex:none;padding:0.4rem 1rem">⚗️ Chemky</button>
         <button class="typ-btn" onclick="filterAudit('Účetnictví')" id="filter-ucet" style="flex:none;padding:0.4rem 1rem">Účetnictví</button>
         <span style="margin-left:auto;font-size:0.62rem;letter-spacing:0.1em;color:var(--text-muted);display:flex;align-items:center;gap:0.5rem">
           <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--crimson-light)"></span>Web
@@ -2947,7 +3139,10 @@ function renderAudit(req) {
     function filterAudit(sekce) {
       activeFilter = sekce;
       document.querySelectorAll('[id^=filter-]').forEach(b => b.className = 'typ-btn');
-      const btnId = sekce === 'vse' ? 'filter-vse' : 'filter-' + sekce.toLowerCase().replace('ě','e').replace('í','i');
+      let btnId;
+      if (sekce === 'vse') btnId = 'filter-vse';
+      else if (sekce === 'Chemky') btnId = 'filter-chemky';
+      else btnId = 'filter-' + sekce.toLowerCase().replace('ě','e').replace('í','i').replace('č','c').replace('ú','u');
       const btn = document.getElementById(btnId);
       if (btn) btn.className = 'typ-btn active-vklad';
       const filtered = sekce === 'vse' ? allEvents : allEvents.filter(e => e.sekce === sekce);
@@ -3018,6 +3213,7 @@ function renderStatistiky(req) {
         const hasAkce   = Object.keys({...s.akce.vklad,...s.akce.vyber}).length > 0;
         const hasWeed   = Object.keys({...s.weed.vklad,...s.weed.vyber}).length > 0;
         const hasDrogy  = Object.keys({...s.drogy.vklad,...s.drogy.vyber}).length > 0;
+        const hasChemky = s.chemky && Object.keys({...s.chemky.vklad,...s.chemky.vyber}).length > 0;
         const hasUcet   = s.ucet.prijem_usd || s.ucet.vydaj_usd || s.ucet.prijem_pesos || s.ucet.vydaj_pesos;
         return \`<div class="stat-card">
           <div class="stat-card-header">
@@ -3031,13 +3227,14 @@ function renderStatistiky(req) {
           \${hasAkce   ? \`<div class="stat-section-label">Akce</div>\${renderItemGroup(s.akce)}\` : ''}
           \${hasWeed   ? \`<div class="stat-section-label">Weed</div>\${renderItemGroup(s.weed)}\` : ''}
           \${hasDrogy  ? \`<div class="stat-section-label">Drogy</div>\${renderItemGroup(s.drogy)}\` : ''}
+          \${hasChemky ? \`<div class="stat-section-label">⚗️ Chemikálie</div>\${renderItemGroup(s.chemky)}\` : ''}
           \${hasUcet ? \`<div class="stat-section-label">Účetnictví</div>
             \${s.ucet.prijem_usd  ? \`<div class="stat-row"><span>Příjmy USD</span><strong style="color:#00CC66">$\${s.ucet.prijem_usd.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.vydaj_usd   ? \`<div class="stat-row"><span>Výdaje USD</span><strong style="color:#FF5555">$\${s.ucet.vydaj_usd.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.prijem_pesos? \`<div class="stat-row"><span>Příjmy Pesos</span><strong style="color:#00CC66">₱\${s.ucet.prijem_pesos.toLocaleString('cs-CZ')}</strong></div>\` : ''}
             \${s.ucet.vydaj_pesos ? \`<div class="stat-row"><span>Výdaje Pesos</span><strong style="color:#FF5555">₱\${s.ucet.vydaj_pesos.toLocaleString('cs-CZ')}</strong></div>\` : ''}
           \` : ''}
-          \${!hasZbrane && !hasNaboje && !hasAkce && !hasWeed && !hasDrogy && !hasUcet
+          \${!hasZbrane && !hasNaboje && !hasAkce && !hasWeed && !hasDrogy && !hasChemky && !hasUcet
             ? '<div style="font-size:0.77rem;color:var(--text-muted);padding:0.5rem 0">Zatím žádná aktivita</div>'
             : ''}
         </div>\`;
