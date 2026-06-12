@@ -1300,6 +1300,10 @@ function baseStyles() {
       .slider-labels{display:flex;justify-content:space-between;font-size:0.66rem;color:var(--text-muted);letter-spacing:0.08em;margin-top:0.4rem}
       .profit-bar{height:5px;background:var(--border);margin-top:1rem;position:relative;overflow:hidden}
       .profit-fill{height:100%;background:linear-gradient(90deg,rgba(0,200,80,0.5),#00C853);transition:width 0.4s}
+      .profit-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.5rem}
+      .profit-stat{background:var(--bg-mid);border:1px solid var(--border);padding:0.9rem 1rem;text-align:center}
+      .profit-stat-label{font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:500;color:var(--text-muted);margin-bottom:0.55rem}
+      .profit-stat-num{font-family:'Cinzel',serif;font-size:1.35rem;color:var(--text);line-height:1}
 
       /* ── CONFIRM MODAL ── */
       .modal-overlay{
@@ -1405,7 +1409,7 @@ function baseStyles() {
 
       @media(max-width:1200px){.nav-menu a .nav-desc{display:none}}
       @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
-      @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}main{padding:1.5rem 1rem}}
+      @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}.profit-grid{grid-template-columns:repeat(2,1fr)}main{padding:1.5rem 1rem}}
 
     </style>
   `;
@@ -2770,6 +2774,60 @@ function renderSazeni(req) {
       </div>
     </div>
 
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header"><span class="card-title">Kalkulačka prodeje &amp; zisku</span><span class="card-badge">4 sáčky / kytka · $150 / sáček</span></div>
+      <div style="font-size:0.8rem;color:var(--text-dim);line-height:1.85;margin-bottom:1.4rem">
+        Z jedné vypěstované kytky se dá udělat přibližně <strong style="color:var(--text)">4 sáčky weedu</strong>. Ty se prodávají členům za <strong style="color:var(--text)">$150 / sáček</strong> a výdělek nad rámec nákladů jde rovnou členům do kapsy. Zadej počet kytek nebo částku, kterou chceš do pěstování investovat, a kalkulačka spočítá počet sáčků, tržbu z prodeje a čistý zisk po odečtení nákladů.
+      </div>
+      <div class="kalk-grid">
+        <div class="kalk-block">
+          <div class="kalk-block-label">Počet kytek</div>
+          <input type="number" class="kalk-input" id="profitKytky" min="1" max="9999" value="10" oninput="profitFromKytky(this.value)">
+          <div class="kalk-result">
+            <div class="kalk-result-num" id="profitSacky">40</div>
+            <div class="kalk-result-label">sáčků weedu</div>
+          </div>
+        </div>
+        <div class="kalk-arrow">⇄</div>
+        <div class="kalk-block">
+          <div class="kalk-block-label">Investice do pěstování</div>
+          <input type="number" class="kalk-input" id="profitInvest" min="0" value="4550" oninput="profitFromInvest(this.value)" style="border-color:rgba(0,200,80,0.18)">
+          <div class="kalk-result" style="background:rgba(0,200,80,0.05);border-color:rgba(0,200,80,0.14)">
+            <div class="kalk-result-num" id="profitTrzba" style="color:#00C853">$6 000</div>
+            <div class="kalk-result-label">tržba z prodeje</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slider-wrap">
+        <input type="range" class="slider" id="profitSlider" min="1" max="200" value="10" oninput="profitSliderChange(this.value)" style="--pct:4.5%">
+        <div class="slider-labels"><span>1</span><span>50</span><span>100</span><span>150</span><span>200 kytek</span></div>
+      </div>
+
+      <div class="profit-grid">
+        <div class="profit-stat">
+          <div class="profit-stat-label">Náklady na pěstování</div>
+          <div class="profit-stat-num" id="profitNaklady">$4 550</div>
+        </div>
+        <div class="profit-stat" style="border-color:rgba(0,200,80,0.14);background:rgba(0,200,80,0.04)">
+          <div class="profit-stat-label">Čistý zisk celkem</div>
+          <div class="profit-stat-num" style="color:#00C853" id="profitZisk">$1 450</div>
+        </div>
+        <div class="profit-stat">
+          <div class="profit-stat-label">Zisk / 1 kytka</div>
+          <div class="profit-stat-num" id="profitZiskKytka">$145</div>
+        </div>
+        <div class="profit-stat">
+          <div class="profit-stat-label">Návratnost (ROI)</div>
+          <div class="profit-stat-num" id="profitROI">+31,9 %</div>
+        </div>
+      </div>
+
+      <div style="margin-top:1.2rem;padding:0.8rem 1rem;background:var(--gold-dim);border:1px solid var(--border-gold);font-size:0.76rem;color:var(--text-dim);line-height:1.8">
+        Z <strong style="color:var(--gold)" id="profitInfoKytky">10</strong> kytek vyrobíš <strong style="color:var(--gold)" id="profitInfoSacky">40</strong> sáčků weedu. Za jejich prodej dostaneš <strong style="color:var(--gold)" id="profitInfoTrzba">$6 000</strong>, po odečtení nákladů na pěstování ve výši <strong style="color:var(--gold)" id="profitInfoNaklady">$4 550</strong> zbyde čistý zisk <strong style="color:var(--gold)" id="profitInfoZisk">$1 450</strong>.
+      </div>
+    </div>
+
   </main>
   <script>
     const COST_PER = 455;
@@ -2807,6 +2865,44 @@ function renderSazeni(req) {
     function calcFromBudget(v) { const k=Math.max(1,Math.floor((parseFloat(v)||0)/COST_PER)); document.getElementById('inputKytky').value=k; updateAll(k); }
     function sliderChange(v) { document.getElementById('inputKytky').value=v; calcFromKytky(v); }
     updateAll(10);
+
+    // ── Kalkulačka prodeje & zisku ─────────────────────────────────────────
+    const SACKY_PER_KYTKA  = 4;
+    const PRICE_PER_SACEK  = 150;
+    const REVENUE_PER_KYTKA = SACKY_PER_KYTKA * PRICE_PER_SACEK; // $600
+    const PROFIT_PER_KYTKA  = REVENUE_PER_KYTKA - COST_PER;      // $145
+
+    function updateProfit(kytky) {
+      kytky = Math.max(1, Math.floor(kytky));
+      const naklady = kytky * COST_PER;
+      const sacky   = kytky * SACKY_PER_KYTKA;
+      const trzba   = sacky * PRICE_PER_SACEK;
+      const zisk    = trzba - naklady;
+      const roi     = (zisk / naklady) * 100;
+
+      document.getElementById('profitSacky').textContent  = sacky.toLocaleString('cs-CZ');
+      document.getElementById('profitTrzba').textContent  = fmt(trzba);
+      document.getElementById('profitNaklady').textContent = fmt(naklady);
+      document.getElementById('profitZisk').textContent   = (zisk >= 0 ? '+' : '') + fmt(zisk);
+      document.getElementById('profitZiskKytka').textContent = (PROFIT_PER_KYTKA >= 0 ? '+' : '') + fmt(PROFIT_PER_KYTKA);
+      document.getElementById('profitROI').textContent = (roi >= 0 ? '+' : '') + roi.toFixed(1).replace('.', ',') + ' %';
+
+      document.getElementById('profitInfoKytky').textContent   = kytky.toLocaleString('cs-CZ');
+      document.getElementById('profitInfoSacky').textContent   = sacky.toLocaleString('cs-CZ');
+      document.getElementById('profitInfoTrzba').textContent   = fmt(trzba);
+      document.getElementById('profitInfoNaklady').textContent = fmt(naklady);
+      document.getElementById('profitInfoZisk').textContent    = fmt(zisk);
+
+      const slider = document.getElementById('profitSlider');
+      const clamped = Math.min(kytky, 200);
+      slider.value = clamped;
+      slider.style.setProperty('--pct', ((clamped - 1) / 199 * 100).toFixed(1) + '%');
+    }
+
+    function profitFromKytky(v) { const k=parseInt(v)||1; document.getElementById('profitInvest').value=k*COST_PER; updateProfit(k); }
+    function profitFromInvest(v) { const k=Math.max(1,Math.floor((parseFloat(v)||0)/COST_PER)); document.getElementById('profitKytky').value=k; updateProfit(k); }
+    function profitSliderChange(v) { document.getElementById('profitKytky').value=v; profitFromKytky(v); }
+    updateProfit(10);
   </script>
   </body></html>`;
 }
