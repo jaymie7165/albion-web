@@ -55,6 +55,17 @@ async function notifyDrogy(typ, droga, mnozstvi, vyroba, prodej, uzivatel) {
   await sendEmbed(channelId, { title: typ === 'VKLAD' ? '💊 VLOŽENO DO SKLADU (web)' : '💊 VYBRÁNO ZE SKLADU (web)', color, fields, timestamp: new Date().toISOString() });
 }
 
+async function notifyChemky(typ, chemikalie, mnozstvi, uzivatel) {
+  const channelId = process.env.CHANNEL_CHEMKY;
+  const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
+  const fields = [
+    { name: 'Chemikálie', value: chemikalie, inline: true },
+    { name: 'Množství', value: `${mnozstvi} ks`, inline: true },
+    { name: typ === 'VKLAD' ? 'Vložil' : 'Vzal', value: uzivatel, inline: true },
+  ];
+  await sendEmbed(channelId, { title: typ === 'VKLAD' ? '⚗️ VLOŽENO DO SKLADU (web)' : '⚗️ VYBRÁNO ZE SKLADU (web)', color, fields, timestamp: new Date().toISOString() });
+}
+
 async function notifyUcet(typ, castka, valuta, poznamka, uzivatel) {
   const channelId = process.env.CHANNEL_UCETNICTVI;
   const color = typ === 'PŘÍJEM' ? 0x00FF88 : 0xFF4444;
@@ -155,4 +166,4 @@ async function isUserOnServer(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyUcet, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyUcet, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer };
