@@ -229,7 +229,7 @@ app.post('/api/ucet', requireAuth, async (req, res) => {
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Účetnictví', [cas, typ, amount, valuta, poznamka, uzivatel]);
-  await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `${typ} — ${valuta === 'USD' ? '$' : '₱'}${amount} | ${poznamka}`);
+  await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `${typ} — ${valuta === 'USD' ? 'SAD ' : '₱'}${amount} | ${poznamka}`);
   broadcastSSE('ucetUpdate', { typ, castka: amount, valuta, poznamka, uzivatel, cas });
   res.json({ ok: true });
 });
@@ -454,7 +454,7 @@ app.get('/api/audit', requireAuth, async (req, res) => {
           rawUzivatel = (r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '—');
         } else if (sekce === 'Účetnictví') {
           // Web: [cas, typ, castka, valuta, poznamka, uzivatel]
-          const sym = (r[3]||'') === 'USD' ? '$' : '₱';
+          const sym = (r[3]||'') === 'USD' ? 'SAD ' : '₱';
           detail = `${sym}${r[2] || '?'} | ${r[4] || '—'}`;
           rawUzivatel = r[5] || '—';
         }
@@ -1479,7 +1479,7 @@ function renderNav(req, active) {
       });
       evtSource.addEventListener('ucetUpdate', (e) => {
         const d = JSON.parse(e.data);
-        showToast('[Finance] ' + d.typ + ' — ' + (d.valuta === 'USD' ? '$' : '₱') + d.castka);
+        showToast('[Finance] ' + d.typ + ' — ' + (d.valuta === 'USD' ? 'SAD ' : '₱') + d.castka);
       });
       function showToast(msg, isError) {
         let t = document.getElementById('toast');
@@ -1550,10 +1550,10 @@ function renderHome(req, data) {
     ...recentWeed.map(r => ({ icon:'🌿', sekce:'Weed', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
     ...recentDrogy.map(r => ({ icon:'💊', sekce:'Drogy', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
     ...recentUcet.map(r => {
-      const sym=(r[3]||'')==='USD'?'$':'₱';
+      const sym=(r[3]||'')==='USD'?'SAD ':'₱';
       return { icon:'💱', sekce:'Finance', typ:r[1]||'', detail:`${sym}${r[2]||'?'} — ${r[4]||'—'}`, kdo:r[5]||'—', cas:r[0]||'' };
     }),
-  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,10);
+  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,3);
 
   const activityHtml = allRecent.length ? allRecent.map(ev => {
     const isIn = /VKLAD|PŘÍJEM/.test((ev.typ||'').toUpperCase());
@@ -1579,17 +1579,17 @@ function renderHome(req, data) {
       <div class="fin-dot" style="background:${isIn?'#00D97A':'#FF5555'}"></div>
       <div class="fin-desc">${r[4]||'—'}</div>
       <div class="fin-amount" style="color:${isIn?'#00D97A':'#FF5555'}">${sym}${r[2]}</div>
-      <div class="fin-cur">${r[3]||''}</div>
+      <div class="fin-cur">${(r[3]||'').replace('USD','SAD')}</div>
     </div>`;
   }).join('') : '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Žádné záznamy</div>';
 
-  // ── Donut chart data (CSS-only pie using conic-gradient)
+  // ── Donut chart data — podle množství (ks), ne hodnoty, protože ceny drog/zbraní nejsou veřejné
   const weedVal  = Object.entries(weed).reduce((s,[k,q])=>s+(q>0&&WEED_P[k]?q*WEED_P[k]:0),0);
-  const drogyVal = Object.entries(drogy).reduce((s,[k,q])=>s+(q>0&&DROGY_P[k]?q*DROGY_P[k]:0),0);
-  const zbraneVal= Object.entries(zbrane).reduce((s,[k,q])=>s+(q>0&&ZBRANE_P[k]?q*ZBRANE_P[k]:0),0);
-  const pieTotal = weedVal + drogyVal + zbraneVal || 1;
-  const pW = Math.round(weedVal/pieTotal*100);
-  const pD = Math.round(drogyVal/pieTotal*100);
+  const drogyVal = 0;   // ceny drog nejsou zobrazovány na home
+  const zbraneVal= 0;   // ceny zbraní nejsou zobrazovány na home
+  const pieTotal = totalWeed + totalDrogy + totalZbrane || 1;
+  const pW = Math.round(totalWeed/pieTotal*100);
+  const pD = Math.round(totalDrogy/pieTotal*100);
   const pZ = 100 - pW - pD;
 
   const greetingHour = new Date().getHours();
@@ -1980,9 +1980,9 @@ function renderHome(req, data) {
     <!-- ── KPI STRIP ── -->
     <div class="kpi-strip">
       <div class="kpi" style="--kpi-color:#FFD700" onclick="location.href='/sklad'">
-        <div class="kpi-label">Zůstatek USD</div>
+        <div class="kpi-label">Zůstatek SAD</div>
         <div class="kpi-value" style="color:var(--gold)">$${ucet.usd.toLocaleString('cs-CZ')}</div>
-        <div class="kpi-sub">Americké dolary</div>
+        <div class="kpi-sub">San Andreas Dollar</div>
         <div class="kpi-icon">$</div>
       </div>
       <div class="kpi" style="--kpi-color:#C8C8CC" onclick="location.href='/sklad'">
@@ -2105,7 +2105,7 @@ function renderHome(req, data) {
         </div>
         <div class="bilance-grid">
           <div class="bil-card">
-            <div class="bil-label">USD Balance</div>
+            <div class="bil-label">SAD Balance</div>
             <div class="bil-value" style="color:${ucet.usd>=0?'#00C853':'#FF5555'}">$${ucet.usd.toLocaleString('cs-CZ')}</div>
           </div>
           <div class="bil-card">
@@ -2198,7 +2198,7 @@ function renderHome(req, data) {
     });
     evtHome.addEventListener('ucetUpdate', (e) => {
       const d = JSON.parse(e.data);
-      bumpLive('💱 ' + d.typ + ' — ' + (d.valuta==='USD'?'$':'₱') + d.castka);
+      bumpLive('💱 ' + d.typ + ' — ' + (d.valuta==='USD'?'SAD ':'₱') + d.castka);
     });
     evtHome.addEventListener('nastenska', (e) => {
       const d = JSON.parse(e.data);
@@ -2280,8 +2280,8 @@ function renderDashboard(req, data) {
     return rows.map(r => {
       const [cas, typ, castka, valuta, pozn] = r;
       const isIn = typ === 'PŘÍJEM';
-      const symbol = valuta === 'USD' ? '$' : '₱';
-      return `<div class="sklad-row"><span style="display:flex;align-items:center;gap:0.5rem"><span style="width:6px;height:6px;border-radius:50%;background:${isIn?'#00FF88':'#FF5555'};flex-shrink:0"></span>${pozn||'—'}</span><span style="${isIn?'color:#00CC66':'color:#FF5555'}">${symbol}${castka} <em style="color:var(--text-muted)">${valuta}</em></span></div>`;
+      const symbol = valuta === 'USD' ? 'SAD ' : '₱';
+      return `<div class="sklad-row"><span style="display:flex;align-items:center;gap:0.5rem"><span style="width:6px;height:6px;border-radius:50%;background:${isIn?'#00FF88':'#FF5555'};flex-shrink:0"></span>${pozn||'—'}</span><span style="${isIn?'color:#00CC66':'color:#FF5555'}">${symbol}${castka} <em style="color:var(--text-muted)">${valuta.replace('USD','SAD')}</em></span></div>`;
     }).join('');
   };
 
@@ -2317,7 +2317,7 @@ function renderDashboard(req, data) {
       updateClock();setInterval(updateClock,1000);
     </script>
     <div class="stats" style="grid-template-columns:repeat(5,1fr)">
-      <div class="stat"><div class="stat-label">Zůstatek USD</div><div class="stat-value">${ucet.usd.toLocaleString('cs-CZ')}</div><div class="stat-sub">Americké dolary</div></div>
+      <div class="stat"><div class="stat-label">Zůstatek SAD</div><div class="stat-value">${ucet.usd.toLocaleString('cs-CZ')}</div><div class="stat-sub">San Andreas Dollar</div></div>
       <div class="stat"><div class="stat-label">Zůstatek Pesos</div><div class="stat-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div><div class="stat-sub">Mexické peso</div></div>
       <div class="stat"><div class="stat-label">Položky Weed</div><div class="stat-value">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
       <div class="stat"><div class="stat-label">Položky Drogy</div><div class="stat-value">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
@@ -2403,7 +2403,7 @@ function renderDashboard(req, data) {
           <input type="hidden" id="ucet-typ" value="PŘÍJEM">
           <div class="form-row">
             <div class="form-group"><label>Částka</label><input type="number" id="ucet-castka" min="1" placeholder="1000"></div>
-            <div class="form-group"><label>Valuta</label><select id="ucet-valuta"><option value="USD">USD</option><option value="PESOS">Pesos</option></select></div>
+            <div class="form-group"><label>Valuta</label><select id="ucet-valuta"><option value="USD">SAD</option><option value="PESOS">Pesos</option></select></div>
           </div>
           <div class="form-group" style="margin-bottom:0.5rem"><label>Poznámka</label><input type="text" id="ucet-poznamka" placeholder="Prodej zboží, plat..."></div>
           <button class="btn-submit" onclick="submitUcet()">Potvrdit transakci</button>
