@@ -1499,43 +1499,52 @@ function renderHome(req, data) {
   const { zbrane, weed, drogy, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy } = data;
   const icName = req.session.icName;
 
-  // Výpočet hodnoty skladu
+  // ── Výpočet hodnoty skladu
   const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
   const DROGY_P = {"Kapky":200,"Kokain":500,"Extáze":350,"Metamfetamin":450,"Benzo":300,"Joyka":250,"Heroin":600,"Speed":280,"LSD":400};
   const ZBRANE_P = {"Pump Shotgun":8000,"Pistol MK2":12000,"Pistol":5000,"Combat Pistol":7000,"Double Action Revolver":15000,"Navy Revolver":14000,"Vintage Pistol":6000,"Gusenberg":18000,"Dlouhé":25000,"9mm":100,"9mm Mk2":150,".75cal":300,".50cal":250,"12-gauge":200};
+
   let totalValue = 0;
   Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
   Object.entries(drogy).forEach(([k,q]) => { if(q>0 && DROGY_P[k]) totalValue += q * DROGY_P[k]; });
   Object.entries(zbrane).forEach(([k,q]) => { if(q>0 && ZBRANE_P[k]) totalValue += q * ZBRANE_P[k]; });
 
-  const totalWeed = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
-  const totalDrogy = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalWeed   = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalDrogy  = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalZbrane = Object.values(zbrane).filter(q=>q>0).reduce((a,b)=>a+b,0);
 
-  // Top 3 položky každé kategorie pro mini-grafy
-  const topItems = (obj, priceMap, limit=5) => Object.entries(obj)
+  // ── Top items pro mini-grafy
+  const topItems = (obj, priceMap, limit=6) => Object.entries(obj)
     .filter(([,q])=>q>0)
     .sort((a,b)=>b[1]-a[1])
     .slice(0,limit)
     .map(([item,qty]) => ({ item, qty, value: priceMap[item] ? qty*priceMap[item] : 0 }));
 
-  const topWeed = topItems(weed, WEED_P);
-  const topDrogy = topItems(drogy, DROGY_P);
+  const topWeed   = topItems(weed, WEED_P);
+  const topDrogy  = topItems(drogy, DROGY_P);
   const topZbrane = topItems(zbrane, ZBRANE_P);
-  const maxWeedQty = topWeed.reduce((m,x)=>Math.max(m,x.qty),1);
-  const maxDrogyQty = topDrogy.reduce((m,x)=>Math.max(m,x.qty),1);
+  const maxWeedQty   = topWeed.reduce((m,x)=>Math.max(m,x.qty),1);
+  const maxDrogyQty  = topDrogy.reduce((m,x)=>Math.max(m,x.qty),1);
   const maxZbraneQty = topZbrane.reduce((m,x)=>Math.max(m,x.qty),1);
 
-  const miniStock = (items, maxQty) => items.length
-    ? items.map(({item,qty}) => `
-        <div class="mini-stock-row">
-          <span class="mini-stock-name">${item}</span>
-          <div class="mini-stock-bar-wrap"><div class="mini-stock-bar-fill" style="width:${Math.round(qty/maxQty*100)}%"></div></div>
-          <span class="mini-stock-qty">${qty}</span>
-        </div>`).join('')
-    : '<p style="color:var(--text-muted);font-size:0.78rem;padding:0.5rem 0">Sklad prázdný</p>';
+  const ITEM_COLORS = {
+    weed:   '#00C853',
+    drogy:  '#FF6B6B',
+    zbrane: '#FFB347',
+  };
 
-  // Poslední aktivity sloučené
+  const miniStockBars = (items, maxQty, color) => items.length
+    ? items.map(({item,qty,value}) => `
+      <div class="msb-row">
+        <div class="msb-label">${item}</div>
+        <div class="msb-track">
+          <div class="msb-fill" style="width:${Math.max(4,Math.round(qty/maxQty*100))}%;background:${color}22;border-right:2px solid ${color}88"></div>
+        </div>
+        <div class="msb-qty">${qty}<span class="msb-val">${value?'$'+value.toLocaleString('cs-CZ'):''}</span></div>
+      </div>`).join('')
+    : '<div class="msb-empty">Sklad prázdný</div>';
+
+  // ── Poslední aktivity
   const allRecent = [
     ...recentZbrane.map(r => ({ icon:'🔫', sekce:'Zbraně', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[5]||'—', cas:r[0]||'' })),
     ...recentWeed.map(r => ({ icon:'🌿', sekce:'Weed', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
@@ -1544,154 +1553,628 @@ function renderHome(req, data) {
       const sym=(r[3]||'')==='USD'?'$':'₱';
       return { icon:'💱', sekce:'Finance', typ:r[1]||'', detail:`${sym}${r[2]||'?'} — ${r[4]||'—'}`, kdo:r[5]||'—', cas:r[0]||'' };
     }),
-  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,12);
+  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,10);
 
   const activityHtml = allRecent.length ? allRecent.map(ev => {
     const isIn = /VKLAD|PŘÍJEM/.test((ev.typ||'').toUpperCase());
-    const typColor = isIn ? 'color:#00D97A' : 'color:#FF5555';
-    return `<div class="activity-item">
-      <div class="activity-icon">${ev.icon}</div>
-      <div class="activity-body">
-        <div class="activity-main"><span style="${typColor};font-weight:600;font-size:0.72rem;letter-spacing:0.1em">${ev.typ}</span> &nbsp;${ev.detail}</div>
-        <div class="activity-meta">${ev.sekce} · ${ev.kdo} · <span style="color:var(--text-label)">${ev.cas}</span></div>
+    const typColor = isIn ? '#00D97A' : '#FF5555';
+    const typBg    = isIn ? 'rgba(0,217,122,0.08)' : 'rgba(255,85,85,0.08)';
+    return `<div class="af-item">
+      <div class="af-icon">${ev.icon}</div>
+      <div class="af-body">
+        <div class="af-main">
+          <span class="af-typ" style="color:${typColor};background:${typBg}">${ev.typ}</span>
+          <span class="af-detail">${ev.detail}</span>
+        </div>
+        <div class="af-meta">${ev.sekce} · <strong>${ev.kdo}</strong> · ${ev.cas}</div>
       </div>
     </div>`;
-  }).join('') : '<p style="color:var(--text-muted);font-size:0.8rem;padding:1rem 0;text-align:center">Zatím žádná aktivita</p>';
+  }).join('') : '<div class="af-empty">Zatím žádná aktivita</div>';
 
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Přehled</title>
+  // ── Finance recent
+  const financeHtml = recentUcet.length ? recentUcet.map(r => {
+    const isIn = r[1]==='PŘÍJEM';
+    const sym  = (r[3]||'')==='USD'?'$':'₱';
+    return `<div class="fin-row">
+      <div class="fin-dot" style="background:${isIn?'#00D97A':'#FF5555'}"></div>
+      <div class="fin-desc">${r[4]||'—'}</div>
+      <div class="fin-amount" style="color:${isIn?'#00D97A':'#FF5555'}">${sym}${r[2]}</div>
+      <div class="fin-cur">${r[3]||''}</div>
+    </div>`;
+  }).join('') : '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Žádné záznamy</div>';
+
+  // ── Donut chart data (CSS-only pie using conic-gradient)
+  const weedVal  = Object.entries(weed).reduce((s,[k,q])=>s+(q>0&&WEED_P[k]?q*WEED_P[k]:0),0);
+  const drogyVal = Object.entries(drogy).reduce((s,[k,q])=>s+(q>0&&DROGY_P[k]?q*DROGY_P[k]:0),0);
+  const zbraneVal= Object.entries(zbrane).reduce((s,[k,q])=>s+(q>0&&ZBRANE_P[k]?q*ZBRANE_P[k]:0),0);
+  const pieTotal = weedVal + drogyVal + zbraneVal || 1;
+  const pW = Math.round(weedVal/pieTotal*100);
+  const pD = Math.round(drogyVal/pieTotal*100);
+  const pZ = 100 - pW - pD;
+
+  const greetingHour = new Date().getHours();
+  const greeting = greetingHour < 12 ? 'Dobré ráno' : greetingHour < 18 ? 'Dobrý den' : 'Dobrý večer';
+
+  return `<!DOCTYPE html><html lang="cs"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Albion — Přehled</title>
   ${baseStyles()}
+  <style>
+    /* ── HOME HERO ── */
+    .home-hero{
+      position:relative;
+      background:var(--bg-card);
+      border:1px solid var(--border-silver);
+      padding:2.8rem 3rem;
+      margin-bottom:2rem;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:2rem;
+    }
+    .home-hero::before{
+      content:'';
+      position:absolute;inset:0;
+      background:
+        radial-gradient(ellipse 60% 100% at 0% 50%, rgba(180,20,20,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 60% at 100% 50%, rgba(200,32,32,0.05) 0%, transparent 60%);
+      pointer-events:none;
+    }
+    .home-hero::after{
+      content:'';
+      position:absolute;bottom:0;left:0;right:0;height:1px;
+      background:linear-gradient(90deg,transparent,var(--crimson-light) 30%,var(--crimson-light) 70%,transparent);
+      opacity:0.35;
+    }
+    body.crystal .home-hero::before{
+      background:
+        radial-gradient(ellipse 60% 100% at 0% 50%, rgba(0,120,200,0.15) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 60% at 100% 50%, rgba(192,57,43,0.08) 0%, transparent 60%);
+    }
+    .hero-left{ position:relative;z-index:1; }
+    .hero-greeting{
+      font-size:0.62rem;letter-spacing:0.42em;text-transform:uppercase;
+      color:var(--crimson-light);margin-bottom:0.6rem;font-weight:500;
+    }
+    .hero-title{
+      font-family:'Cinzel',serif;
+      font-size:2.2rem;font-weight:500;color:var(--text);
+      letter-spacing:0.02em;line-height:1.15;
+    }
+    .hero-title .hero-name{ color:var(--crimson-light); }
+    .hero-sub{
+      font-family:'Cormorant Garamond',serif;
+      font-style:italic;color:var(--text-dim);
+      font-size:1.1rem;margin-top:0.5rem;
+    }
+    .hero-status{
+      display:inline-flex;align-items:center;gap:0.5rem;
+      margin-top:1.2rem;
+      font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;
+      color:#00D97A;font-weight:500;
+    }
+    .hero-status-dot{
+      width:7px;height:7px;border-radius:50%;
+      background:#00D97A;
+      box-shadow:0 0 8px #00D97A;
+      animation:pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot{
+      0%,100%{box-shadow:0 0 6px #00D97A}
+      50%{box-shadow:0 0 16px #00D97A,0 0 28px rgba(0,217,122,0.4)}
+    }
+
+    .quick-actions{
+      display:flex;flex-wrap:wrap;gap:0.65rem;margin-top:1.6rem;
+    }
+    .quick-btn{
+      display:inline-flex;align-items:center;gap:0.5rem;
+      font-size:0.63rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:500;
+      color:var(--text-dim);text-decoration:none;
+      padding:0.55rem 1.1rem;
+      border:1px solid var(--border-hover);
+      background:var(--bg-mid);
+      transition:all 0.22s;
+      position:relative;overflow:hidden;
+    }
+    .quick-btn::before{
+      content:'';position:absolute;inset:0;
+      background:var(--crimson-glow);
+      transform:translateX(-100%);
+      transition:transform 0.3s;
+    }
+    .quick-btn:hover{color:var(--text);border-color:var(--crimson-light);transform:translateY(-1px)}
+    .quick-btn:hover::before{transform:translateX(0)}
+    .quick-btn svg{width:13px;height:13px;position:relative;z-index:1;flex-shrink:0}
+    .quick-btn span{position:relative;z-index:1}
+    .quick-btn.primary{
+      background:var(--crimson-glow);
+      border-color:var(--crimson-light);
+      color:var(--text);
+    }
+
+    .hero-right{
+      position:relative;z-index:1;
+      text-align:right;flex-shrink:0;
+    }
+    .hero-clock{
+      font-family:'Cinzel',serif;
+      font-size:2.4rem;color:var(--silver-bright);
+      letter-spacing:0.1em;line-height:1;
+      text-shadow:0 0 40px rgba(255,255,255,0.06);
+    }
+    .hero-date{
+      font-size:0.68rem;letter-spacing:0.16em;
+      color:var(--text-dim);text-transform:uppercase;margin-top:0.5rem;
+    }
+    .hero-dow{
+      font-family:'Cormorant Garamond',serif;
+      font-style:italic;color:var(--crimson-light);
+      font-size:1rem;margin-top:0.2rem;
+    }
+
+    /* ── KPI STRIP ── */
+    .kpi-strip{
+      display:grid;
+      grid-template-columns:repeat(5,1fr);
+      gap:1px;
+      background:var(--border-silver);
+      border:1px solid var(--border-silver);
+      margin-bottom:2rem;
+      overflow:hidden;
+    }
+    .kpi{
+      background:var(--bg-card);
+      padding:1.4rem 1.5rem;
+      cursor:pointer;
+      transition:background 0.22s;
+      position:relative;
+      overflow:hidden;
+    }
+    .kpi::after{
+      content:'';
+      position:absolute;top:0;left:0;right:0;height:2px;
+      background:var(--kpi-color,var(--crimson-light));
+      transform:scaleX(0);
+      transform-origin:left;
+      transition:transform 0.3s;
+    }
+    .kpi:hover::after{transform:scaleX(1)}
+    .kpi:hover{background:var(--bg-card2)}
+    .kpi-label{
+      font-size:0.57rem;letter-spacing:0.26em;text-transform:uppercase;
+      color:var(--text-muted);font-weight:500;margin-bottom:0.5rem;
+    }
+    .kpi-value{
+      font-family:'Cinzel',serif;
+      font-size:1.5rem;color:var(--text);font-weight:500;
+      letter-spacing:0.02em;line-height:1;
+      transition:color 0.2s;
+    }
+    .kpi:hover .kpi-value{color:var(--kpi-color,var(--crimson-light))}
+    .kpi-sub{font-size:0.64rem;color:var(--text-muted);margin-top:0.45rem}
+    .kpi-icon{
+      position:absolute;right:1.2rem;top:50%;transform:translateY(-50%);
+      font-size:1.6rem;opacity:0.07;transition:opacity 0.2s,transform 0.2s;
+      pointer-events:none;
+    }
+    .kpi:hover .kpi-icon{opacity:0.15;transform:translateY(-50%) scale(1.1)}
+
+    /* ── GRID LAYOUT ── */
+    .home-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr 1.5fr;
+      gap:1.5rem;
+      align-items:start;
+      margin-bottom:1.5rem;
+    }
+    .home-bottom{
+      display:grid;
+      grid-template-columns:1.4fr 1fr 1.1fr;
+      gap:1.5rem;
+      align-items:start;
+    }
+
+    /* ── MINI STOCK BARS ── */
+    .msb-row{
+      display:grid;
+      grid-template-columns:1fr 1.8fr auto;
+      gap:0.6rem;
+      align-items:center;
+      padding:0.45rem 0;
+      border-bottom:1px solid var(--border);
+    }
+    .msb-row:last-child{border-bottom:none}
+    .msb-label{font-size:0.76rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .msb-track{
+      height:4px;background:var(--bg-mid);
+      border-radius:0;overflow:hidden;
+      position:relative;
+    }
+    .msb-fill{
+      height:100%;
+      transition:width 0.6s cubic-bezier(0.22,1,0.36,1);
+    }
+    .msb-qty{
+      font-family:'Cinzel',serif;font-size:0.8rem;
+      color:var(--text);text-align:right;white-space:nowrap;
+      min-width:3.5rem;
+    }
+    .msb-val{
+      display:block;font-family:'Inter',sans-serif;
+      font-size:0.6rem;color:var(--text-muted);
+      margin-top:0.1rem;
+    }
+    .msb-empty{
+      color:var(--text-muted);font-size:0.78rem;
+      padding:0.8rem 0;text-align:center;
+      letter-spacing:0.08em;
+    }
+
+    /* ── ACTIVITY FEED ── */
+    .af-item{
+      display:flex;gap:0.9rem;align-items:flex-start;
+      padding:0.8rem 0;
+      border-bottom:1px solid var(--border);
+      transition:background 0.18s,padding-left 0.18s;
+    }
+    .af-item:last-child{border-bottom:none}
+    .af-item:hover{padding-left:0.4rem;background:var(--crimson-glow)}
+    .af-icon{
+      font-size:1.1rem;flex-shrink:0;
+      width:28px;height:28px;
+      display:flex;align-items:center;justify-content:center;
+      background:var(--bg-mid);border:1px solid var(--border);
+      margin-top:0.1rem;
+    }
+    .af-body{flex:1;min-width:0}
+    .af-main{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.2rem}
+    .af-typ{
+      font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;
+      padding:0.15rem 0.5rem;flex-shrink:0;
+    }
+    .af-detail{font-size:0.84rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .af-meta{font-size:0.66rem;color:var(--text-muted);letter-spacing:0.04em}
+    .af-meta strong{color:var(--text-dim);font-weight:500}
+    .af-empty{color:var(--text-muted);font-size:0.8rem;padding:1.5rem 0;text-align:center;letter-spacing:0.08em}
+
+    /* ── FINANCE ROW ── */
+    .fin-row{
+      display:grid;grid-template-columns:auto 1fr auto auto;
+      gap:0.6rem;align-items:center;
+      padding:0.6rem 0;border-bottom:1px solid var(--border);
+      transition:background 0.18s;
+    }
+    .fin-row:last-child{border-bottom:none}
+    .fin-row:hover{background:var(--crimson-glow);padding-left:0.3rem;border-radius:0}
+    .fin-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .fin-desc{font-size:0.82rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .fin-amount{font-family:'Cinzel',serif;font-size:0.9rem;font-weight:500;white-space:nowrap}
+    .fin-cur{font-size:0.62rem;color:var(--text-muted);letter-spacing:0.08em}
+
+    /* ── PIE / DONUT ── */
+    .pie-wrap{
+      display:flex;align-items:center;gap:2rem;
+      padding:1rem 0;
+    }
+    .pie-donut{
+      width:100px;height:100px;
+      border-radius:50%;
+      flex-shrink:0;
+      position:relative;
+    }
+    .pie-legend{flex:1}
+    .pie-leg-item{
+      display:flex;align-items:center;gap:0.6rem;
+      padding:0.35rem 0;font-size:0.78rem;color:var(--text-dim);
+    }
+    .pie-leg-dot{width:8px;height:8px;flex-shrink:0}
+    .pie-leg-pct{margin-left:auto;font-family:'Cinzel',serif;font-size:0.8rem;color:var(--text)}
+
+    /* ── BILANCE CARDS ── */
+    .bilance-grid{
+      display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem;
+    }
+    .bil-card{
+      text-align:center;padding:1.4rem 1rem;
+      background:var(--bg-mid);border:1px solid var(--border-hover);
+      transition:border-color 0.2s;
+    }
+    .bil-card:hover{border-color:var(--border-silver)}
+    .bil-label{font-size:0.54rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem}
+    .bil-value{font-family:'Cinzel',serif;font-size:1.5rem;letter-spacing:0.02em}
+
+    /* ── SECTION DIVIDER ── */
+    .sec-divider{
+      display:flex;align-items:center;gap:1.2rem;
+      margin:1.8rem 0 1.2rem;
+    }
+    .sec-divider-label{
+      font-size:0.58rem;letter-spacing:0.36em;text-transform:uppercase;
+      color:var(--crimson-light);font-weight:500;white-space:nowrap;flex-shrink:0;
+    }
+    .sec-divider-line{
+      flex:1;height:1px;
+      background:linear-gradient(90deg,var(--crimson-light),transparent);
+      opacity:0.3;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:1200px){
+      .home-grid{grid-template-columns:1fr 1fr}
+      .kpi-strip{grid-template-columns:repeat(3,1fr)}
+    }
+    @media(max-width:768px){
+      .home-hero{flex-direction:column;padding:1.8rem}
+      .hero-right{text-align:left}
+      .kpi-strip{grid-template-columns:1fr 1fr}
+      .home-grid{grid-template-columns:1fr}
+      .home-bottom{grid-template-columns:1fr}
+    }
+  </style>
   </head><body>
   ${renderNav(req, 'home')}
   <main>
 
-    <!-- Hero banner -->
+    <!-- ── HERO BANNER ── -->
     <div class="home-hero">
-      <div>
-        <div style="font-size:0.58rem;letter-spacing:0.45em;text-transform:uppercase;color:var(--crimson-light);margin-bottom:0.5rem;font-weight:500">Albion — Centrální systém</div>
-        <h1 style="font-family:'Cinzel',serif;font-size:2rem;font-weight:500;color:var(--text);letter-spacing:0.02em">Vítej zpět, <span style="color:var(--crimson-light)">${icName}</span></h1>
-        <p style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--text-dim);font-size:1.05rem;margin-top:0.4rem">Organizace je aktivní. Níže najdeš aktuální přehled skladu a financí.</p>
+      <div class="hero-left">
+        <div class="hero-greeting">${greeting}, bratře</div>
+        <h1 class="hero-title">Vítej zpět,&nbsp;<span class="hero-name">${icName}</span></h1>
+        <p class="hero-sub">Organizace Albion je aktivní. Systém eviduje zásoby a transakce v reálném čase.</p>
+        <div class="hero-status">
+          <div class="hero-status-dot"></div>
+          Systém online · Live data
+        </div>
         <div class="quick-actions">
-          <a href="/sklad" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8h14M5 8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v.01M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/></svg>Správa skladu</a>
-          <a href="/audit" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>Audit log</a>
-          <a href="/nastenska" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Nástěnka</a>
-          <a href="/statistiky" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Statistiky</a>
-          <a href="/sazeni" class="quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Sázení</a>
+          <a href="/sklad" class="quick-btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8h14M5 8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v.01M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/></svg>
+            <span>Správa skladu</span>
+          </a>
+          <a href="/audit" class="quick-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
+            <span>Audit log</span>
+          </a>
+          <a href="/nastenska" class="quick-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span>Nástěnka</span>
+          </a>
+          <a href="/statistiky" class="quick-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Statistiky</span>
+          </a>
+          <a href="/sazeni" class="quick-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+            <span>Sázení</span>
+          </a>
+          <a href="/lore" class="quick-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            <span>Lore</span>
+          </a>
         </div>
       </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div id="live-clock" style="font-family:'Cinzel',serif;font-size:2rem;color:var(--silver-bright);letter-spacing:0.1em;line-height:1"></div>
-        <div id="live-date" style="font-size:0.68rem;letter-spacing:0.14em;color:var(--text-dim);text-transform:uppercase;margin-top:0.5rem"></div>
-        <div id="live-dow" style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--crimson-light);font-size:0.9rem;margin-top:0.2rem"></div>
+      <div class="hero-right">
+        <div class="hero-clock" id="live-clock">--:--:--</div>
+        <div class="hero-date" id="live-date"></div>
+        <div class="hero-dow" id="live-dow"></div>
+        <div id="live-notif-count" style="display:none;margin-top:1rem;font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--crimson-light);padding:0.3rem 0.8rem;border:1px solid var(--border-gold)"></div>
       </div>
     </div>
+
     <script>
-      function updateClock(){
-        const now=new Date();
-        document.getElementById('live-clock').textContent=now.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-        document.getElementById('live-date').textContent=now.toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'});
-        document.getElementById('live-dow').textContent=now.toLocaleDateString('cs-CZ',{weekday:'long'});
-      }
-      updateClock();setInterval(updateClock,1000);
+      (function clock(){
+        const c=document.getElementById('live-clock');
+        const d=document.getElementById('live-date');
+        const w=document.getElementById('live-dow');
+        function tick(){
+          const n=new Date();
+          if(c) c.textContent=n.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+          if(d) d.textContent=n.toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'});
+          if(w) w.textContent=n.toLocaleDateString('cs-CZ',{weekday:'long'});
+        }
+        tick();setInterval(tick,1000);
+      })();
     </script>
 
-    <!-- KPI stats strip -->
-    <div class="stats" style="grid-template-columns:repeat(5,1fr);margin-bottom:2rem">
-      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
-        <div class="stat-label">Zůstatek USD</div>
-        <div class="stat-value" style="color:var(--gold)">$${ucet.usd.toLocaleString('cs-CZ')}</div>
-        <div class="stat-sub">Americké dolary</div>
+    <!-- ── KPI STRIP ── -->
+    <div class="kpi-strip">
+      <div class="kpi" style="--kpi-color:#FFD700" onclick="location.href='/sklad'">
+        <div class="kpi-label">Zůstatek USD</div>
+        <div class="kpi-value" style="color:var(--gold)">$${ucet.usd.toLocaleString('cs-CZ')}</div>
+        <div class="kpi-sub">Americké dolary</div>
+        <div class="kpi-icon">$</div>
       </div>
-      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
-        <div class="stat-label">Zůstatek Pesos</div>
-        <div class="stat-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
-        <div class="stat-sub">Mexické peso</div>
+      <div class="kpi" style="--kpi-color:#C8C8CC" onclick="location.href='/sklad'">
+        <div class="kpi-label">Zůstatek Pesos</div>
+        <div class="kpi-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
+        <div class="kpi-sub">Mexické peso</div>
+        <div class="kpi-icon">₱</div>
       </div>
-      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
-        <div class="stat-label">Weed v skladu</div>
-        <div class="stat-value" style="color:#00C853">${totalWeed}</div>
-        <div class="stat-sub">${Object.keys(weed).filter(k=>weed[k]>0).length} odrůd</div>
+      <div class="kpi" style="--kpi-color:#00C853" onclick="location.href='/sklad'">
+        <div class="kpi-label">Weed v skladu</div>
+        <div class="kpi-value" style="color:#00C853">${totalWeed}</div>
+        <div class="kpi-sub">${Object.keys(weed).filter(k=>weed[k]>0).length} odrůd · $${weedVal.toLocaleString('cs-CZ')}</div>
+        <div class="kpi-icon">🌿</div>
       </div>
-      <div class="stat" style="cursor:pointer" onclick="location.href='/sklad'">
-        <div class="stat-label">Drogy v skladu</div>
-        <div class="stat-value">${totalDrogy}</div>
-        <div class="stat-sub">${Object.keys(drogy).filter(k=>drogy[k]>0).length} typů</div>
+      <div class="kpi" style="--kpi-color:#FF6B6B" onclick="location.href='/sklad'">
+        <div class="kpi-label">Drogy v skladu</div>
+        <div class="kpi-value" style="color:#FF6B6B">${totalDrogy}</div>
+        <div class="kpi-sub">${Object.keys(drogy).filter(k=>drogy[k]>0).length} typů · $${drogyVal.toLocaleString('cs-CZ')}</div>
+        <div class="kpi-icon">💊</div>
       </div>
-      <div class="stat" style="border-top-color:var(--gold);cursor:pointer" onclick="location.href='/sklad'">
-        <div class="stat-label">Hodnota skladu</div>
-        <div class="stat-value" style="font-size:1.3rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
-        <div class="stat-sub">Weed + Drogy + Zbraně</div>
+      <div class="kpi" style="--kpi-color:var(--gold)" onclick="location.href='/sklad'">
+        <div class="kpi-label">Hodnota skladu</div>
+        <div class="kpi-value" style="font-size:1.3rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
+        <div class="kpi-sub">Weed + Drogy + Zbraně</div>
+        <div class="kpi-icon">◆</div>
       </div>
     </div>
 
-    <!-- 3-col layout: stock summaries + activity feed -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr;gap:1.5rem;align-items:start">
+    <!-- ── MAIN GRID: Zásoby + Activity feed ── -->
+    <div class="home-grid">
 
       <!-- Weed -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">🌿 Weed</span>
-          <span class="card-badge">${totalWeed} ks</span>
+          <span class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22V12M12 12C12 12 8 9 4 9c0 5 3.5 8 8 8M12 12c0 0 4-3 8-3 0 5-3.5 8-8 8M12 12C12 7 9 4 6 2c-1 4 1 8 6 10M12 12c0-5 3-8 6-10 1 4-1 8-6 10"/></svg>
+            Weed
+          </span>
+          <span class="card-badge" style="color:#00C853;border-color:rgba(0,200,83,0.3)">${totalWeed} ks</span>
         </div>
-        ${miniStock(topWeed, maxWeedQty)}
-        <a href="/sklad" style="display:block;margin-top:1.2rem;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;text-align:center;padding:0.5rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Spravovat →</a>
+        ${miniStockBars(topWeed, maxWeedQty, '#00C853')}
+        <a href="/sklad" class="quick-btn" style="width:100%;justify-content:center;margin-top:1.2rem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span>Spravovat</span>
+        </a>
       </div>
 
       <!-- Drogy -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">💊 Drogy</span>
-          <span class="card-badge">${totalDrogy} ks</span>
+          <span class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 6v12M6 12h12"/></svg>
+            Drogy
+          </span>
+          <span class="card-badge" style="color:#FF6B6B;border-color:rgba(255,107,107,0.3)">${totalDrogy} ks</span>
         </div>
-        ${miniStock(topDrogy, maxDrogyQty)}
-        <a href="/sklad" style="display:block;margin-top:1.2rem;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;text-align:center;padding:0.5rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Spravovat →</a>
+        ${miniStockBars(topDrogy, maxDrogyQty, '#FF6B6B')}
+        <a href="/sklad" class="quick-btn" style="width:100%;justify-content:center;margin-top:1.2rem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span>Spravovat</span>
+        </a>
       </div>
 
       <!-- Zbraně -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">🔫 Zbraně</span>
-          <span class="card-badge">${totalZbrane} ks</span>
+          <span class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h10l2-4h4v8H4z"/><path d="M8 12v4"/></svg>
+            Zbraně
+          </span>
+          <span class="card-badge" style="color:#FFB347;border-color:rgba(255,179,71,0.3)">${totalZbrane} ks</span>
         </div>
-        ${miniStock(topZbrane, maxZbraneQty)}
-        <a href="/sklad" style="display:block;margin-top:1.2rem;font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;text-align:center;padding:0.5rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Spravovat →</a>
+        ${miniStockBars(topZbrane, maxZbraneQty, '#FFB347')}
+        <a href="/sklad" class="quick-btn" style="width:100%;justify-content:center;margin-top:1.2rem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <span>Spravovat</span>
+        </a>
       </div>
 
       <!-- Activity feed -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Poslední aktivita</span>
-          <a href="/audit" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;padding:0.2rem 0.6rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Celý audit</a>
+          <span class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Poslední aktivita
+          </span>
+          <a href="/audit" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;padding:0.22rem 0.65rem;border:1px solid var(--border-gold);transition:background 0.2s;white-space:nowrap" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Vše →</a>
         </div>
         <div id="activity-feed">${activityHtml}</div>
       </div>
     </div>
 
-    <!-- Finance přehled -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem">
+    <!-- ── BOTTOM ROW: Finance + Bilance ── -->
+    <div class="sec-divider">
+      <span class="sec-divider-label">Finance &amp; Přehled</span>
+      <div class="sec-divider-line"></div>
+    </div>
+
+    <div class="home-bottom">
+
+      <!-- Poslední transakce -->
       <div class="card">
-        <div class="card-header"><span class="card-title">💱 Poslední transakce</span><a href="/sklad" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;padding:0.2rem 0.6rem;border:1px solid var(--border-gold);transition:background 0.2s" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Přidat →</a></div>
-        ${recentUcet.length ? recentUcet.map(r => {
-          const isIn=r[1]==='PŘÍJEM';
-          const sym=(r[3]||'')==='USD'?'$':'₱';
-          return `<div class="sklad-row"><span style="display:flex;align-items:center;gap:0.5rem"><span style="width:6px;height:6px;border-radius:50%;background:${isIn?'#00FF88':'#FF5555'};flex-shrink:0"></span>${r[4]||'—'}</span><span style="${isIn?'color:#00CC66':'color:#FF5555'}">${sym}${r[2]} <em style="color:var(--text-muted)">${r[3]||''}</em></span></div>`;
-        }).join('') : '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Žádné záznamy</p>'}
+        <div class="card-header">
+          <span class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Poslední transakce
+          </span>
+          <a href="/sklad" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--crimson-light);text-decoration:none;padding:0.22rem 0.65rem;border:1px solid var(--border-gold);transition:background 0.2s;white-space:nowrap" onmouseover="this.style.background='var(--crimson-glow)'" onmouseout="this.style.background='transparent'">Přidat →</a>
+        </div>
+        ${financeHtml}
       </div>
+
+      <!-- Bilance -->
       <div class="card">
-        <div class="card-header"><span class="card-title">📊 Bilance organizace</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem">
-          <div style="text-align:center;padding:1.5rem;background:var(--bg-mid);border:1px solid var(--border-hover)">
-            <div style="font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:0.5rem">USD Balance</div>
-            <div style="font-family:'Cinzel',serif;font-size:1.6rem;color:${ucet.usd>=0?'#00C853':'#FF5555'}">$${ucet.usd.toLocaleString('cs-CZ')}</div>
+        <div class="card-header">
+          <span class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Bilance organizace
+          </span>
+        </div>
+        <div class="bilance-grid">
+          <div class="bil-card">
+            <div class="bil-label">USD Balance</div>
+            <div class="bil-value" style="color:${ucet.usd>=0?'#00C853':'#FF5555'}">$${ucet.usd.toLocaleString('cs-CZ')}</div>
           </div>
-          <div style="text-align:center;padding:1.5rem;background:var(--bg-mid);border:1px solid var(--border-hover)">
-            <div style="font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--silver);margin-bottom:0.5rem">PESOS Balance</div>
-            <div style="font-family:'Cinzel',serif;font-size:1.6rem;color:${ucet.pesos>=0?'#00C853':'#FF5555'}">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
+          <div class="bil-card">
+            <div class="bil-label">Pesos Balance</div>
+            <div class="bil-value" style="color:${ucet.pesos>=0?'#00C853':'#FF5555'}">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
           </div>
         </div>
-        <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)">
-          <div style="font-size:0.55rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.6rem">Celková hodnota skladu</div>
-          <div style="font-family:'Cinzel',serif;font-size:1.4rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.3rem">Weed + Drogy + Zbraně (prodejní ceny)</div>
+        <div style="padding-top:0.8rem;border-top:1px solid var(--border)">
+          <div style="font-size:0.54rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.5rem">Celková hodnota skladu</div>
+          <div style="font-family:'Cinzel',serif;font-size:1.5rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
+          <div style="font-size:0.66rem;color:var(--text-muted);margin-top:0.3rem">Weed · Drogy · Zbraně · prodejní ceny</div>
+        </div>
+      </div>
+
+      <!-- Skladové složení (donut) -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+            Složení skladu
+          </span>
+          <span class="card-badge">$${totalValue.toLocaleString('cs-CZ')}</span>
+        </div>
+        <div class="pie-wrap">
+          <div class="pie-donut" style="background:conic-gradient(#00C853 0% ${pW}%, #FF6B6B ${pW}% ${pW+pD}%, #FFB347 ${pW+pD}% 100%);
+            box-shadow:0 0 0 8px var(--bg-card),0 0 0 9px var(--border);
+            border-radius:50%;position:relative;">
+            <div style="position:absolute;inset:18px;border-radius:50%;background:var(--bg-card);display:flex;align-items:center;justify-content:center;flex-direction:column">
+              <div style="font-family:'Cinzel',serif;font-size:1rem;color:var(--text)">${totalWeed+totalDrogy+totalZbrane}</div>
+              <div style="font-size:0.5rem;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase">kusů</div>
+            </div>
+          </div>
+          <div class="pie-legend">
+            <div class="pie-leg-item">
+              <div class="pie-leg-dot" style="background:#00C853"></div>
+              Weed
+              <div class="pie-leg-pct">${pW}%</div>
+            </div>
+            <div class="pie-leg-item">
+              <div class="pie-leg-dot" style="background:#FF6B6B"></div>
+              Drogy
+              <div class="pie-leg-pct">${pD}%</div>
+            </div>
+            <div class="pie-leg-item">
+              <div class="pie-leg-dot" style="background:#FFB347"></div>
+              Zbraně
+              <div class="pie-leg-pct">${pZ}%</div>
+            </div>
+            <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border)">
+              <div style="font-size:0.62rem;color:var(--text-muted)">Hodnotově nejcennější</div>
+              <div style="font-size:0.82rem;color:var(--text);margin-top:0.2rem">
+                ${zbraneVal>=weedVal&&zbraneVal>=drogyVal?'⚔️ Zbraně':weedVal>=drogyVal?'🌿 Weed':'💊 Drogy'}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;text-align:center">
+          <div>
+            <div style="font-size:0.54rem;letter-spacing:0.18em;text-transform:uppercase;color:#00C853;margin-bottom:0.2rem">Weed</div>
+            <div style="font-family:'Cinzel',serif;font-size:0.85rem;color:var(--text)">$${weedVal.toLocaleString('cs-CZ')}</div>
+          </div>
+          <div>
+            <div style="font-size:0.54rem;letter-spacing:0.18em;text-transform:uppercase;color:#FF6B6B;margin-bottom:0.2rem">Drogy</div>
+            <div style="font-family:'Cinzel',serif;font-size:0.85rem;color:var(--text)">$${drogyVal.toLocaleString('cs-CZ')}</div>
+          </div>
+          <div>
+            <div style="font-size:0.54rem;letter-spacing:0.18em;text-transform:uppercase;color:#FFB347;margin-bottom:0.2rem">Zbraně</div>
+            <div style="font-family:'Cinzel',serif;font-size:0.85rem;color:var(--text)">$${zbraneVal.toLocaleString('cs-CZ')}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1699,20 +2182,27 @@ function renderHome(req, data) {
   </main>
   <div class="toast" id="toast"></div>
   <script>
-    // Live SSE activity update
+    // ── Live SSE
     const evtHome = new EventSource('/api/events');
+    let liveCount = 0;
+    function bumpLive(msg) {
+      liveCount++;
+      const el = document.getElementById('live-notif-count');
+      if (el) { el.style.display=''; el.textContent = liveCount + ' nová aktualizace' + (liveCount>1?'':''); }
+      showToast(msg);
+    }
     evtHome.addEventListener('skladUpdate', (e) => {
       const d = JSON.parse(e.data);
       const label = d.sekce==='zbrane'?'🔫 Zbraně':d.sekce==='weed'?'🌿 Weed':'💊 Drogy';
-      showToast(label+' '+d.typ+' — '+(d.polozka||d.odruda||d.droga)+' ('+d.qty+' ks)');
+      bumpLive(label + ' ' + d.typ + ' — ' + (d.polozka||d.odruda||d.droga) + ' (' + d.qty + ' ks)');
     });
     evtHome.addEventListener('ucetUpdate', (e) => {
       const d = JSON.parse(e.data);
-      showToast('💱 '+d.typ+' — '+(d.valuta==='USD'?'$':'₱')+d.castka);
+      bumpLive('💱 ' + d.typ + ' — ' + (d.valuta==='USD'?'$':'₱') + d.castka);
     });
     evtHome.addEventListener('nastenska', (e) => {
       const d = JSON.parse(e.data);
-      showToast('📢 Nové oznámení: '+d.title);
+      bumpLive('📢 Nové oznámení: ' + d.title);
     });
     function showToast(msg, isError) {
       let t=document.getElementById('toast');
@@ -1723,6 +2213,28 @@ function renderHome(req, data) {
       t._timer=setTimeout(()=>t.className='toast',3500);
     }
     window.showToast=showToast;
+
+    // ── Animace KPI čísel při načtení
+    document.querySelectorAll('.kpi-value').forEach(el => {
+      el.style.opacity='0';el.style.transform='translateY(8px)';
+      el.style.transition='opacity 0.5s,transform 0.5s';
+    });
+    requestAnimationFrame(()=>{
+      let i=0;
+      document.querySelectorAll('.kpi-value').forEach(el=>{
+        setTimeout(()=>{
+          el.style.opacity='1';el.style.transform='translateY(0)';
+        }, i*80);
+        i++;
+      });
+    });
+
+    // ── Animace stock barů
+    document.querySelectorAll('.msb-fill').forEach(el => {
+      const target = el.style.width;
+      el.style.width = '0';
+      setTimeout(() => { el.style.width = target; }, 300);
+    });
   </script>
   </body></html>`;
 }
