@@ -924,6 +924,37 @@ app.post('/api/blackbook/query', requireAuth, async (req, res) => {
   }
 });
 
+// ── API — BLACKBOOK AI (proxy na Anthropic server-side) ──────────────────────
+app.post('/api/blackbook/ai', requireAuth, async (req, res) => {
+  try {
+    const { query, data } = req.body;
+    if (!query || !data) return res.status(400).json({ ok: false, error: 'Chybí parametry.' });
+
+    const systemPrompt = `Jsi analytik organizace Albion — tajné kriminální organizace z FiveM RP serveru. Píšeš interní reporty pro vedení organizace. Tvůj styl je stručný, věcný a profesionální. Používej češtinu. Vyhni se zbytečným úvodům — rovnou k věci. Formátuj výstup přehledně (používej odrážky, sekce, čísla). Data jsou reálná z organizace.`;
+
+    const userPrompt = `Zpracuj tento report: "${query}"\n\nData z organizace:\n${JSON.stringify(data, null, 2)}\n\nNapiš analytický report v češtině. Uveď klíčové zjištění, konkrétní čísla a jména (pokud jsou v datech), a případně doporučení nebo varování. Buď stručný ale výstižný.`;
+
+    const aiRes = await axios.post('https://api.anthropic.com/v1/messages', {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+    });
+
+    const text = aiRes.data.content.map(b => b.text || '').join('\n').trim();
+    res.json({ ok: true, text });
+  } catch (e) {
+    console.error('[BLACKBOOK AI]', e.response?.data || e.message);
+    res.status(500).json({ ok: false, error: e.response?.data?.error?.message || e.message });
+  }
+});
+
 // ── API — BLACKBOOK LIST (metadata pro AI) ────────────────────────────────────
 app.get('/api/blackbook/queries', requireAuth, (req, res) => {
   const BB_REPORTS_META = [
@@ -3883,33 +3914,17 @@ function renderBlackbook(req) {
         const dataJson = await dataRes.json();
         if (!dataJson.ok) throw new Error(dataJson.error || 'Chyba při načítání dat.');
 
-        // 2. Pošli do Anthropic API
-        const systemPrompt = \`Jsi analytik organizace Albion — tajné kriminální organizace z FiveM RP serveru. Píšeš interní reporty pro vedení organizace. Tvůj styl je stručný, věcný a profesionální. Používej češtinu. Vyhni se zbytečným úvodům — rovnou k věci. Formátuj výstup přehledně (používej odrážky, sekce, čísla). Data jsou reálná z organizace.\`;
-
-        const userPrompt = \`Zpracuj tento report: "\${query}"
-
-Data z organizace:
-\${JSON.stringify(dataJson.data, null, 2)}
-
-Napiš analytický report v češtině. Uveď klíčové zjištění, konkrétní čísla a jména (pokud jsou v datech), a případně doporučení nebo varování. Buď stručný ale výstižný.\`;
-
-        const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        // 2. Pošli do AI modulu (server-side proxy)
+        const aiRes = await fetch('/api/blackbook/ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1000,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: userPrompt }],
-          }),
+          body: JSON.stringify({ query, data: dataJson.data }),
         });
 
         const aiJson = await aiRes.json();
-        if (!aiRes.ok || !aiJson.content) {
-          throw new Error(aiJson.error?.message || 'Chyba AI modulu.');
-        }
+        if (!aiJson.ok) throw new Error(aiJson.error || 'Chyba AI modulu.');
 
-        const text = aiJson.content.map(b => b.text || '').join('\\n').trim();
+        const text = aiJson.text;
 
         // 3. Zobraz výsledek
         loading.classList.remove('active');
