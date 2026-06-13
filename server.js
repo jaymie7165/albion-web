@@ -554,6 +554,16 @@ app.get('/api/audit', requireAuth, async (req, res) => {
   }
 });
 
+// ── API — IC JMÉNA (pro Blackbook dropdown) ───────────────────────────────────
+app.get('/api/ic-names', requireAuth, (req, res) => {
+  try {
+    const users = db.prepare('SELECT ic_name FROM users WHERE ic_name IS NOT NULL ORDER BY ic_name ASC').all();
+    res.json({ ok: true, names: users.map(u => u.ic_name) });
+  } catch (e) {
+    res.json({ ok: false, names: [] });
+  }
+});
+
 // ── API — DEBUG SHEETS (dočasný endpoint pro diagnostiku) ─────────────────────
 app.get('/api/debug-sheets', requireAuth, async (req, res) => {
   try {
@@ -569,6 +579,365 @@ app.get('/api/debug-sheets', requireAuth, async (req, res) => {
   }
 });
 
+
+// ── API — BLACKBOOK QUERY (pro AI) ───────────────────────────────────────────
+// Předdefinované dotazy odpovídající skupinám v renderBlackbook()
+const BB_REPORTS = [
+  { group: '📊 Finance',    items: ['Příjmy za 30 dní','Výdaje za 30 dní','Finanční přehled','Největší příjmy','Největší výdaje','Měsíční srovnání'] },
+  { group: '📦 Sklad',      items: ['Nejvíce vybírané položky','Nejvíce doplňované položky','Docházející zásoby','Nedoplněné položky','Stav skladu','Pohyb skladu'] },
+  { group: '👥 Členové',    items: ['Nejaktivnější člen','Aktivita členů','Neaktivní členové','Největší přispěvatelé','Nejvíce výběrů','Nejvíce vkladů'] },
+  { group: '🧪 Chemikálie', items: ['Aktivita chemikálií','Největší chemik','Spotřeba chemikálií','Doplňování chemikálií','Chemický report'] },
+  { group: '🚨 Bezpečnost', items: ['Podezřelé výběry','Nadměrné čerpání','Nestandardní aktivita','Velké transakce','Audit členů','Rizikové pohyby'] },
+  { group: '📜 Kronika',    items: ['Týdenní kronika','Měsíční kronika','Souhrn aktivit','Nejvýznamnější změny','Vývoj organizace','Operační report'] },
+  { group: '🏆 Statistiky', items: ['Top členové','Top skladníci','Top obchodníci','Největší aktivita','Rekordy organizace','Přehled výkonu'] },
+  { group: '🧠 Moje nejoblíbenější', items: ['Týdenní kronika','Stav organizace','Finanční přehled','Docházející zásoby','Nejaktivnější člen','Podezřelé výběry','Aktivita chemikálií'] },
+];
+
+// Flat set pro rychlou validaci
+const BB_VALID_QUERIES = new Set(BB_REPORTS.flatMap(g => g.items));
+
+app.post('/api/blackbook/query', requireAuth, async (req, res) => {
+  try {
+    const { query } = req.body;
+
+    // 1. Validace — přijímáme POUZE předdefinované dotazy
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Chybí parametr query.' });
+    }
+    if (!BB_VALID_QUERIES.has(query.trim())) {
+      return res.status(400).json({
+        ok: false,
+        error: `Nepovolený dotaz. Povolené dotazy: ${[...BB_VALID_QUERIES].join(', ')}`,
+        allowed: [...BB_VALID_QUERIES],
+      });
+    }
+
+    const q = query.trim();
+
+    // 2. Načti data ze sheets a DB
+    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
+      sheets.getRows('Zbraně').catch(() => []),
+      sheets.getRows('Weed').catch(() => []),
+      sheets.getRows('Drogy').catch(() => []),
+      sheets.getRows('Účetnictví').catch(() => []),
+      sheets.getRows('Chemky').catch(() => []),
+    ]);
+    const allUsers = db.prepare('SELECT * FROM users').all();
+
+    // 3. Pomocné funkce
+    const parseDate = (str) => {
+      if (!str) return null;
+      // "12.6.2025, 14:30:00" nebo ISO
+      const czMatch = str.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+      if (czMatch) return new Date(`${czMatch[3]}-${czMatch[2].padStart(2,'0')}-${czMatch[1].padStart(2,'0')}`);
+      const d = new Date(str);
+      return isNaN(d) ? null : d;
+    };
+    const now = new Date();
+    const daysAgo = (n) => new Date(now - n * 86400000);
+
+    // Normalizace jmen
+    const nameMap = {};
+    allUsers.forEach(u => {
+      if (u.ic_name) {
+        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
+        if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
+      }
+    });
+    const normName = (name) => {
+      if (!name) return '—';
+      const l = name.trim().toLowerCase();
+      return nameMap[l] || name.trim();
+    };
+
+    // Agregace počtu operací per uživatel per sekce
+    const countByUser = (rows, userCol) => {
+      const m = {};
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const u = normName(r[userCol]);
+        if (!u || u === '—') continue;
+        m[u] = (m[u] || 0) + 1;
+      }
+      return m;
+    };
+
+    const sumByItem = (rows, itemCol, qtyCol, filterTyp) => {
+      const m = {};
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const typ = (r[1] || '').toUpperCase();
+        if (filterTyp && typ !== filterTyp) continue;
+        const item = r[itemCol] || '?';
+        const qty = parseInt(r[qtyCol]) || 0;
+        m[item] = (m[item] || 0) + qty;
+      }
+      return m;
+    };
+
+    const topN = (obj, n = 5) =>
+      Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n);
+
+    // Finance helpers
+    const financeRows = (rows, filterDays) => {
+      return rows.filter((r, i) => {
+        if (i === 0) return false;
+        if (!filterDays) return true;
+        const d = parseDate(r[0]);
+        return d && d >= daysAgo(filterDays);
+      });
+    };
+
+    // 4. Zpracování dotazů
+    let data = {};
+
+    // ── FINANCE ──────────────────────────────────────────────────────────────
+    if (q === 'Příjmy za 30 dní') {
+      const rows = financeRows(ucetRows, 30).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM');
+      const totalUsd = rows.filter(r => (r[3]||'') === 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
+      const totalPesos = rows.filter(r => (r[3]||'') !== 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
+      data = { celkem_usd: totalUsd, celkem_pesos: totalPesos, pocet_transakci: rows.length,
+        per_uzivatel: topN(Object.fromEntries(
+          Object.entries(rows.reduce((m,r) => { const u=normName(r[5]); m[u]=(m[u]||0)+(parseFloat(r[2])||0); return m; }, {}))
+        )) };
+    }
+    else if (q === 'Výdaje za 30 dní') {
+      const rows = financeRows(ucetRows, 30).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ');
+      const totalUsd = rows.filter(r => (r[3]||'') === 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
+      const totalPesos = rows.filter(r => (r[3]||'') !== 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
+      data = { celkem_usd: totalUsd, celkem_pesos: totalPesos, pocet_transakci: rows.length };
+    }
+    else if (q === 'Finanční přehled' || q === 'Stav organizace') {
+      const prijemUsd = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM' && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
+      const vydajUsd  = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ'  && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
+      const prijemP   = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM' && (r[3]||'') !== 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
+      const vydajP    = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ'  && (r[3]||'') !== 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
+      data = { prijem_usd: prijemUsd, vydaj_usd: vydajUsd, net_usd: prijemUsd - vydajUsd,
+               prijem_pesos: prijemP, vydaj_pesos: vydajP, net_pesos: prijemP - vydajP,
+               celkem_transakci: ucetRows.length - 1 };
+    }
+    else if (q === 'Největší příjmy') {
+      const rows = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM');
+      const sorted = rows.sort((a, b) => (parseFloat(b[2])||0) - (parseFloat(a[2])||0)).slice(0, 10);
+      data = { top_prijmy: sorted.map(r => ({ castka: parseFloat(r[2])||0, valuta: r[3]||'?', poznamka: r[4]||'—', uzivatel: normName(r[5]), cas: r[0] })) };
+    }
+    else if (q === 'Největší výdaje') {
+      const rows = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ');
+      const sorted = rows.sort((a, b) => (parseFloat(b[2])||0) - (parseFloat(a[2])||0)).slice(0, 10);
+      data = { top_vydaje: sorted.map(r => ({ castka: parseFloat(r[2])||0, valuta: r[3]||'?', poznamka: r[4]||'—', uzivatel: normName(r[5]), cas: r[0] })) };
+    }
+    else if (q === 'Měsíční srovnání') {
+      const byMonth = {};
+      for (let i = 1; i < ucetRows.length; i++) {
+        const r = ucetRows[i];
+        const d = parseDate(r[0]);
+        if (!d) continue;
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if (!byMonth[key]) byMonth[key] = { prijem: 0, vydaj: 0 };
+        const typ = (r[1]||'').toUpperCase();
+        const castka = parseFloat(r[2]) || 0;
+        if (typ === 'PŘÍJEM') byMonth[key].prijem += castka;
+        else byMonth[key].vydaj += castka;
+      }
+      data = { mesice: Object.entries(byMonth).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 12) };
+    }
+
+    // ── SKLAD ────────────────────────────────────────────────────────────────
+    else if (q === 'Nejvíce vybírané položky') {
+      const zbrane = sumByItem(zbraneRows, 2, 3, 'VÝBĚR');
+      const weed   = sumByItem(weedRows, 2, 3, 'VÝBĚR');
+      const drogy  = sumByItem(drogyRows, 2, 3, 'VÝBĚR');
+      data = { zbrane: topN(zbrane), weed: topN(weed), drogy: topN(drogy) };
+    }
+    else if (q === 'Nejvíce doplňované položky') {
+      const zbrane = sumByItem(zbraneRows, 2, 3, 'VKLAD');
+      const weed   = sumByItem(weedRows, 2, 3, 'VKLAD');
+      const drogy  = sumByItem(drogyRows, 2, 3, 'VKLAD');
+      data = { zbrane: topN(zbrane), weed: topN(weed), drogy: topN(drogy) };
+    }
+    else if (q === 'Stav skladu') {
+      const stavZbrane = {};
+      for (let i = 1; i < zbraneRows.length; i++) {
+        const r = zbraneRows[i];
+        const item = r[2] || '?'; const qty = parseInt(r[3]) || 0;
+        const typ = (r[1]||'').toUpperCase();
+        stavZbrane[item] = (stavZbrane[item] || 0) + (typ === 'VKLAD' ? qty : -qty);
+      }
+      const stavDrogy = {};
+      for (let i = 1; i < drogyRows.length; i++) {
+        const r = drogyRows[i];
+        const item = r[2] || '?'; const qty = parseInt(r[3]) || 0;
+        const typ = (r[1]||'').toUpperCase();
+        stavDrogy[item] = (stavDrogy[item] || 0) + (typ === 'VKLAD' ? qty : -qty);
+      }
+      data = { zbrane_net: Object.entries(stavZbrane).sort((a,b) => b[1]-a[1]), drogy_net: Object.entries(stavDrogy).sort((a,b) => b[1]-a[1]) };
+    }
+    else if (q === 'Docházející zásoby' || q === 'Nedoplněné položky') {
+      const stav = {};
+      for (let i = 1; i < zbraneRows.length; i++) {
+        const r = zbraneRows[i];
+        const item = r[2] || '?'; const qty = parseInt(r[3]) || 0;
+        const typ = (r[1]||'').toUpperCase();
+        stav[item] = (stav[item] || 0) + (typ === 'VKLAD' ? qty : -qty);
+      }
+      data = { docházející: Object.entries(stav).filter(([,v]) => v <= 5).sort((a,b) => a[1]-b[1]) };
+    }
+    else if (q === 'Pohyb skladu') {
+      const posledni = [];
+      const addLast = (rows, sekce) => {
+        for (let i = Math.max(1, rows.length - 20); i < rows.length; i++) {
+          const r = rows[i];
+          posledni.push({ cas: r[0], sekce, typ: r[1], polozka: r[2], qty: r[3] });
+        }
+      };
+      addLast(zbraneRows, 'Zbraně'); addLast(weedRows, 'Weed'); addLast(drogyRows, 'Drogy');
+      data = { posledni_pohyby: posledni.slice(-30) };
+    }
+
+    // ── ČLENOVÉ ──────────────────────────────────────────────────────────────
+    else if (q === 'Nejaktivnější člen' || q === 'Aktivita členů') {
+      const aktZbrane = countByUser(zbraneRows, 5);
+      const aktWeed   = countByUser(weedRows, 6);
+      const aktDrogy  = countByUser(drogyRows, 6);
+      const aktChemky = countByUser(chemkyRows, 4);
+      const celkova = {};
+      [aktZbrane, aktWeed, aktDrogy, aktChemky].forEach(m => {
+        Object.entries(m).forEach(([u, c]) => { celkova[u] = (celkova[u]||0) + c; });
+      });
+      data = { top_clenove: topN(celkova, 10), per_sekce: { zbrane: topN(aktZbrane,5), weed: topN(aktWeed,5), drogy: topN(aktDrogy,5), chemky: topN(aktChemky,5) } };
+    }
+    else if (q === 'Neaktivní členové') {
+      const aktivni = new Set();
+      const addActive = (rows, col) => { for (let i=1;i<rows.length;i++) { const u=normName(rows[i][col]); if(u&&u!=='—') aktivni.add(u); } };
+      addActive(zbraneRows,5); addActive(weedRows,6); addActive(drogyRows,6); addActive(chemkyRows,4);
+      const vsichni = allUsers.map(u => u.ic_name).filter(Boolean);
+      data = { neaktivni: vsichni.filter(u => !aktivni.has(u)), aktivni_celkem: aktivni.size, clenove_celkem: vsichni.length };
+    }
+    else if (q === 'Největší přispěvatelé' || q === 'Nejvíce vkladů') {
+      const vklady = {};
+      const addVklady = (rows, col) => { for (let i=1;i<rows.length;i++) { if((rows[i][1]||'').toUpperCase()==='VKLAD') { const u=normName(rows[i][col]); vklady[u]=(vklady[u]||0)+1; } } };
+      addVklady(zbraneRows,5); addVklady(weedRows,6); addVklady(drogyRows,6); addVklady(chemkyRows,4);
+      data = { top_vkladatele: topN(vklady, 10) };
+    }
+    else if (q === 'Nejvíce výběrů') {
+      const vybery = {};
+      const addVybery = (rows, col) => { for (let i=1;i<rows.length;i++) { if((rows[i][1]||'').toUpperCase()==='VÝBĚR') { const u=normName(rows[i][col]); vybery[u]=(vybery[u]||0)+1; } } };
+      addVybery(zbraneRows,5); addVybery(weedRows,6); addVybery(drogyRows,6); addVybery(chemkyRows,4);
+      data = { top_vyberi: topN(vybery, 10) };
+    }
+
+    // ── CHEMIKÁLIE ────────────────────────────────────────────────────────────
+    else if (q === 'Aktivita chemikálií' || q === 'Spotřeba chemikálií') {
+      const spotreba = sumByItem(chemkyRows, 2, 3, 'VÝBĚR');
+      const doplneni = sumByItem(chemkyRows, 2, 3, 'VKLAD');
+      data = { spotreba: topN(spotreba), doplneni: topN(doplneni) };
+    }
+    else if (q === 'Největší chemik') {
+      const chemici = countByUser(chemkyRows, 4);
+      data = { top_chemici: topN(chemici, 10) };
+    }
+    else if (q === 'Doplňování chemikálií') {
+      const doplneni = sumByItem(chemkyRows, 2, 3, 'VKLAD');
+      data = { top_doplneni: topN(doplneni) };
+    }
+    else if (q === 'Chemický report') {
+      const spotreba = sumByItem(chemkyRows, 2, 3, 'VÝBĚR');
+      const doplneni = sumByItem(chemkyRows, 2, 3, 'VKLAD');
+      const chemici  = countByUser(chemkyRows, 4);
+      data = { spotreba: topN(spotreba), doplneni: topN(doplneni), top_chemici: topN(chemici,5), celkem_operaci: chemkyRows.length - 1 };
+    }
+
+    // ── BEZPEČNOST ────────────────────────────────────────────────────────────
+    else if (q === 'Podezřelé výběry' || q === 'Nadměrné čerpání' || q === 'Nestandardní aktivita') {
+      // Výběry za posledních 7 dní > průměr
+      const vybery7d = [];
+      for (let i = 1; i < zbraneRows.length; i++) {
+        const r = zbraneRows[i];
+        if ((r[1]||'').toUpperCase() !== 'VÝBĚR') continue;
+        const d = parseDate(r[0]);
+        if (!d || d < daysAgo(7)) continue;
+        vybery7d.push({ cas: r[0], polozka: r[2], qty: parseInt(r[3])||0, uzivatel: normName(r[5]) });
+      }
+      const perUser = {};
+      vybery7d.forEach(v => { perUser[v.uzivatel] = (perUser[v.uzivatel]||0) + v.qty; });
+      const avgQty = Object.values(perUser).reduce((a,b) => a+b, 0) / (Object.keys(perUser).length || 1);
+      const podezreli = Object.entries(perUser).filter(([,q]) => q > avgQty * 2).sort((a,b) => b[1]-a[1]);
+      data = { podezreli_uzivatele: podezreli, prumer_qty: Math.round(avgQty), vybery_7d: vybery7d.slice(0,20) };
+    }
+    else if (q === 'Velké transakce') {
+      const velke = [];
+      for (let i = 1; i < ucetRows.length; i++) {
+        const r = ucetRows[i];
+        const castka = parseFloat(r[2]) || 0;
+        if (castka >= 50000) velke.push({ cas: r[0], typ: r[1], castka, valuta: r[3], poznamka: r[4], uzivatel: normName(r[5]) });
+      }
+      data = { velke_transakce: velke.sort((a,b) => b.castka - a.castka).slice(0,20) };
+    }
+    else if (q === 'Audit členů' || q === 'Rizikové pohyby') {
+      const rizikove = [];
+      for (let i = 1; i < zbraneRows.length; i++) {
+        const r = zbraneRows[i];
+        const qty = parseInt(r[3]) || 0;
+        if ((r[1]||'').toUpperCase() === 'VÝBĚR' && qty >= 10) {
+          rizikove.push({ cas: r[0], polozka: r[2], qty, uzivatel: normName(r[5]), ucel: r[6]||'—' });
+        }
+      }
+      data = { rizikove_pohyby: rizikove.sort((a,b) => b.qty - a.qty).slice(0,20) };
+    }
+
+    // ── KRONIKA / STATISTIKY (souhrnné) ───────────────────────────────────────
+    else {
+      // Všechny zbývající dotazy (kronika, statistiky, top) → vrátíme souhrnný snapshot
+      const celkova = {};
+      const addActive = (rows, col) => {
+        for (let i=1;i<rows.length;i++) { const u=normName(rows[i][col]); if(u&&u!=='—') celkova[u]=(celkova[u]||0)+1; }
+      };
+      addActive(zbraneRows,5); addActive(weedRows,6); addActive(drogyRows,6); addActive(chemkyRows,4);
+
+      const prijemUsd = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM' && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
+      const vydajUsd  = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ'  && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
+
+      data = {
+        snapshot: {
+          celkem_clenove: allUsers.length,
+          top_aktivni: topN(celkova, 5),
+          finance: { prijem_usd: prijemUsd, vydaj_usd: vydajUsd, net_usd: prijemUsd - vydajUsd },
+          transakce_zbrane: zbraneRows.length - 1,
+          transakce_weed: weedRows.length - 1,
+          transakce_drogy: drogyRows.length - 1,
+          transakce_chemky: chemkyRows.length - 1,
+          transakce_ucet: ucetRows.length - 1,
+        }
+      };
+    }
+
+    res.json({
+      ok: true,
+      query: q,
+      generated_at: new Date().toISOString(),
+      data,
+    });
+
+  } catch (e) {
+    console.error('[BLACKBOOK QUERY]', e);
+    res.status(500).json({ ok: false, error: 'Chyba při zpracování dotazu: ' + e.message });
+  }
+});
+
+// ── API — BLACKBOOK LIST (metadata pro AI) ────────────────────────────────────
+app.get('/api/blackbook/queries', requireAuth, (req, res) => {
+  const BB_REPORTS_META = [
+    { group: '📊 Finance',    items: ['Příjmy za 30 dní','Výdaje za 30 dní','Finanční přehled','Největší příjmy','Největší výdaje','Měsíční srovnání'] },
+    { group: '📦 Sklad',      items: ['Nejvíce vybírané položky','Nejvíce doplňované položky','Docházející zásoby','Nedoplněné položky','Stav skladu','Pohyb skladu'] },
+    { group: '👥 Členové',    items: ['Nejaktivnější člen','Aktivita členů','Neaktivní členové','Největší přispěvatelé','Nejvíce výběrů','Nejvíce vkladů'] },
+    { group: '🧪 Chemikálie', items: ['Aktivita chemikálií','Největší chemik','Spotřeba chemikálií','Doplňování chemikálií','Chemický report'] },
+    { group: '🚨 Bezpečnost', items: ['Podezřelé výběry','Nadměrné čerpání','Nestandardní aktivita','Velké transakce','Audit členů','Rizikové pohyby'] },
+    { group: '📜 Kronika',    items: ['Týdenní kronika','Měsíční kronika','Souhrn aktivit','Nejvýznamnější změny','Vývoj organizace','Operační report'] },
+    { group: '🏆 Statistiky', items: ['Top členové','Top skladníci','Top obchodníci','Největší aktivita','Rekordy organizace','Přehled výkonu'] },
+    { group: '🧠 Moje nejoblíbenější', items: ['Týdenní kronika','Stav organizace','Finanční přehled','Docházející zásoby','Nejaktivnější člen','Podezřelé výběry','Aktivita chemikálií'] },
+  ];
+  res.json({ ok: true, groups: BB_REPORTS_META, all_queries: BB_REPORTS_META.flatMap(g => g.items) });
+});
 
 app.get('/home', requireAuth, async (req, res) => {
   try {
@@ -615,6 +984,7 @@ app.get('/audit', requireAuth, (req, res) => res.send(renderAudit(req)));
 app.get('/statistiky', requireAuth, (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
+app.get('/blackbook', requireAuth, (req, res) => res.send(renderBlackbook(req)));
 app.get('/sazeni', requireAuth, (req, res) => res.send(renderSazeni(req)));
 
 
@@ -1624,6 +1994,35 @@ function baseStyles() {
       .nav-dropdown-menu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:1.5rem}
       .nav-dropdown-menu a.active{color:var(--crimson-light);background:rgba(160,0,0,0.08)}
 
+      /* ── NAV MEGA DROPDOWN — Blackbook ── */
+      .nav-dropdown-menu.mega{
+        min-width:auto;
+        width:max-content;
+        max-width:96vw;
+        padding:1.1rem 1.2rem;
+        display:grid;
+        grid-template-columns:repeat(4,minmax(180px,1fr));
+        gap:0.4rem 1.6rem;
+      }
+      .bb-group{padding:0.3rem 0}
+      .bb-group-title{
+        display:flex;align-items:center;gap:0.4rem;
+        font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:700;
+        color:var(--silver-bright);
+        padding-bottom:0.5rem;margin-bottom:0.35rem;
+        border-bottom:1px solid var(--border);
+      }
+      .nav-dropdown-menu.mega a{
+        padding:0.4rem 0.3rem;
+        font-size:0.66rem;letter-spacing:0.06em;text-transform:none;font-weight:400;
+        border-bottom:none;color:var(--text-muted);
+        border-radius:2px;
+      }
+      .nav-dropdown-menu.mega a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:0.6rem}
+      @media(max-width:1100px){
+        .nav-dropdown-menu.mega{grid-template-columns:repeat(2,minmax(170px,1fr));max-height:75vh;overflow-y:auto}
+      }
+
       /* ── SELECT EXPANDABLE — vizuální indikátor rozbalovacího menu ── */
       .form-group{position:relative}
       .select-expandable{
@@ -1680,6 +2079,7 @@ function renderNav(req, active) {
   const skladPages = ['sklad'];
   const infoPages  = ['nastenska','kodex','lore','hierarchy','sazeni'];
   const dataPages  = ['audit','statistiky'];
+  const blackbookPages = ['blackbook'];
 
   return `
     <nav>
@@ -1725,6 +2125,89 @@ function renderNav(req, active) {
             <a href="/kodex" class="${active==='kodex'?'active':''}">📜 Kodex</a>
             <a href="/lore" class="${active==='lore'?'active':''}">📖 Historie</a>
             <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">🏛️ Hierarchie</a>
+          </div>
+        </li>
+
+        <li class="nav-dropdown ${blackbookPages.includes(active)?'open':''}">
+          <a href="/blackbook" class="nav-drop-trigger ${blackbookPages.includes(active)?'active':''}">
+            Blackbook
+            <span class="nav-desc">Records · Contacts · Intelligence</span>
+            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
+          </a>
+          <div class="nav-dropdown-menu mega">
+            <div class="bb-group">
+              <div class="bb-group-title">📊 Finance</div>
+              <a href="#">Příjmy za 30 dní</a>
+              <a href="#">Výdaje za 30 dní</a>
+              <a href="#">Finanční přehled</a>
+              <a href="#">Největší příjmy</a>
+              <a href="#">Největší výdaje</a>
+              <a href="#">Měsíční srovnání</a>
+            </div>
+            <div class="bb-group">
+              <div class="bb-group-title">📦 Sklad</div>
+              <a href="#">Nejvíce vybírané položky</a>
+              <a href="#">Nejvíce doplňované položky</a>
+              <a href="#">Docházející zásoby</a>
+              <a href="#">Nedoplněné položky</a>
+              <a href="#">Stav skladu</a>
+              <a href="#">Pohyb skladu</a>
+            </div>
+            <div class="bb-group">
+              <div class="bb-group-title">👥 Členové</div>
+              <a href="#">Nejaktivnější člen</a>
+              <a href="#">Aktivita členů</a>
+              <a href="#">Neaktivní členové</a>
+              <a href="#">Největší přispěvatelé</a>
+              <a href="#">Nejvíce výběrů</a>
+              <a href="#">Nejvíce vkladů</a>
+            </div>
+            <div class="bb-group">
+              <div class="bb-group-title">🧪 Chemikálie</div>
+              <a href="#">Aktivita chemikálií</a>
+              <a href="#">Největší chemik</a>
+              <a href="#">Spotřeba chemikálií</a>
+              <a href="#">Doplňování chemikálií</a>
+              <a href="#">Chemický report</a>
+            </div>
+            <div class="bb-group">
+              <div class="bb-group-title">🚨 Bezpečnost</div>
+              <a href="#">Podezřelé výběry</a>
+              <a href="#">Nadměrné čerpání</a>
+              <a href="#">Nestandardní aktivita</a>
+              <a href="#">Velké transakce</a>
+              <a href="#">Audit členů</a>
+              <a href="#">Rizikové pohyby</a>
+            </div>
+            <div class="bb-group">
+              <div class="bb-group-title">📜 Kronika</div>
+              <a href="#">Týdenní kronika</a>
+              <a href="#">Měsíční kronika</a>
+              <a href="#">Souhrn aktivit</a>
+              <a href="#">Nejvýznamnější změny</a>
+              <a href="#">Vývoj organizace</a>
+              <a href="#">Operační report</a>
+            </div>
+            <div class="bb-group">
+              <div class="bb-group-title">🏆 Statistiky</div>
+              <a href="#">Top členové</a>
+              <a href="#">Top skladníci</a>
+              <a href="#">Top obchodníci</a>
+              <a href="#">Největší aktivita</a>
+              <a href="#">Rekordy organizace</a>
+              <a href="#">Přehled výkonu</a>
+            </div>
+            <div class="bb-group">
+              <div class="bb-group-title">🧠 Moje nejoblíbenější</div>
+              <a href="#">Týdenní kronika</a>
+              <a href="#">Stav organizace</a>
+              <a href="#">Finanční přehled</a>
+              <a href="#">Docházející zásoby</a>
+              <a href="#">Nejaktivnější člen</a>
+              <a href="#">Podezřelé výběry</a>
+              <a href="#">Aktivita chemikálií</a>
+              <a href="#">Souhrn posledních 30 dní</a>
+            </div>
           </div>
         </li>
       </ul>
@@ -3066,6 +3549,119 @@ function renderKodex(req) {
           Kodex Albionu je závazný pro každého člena bez výjimky.
         </div>
       </div>
+    </div>
+  </main>
+  </body></html>`;
+}
+
+// ── RENDER AUDIT ───────────────────────────────────────────────────────────────
+function renderBlackbook(req) {
+  const BB_REPORTS = [
+    { group: '📊 Finance', items: ['Příjmy za 30 dní','Výdaje za 30 dní','Finanční přehled','Největší příjmy','Největší výdaje','Měsíční srovnání'] },
+    { group: '📦 Sklad',   items: ['Nejvíce vybírané položky','Nejvíce doplňované položky','Docházející zásoby','Nedoplněné položky','Stav skladu','Pohyb skladu'] },
+    { group: '👥 Členové', items: ['Nejaktivnější člen','Aktivita členů','Neaktivní členové','Největší přispěvatelé','Nejvíce výběrů','Nejvíce vkladů'] },
+    { group: '🧪 Chemikálie', items: ['Aktivita chemikálií','Největší chemik','Spotřeba chemikálií','Doplňování chemikálií','Chemický report'] },
+    { group: '🚨 Bezpečnost', items: ['Podezřelé výběry','Nadměrné čerpání','Nestandardní aktivita','Velké transakce','Audit členů','Rizikové pohyby'] },
+    { group: '📜 Kronika',    items: ['Týdenní kronika','Měsíční kronika','Souhrn aktivit','Nejvýznamnější změny','Vývoj organizace','Operační report'] },
+    { group: '🏆 Statistiky', items: ['Top členové','Top skladníci','Top obchodníci','Největší aktivita','Rekordy organizace','Přehled výkonu'] },
+    { group: '🧠 Moje nejoblíbenější', items: ['Týdenní kronika','Stav organizace','Finanční přehled','Docházející zásoby','Nejaktivnější člen','Podezřelé výběry','Aktivita chemikálií'] },
+  ];
+
+  const optionsHtml = BB_REPORTS.map(g =>
+    `<optgroup label="${g.group}">${g.items.map(i => `<option value="${i}">${i}</option>`).join('')}</optgroup>`
+  ).join('');
+
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Blackbook</title>
+  ${baseStyles()}
+  <style>
+    .bb-select-wrap{
+      position:relative;
+      max-width:560px;
+    }
+    .bb-select{
+      width:100%;
+      background:var(--input-bg);
+      border:1px solid rgba(180,0,0,0.35);
+      color:var(--text);
+      padding:0.85rem 3rem 0.85rem 1.1rem;
+      font-family:'Inter',sans-serif;
+      font-size:0.9rem;
+      appearance:none;-webkit-appearance:none;
+      cursor:pointer;
+      outline:none;
+      transition:border-color 0.2s,box-shadow 0.2s;
+    }
+    .bb-select:focus,.bb-select:hover{
+      border-color:var(--crimson-light);
+      box-shadow:0 0 0 3px var(--crimson-glow);
+    }
+    .bb-select option,.bb-select optgroup{
+      background:var(--bg-mid);
+      color:var(--text);
+    }
+    .bb-select-arrow{
+      position:absolute;
+      right:1.1rem;top:50%;transform:translateY(-50%);
+      pointer-events:none;
+      color:var(--crimson-light);
+      opacity:0.85;
+    }
+    .bb-select-arrow svg{width:14px;height:14px;display:block}
+    .bb-select-label{
+      font-size:0.58rem;letter-spacing:0.32em;text-transform:uppercase;
+      color:var(--silver);font-weight:600;margin-bottom:0.55rem;display:block;
+    }
+    .bb-coming-soon{
+      margin-top:0.65rem;
+      font-size:0.72rem;
+      color:var(--text-muted);
+      letter-spacing:0.04em;
+      display:flex;align-items:center;gap:0.45rem;
+    }
+    .bb-coming-soon::before{
+      content:'';display:inline-block;
+      width:5px;height:5px;border-radius:50%;
+      background:var(--crimson-light);opacity:0.5;flex-shrink:0;
+    }
+  </style>
+  </head><body>
+  ${renderNav(req, 'blackbook')}
+  <main>
+    <div class="page-header">
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Blackbook</h1>
+        <p class="page-sub">Records. Contacts. Intelligence.</p>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></div>
+      <div class="page-info-body">
+        <div class="page-info-title">Centrální evidence organizace</div>
+        <div class="page-info-text">Blackbook shromažďuje finanční přehledy, statistiky skladu, aktivitu členů, chemikálie, bezpečnostní hlášení, kroniku a výkonnostní statistiky organizace na jednom místě. Jednotlivé sekce a reporty jsou dostupné v rozbalovacím menu výše.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          Výběr reportu
+        </span>
+        <span class="card-badge">AI připraveno</span>
+      </div>
+
+      <div class="bb-select-wrap">
+        <span class="bb-select-label">Report</span>
+        <select class="bb-select" id="bb-report-select">
+          <option value="" disabled selected>— Vyberte report —</option>
+          ${optionsHtml}
+        </select>
+        <span class="bb-select-arrow">
+          <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 1 5 5 9 1"/></svg>
+        </span>
+      </div>
+      <div class="bb-coming-soon">Reporty budou generovány automaticky po zapojení AI modulu.</div>
     </div>
   </main>
   </body></html>`;
