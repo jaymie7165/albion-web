@@ -1994,34 +1994,45 @@ function baseStyles() {
       .nav-dropdown-menu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:1.5rem}
       .nav-dropdown-menu a.active{color:var(--crimson-light);background:rgba(160,0,0,0.08)}
 
-      /* ── NAV MEGA DROPDOWN — Blackbook ── */
+      /* ── NAV DROPDOWN — Blackbook (kompaktní, sekce → submenu) ── */
       .nav-dropdown-menu.mega{
-        min-width:auto;
+        min-width:220px;
         width:max-content;
         max-width:96vw;
-        padding:1.1rem 1.2rem;
-        display:grid;
-        grid-template-columns:repeat(4,minmax(180px,1fr));
-        gap:0.4rem 1.6rem;
+        padding:0.4rem;
       }
-      .bb-group{padding:0.3rem 0}
+      .bb-group{position:relative}
       .bb-group-title{
-        display:flex;align-items:center;gap:0.4rem;
-        font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:700;
-        color:var(--silver-bright);
-        padding-bottom:0.5rem;margin-bottom:0.35rem;
-        border-bottom:1px solid var(--border);
+        display:flex;align-items:center;justify-content:space-between;gap:0.5rem;
+        font-size:0.7rem;letter-spacing:0.08em;font-weight:500;
+        color:var(--text-muted);
+        padding:0.55rem 0.7rem;
+        border-radius:2px;
+        cursor:pointer;
+        white-space:nowrap;
       }
-      .nav-dropdown-menu.mega a{
-        padding:0.4rem 0.3rem;
+      .bb-group-title:hover,.bb-group.open .bb-group-title{color:var(--silver-bright);background:var(--crimson-glow)}
+      .bb-group-title .bb-arrow{
+        width:0;height:0;flex:none;
+        border-top:4px solid transparent;border-bottom:4px solid transparent;
+        border-left:5px solid currentColor;
+        opacity:0.6;
+        transition:transform 0.15s;
+      }
+      .bb-group.open .bb-group-title .bb-arrow{transform:rotate(90deg)}
+      .bb-submenu{
+        display:none;
+        flex-direction:column;
+        padding:0.2rem 0 0.3rem 0;
+      }
+      .bb-group.open .bb-submenu{display:flex}
+      .nav-dropdown-menu.mega .bb-submenu a{
+        padding:0.4rem 0.7rem 0.4rem 1.6rem;
         font-size:0.66rem;letter-spacing:0.06em;text-transform:none;font-weight:400;
         border-bottom:none;color:var(--text-muted);
         border-radius:2px;
       }
-      .nav-dropdown-menu.mega a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:0.6rem}
-      @media(max-width:1100px){
-        .nav-dropdown-menu.mega{grid-template-columns:repeat(2,minmax(170px,1fr));max-height:75vh;overflow-y:auto}
-      }
+      .nav-dropdown-menu.mega .bb-submenu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:1.9rem}
 
       /* ── SELECT EXPANDABLE — vizuální indikátor rozbalovacího menu ── */
       .form-group{position:relative}
@@ -2136,77 +2147,81 @@ function renderNav(req, active) {
           </a>
           <div class="nav-dropdown-menu mega">
             <div class="bb-group">
-              <div class="bb-group-title">📊 Finance</div>
-              <a href="#">Příjmy za 30 dní</a>
-              <a href="#">Výdaje za 30 dní</a>
-              <a href="#">Finanční přehled</a>
-              <a href="#">Největší příjmy</a>
-              <a href="#">Největší výdaje</a>
-              <a href="#">Měsíční srovnání</a>
+              <div class="bb-group-title" onclick="toggleBBGroup(this)">📊 Finance<span class="bb-arrow"></span></div>
+              <div class="bb-submenu">
+                <a href="#">Příjmy za 30 dní</a>
+                <a href="#">Výdaje za 30 dní</a>
+                <a href="#">Finanční přehled</a>
+                <a href="#">Největší příjmy</a>
+                <a href="#">Největší výdaje</a>
+                <a href="#">Měsíční srovnání</a>
+              </div>
             </div>
             <div class="bb-group">
-              <div class="bb-group-title">📦 Sklad</div>
-              <a href="#">Nejvíce vybírané položky</a>
-              <a href="#">Nejvíce doplňované položky</a>
-              <a href="#">Docházející zásoby</a>
-              <a href="#">Nedoplněné položky</a>
-              <a href="#">Stav skladu</a>
-              <a href="#">Pohyb skladu</a>
+              <div class="bb-group-title" onclick="toggleBBGroup(this)">📦 Sklad<span class="bb-arrow"></span></div>
+              <div class="bb-submenu">
+                <a href="#">Nejvíce vybírané položky</a>
+                <a href="#">Nejvíce doplňované položky</a>
+                <a href="#">Docházející zásoby</a>
+                <a href="#">Nedoplněné položky</a>
+                <a href="#">Stav skladu</a>
+                <a href="#">Pohyb skladu</a>
+              </div>
             </div>
             <div class="bb-group">
-              <div class="bb-group-title">👥 Členové</div>
-              <a href="#">Nejaktivnější člen</a>
-              <a href="#">Aktivita členů</a>
-              <a href="#">Neaktivní členové</a>
-              <a href="#">Největší přispěvatelé</a>
-              <a href="#">Nejvíce výběrů</a>
-              <a href="#">Nejvíce vkladů</a>
+              <div class="bb-group-title" onclick="toggleBBGroup(this)">👥 Členové<span class="bb-arrow"></span></div>
+              <div class="bb-submenu">
+                <a href="#">Nejaktivnější člen</a>
+                <a href="#">Aktivita členů</a>
+                <a href="#">Neaktivní členové</a>
+                <a href="#">Největší přispěvatelé</a>
+                <a href="#">Nejvíce výběrů</a>
+                <a href="#">Nejvíce vkladů</a>
+              </div>
             </div>
             <div class="bb-group">
-              <div class="bb-group-title">🧪 Chemikálie</div>
-              <a href="#">Aktivita chemikálií</a>
-              <a href="#">Největší chemik</a>
-              <a href="#">Spotřeba chemikálií</a>
-              <a href="#">Doplňování chemikálií</a>
-              <a href="#">Chemický report</a>
+              <div class="bb-group-title" onclick="toggleBBGroup(this)">🧪 Chemikálie<span class="bb-arrow"></span></div>
+              <div class="bb-submenu">
+                <a href="#">Aktivita chemikálií</a>
+                <a href="#">Největší chemik</a>
+                <a href="#">Spotřeba chemikálií</a>
+                <a href="#">Doplňování chemikálií</a>
+                <a href="#">Chemický report</a>
+              </div>
             </div>
             <div class="bb-group">
-              <div class="bb-group-title">🚨 Bezpečnost</div>
-              <a href="#">Podezřelé výběry</a>
-              <a href="#">Nadměrné čerpání</a>
-              <a href="#">Nestandardní aktivita</a>
-              <a href="#">Velké transakce</a>
-              <a href="#">Audit členů</a>
-              <a href="#">Rizikové pohyby</a>
+              <div class="bb-group-title" onclick="toggleBBGroup(this)">🚨 Bezpečnost<span class="bb-arrow"></span></div>
+              <div class="bb-submenu">
+                <a href="#">Podezřelé výběry</a>
+                <a href="#">Nadměrné čerpání</a>
+                <a href="#">Nestandardní aktivita</a>
+                <a href="#">Velké transakce</a>
+                <a href="#">Audit členů</a>
+                <a href="#">Rizikové pohyby</a>
+              </div>
             </div>
             <div class="bb-group">
-              <div class="bb-group-title">📜 Kronika</div>
-              <a href="#">Týdenní kronika</a>
-              <a href="#">Měsíční kronika</a>
-              <a href="#">Souhrn aktivit</a>
-              <a href="#">Nejvýznamnější změny</a>
-              <a href="#">Vývoj organizace</a>
-              <a href="#">Operační report</a>
+              <div class="bb-group-title" onclick="toggleBBGroup(this)">🏆 Statistiky<span class="bb-arrow"></span></div>
+              <div class="bb-submenu">
+                <a href="#">Top členové</a>
+                <a href="#">Top skladníci</a>
+                <a href="#">Top obchodníci</a>
+                <a href="#">Největší aktivita</a>
+                <a href="#">Rekordy organizace</a>
+                <a href="#">Přehled výkonu</a>
+              </div>
             </div>
             <div class="bb-group">
-              <div class="bb-group-title">🏆 Statistiky</div>
-              <a href="#">Top členové</a>
-              <a href="#">Top skladníci</a>
-              <a href="#">Top obchodníci</a>
-              <a href="#">Největší aktivita</a>
-              <a href="#">Rekordy organizace</a>
-              <a href="#">Přehled výkonu</a>
-            </div>
-            <div class="bb-group">
-              <div class="bb-group-title">🧠 Moje nejoblíbenější</div>
-              <a href="#">Týdenní kronika</a>
-              <a href="#">Stav organizace</a>
-              <a href="#">Finanční přehled</a>
-              <a href="#">Docházející zásoby</a>
-              <a href="#">Nejaktivnější člen</a>
-              <a href="#">Podezřelé výběry</a>
-              <a href="#">Aktivita chemikálií</a>
-              <a href="#">Souhrn posledních 30 dní</a>
+              <div class="bb-group-title" onclick="toggleBBGroup(this)">🧠 Moje nejoblíbenější<span class="bb-arrow"></span></div>
+              <div class="bb-submenu">
+                <a href="#">Stav organizace</a>
+                <a href="#">Finanční přehled</a>
+                <a href="#">Docházející zásoby</a>
+                <a href="#">Nejaktivnější člen</a>
+                <a href="#">Podezřelé výběry</a>
+                <a href="#">Aktivita chemikálií</a>
+                <a href="#">Souhrn posledních 30 dní</a>
+              </div>
             </div>
           </div>
         </li>
@@ -2261,6 +2276,12 @@ function renderNav(req, active) {
       }
       applyTheme(currentTheme);
       function setTheme(t) { applyTheme(t); }
+      function toggleBBGroup(el) {
+        const group = el.parentElement;
+        const wasOpen = group.classList.contains('open');
+        group.parentElement.querySelectorAll('.bb-group.open').forEach(g => g.classList.remove('open'));
+        if (!wasOpen) group.classList.add('open');
+      }
       document.addEventListener('click', () => {});
       let newCount = 0;
       const evtSource = new EventSource('/api/events');
@@ -3611,18 +3632,149 @@ function renderBlackbook(req) {
       font-size:0.58rem;letter-spacing:0.32em;text-transform:uppercase;
       color:var(--silver);font-weight:600;margin-bottom:0.55rem;display:block;
     }
-    .bb-coming-soon{
-      margin-top:0.65rem;
-      font-size:0.72rem;
+
+    /* ── AI výsledek ── */
+    #bb-result-card{
+      margin-top:1.5rem;
+      display:none;
+    }
+    #bb-result-card.visible{
+      display:block;
+    }
+    .bb-result-header{
+      display:flex;align-items:center;gap:0.75rem;
+      margin-bottom:1.2rem;
+      padding-bottom:1rem;
+      border-bottom:1px solid var(--border);
+    }
+    .bb-result-title{
+      font-family:'Cinzel',serif;
+      font-size:0.78rem;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      color:var(--silver);
+      flex:1;
+    }
+    .bb-result-badge{
+      font-size:0.58rem;
+      letter-spacing:0.22em;
+      text-transform:uppercase;
+      color:var(--crimson-light);
+      background:var(--gold-dim);
+      border:1px solid rgba(180,0,0,0.22);
+      padding:0.25rem 0.65rem;
+      border-radius:2px;
+    }
+    .bb-result-query{
+      font-size:0.65rem;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
       color:var(--text-muted);
-      letter-spacing:0.04em;
-      display:flex;align-items:center;gap:0.45rem;
+      margin-bottom:1rem;
     }
-    .bb-coming-soon::before{
+
+    /* Loading dots */
+    .bb-loading{
+      display:none;
+      align-items:center;
+      gap:0.5rem;
+      padding:1.5rem 0;
+      color:var(--text-dim);
+      font-size:0.8rem;
+      letter-spacing:0.08em;
+    }
+    .bb-loading.active{ display:flex; }
+    .bb-dots{ display:flex; gap:5px; }
+    .bb-dots span{
+      width:6px;height:6px;border-radius:50%;
+      background:var(--crimson-light);
+      animation:bbpulse 1.2s infinite ease-in-out;
+    }
+    .bb-dots span:nth-child(2){ animation-delay:0.2s; }
+    .bb-dots span:nth-child(3){ animation-delay:0.4s; }
+    @keyframes bbpulse{
+      0%,80%,100%{ opacity:0.2;transform:scale(0.8); }
+      40%{ opacity:1;transform:scale(1); }
+    }
+
+    /* AI text output */
+    .bb-ai-text{
+      font-size:0.88rem;
+      line-height:1.95;
+      color:var(--text-dim);
+      white-space:pre-wrap;
+      font-family:'Inter',sans-serif;
+    }
+    .bb-ai-text strong{
+      color:var(--text);
+      font-weight:600;
+    }
+
+    /* Sekce badge */
+    .bb-section-tag{
+      display:inline-flex;align-items:center;gap:0.4rem;
+      font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;
+      color:var(--crimson-light);
+      background:var(--gold-dim);
+      border:1px solid rgba(180,0,0,0.18);
+      padding:0.2rem 0.55rem;
+      border-radius:2px;
+      margin-bottom:1rem;
+    }
+
+    /* Error stav */
+    .bb-error{
+      display:none;
+      padding:1rem 1.2rem;
+      background:rgba(180,0,0,0.08);
+      border:1px solid rgba(180,0,0,0.22);
+      color:var(--crimson-light);
+      font-size:0.8rem;
+      border-radius:2px;
+      margin-top:1rem;
+    }
+    .bb-error.visible{ display:block; }
+
+    /* Timestamp */
+    .bb-timestamp{
+      margin-top:1.4rem;
+      padding-top:0.9rem;
+      border-top:1px solid var(--border);
+      font-size:0.62rem;
+      letter-spacing:0.12em;
+      color:var(--text-muted);
+      display:flex;align-items:center;gap:0.5rem;
+    }
+    .bb-timestamp::before{
       content:'';display:inline-block;
-      width:5px;height:5px;border-radius:50%;
-      background:var(--crimson-light);opacity:0.5;flex-shrink:0;
+      width:4px;height:4px;border-radius:50%;
+      background:var(--crimson-light);opacity:0.4;
     }
+
+    /* Generovat btn */
+    .bb-gen-btn{
+      margin-top:1.1rem;
+      display:inline-flex;align-items:center;gap:0.55rem;
+      background:var(--crimson);
+      color:#fff;
+      border:none;
+      padding:0.75rem 1.4rem;
+      font-family:'Cinzel',serif;
+      font-size:0.72rem;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      cursor:pointer;
+      border-radius:2px;
+      transition:background 0.2s,box-shadow 0.2s;
+    }
+    .bb-gen-btn:hover{
+      background:var(--crimson-light);
+      box-shadow:0 0 18px var(--crimson-glow);
+    }
+    .bb-gen-btn:disabled{
+      opacity:0.45;cursor:not-allowed;
+    }
+    .bb-gen-btn svg{ width:14px;height:14px;flex-shrink:0; }
   </style>
   </head><body>
   ${renderNav(req, 'blackbook')}
@@ -3638,7 +3790,7 @@ function renderBlackbook(req) {
       <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></div>
       <div class="page-info-body">
         <div class="page-info-title">Centrální evidence organizace</div>
-        <div class="page-info-text">Blackbook shromažďuje finanční přehledy, statistiky skladu, aktivitu členů, chemikálie, bezpečnostní hlášení, kroniku a výkonnostní statistiky organizace na jednom místě. Jednotlivé sekce a reporty jsou dostupné v rozbalovacím menu výše.</div>
+        <div class="page-info-text">Blackbook shromažďuje finanční přehledy, statistiky skladu, aktivitu členů, chemikálie, bezpečnostní hlášení, kroniku a výkonnostní statistiky organizace na jednom místě. Vyberte report a nechte AI analyzovat data organizace.</div>
       </div>
     </div>
 
@@ -3648,7 +3800,7 @@ function renderBlackbook(req) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
           Výběr reportu
         </span>
-        <span class="card-badge">AI připraveno</span>
+        <span class="card-badge">AI aktivní</span>
       </div>
 
       <div class="bb-select-wrap">
@@ -3661,9 +3813,123 @@ function renderBlackbook(req) {
           <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 1 5 5 9 1"/></svg>
         </span>
       </div>
-      <div class="bb-coming-soon">Reporty budou generovány automaticky po zapojení AI modulu.</div>
+
+      <button class="bb-gen-btn" id="bb-gen-btn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        Generovat report
+      </button>
+
+      <div class="bb-error" id="bb-error"></div>
     </div>
+
+    <!-- Výsledek AI -->
+    <div class="card" id="bb-result-card">
+      <div class="bb-result-header">
+        <span class="bb-result-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline;vertical-align:-2px;margin-right:0.4rem"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          Analýza — AI
+        </span>
+        <span class="bb-result-badge" id="bb-result-badge">—</span>
+      </div>
+
+      <div class="bb-loading" id="bb-loading">
+        <div class="bb-dots"><span></span><span></span><span></span></div>
+        Analyzuji data organizace…
+      </div>
+
+      <div id="bb-result-body" style="display:none">
+        <div class="bb-section-tag" id="bb-result-section"></div>
+        <div class="bb-ai-text" id="bb-ai-text"></div>
+        <div class="bb-timestamp" id="bb-timestamp"></div>
+      </div>
+    </div>
+
   </main>
+  <script>
+    const select   = document.getElementById('bb-report-select');
+    const genBtn   = document.getElementById('bb-gen-btn');
+    const resultCard = document.getElementById('bb-result-card');
+    const loading  = document.getElementById('bb-loading');
+    const resultBody = document.getElementById('bb-result-body');
+    const aiText   = document.getElementById('bb-ai-text');
+    const errBox   = document.getElementById('bb-error');
+    const badge    = document.getElementById('bb-result-badge');
+    const section  = document.getElementById('bb-result-section');
+    const tsEl     = document.getElementById('bb-timestamp');
+
+    select.addEventListener('change', () => {
+      genBtn.disabled = !select.value;
+      errBox.classList.remove('visible');
+    });
+
+    genBtn.addEventListener('click', async () => {
+      const query = select.value;
+      if (!query) return;
+
+      // Reset UI
+      genBtn.disabled = true;
+      errBox.classList.remove('visible');
+      resultCard.classList.add('visible');
+      loading.classList.add('active');
+      resultBody.style.display = 'none';
+
+      try {
+        // 1. Fetch data ze serveru
+        const dataRes = await fetch('/api/blackbook/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        });
+        const dataJson = await dataRes.json();
+        if (!dataJson.ok) throw new Error(dataJson.error || 'Chyba při načítání dat.');
+
+        // 2. Pošli do Anthropic API
+        const systemPrompt = \`Jsi analytik organizace Albion — tajné kriminální organizace z FiveM RP serveru. Píšeš interní reporty pro vedení organizace. Tvůj styl je stručný, věcný a profesionální. Používej češtinu. Vyhni se zbytečným úvodům — rovnou k věci. Formátuj výstup přehledně (používej odrážky, sekce, čísla). Data jsou reálná z organizace.\`;
+
+        const userPrompt = \`Zpracuj tento report: "\${query}"
+
+Data z organizace:
+\${JSON.stringify(dataJson.data, null, 2)}
+
+Napiš analytický report v češtině. Uveď klíčové zjištění, konkrétní čísla a jména (pokud jsou v datech), a případně doporučení nebo varování. Buď stručný ale výstižný.\`;
+
+        const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userPrompt }],
+          }),
+        });
+
+        const aiJson = await aiRes.json();
+        if (!aiRes.ok || !aiJson.content) {
+          throw new Error(aiJson.error?.message || 'Chyba AI modulu.');
+        }
+
+        const text = aiJson.content.map(b => b.text || '').join('\\n').trim();
+
+        // 3. Zobraz výsledek
+        loading.classList.remove('active');
+        badge.textContent = query;
+        section.textContent = new Date().toLocaleString('cs-CZ');
+        aiText.textContent = text;
+        const ts = dataJson.generated_at ? new Date(dataJson.generated_at).toLocaleString('cs-CZ') : new Date().toLocaleString('cs-CZ');
+        tsEl.textContent = 'Data načtena: ' + ts;
+        resultBody.style.display = 'block';
+
+      } catch (err) {
+        loading.classList.remove('active');
+        resultCard.classList.remove('visible');
+        errBox.textContent = '⚠ ' + (err.message || 'Neznámá chyba.');
+        errBox.classList.add('visible');
+      } finally {
+        genBtn.disabled = false;
+      }
+    });
+  </script>
   </body></html>`;
 }
 
