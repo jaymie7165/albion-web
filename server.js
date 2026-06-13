@@ -38,7 +38,7 @@ const CONFIG = {
     "Modrý kanabis":  { vyroba: 100, prodej: 150 },
   },
   drogyTypy: ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"],
-  chemkyTypy: ["Acetylaceton","Aceton","Anhydrid kyseliny octové","Chlorid sodný","Diethylether","Ethanol","Fosforečnan draselný","Hydroxid sodný","Hydrogensíran sodný","Jód","Kyselina chlorovodíková","Kyselina fosforečná","Kyselina octová","Kyselina sírová","Lithium","Peroxid vodíku","Pseudoefedrin","Síran amonný","Toluen","Xylén"],
+  chemkyTypy: ["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná"],
   drogyCeny: {
     "Kapky":       { prodej: 200 },
     "Kokain":      { prodej: 500 },
@@ -239,6 +239,7 @@ app.post('/api/chemky', requireAuth, async (req, res) => {
   const { typ, chemikalie, mnozstvi } = req.body;
   const qty = parseInt(mnozstvi);
   if (!chemikalie || !qty || qty <= 0) return res.json({ ok: false, error: 'Chybné údaje' });
+  if (!CONFIG.chemkyTypy.includes(chemikalie)) return res.json({ ok: false, error: 'Nepovolená chemikálie' });
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
@@ -1623,6 +1624,53 @@ function baseStyles() {
       .nav-dropdown-menu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:1.5rem}
       .nav-dropdown-menu a.active{color:var(--crimson-light);background:rgba(160,0,0,0.08)}
 
+      /* ── SELECT EXPANDABLE — vizuální indikátor rozbalovacího menu ── */
+      .form-group{position:relative}
+      .select-expandable{
+        padding-right:2.8rem!important;
+        cursor:pointer;
+        border-color:rgba(180,0,0,0.35)!important;
+      }
+      .select-expandable:hover{
+        border-color:var(--crimson-light)!important;
+        box-shadow:0 0 0 2px var(--crimson-glow);
+      }
+      /* šipka dolů */
+      .select-wrap{position:relative;display:flex;flex-direction:column;gap:0.4rem}
+      .select-wrap::after{
+        content:'';
+        position:absolute;
+        right:1rem;
+        bottom:0.95rem;
+        width:0;height:0;
+        border-left:5px solid transparent;
+        border-right:5px solid transparent;
+        border-top:6px solid var(--crimson-light);
+        pointer-events:none;
+        opacity:0.85;
+        transition:transform 0.2s,opacity 0.2s;
+      }
+      .select-wrap:focus-within::after{
+        transform:rotate(180deg);
+        opacity:1;
+      }
+      /* malý badge s počtem voleb */
+      .select-count-badge{
+        position:absolute;
+        right:2.2rem;
+        bottom:0.72rem;
+        font-size:0.52rem;
+        letter-spacing:0.10em;
+        color:var(--crimson-light);
+        background:var(--crimson-glow);
+        border:1px solid var(--border-gold);
+        padding:0.08rem 0.38rem;
+        pointer-events:none;
+        line-height:1.4;
+        font-weight:600;
+        opacity:0.85;
+      }
+
     </style>
   `;
 }
@@ -2642,8 +2690,8 @@ function renderDashboard(req, data) {
           </div>
           <input type="hidden" id="zbrane-typ" value="VKLAD">
           <div class="form-row">
-            <div class="form-group"><label>Kategorie</label><select id="zbrane-kat" onchange="updateZbraneItems()"><option value="Zbraň">Zbraně</option><option value="Střelivo">Střelivo</option><option value="Akce">Akce</option></select></div>
-            <div class="form-group"><label>Položka</label><select id="zbrane-polozka"></select></div>
+            <div class="form-group select-wrap"><label>Kategorie</label><select id="zbrane-kat" class="select-expandable" onchange="updateZbraneItems()"><option value="Zbraň">Zbraně</option><option value="Střelivo">Střelivo</option><option value="Akce">Akce</option></select><span class="select-count-badge">3</span></div>
+            <div class="form-group select-wrap"><label>Položka</label><select id="zbrane-polozka" class="select-expandable"></select><span class="select-count-badge" id="zbrane-polozka-count">9</span></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>Množství</label><input type="number" id="zbrane-mnozstvi" min="1" value="1"></div>
@@ -2662,7 +2710,7 @@ function renderDashboard(req, data) {
           </div>
           <input type="hidden" id="weed-typ" value="VKLAD">
           <div class="form-row">
-            <div class="form-group"><label>Odrůda</label><select id="weed-odruda"><option>Žlutý kanabis</option><option>Zelený kanabis</option><option>Kanabis</option><option>Červený kanabis</option><option>Modrý kanabis</option></select></div>
+            <div class="form-group select-wrap"><label>Odrůda</label><select id="weed-odruda" class="select-expandable"><option>Žlutý kanabis</option><option>Zelený kanabis</option><option>Kanabis</option><option>Červený kanabis</option><option>Modrý kanabis</option></select><span class="select-count-badge">5</span></div>
             <div class="form-group"><label>Množství</label><input type="number" id="weed-mnozstvi" min="1" value="1"></div>
           </div>
           <div class="info-box" id="weed-info"></div>
@@ -2679,7 +2727,7 @@ function renderDashboard(req, data) {
           </div>
           <input type="hidden" id="drogy-typ" value="VKLAD">
           <div class="form-row">
-            <div class="form-group"><label>Droga</label><select id="drogy-droga"><option>Kapky</option><option>Kokain</option><option>Extáze</option><option>Metamfetamin</option><option>Benzo</option><option>Joyka</option><option>Heroin</option><option>Speed</option><option>LSD</option></select></div>
+            <div class="form-group select-wrap"><label>Droga</label><select id="drogy-droga" class="select-expandable"><option>Kapky</option><option>Kokain</option><option>Extáze</option><option>Metamfetamin</option><option>Benzo</option><option>Joyka</option><option>Heroin</option><option>Speed</option><option>LSD</option></select><span class="select-count-badge">9</span></div>
             <div class="form-group"><label>Množství</label><input type="number" id="drogy-mnozstvi" min="1" value="1"></div>
           </div>
           <button class="btn-submit" onclick="submitDrogy()">Potvrdit akci</button>
@@ -2712,7 +2760,7 @@ function renderDashboard(req, data) {
           </div>
           <input type="hidden" id="chemky-typ" value="VKLAD">
           <div class="form-row">
-            <div class="form-group"><label>Chemikálie</label><select id="chemky-chemikalie"><option>Acetylaceton</option><option>Aceton</option><option>Anhydrid kyseliny octové</option><option>Chlorid sodný</option><option>Diethylether</option><option>Ethanol</option><option>Fosforečnan draselný</option><option>Hydroxid sodný</option><option>Hydrogensíran sodný</option><option>Jód</option><option>Kyselina chlorovodíková</option><option>Kyselina fosforečná</option><option>Kyselina octová</option><option>Kyselina sírová</option><option>Lithium</option><option>Peroxid vodíku</option><option>Pseudoefedrin</option><option>Síran amonný</option><option>Toluen</option><option>Xylén</option></select></div>
+            <div class="form-group select-wrap"><label>Chemikálie</label><select id="chemky-chemikalie" class="select-expandable"><option>Aceton</option><option>Peroxid vodíku</option><option>Kofein</option><option>Propylenglykol</option><option>Toluen</option><option>Benzín</option><option>Bismut</option><option>Kyselina fosforečná</option></select><span class="select-count-badge">8</span></div>
             <div class="form-group"><label>Množství</label><input type="number" id="chemky-mnozstvi" min="1" value="1"></div>
           </div>
           <button class="btn-submit" onclick="submitChemky()">Potvrdit akci</button>
@@ -2771,6 +2819,8 @@ function renderDashboard(req, data) {
       const sel=document.getElementById('zbrane-polozka');
       const items=kat==='Zbraň'?ZBRANE:kat==='Střelivo'?NABOJE:AKCE;
       sel.innerHTML=items.map(i=>'<option>'+i+'</option>').join('');
+      const badge=document.getElementById('zbrane-polozka-count');
+      if(badge) badge.textContent=items.length;
     }
     updateZbraneItems();
     function setTyp(prefix,typ,btn){
