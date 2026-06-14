@@ -554,7 +554,7 @@ app.get('/api/audit', requireAuth, async (req, res) => {
   }
 });
 
-// ── API — IC JMÉNA (pro Blackbook dropdown) ───────────────────────────────────
+// ── API — IC JMÉNA ──────────────────────────────────────────────────────────
 app.get('/api/ic-names', requireAuth, (req, res) => {
   try {
     const users = db.prepare('SELECT ic_name FROM users WHERE ic_name IS NOT NULL ORDER BY ic_name ASC').all();
@@ -579,396 +579,6 @@ app.get('/api/debug-sheets', requireAuth, async (req, res) => {
   }
 });
 
-
-// ── API — BLACKBOOK QUERY (pro AI) ───────────────────────────────────────────
-// Předdefinované dotazy odpovídající skupinám v renderBlackbook()
-const BB_REPORTS = [
-  { group: '📊 Finance',    items: ['Příjmy za 30 dní','Výdaje za 30 dní','Finanční přehled','Největší příjmy','Největší výdaje','Měsíční srovnání'] },
-  { group: '📦 Sklad',      items: ['Nejvíce vybírané položky','Nejvíce doplňované položky','Docházející zásoby','Nedoplněné položky','Stav skladu','Pohyb skladu'] },
-  { group: '👥 Členové',    items: ['Nejaktivnější člen','Aktivita členů','Neaktivní členové','Největší přispěvatelé','Nejvíce výběrů','Nejvíce vkladů'] },
-  { group: '🧪 Chemikálie', items: ['Aktivita chemikálií','Největší chemik','Spotřeba chemikálií','Doplňování chemikálií','Chemický report'] },
-  { group: '🚨 Bezpečnost', items: ['Podezřelé výběry','Nadměrné čerpání','Nestandardní aktivita','Velké transakce','Audit členů','Rizikové pohyby'] },
-  { group: '📜 Kronika',    items: ['Týdenní kronika','Měsíční kronika','Souhrn aktivit','Nejvýznamnější změny','Vývoj organizace','Operační report'] },
-  { group: '🏆 Statistiky', items: ['Top členové','Top skladníci','Top obchodníci','Největší aktivita','Rekordy organizace','Přehled výkonu'] },
-  { group: '🧠 Moje nejoblíbenější', items: ['Týdenní kronika','Stav organizace','Finanční přehled','Docházející zásoby','Nejaktivnější člen','Podezřelé výběry','Aktivita chemikálií'] },
-];
-
-// Flat set pro rychlou validaci
-const BB_VALID_QUERIES = new Set(BB_REPORTS.flatMap(g => g.items));
-
-app.post('/api/blackbook/query', requireAuth, async (req, res) => {
-  try {
-    const { query } = req.body;
-
-    // 1. Validace — přijímáme POUZE předdefinované dotazy
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({ ok: false, error: 'Chybí parametr query.' });
-    }
-    if (!BB_VALID_QUERIES.has(query.trim())) {
-      return res.status(400).json({
-        ok: false,
-        error: `Nepovolený dotaz. Povolené dotazy: ${[...BB_VALID_QUERIES].join(', ')}`,
-        allowed: [...BB_VALID_QUERIES],
-      });
-    }
-
-    const q = query.trim();
-
-    // 2. Načti data ze sheets a DB
-    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
-      sheets.getRows('Zbraně').catch(() => []),
-      sheets.getRows('Weed').catch(() => []),
-      sheets.getRows('Drogy').catch(() => []),
-      sheets.getRows('Účetnictví').catch(() => []),
-      sheets.getRows('Chemky').catch(() => []),
-    ]);
-    const allUsers = db.prepare('SELECT * FROM users').all();
-
-    // 3. Pomocné funkce
-    const parseDate = (str) => {
-      if (!str) return null;
-      // "12.6.2025, 14:30:00" nebo ISO
-      const czMatch = str.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-      if (czMatch) return new Date(`${czMatch[3]}-${czMatch[2].padStart(2,'0')}-${czMatch[1].padStart(2,'0')}`);
-      const d = new Date(str);
-      return isNaN(d) ? null : d;
-    };
-    const now = new Date();
-    const daysAgo = (n) => new Date(now - n * 86400000);
-
-    // Normalizace jmen
-    const nameMap = {};
-    allUsers.forEach(u => {
-      if (u.ic_name) {
-        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
-        if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
-      }
-    });
-    const normName = (name) => {
-      if (!name) return '—';
-      const l = name.trim().toLowerCase();
-      return nameMap[l] || name.trim();
-    };
-
-    // Agregace počtu operací per uživatel per sekce
-    const countByUser = (rows, userCol) => {
-      const m = {};
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
-        const u = normName(r[userCol]);
-        if (!u || u === '—') continue;
-        m[u] = (m[u] || 0) + 1;
-      }
-      return m;
-    };
-
-    const sumByItem = (rows, itemCol, qtyCol, filterTyp) => {
-      const m = {};
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
-        const typ = (r[1] || '').toUpperCase();
-        if (filterTyp && typ !== filterTyp) continue;
-        const item = r[itemCol] || '?';
-        const qty = parseInt(r[qtyCol]) || 0;
-        m[item] = (m[item] || 0) + qty;
-      }
-      return m;
-    };
-
-    const topN = (obj, n = 5) =>
-      Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n);
-
-    // Finance helpers
-    const financeRows = (rows, filterDays) => {
-      return rows.filter((r, i) => {
-        if (i === 0) return false;
-        if (!filterDays) return true;
-        const d = parseDate(r[0]);
-        return d && d >= daysAgo(filterDays);
-      });
-    };
-
-    // 4. Zpracování dotazů
-    let data = {};
-
-    // ── FINANCE ──────────────────────────────────────────────────────────────
-    if (q === 'Příjmy za 30 dní') {
-      const rows = financeRows(ucetRows, 30).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM');
-      const totalUsd = rows.filter(r => (r[3]||'') === 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
-      const totalPesos = rows.filter(r => (r[3]||'') !== 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
-      data = { celkem_usd: totalUsd, celkem_pesos: totalPesos, pocet_transakci: rows.length,
-        per_uzivatel: topN(Object.fromEntries(
-          Object.entries(rows.reduce((m,r) => { const u=normName(r[5]); m[u]=(m[u]||0)+(parseFloat(r[2])||0); return m; }, {}))
-        )) };
-    }
-    else if (q === 'Výdaje za 30 dní') {
-      const rows = financeRows(ucetRows, 30).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ');
-      const totalUsd = rows.filter(r => (r[3]||'') === 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
-      const totalPesos = rows.filter(r => (r[3]||'') !== 'USD').reduce((s, r) => s + (parseFloat(r[2]) || 0), 0);
-      data = { celkem_usd: totalUsd, celkem_pesos: totalPesos, pocet_transakci: rows.length };
-    }
-    else if (q === 'Finanční přehled' || q === 'Stav organizace') {
-      const prijemUsd = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM' && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
-      const vydajUsd  = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ'  && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
-      const prijemP   = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM' && (r[3]||'') !== 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
-      const vydajP    = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ'  && (r[3]||'') !== 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
-      data = { prijem_usd: prijemUsd, vydaj_usd: vydajUsd, net_usd: prijemUsd - vydajUsd,
-               prijem_pesos: prijemP, vydaj_pesos: vydajP, net_pesos: prijemP - vydajP,
-               celkem_transakci: ucetRows.length - 1 };
-    }
-    else if (q === 'Největší příjmy') {
-      const rows = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM');
-      const sorted = rows.sort((a, b) => (parseFloat(b[2])||0) - (parseFloat(a[2])||0)).slice(0, 10);
-      data = { top_prijmy: sorted.map(r => ({ castka: parseFloat(r[2])||0, valuta: r[3]||'?', poznamka: r[4]||'—', uzivatel: normName(r[5]), cas: r[0] })) };
-    }
-    else if (q === 'Největší výdaje') {
-      const rows = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ');
-      const sorted = rows.sort((a, b) => (parseFloat(b[2])||0) - (parseFloat(a[2])||0)).slice(0, 10);
-      data = { top_vydaje: sorted.map(r => ({ castka: parseFloat(r[2])||0, valuta: r[3]||'?', poznamka: r[4]||'—', uzivatel: normName(r[5]), cas: r[0] })) };
-    }
-    else if (q === 'Měsíční srovnání') {
-      const byMonth = {};
-      for (let i = 1; i < ucetRows.length; i++) {
-        const r = ucetRows[i];
-        const d = parseDate(r[0]);
-        if (!d) continue;
-        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        if (!byMonth[key]) byMonth[key] = { prijem: 0, vydaj: 0 };
-        const typ = (r[1]||'').toUpperCase();
-        const castka = parseFloat(r[2]) || 0;
-        if (typ === 'PŘÍJEM') byMonth[key].prijem += castka;
-        else byMonth[key].vydaj += castka;
-      }
-      data = { mesice: Object.entries(byMonth).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 12) };
-    }
-
-    // ── SKLAD ────────────────────────────────────────────────────────────────
-    else if (q === 'Nejvíce vybírané položky') {
-      const zbrane = sumByItem(zbraneRows, 2, 3, 'VÝBĚR');
-      const weed   = sumByItem(weedRows, 2, 3, 'VÝBĚR');
-      const drogy  = sumByItem(drogyRows, 2, 3, 'VÝBĚR');
-      data = { zbrane: topN(zbrane), weed: topN(weed), drogy: topN(drogy) };
-    }
-    else if (q === 'Nejvíce doplňované položky') {
-      const zbrane = sumByItem(zbraneRows, 2, 3, 'VKLAD');
-      const weed   = sumByItem(weedRows, 2, 3, 'VKLAD');
-      const drogy  = sumByItem(drogyRows, 2, 3, 'VKLAD');
-      data = { zbrane: topN(zbrane), weed: topN(weed), drogy: topN(drogy) };
-    }
-    else if (q === 'Stav skladu') {
-      const stavZbrane = {};
-      for (let i = 1; i < zbraneRows.length; i++) {
-        const r = zbraneRows[i];
-        const item = r[2] || '?'; const qty = parseInt(r[3]) || 0;
-        const typ = (r[1]||'').toUpperCase();
-        stavZbrane[item] = (stavZbrane[item] || 0) + (typ === 'VKLAD' ? qty : -qty);
-      }
-      const stavDrogy = {};
-      for (let i = 1; i < drogyRows.length; i++) {
-        const r = drogyRows[i];
-        const item = r[2] || '?'; const qty = parseInt(r[3]) || 0;
-        const typ = (r[1]||'').toUpperCase();
-        stavDrogy[item] = (stavDrogy[item] || 0) + (typ === 'VKLAD' ? qty : -qty);
-      }
-      data = { zbrane_net: Object.entries(stavZbrane).sort((a,b) => b[1]-a[1]), drogy_net: Object.entries(stavDrogy).sort((a,b) => b[1]-a[1]) };
-    }
-    else if (q === 'Docházející zásoby' || q === 'Nedoplněné položky') {
-      const stav = {};
-      for (let i = 1; i < zbraneRows.length; i++) {
-        const r = zbraneRows[i];
-        const item = r[2] || '?'; const qty = parseInt(r[3]) || 0;
-        const typ = (r[1]||'').toUpperCase();
-        stav[item] = (stav[item] || 0) + (typ === 'VKLAD' ? qty : -qty);
-      }
-      data = { docházející: Object.entries(stav).filter(([,v]) => v <= 5).sort((a,b) => a[1]-b[1]) };
-    }
-    else if (q === 'Pohyb skladu') {
-      const posledni = [];
-      const addLast = (rows, sekce) => {
-        for (let i = Math.max(1, rows.length - 20); i < rows.length; i++) {
-          const r = rows[i];
-          posledni.push({ cas: r[0], sekce, typ: r[1], polozka: r[2], qty: r[3] });
-        }
-      };
-      addLast(zbraneRows, 'Zbraně'); addLast(weedRows, 'Weed'); addLast(drogyRows, 'Drogy');
-      data = { posledni_pohyby: posledni.slice(-30) };
-    }
-
-    // ── ČLENOVÉ ──────────────────────────────────────────────────────────────
-    else if (q === 'Nejaktivnější člen' || q === 'Aktivita členů') {
-      const aktZbrane = countByUser(zbraneRows, 5);
-      const aktWeed   = countByUser(weedRows, 6);
-      const aktDrogy  = countByUser(drogyRows, 6);
-      const aktChemky = countByUser(chemkyRows, 4);
-      const celkova = {};
-      [aktZbrane, aktWeed, aktDrogy, aktChemky].forEach(m => {
-        Object.entries(m).forEach(([u, c]) => { celkova[u] = (celkova[u]||0) + c; });
-      });
-      data = { top_clenove: topN(celkova, 10), per_sekce: { zbrane: topN(aktZbrane,5), weed: topN(aktWeed,5), drogy: topN(aktDrogy,5), chemky: topN(aktChemky,5) } };
-    }
-    else if (q === 'Neaktivní členové') {
-      const aktivni = new Set();
-      const addActive = (rows, col) => { for (let i=1;i<rows.length;i++) { const u=normName(rows[i][col]); if(u&&u!=='—') aktivni.add(u); } };
-      addActive(zbraneRows,5); addActive(weedRows,6); addActive(drogyRows,6); addActive(chemkyRows,4);
-      const vsichni = allUsers.map(u => u.ic_name).filter(Boolean);
-      data = { neaktivni: vsichni.filter(u => !aktivni.has(u)), aktivni_celkem: aktivni.size, clenove_celkem: vsichni.length };
-    }
-    else if (q === 'Největší přispěvatelé' || q === 'Nejvíce vkladů') {
-      const vklady = {};
-      const addVklady = (rows, col) => { for (let i=1;i<rows.length;i++) { if((rows[i][1]||'').toUpperCase()==='VKLAD') { const u=normName(rows[i][col]); vklady[u]=(vklady[u]||0)+1; } } };
-      addVklady(zbraneRows,5); addVklady(weedRows,6); addVklady(drogyRows,6); addVklady(chemkyRows,4);
-      data = { top_vkladatele: topN(vklady, 10) };
-    }
-    else if (q === 'Nejvíce výběrů') {
-      const vybery = {};
-      const addVybery = (rows, col) => { for (let i=1;i<rows.length;i++) { if((rows[i][1]||'').toUpperCase()==='VÝBĚR') { const u=normName(rows[i][col]); vybery[u]=(vybery[u]||0)+1; } } };
-      addVybery(zbraneRows,5); addVybery(weedRows,6); addVybery(drogyRows,6); addVybery(chemkyRows,4);
-      data = { top_vyberi: topN(vybery, 10) };
-    }
-
-    // ── CHEMIKÁLIE ────────────────────────────────────────────────────────────
-    else if (q === 'Aktivita chemikálií' || q === 'Spotřeba chemikálií') {
-      const spotreba = sumByItem(chemkyRows, 2, 3, 'VÝBĚR');
-      const doplneni = sumByItem(chemkyRows, 2, 3, 'VKLAD');
-      data = { spotreba: topN(spotreba), doplneni: topN(doplneni) };
-    }
-    else if (q === 'Největší chemik') {
-      const chemici = countByUser(chemkyRows, 4);
-      data = { top_chemici: topN(chemici, 10) };
-    }
-    else if (q === 'Doplňování chemikálií') {
-      const doplneni = sumByItem(chemkyRows, 2, 3, 'VKLAD');
-      data = { top_doplneni: topN(doplneni) };
-    }
-    else if (q === 'Chemický report') {
-      const spotreba = sumByItem(chemkyRows, 2, 3, 'VÝBĚR');
-      const doplneni = sumByItem(chemkyRows, 2, 3, 'VKLAD');
-      const chemici  = countByUser(chemkyRows, 4);
-      data = { spotreba: topN(spotreba), doplneni: topN(doplneni), top_chemici: topN(chemici,5), celkem_operaci: chemkyRows.length - 1 };
-    }
-
-    // ── BEZPEČNOST ────────────────────────────────────────────────────────────
-    else if (q === 'Podezřelé výběry' || q === 'Nadměrné čerpání' || q === 'Nestandardní aktivita') {
-      // Výběry za posledních 7 dní > průměr
-      const vybery7d = [];
-      for (let i = 1; i < zbraneRows.length; i++) {
-        const r = zbraneRows[i];
-        if ((r[1]||'').toUpperCase() !== 'VÝBĚR') continue;
-        const d = parseDate(r[0]);
-        if (!d || d < daysAgo(7)) continue;
-        vybery7d.push({ cas: r[0], polozka: r[2], qty: parseInt(r[3])||0, uzivatel: normName(r[5]) });
-      }
-      const perUser = {};
-      vybery7d.forEach(v => { perUser[v.uzivatel] = (perUser[v.uzivatel]||0) + v.qty; });
-      const avgQty = Object.values(perUser).reduce((a,b) => a+b, 0) / (Object.keys(perUser).length || 1);
-      const podezreli = Object.entries(perUser).filter(([,q]) => q > avgQty * 2).sort((a,b) => b[1]-a[1]);
-      data = { podezreli_uzivatele: podezreli, prumer_qty: Math.round(avgQty), vybery_7d: vybery7d.slice(0,20) };
-    }
-    else if (q === 'Velké transakce') {
-      const velke = [];
-      for (let i = 1; i < ucetRows.length; i++) {
-        const r = ucetRows[i];
-        const castka = parseFloat(r[2]) || 0;
-        if (castka >= 50000) velke.push({ cas: r[0], typ: r[1], castka, valuta: r[3], poznamka: r[4], uzivatel: normName(r[5]) });
-      }
-      data = { velke_transakce: velke.sort((a,b) => b.castka - a.castka).slice(0,20) };
-    }
-    else if (q === 'Audit členů' || q === 'Rizikové pohyby') {
-      const rizikove = [];
-      for (let i = 1; i < zbraneRows.length; i++) {
-        const r = zbraneRows[i];
-        const qty = parseInt(r[3]) || 0;
-        if ((r[1]||'').toUpperCase() === 'VÝBĚR' && qty >= 10) {
-          rizikove.push({ cas: r[0], polozka: r[2], qty, uzivatel: normName(r[5]), ucel: r[6]||'—' });
-        }
-      }
-      data = { rizikove_pohyby: rizikove.sort((a,b) => b.qty - a.qty).slice(0,20) };
-    }
-
-    // ── KRONIKA / STATISTIKY (souhrnné) ───────────────────────────────────────
-    else {
-      // Všechny zbývající dotazy (kronika, statistiky, top) → vrátíme souhrnný snapshot
-      const celkova = {};
-      const addActive = (rows, col) => {
-        for (let i=1;i<rows.length;i++) { const u=normName(rows[i][col]); if(u&&u!=='—') celkova[u]=(celkova[u]||0)+1; }
-      };
-      addActive(zbraneRows,5); addActive(weedRows,6); addActive(drogyRows,6); addActive(chemkyRows,4);
-
-      const prijemUsd = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'PŘÍJEM' && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
-      const vydajUsd  = financeRows(ucetRows).filter(r => (r[1]||'').toUpperCase() === 'VÝDAJ'  && (r[3]||'') === 'USD').reduce((s,r) => s+(parseFloat(r[2])||0), 0);
-
-      data = {
-        snapshot: {
-          celkem_clenove: allUsers.length,
-          top_aktivni: topN(celkova, 5),
-          finance: { prijem_usd: prijemUsd, vydaj_usd: vydajUsd, net_usd: prijemUsd - vydajUsd },
-          transakce_zbrane: zbraneRows.length - 1,
-          transakce_weed: weedRows.length - 1,
-          transakce_drogy: drogyRows.length - 1,
-          transakce_chemky: chemkyRows.length - 1,
-          transakce_ucet: ucetRows.length - 1,
-        }
-      };
-    }
-
-    res.json({
-      ok: true,
-      query: q,
-      generated_at: new Date().toISOString(),
-      data,
-    });
-
-  } catch (e) {
-    console.error('[BLACKBOOK QUERY]', e);
-    res.status(500).json({ ok: false, error: 'Chyba při zpracování dotazu: ' + e.message });
-  }
-});
-
-// ── API — BLACKBOOK AI (proxy na Anthropic server-side) ──────────────────────
-app.post('/api/blackbook/ai', requireAuth, async (req, res) => {
-  try {
-    const { query, data } = req.body;
-    if (!query || !data) return res.status(400).json({ ok: false, error: 'Chybí parametry.' });
-
-    const systemPrompt = `Jsi analytik organizace Albion — tajné kriminální organizace z FiveM RP serveru. Píšeš interní reporty pro vedení organizace. Tvůj styl je stručný, věcný a profesionální. Používej češtinu. Vyhni se zbytečným úvodům — rovnou k věci. Formátuj výstup přehledně (používej odrážky, sekce, čísla). Data jsou reálná z organizace.`;
-
-    const userPrompt = `Zpracuj tento report: "${query}"\n\nData z organizace:\n${JSON.stringify(data, null, 2)}\n\nNapiš analytický report v češtině. Uveď klíčové zjištění, konkrétní čísla a jména (pokud jsou v datech), a případně doporučení nebo varování. Buď stručný ale výstižný.`;
-
-    const aiRes = await axios.post('https://api.anthropic.com/v1/messages', {
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-    });
-
-    const text = aiRes.data.content.map(b => b.text || '').join('\n').trim();
-    res.json({ ok: true, text });
-  } catch (e) {
-    console.error('[BLACKBOOK AI]', e.response?.data || e.message);
-    res.status(500).json({ ok: false, error: e.response?.data?.error?.message || e.message });
-  }
-});
-
-// ── API — BLACKBOOK LIST (metadata pro AI) ────────────────────────────────────
-app.get('/api/blackbook/queries', requireAuth, (req, res) => {
-  const BB_REPORTS_META = [
-    { group: '📊 Finance',    items: ['Příjmy za 30 dní','Výdaje za 30 dní','Finanční přehled','Největší příjmy','Největší výdaje','Měsíční srovnání'] },
-    { group: '📦 Sklad',      items: ['Nejvíce vybírané položky','Nejvíce doplňované položky','Docházející zásoby','Nedoplněné položky','Stav skladu','Pohyb skladu'] },
-    { group: '👥 Členové',    items: ['Nejaktivnější člen','Aktivita členů','Neaktivní členové','Největší přispěvatelé','Nejvíce výběrů','Nejvíce vkladů'] },
-    { group: '🧪 Chemikálie', items: ['Aktivita chemikálií','Největší chemik','Spotřeba chemikálií','Doplňování chemikálií','Chemický report'] },
-    { group: '🚨 Bezpečnost', items: ['Podezřelé výběry','Nadměrné čerpání','Nestandardní aktivita','Velké transakce','Audit členů','Rizikové pohyby'] },
-    { group: '📜 Kronika',    items: ['Týdenní kronika','Měsíční kronika','Souhrn aktivit','Nejvýznamnější změny','Vývoj organizace','Operační report'] },
-    { group: '🏆 Statistiky', items: ['Top členové','Top skladníci','Top obchodníci','Největší aktivita','Rekordy organizace','Přehled výkonu'] },
-    { group: '🧠 Moje nejoblíbenější', items: ['Týdenní kronika','Stav organizace','Finanční přehled','Docházející zásoby','Nejaktivnější člen','Podezřelé výběry','Aktivita chemikálií'] },
-  ];
-  res.json({ ok: true, groups: BB_REPORTS_META, all_queries: BB_REPORTS_META.flatMap(g => g.items) });
-});
 
 app.get('/home', requireAuth, async (req, res) => {
   try {
@@ -1015,7 +625,6 @@ app.get('/audit', requireAuth, (req, res) => res.send(renderAudit(req)));
 app.get('/statistiky', requireAuth, (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
-app.get('/blackbook', requireAuth, (req, res) => res.send(renderBlackbook(req)));
 app.get('/sazeni', requireAuth, (req, res) => res.send(renderSazeni(req)));
 
 
@@ -2025,7 +1634,6 @@ function baseStyles() {
       .nav-dropdown-menu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:1.5rem}
       .nav-dropdown-menu a.active{color:var(--crimson-light);background:rgba(160,0,0,0.08)}
 
-      /* ── NAV DROPDOWN — Blackbook (kompaktní, sekce → submenu) ── */
       .nav-dropdown-menu.mega{
         min-width:220px;
         width:max-content;
@@ -2121,7 +1729,6 @@ function renderNav(req, active) {
   const skladPages = ['sklad'];
   const infoPages  = ['nastenska','kodex','lore','hierarchy','sazeni'];
   const dataPages  = ['audit','statistiky'];
-  const blackbookPages = ['blackbook'];
 
   return `
     <nav>
@@ -2170,92 +1777,6 @@ function renderNav(req, active) {
           </div>
         </li>
 
-        <li class="nav-dropdown ${blackbookPages.includes(active)?'open':''}">
-          <a href="/blackbook" class="nav-drop-trigger ${blackbookPages.includes(active)?'active':''}">
-            Blackbook
-            <span class="nav-desc">Records · Contacts · Intelligence</span>
-            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
-          </a>
-          <div class="nav-dropdown-menu mega">
-            <div class="bb-group">
-              <div class="bb-group-title" onclick="toggleBBGroup(this)">📊 Finance<span class="bb-arrow"></span></div>
-              <div class="bb-submenu">
-                <a href="#">Příjmy za 30 dní</a>
-                <a href="#">Výdaje za 30 dní</a>
-                <a href="#">Finanční přehled</a>
-                <a href="#">Největší příjmy</a>
-                <a href="#">Největší výdaje</a>
-                <a href="#">Měsíční srovnání</a>
-              </div>
-            </div>
-            <div class="bb-group">
-              <div class="bb-group-title" onclick="toggleBBGroup(this)">📦 Sklad<span class="bb-arrow"></span></div>
-              <div class="bb-submenu">
-                <a href="#">Nejvíce vybírané položky</a>
-                <a href="#">Nejvíce doplňované položky</a>
-                <a href="#">Docházející zásoby</a>
-                <a href="#">Nedoplněné položky</a>
-                <a href="#">Stav skladu</a>
-                <a href="#">Pohyb skladu</a>
-              </div>
-            </div>
-            <div class="bb-group">
-              <div class="bb-group-title" onclick="toggleBBGroup(this)">👥 Členové<span class="bb-arrow"></span></div>
-              <div class="bb-submenu">
-                <a href="#">Nejaktivnější člen</a>
-                <a href="#">Aktivita členů</a>
-                <a href="#">Neaktivní členové</a>
-                <a href="#">Největší přispěvatelé</a>
-                <a href="#">Nejvíce výběrů</a>
-                <a href="#">Nejvíce vkladů</a>
-              </div>
-            </div>
-            <div class="bb-group">
-              <div class="bb-group-title" onclick="toggleBBGroup(this)">🧪 Chemikálie<span class="bb-arrow"></span></div>
-              <div class="bb-submenu">
-                <a href="#">Aktivita chemikálií</a>
-                <a href="#">Největší chemik</a>
-                <a href="#">Spotřeba chemikálií</a>
-                <a href="#">Doplňování chemikálií</a>
-                <a href="#">Chemický report</a>
-              </div>
-            </div>
-            <div class="bb-group">
-              <div class="bb-group-title" onclick="toggleBBGroup(this)">🚨 Bezpečnost<span class="bb-arrow"></span></div>
-              <div class="bb-submenu">
-                <a href="#">Podezřelé výběry</a>
-                <a href="#">Nadměrné čerpání</a>
-                <a href="#">Nestandardní aktivita</a>
-                <a href="#">Velké transakce</a>
-                <a href="#">Audit členů</a>
-                <a href="#">Rizikové pohyby</a>
-              </div>
-            </div>
-            <div class="bb-group">
-              <div class="bb-group-title" onclick="toggleBBGroup(this)">🏆 Statistiky<span class="bb-arrow"></span></div>
-              <div class="bb-submenu">
-                <a href="#">Top členové</a>
-                <a href="#">Top skladníci</a>
-                <a href="#">Top obchodníci</a>
-                <a href="#">Největší aktivita</a>
-                <a href="#">Rekordy organizace</a>
-                <a href="#">Přehled výkonu</a>
-              </div>
-            </div>
-            <div class="bb-group">
-              <div class="bb-group-title" onclick="toggleBBGroup(this)">🧠 Moje nejoblíbenější<span class="bb-arrow"></span></div>
-              <div class="bb-submenu">
-                <a href="#">Stav organizace</a>
-                <a href="#">Finanční přehled</a>
-                <a href="#">Docházející zásoby</a>
-                <a href="#">Nejaktivnější člen</a>
-                <a href="#">Podezřelé výběry</a>
-                <a href="#">Aktivita chemikálií</a>
-                <a href="#">Souhrn posledních 30 dní</a>
-              </div>
-            </div>
-          </div>
-        </li>
       </ul>
       <div class="nav-right">
         <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
@@ -2358,8 +1879,6 @@ function renderHome(req, data) {
 
   let totalValue = 0;
   Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
-  Object.entries(drogy).forEach(([k,q]) => { if(q>0 && DROGY_P[k]) totalValue += q * DROGY_P[k]; });
-  Object.entries(zbrane).forEach(([k,q]) => { if(q>0 && ZBRANE_P[k]) totalValue += q * ZBRANE_P[k]; });
 
   const totalWeed   = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalDrogy  = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
@@ -2881,8 +2400,8 @@ function renderHome(req, data) {
       <div class="kpi" style="--kpi-color:var(--gold)" onclick="location.href='/sklad'">
         <div class="kpi-label">Hodnota skladu</div>
         <div class="kpi-value" style="font-size:1.3rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
-        <div class="kpi-sub">Weed + Drogy + Zbraně</div>
-        <div class="kpi-icon">◆</div>
+        <div class="kpi-sub">Weed</div>
+        <div class="kpi-icon">$</div>
       </div>
     </div>
 
@@ -2991,7 +2510,7 @@ function renderHome(req, data) {
         <div style="padding-top:0.8rem;border-top:1px solid var(--border)">
           <div style="font-size:0.54rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.5rem">Celková hodnota skladu</div>
           <div style="font-family:'Cinzel',serif;font-size:1.5rem;color:var(--gold)">$${totalValue.toLocaleString('cs-CZ')}</div>
-          <div style="font-size:0.66rem;color:var(--text-muted);margin-top:0.3rem">Weed · Drogy · Zbraně · prodejní ceny</div>
+          <div style="font-size:0.66rem;color:var(--text-muted);margin-top:0.3rem">Weed · prodejní ceny</div>
         </div>
       </div>
 
@@ -3607,348 +3126,6 @@ function renderKodex(req) {
 }
 
 // ── RENDER AUDIT ───────────────────────────────────────────────────────────────
-function renderBlackbook(req) {
-  const BB_REPORTS = [
-    { group: '📊 Finance', items: ['Příjmy za 30 dní','Výdaje za 30 dní','Finanční přehled','Největší příjmy','Největší výdaje','Měsíční srovnání'] },
-    { group: '📦 Sklad',   items: ['Nejvíce vybírané položky','Nejvíce doplňované položky','Docházející zásoby','Nedoplněné položky','Stav skladu','Pohyb skladu'] },
-    { group: '👥 Členové', items: ['Nejaktivnější člen','Aktivita členů','Neaktivní členové','Největší přispěvatelé','Nejvíce výběrů','Nejvíce vkladů'] },
-    { group: '🧪 Chemikálie', items: ['Aktivita chemikálií','Největší chemik','Spotřeba chemikálií','Doplňování chemikálií','Chemický report'] },
-    { group: '🚨 Bezpečnost', items: ['Podezřelé výběry','Nadměrné čerpání','Nestandardní aktivita','Velké transakce','Audit členů','Rizikové pohyby'] },
-    { group: '📜 Kronika',    items: ['Týdenní kronika','Měsíční kronika','Souhrn aktivit','Nejvýznamnější změny','Vývoj organizace','Operační report'] },
-    { group: '🏆 Statistiky', items: ['Top členové','Top skladníci','Top obchodníci','Největší aktivita','Rekordy organizace','Přehled výkonu'] },
-    { group: '🧠 Moje nejoblíbenější', items: ['Týdenní kronika','Stav organizace','Finanční přehled','Docházející zásoby','Nejaktivnější člen','Podezřelé výběry','Aktivita chemikálií'] },
-  ];
-
-  const optionsHtml = BB_REPORTS.map(g =>
-    `<optgroup label="${g.group}">${g.items.map(i => `<option value="${i}">${i}</option>`).join('')}</optgroup>`
-  ).join('');
-
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Blackbook</title>
-  ${baseStyles()}
-  <style>
-    .bb-select-wrap{
-      position:relative;
-      max-width:560px;
-    }
-    .bb-select{
-      width:100%;
-      background:var(--input-bg);
-      border:1px solid rgba(180,0,0,0.35);
-      color:var(--text);
-      padding:0.85rem 3rem 0.85rem 1.1rem;
-      font-family:'Inter',sans-serif;
-      font-size:0.9rem;
-      appearance:none;-webkit-appearance:none;
-      cursor:pointer;
-      outline:none;
-      transition:border-color 0.2s,box-shadow 0.2s;
-    }
-    .bb-select:focus,.bb-select:hover{
-      border-color:var(--crimson-light);
-      box-shadow:0 0 0 3px var(--crimson-glow);
-    }
-    .bb-select option,.bb-select optgroup{
-      background:var(--bg-mid);
-      color:var(--text);
-    }
-    .bb-select-arrow{
-      position:absolute;
-      right:1.1rem;top:50%;transform:translateY(-50%);
-      pointer-events:none;
-      color:var(--crimson-light);
-      opacity:0.85;
-    }
-    .bb-select-arrow svg{width:14px;height:14px;display:block}
-    .bb-select-label{
-      font-size:0.58rem;letter-spacing:0.32em;text-transform:uppercase;
-      color:var(--silver);font-weight:600;margin-bottom:0.55rem;display:block;
-    }
-
-    /* ── AI výsledek ── */
-    #bb-result-card{
-      margin-top:1.5rem;
-      display:none;
-    }
-    #bb-result-card.visible{
-      display:block;
-    }
-    .bb-result-header{
-      display:flex;align-items:center;gap:0.75rem;
-      margin-bottom:1.2rem;
-      padding-bottom:1rem;
-      border-bottom:1px solid var(--border);
-    }
-    .bb-result-title{
-      font-family:'Cinzel',serif;
-      font-size:0.78rem;
-      letter-spacing:0.18em;
-      text-transform:uppercase;
-      color:var(--silver);
-      flex:1;
-    }
-    .bb-result-badge{
-      font-size:0.58rem;
-      letter-spacing:0.22em;
-      text-transform:uppercase;
-      color:var(--crimson-light);
-      background:var(--gold-dim);
-      border:1px solid rgba(180,0,0,0.22);
-      padding:0.25rem 0.65rem;
-      border-radius:2px;
-    }
-    .bb-result-query{
-      font-size:0.65rem;
-      letter-spacing:0.18em;
-      text-transform:uppercase;
-      color:var(--text-muted);
-      margin-bottom:1rem;
-    }
-
-    /* Loading dots */
-    .bb-loading{
-      display:none;
-      align-items:center;
-      gap:0.5rem;
-      padding:1.5rem 0;
-      color:var(--text-dim);
-      font-size:0.8rem;
-      letter-spacing:0.08em;
-    }
-    .bb-loading.active{ display:flex; }
-    .bb-dots{ display:flex; gap:5px; }
-    .bb-dots span{
-      width:6px;height:6px;border-radius:50%;
-      background:var(--crimson-light);
-      animation:bbpulse 1.2s infinite ease-in-out;
-    }
-    .bb-dots span:nth-child(2){ animation-delay:0.2s; }
-    .bb-dots span:nth-child(3){ animation-delay:0.4s; }
-    @keyframes bbpulse{
-      0%,80%,100%{ opacity:0.2;transform:scale(0.8); }
-      40%{ opacity:1;transform:scale(1); }
-    }
-
-    /* AI text output */
-    .bb-ai-text{
-      font-size:0.88rem;
-      line-height:1.95;
-      color:var(--text-dim);
-      white-space:pre-wrap;
-      font-family:'Inter',sans-serif;
-    }
-    .bb-ai-text strong{
-      color:var(--text);
-      font-weight:600;
-    }
-
-    /* Sekce badge */
-    .bb-section-tag{
-      display:inline-flex;align-items:center;gap:0.4rem;
-      font-size:0.6rem;letter-spacing:0.22em;text-transform:uppercase;
-      color:var(--crimson-light);
-      background:var(--gold-dim);
-      border:1px solid rgba(180,0,0,0.18);
-      padding:0.2rem 0.55rem;
-      border-radius:2px;
-      margin-bottom:1rem;
-    }
-
-    /* Error stav */
-    .bb-error{
-      display:none;
-      padding:1rem 1.2rem;
-      background:rgba(180,0,0,0.08);
-      border:1px solid rgba(180,0,0,0.22);
-      color:var(--crimson-light);
-      font-size:0.8rem;
-      border-radius:2px;
-      margin-top:1rem;
-    }
-    .bb-error.visible{ display:block; }
-
-    /* Timestamp */
-    .bb-timestamp{
-      margin-top:1.4rem;
-      padding-top:0.9rem;
-      border-top:1px solid var(--border);
-      font-size:0.62rem;
-      letter-spacing:0.12em;
-      color:var(--text-muted);
-      display:flex;align-items:center;gap:0.5rem;
-    }
-    .bb-timestamp::before{
-      content:'';display:inline-block;
-      width:4px;height:4px;border-radius:50%;
-      background:var(--crimson-light);opacity:0.4;
-    }
-
-    /* Generovat btn */
-    .bb-gen-btn{
-      margin-top:1.1rem;
-      display:inline-flex;align-items:center;gap:0.55rem;
-      background:var(--crimson);
-      color:#fff;
-      border:none;
-      padding:0.75rem 1.4rem;
-      font-family:'Cinzel',serif;
-      font-size:0.72rem;
-      letter-spacing:0.18em;
-      text-transform:uppercase;
-      cursor:pointer;
-      border-radius:2px;
-      transition:background 0.2s,box-shadow 0.2s;
-    }
-    .bb-gen-btn:hover{
-      background:var(--crimson-light);
-      box-shadow:0 0 18px var(--crimson-glow);
-    }
-    .bb-gen-btn:disabled{
-      opacity:0.45;cursor:not-allowed;
-    }
-    .bb-gen-btn svg{ width:14px;height:14px;flex-shrink:0; }
-  </style>
-  </head><body>
-  ${renderNav(req, 'blackbook')}
-  <main>
-    <div class="page-header">
-      <div>
-        <div class="page-label">Organizace Albion</div>
-        <h1 class="page-title">Blackbook</h1>
-        <p class="page-sub">Records. Contacts. Intelligence.</p>
-      </div>
-    </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Centrální evidence organizace</div>
-        <div class="page-info-text">Blackbook shromažďuje finanční přehledy, statistiky skladu, aktivitu členů, chemikálie, bezpečnostní hlášení, kroniku a výkonnostní statistiky organizace na jednom místě. Vyberte report a nechte AI analyzovat data organizace.</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          Výběr reportu
-        </span>
-        <span class="card-badge">AI aktivní</span>
-      </div>
-
-      <div class="bb-select-wrap">
-        <span class="bb-select-label">Report</span>
-        <select class="bb-select" id="bb-report-select">
-          <option value="" disabled selected>— Vyberte report —</option>
-          ${optionsHtml}
-        </select>
-        <span class="bb-select-arrow">
-          <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 1 5 5 9 1"/></svg>
-        </span>
-      </div>
-
-      <button class="bb-gen-btn" id="bb-gen-btn" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-        Generovat report
-      </button>
-
-      <div class="bb-error" id="bb-error"></div>
-    </div>
-
-    <!-- Výsledek AI -->
-    <div class="card" id="bb-result-card">
-      <div class="bb-result-header">
-        <span class="bb-result-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;display:inline;vertical-align:-2px;margin-right:0.4rem"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-          Analýza — AI
-        </span>
-        <span class="bb-result-badge" id="bb-result-badge">—</span>
-      </div>
-
-      <div class="bb-loading" id="bb-loading">
-        <div class="bb-dots"><span></span><span></span><span></span></div>
-        Analyzuji data organizace…
-      </div>
-
-      <div id="bb-result-body" style="display:none">
-        <div class="bb-section-tag" id="bb-result-section"></div>
-        <div class="bb-ai-text" id="bb-ai-text"></div>
-        <div class="bb-timestamp" id="bb-timestamp"></div>
-      </div>
-    </div>
-
-  </main>
-  <script>
-    const select   = document.getElementById('bb-report-select');
-    const genBtn   = document.getElementById('bb-gen-btn');
-    const resultCard = document.getElementById('bb-result-card');
-    const loading  = document.getElementById('bb-loading');
-    const resultBody = document.getElementById('bb-result-body');
-    const aiText   = document.getElementById('bb-ai-text');
-    const errBox   = document.getElementById('bb-error');
-    const badge    = document.getElementById('bb-result-badge');
-    const section  = document.getElementById('bb-result-section');
-    const tsEl     = document.getElementById('bb-timestamp');
-
-    select.addEventListener('change', () => {
-      genBtn.disabled = !select.value;
-      errBox.classList.remove('visible');
-    });
-
-    genBtn.addEventListener('click', async () => {
-      const query = select.value;
-      if (!query) return;
-
-      // Reset UI
-      genBtn.disabled = true;
-      errBox.classList.remove('visible');
-      resultCard.classList.add('visible');
-      loading.classList.add('active');
-      resultBody.style.display = 'none';
-
-      try {
-        // 1. Fetch data ze serveru
-        const dataRes = await fetch('/api/blackbook/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query }),
-        });
-        const dataJson = await dataRes.json();
-        if (!dataJson.ok) throw new Error(dataJson.error || 'Chyba při načítání dat.');
-
-        // 2. Pošli do AI modulu (server-side proxy)
-        const aiRes = await fetch('/api/blackbook/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, data: dataJson.data }),
-        });
-
-        const aiJson = await aiRes.json();
-        if (!aiJson.ok) throw new Error(aiJson.error || 'Chyba AI modulu.');
-
-        const text = aiJson.text;
-
-        // 3. Zobraz výsledek
-        loading.classList.remove('active');
-        badge.textContent = query;
-        section.textContent = new Date().toLocaleString('cs-CZ');
-        aiText.textContent = text;
-        const ts = dataJson.generated_at ? new Date(dataJson.generated_at).toLocaleString('cs-CZ') : new Date().toLocaleString('cs-CZ');
-        tsEl.textContent = 'Data načtena: ' + ts;
-        resultBody.style.display = 'block';
-
-      } catch (err) {
-        loading.classList.remove('active');
-        resultCard.classList.remove('visible');
-        errBox.textContent = '⚠ ' + (err.message || 'Neznámá chyba.');
-        errBox.classList.add('visible');
-      } finally {
-        genBtn.disabled = false;
-      }
-    });
-  </script>
-  </body></html>`;
-}
-
-// ── RENDER AUDIT ───────────────────────────────────────────────────────────────
 function renderAudit(req) {
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Audit</title>
   ${baseStyles()}
@@ -4510,7 +3687,7 @@ function renderSazeni(req) {
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem">
       <div class="card">
         <div class="card-header"><span class="card-title">Rozpis nákladů / 1 kytka</span><span class="card-badge">Fixní ceny</span></div>
         <table class="cost-table">
@@ -4526,6 +3703,58 @@ function renderSazeni(req) {
         </table>
         <div style="margin-top:1rem;padding:0.8rem 1rem;background:var(--gold-dim);border:1px solid var(--border-gold);font-size:0.76rem;color:var(--text-dim)">
           Cena <strong style="color:var(--gold)">$455</strong> je náklad na jednu rostlinu.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Zasadit kytky</span><span class="card-badge">⏱ 20h růst</span></div>
+        <div id="sazeni-form-wrap">
+          <div style="font-size:0.76rem;color:var(--text-dim);line-height:1.8;margin-bottom:1.2rem">
+            Zadej postal políčka a jméno pěstitele. Po potvrzení se spustí 20hodinový odpočet do sklizně.
+          </div>
+          <div style="margin-bottom:0.9rem">
+            <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">Postal políčka (4 číslice)</div>
+            <input type="text" id="saz-postal" maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
+              style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
+              placeholder="1234"
+              onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
+          </div>
+          <div style="margin-bottom:1.2rem">
+            <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">IC jméno pěstitele</div>
+            <input type="text" id="saz-ic"
+              style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
+              placeholder="Christopher Sinclair"
+              onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
+          </div>
+          <div id="saz-error" style="display:none;padding:0.6rem 0.9rem;background:rgba(180,0,0,0.10);border:1px solid rgba(180,0,0,0.30);font-size:0.75rem;color:#CC5555;margin-bottom:0.9rem"></div>
+          <button onclick="sazeniPotvrd()"
+            style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#004A1A 0%,#007A2C 50%,#005A1E 100%);color:#C8FFD8;border:1px solid rgba(0,200,80,0.22);font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.32em;text-transform:uppercase;cursor:pointer;transition:all 0.22s;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))"
+            onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter='none'">
+            Zasadit &amp; spustit odpočet
+          </button>
+        </div>
+        <div id="sazeni-countdown-wrap" style="display:none">
+          <div style="text-align:center;padding:0.6rem 0 1.2rem">
+            <div style="font-size:0.55rem;letter-spacing:0.38em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.5rem">Kytky rostou</div>
+            <div style="font-family:'Cinzel',serif;font-size:0.78rem;color:var(--text-dim);margin-bottom:0.3rem">Postal: <span id="cd-postal" style="color:var(--gold)"></span></div>
+            <div style="font-family:'Cinzel',serif;font-size:0.78rem;color:var(--text-dim);margin-bottom:1.2rem">Pěstitel: <span id="cd-ic" style="color:var(--gold)"></span></div>
+            <div id="cd-display"
+              style="font-family:'Cinzel',serif;font-size:2.2rem;color:#00C853;letter-spacing:0.06em;text-shadow:0 0 24px rgba(0,200,80,0.45);margin-bottom:0.3rem">
+              20:00:00
+            </div>
+            <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted)">do sklizně</div>
+            <div style="margin:1.2rem 0;height:6px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden">
+              <div id="cd-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#007A2C,#00C853);transition:width 1s linear;border-radius:3px"></div>
+            </div>
+            <div id="cd-done" style="display:none;padding:0.7rem;background:rgba(0,200,80,0.10);border:1px solid rgba(0,200,80,0.30);font-size:0.78rem;color:#00C853;font-family:'Cinzel',serif;letter-spacing:0.15em">
+              ✓ KYTKY JSOU PŘIPRAVENY KE SKLIZNI
+            </div>
+          </div>
+          <button onclick="sazeniReset()"
+            style="width:100%;padding:0.65rem;background:transparent;border:1px solid rgba(0,200,80,0.18);color:rgba(0,200,80,0.6);font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.28em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;margin-top:0.4rem"
+            onmouseover="this.style.background='rgba(0,200,80,0.06)'" onmouseout="this.style.background='transparent'">
+            Nové sázení
+          </button>
         </div>
       </div>
 
@@ -4712,6 +3941,62 @@ function renderSazeni(req) {
     function profitFromInvest(v) { const k=Math.max(1,Math.floor((parseFloat(v)||0)/COST_PER)); document.getElementById('profitKytky').value=k; updateProfit(k); }
     function profitSliderChange(v) { document.getElementById('profitKytky').value=v; profitFromKytky(v); }
     updateProfit(10);
+
+    // ── Sázení — odpočet 20 hodin ──────────────────────────────────────────
+    const GROW_MS = 20 * 60 * 60 * 1000;
+    let cdInterval = null;
+
+    function sazeniPotvrd() {
+      const postal = document.getElementById('saz-postal').value.trim();
+      const ic     = document.getElementById('saz-ic').value.trim();
+      const errEl  = document.getElementById('saz-error');
+      errEl.style.display = 'none';
+      if (!/^[0-9]{4}$/.test(postal)) {
+        errEl.textContent = 'Postal musí obsahovat přesně 4 číslice.';
+        errEl.style.display = 'block'; return;
+      }
+      if (!ic) {
+        errEl.textContent = 'Zadej IC jméno pěstitele.';
+        errEl.style.display = 'block'; return;
+      }
+      const endsAt = Date.now() + GROW_MS;
+      document.getElementById('cd-postal').textContent = postal;
+      document.getElementById('cd-ic').textContent     = ic;
+      document.getElementById('sazeni-form-wrap').style.display      = 'none';
+      document.getElementById('sazeni-countdown-wrap').style.display = 'block';
+      document.getElementById('cd-done').style.display = 'none';
+      startCountdown(endsAt);
+    }
+
+    function startCountdown(endsAt) {
+      if (cdInterval) clearInterval(cdInterval);
+      function tick() {
+        const left = Math.max(0, endsAt - Date.now());
+        const h = Math.floor(left / 3600000);
+        const m = Math.floor((left % 3600000) / 60000);
+        const s = Math.floor((left % 60000) / 1000);
+        document.getElementById('cd-display').textContent =
+          String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        const pct = ((GROW_MS - left) / GROW_MS * 100).toFixed(2);
+        document.getElementById('cd-bar').style.width = pct + '%';
+        if (left === 0) {
+          clearInterval(cdInterval);
+          document.getElementById('cd-done').style.display = 'block';
+          document.getElementById('cd-display').style.color = '#00FF88';
+        }
+      }
+      tick();
+      cdInterval = setInterval(tick, 1000);
+    }
+
+    function sazeniReset() {
+      if (cdInterval) clearInterval(cdInterval);
+      document.getElementById('saz-postal').value = '';
+      document.getElementById('saz-ic').value     = '';
+      document.getElementById('saz-error').style.display = 'none';
+      document.getElementById('sazeni-form-wrap').style.display      = 'block';
+      document.getElementById('sazeni-countdown-wrap').style.display = 'none';
+    }
   </script>
   </body></html>`;
 }
