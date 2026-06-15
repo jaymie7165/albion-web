@@ -1614,7 +1614,7 @@ function baseStyles() {
         font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;font-weight:600;
         text-decoration:none;transition:all 0.2s;
         font-family:'Cinzel',serif;
-        clip-path:polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+        border-radius:2px;
       }
       .quick-btn:hover{background:rgba(204,21,0,0.12);border-color:rgba(204,21,0,0.4);color:var(--text);transform:translateY(-2px);box-shadow:0 4px 16px rgba(180,0,0,0.2)}
       .quick-btn svg{width:13px;height:13px;opacity:0.7}
@@ -3782,7 +3782,7 @@ function renderSazeni(req) {
         </div>
         <div id="saz-error" style="display:none;padding:0.6rem 0.9rem;background:rgba(180,0,0,0.10);border:1px solid rgba(180,0,0,0.30);font-size:0.75rem;color:#CC5555;margin-bottom:0.9rem"></div>
         <button onclick="sazeniPotvrd()"
-          style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#004A1A 0%,#007A2C 50%,#005A1E 100%);color:#C8FFD8;border:1px solid rgba(0,200,80,0.22);font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.32em;text-transform:uppercase;cursor:pointer;transition:all 0.22s;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))"
+          style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#004A1A 0%,#007A2C 50%,#005A1E 100%);color:#C8FFD8;border:1px solid rgba(0,200,80,0.22);font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.32em;text-transform:uppercase;cursor:pointer;transition:all 0.22s;position:relative;overflow:hidden"
           onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter='none'">
           Zasadit &amp; spustit odpočet
         </button>
@@ -4049,7 +4049,7 @@ function renderSazeni(req) {
         '<div style="height:5px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;margin-bottom:0.6rem">' +
           '<div id="cd-bar-' + row.id + '" style="height:100%;width:0%;background:linear-gradient(90deg,#007A2C,#00C853);transition:width 1s linear;border-radius:3px"></div>' +
         '</div>' +
-        '<div id="cd-done-' + row.id + '" style="display:none;padding:0.5rem 0.7rem;background:rgba(0,200,80,0.10);border:1px solid rgba(0,200,80,0.30);font-size:0.72rem;color:#00C853;font-family:Cinzel,serif;letter-spacing:0.12em;margin-bottom:0.6rem">\u2713 P\u0158IPRAVENO KE SKLIZNL</div>' +
+        '<div id="cd-done-' + row.id + '" style="display:none;padding:0.5rem 0.7rem;background:rgba(0,200,80,0.10);border:1px solid rgba(0,200,80,0.30);font-size:0.72rem;color:#00C853;font-family:Cinzel,serif;letter-spacing:0.12em;margin-bottom:0.6rem">\u2713 P\u0158IPRAVENO KE SKLIZNI</div>' +
         '<button onclick="sazeniRemove(' + row.id + ')"' +
           ' style="width:100%;padding:0.5rem;background:transparent;border:1px solid rgba(200,50,50,0.25);color:rgba(200,80,80,0.7);font-family:Cinzel,serif;font-size:0.56rem;letter-spacing:0.24em;text-transform:uppercase;cursor:pointer;transition:all 0.2s"' +
           ' onmouseover="this.style.background=\'rgba(200,50,50,0.08)\'" onmouseout="this.style.background=\'transparent\'">' +
