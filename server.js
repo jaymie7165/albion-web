@@ -8,6 +8,17 @@ const path    = require('path');
 
 const db      = require('./db');
 const sheets  = require('./sheets');
+
+// ── Tabulka pro sázení odpočty ────────────────────────────────────────────────
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS sazeni_countdowns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    postal TEXT NOT NULL,
+    ic TEXT NOT NULL,
+    ends_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+  )
+`).run();
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 
@@ -626,6 +637,50 @@ app.get('/statistiky', requireAuth, (req, res) => res.send(renderStatistiky(req)
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/sazeni', requireAuth, (req, res) => res.send(renderSazeni(req)));
+
+// ── API: Sázení odpočty ───────────────────────────────────────────────────────
+// Načti všechny aktivní odpočty
+app.get('/api/sazeni', requireAuth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM sazeni_countdowns ORDER BY ends_at ASC').all();
+  res.json(rows);
+});
+
+// Ulož nový odpočet (každý uživatel může přidat svůj vlastní)
+app.post('/api/sazeni', requireAuth, (req, res) => {
+  const { postal, ic, ends_at } = req.body;
+  if (!/^[0-9]{4}$/.test(postal) || !ic || !ends_at) {
+    return res.status(400).json({ error: 'Neplatná data' });
+  }
+  // Kontrola: stejný postal už nesmí mít aktivní odpočet
+  const existing = db.prepare(
+    'SELECT * FROM sazeni_countdowns WHERE postal = ? AND ends_at > ?'
+  ).get(postal, Date.now());
+  if (existing) {
+    return res.status(409).json({ error: `Postal ${postal} už má aktivní odpočet.` });
+  }
+  const result = db.prepare(
+    'INSERT INTO sazeni_countdowns (postal, ic, ends_at) VALUES (?, ?, ?)'
+  ).run(postal, ic, Number(ends_at));
+  const newRow = { id: result.lastInsertRowid, postal, ic, ends_at: Number(ends_at) };
+  broadcastSSE('sazeniUpdate', { action: 'add', row: newRow });
+  res.json(newRow);
+});
+
+// Smaž konkrétní odpočet podle id
+app.delete('/api/sazeni/:id', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Chybí id' });
+  db.prepare('DELETE FROM sazeni_countdowns WHERE id = ?').run(id);
+  broadcastSSE('sazeniUpdate', { action: 'remove', id });
+  res.json({ ok: true });
+});
+
+// Zpětná kompatibilita — DELETE bez id smaže vše (reset)
+app.delete('/api/sazeni', requireAuth, (req, res) => {
+  db.prepare('DELETE FROM sazeni_countdowns').run();
+  broadcastSSE('sazeniUpdate', { action: 'reset' });
+  res.json({ ok: true });
+});
 
 
 // ── BASE STYLES ───────────────────────────────────────────────────────────────
@@ -1892,8 +1947,8 @@ function renderHome(req, data) {
     .map(([item,qty]) => ({ item, qty, value: priceMap[item] ? qty*priceMap[item] : 0 }));
 
   const topWeed   = topItems(weed, WEED_P);
-  const topDrogy  = topItems(drogy, DROGY_P);
-  const topZbrane = topItems(zbrane, ZBRANE_P);
+  const topDrogy  = topItems(drogy, {});   // ceny drog se nezobrazují
+  const topZbrane = topItems(zbrane, {});  // ceny zbraní se nezobrazují
   const maxWeedQty   = topWeed.reduce((m,x)=>Math.max(m,x.qty),1);
   const maxDrogyQty  = topDrogy.reduce((m,x)=>Math.max(m,x.qty),1);
   const maxZbraneQty = topZbrane.reduce((m,x)=>Math.max(m,x.qty),1);
@@ -3708,54 +3763,29 @@ function renderSazeni(req) {
 
       <div class="card">
         <div class="card-header"><span class="card-title">Zasadit kytky</span><span class="card-badge">⏱ 20h růst</span></div>
-        <div id="sazeni-form-wrap">
-          <div style="font-size:0.76rem;color:var(--text-dim);line-height:1.8;margin-bottom:1.2rem">
-            Zadej postal políčka a jméno pěstitele. Po potvrzení se spustí 20hodinový odpočet do sklizně.
-          </div>
-          <div style="margin-bottom:0.9rem">
-            <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">Postal políčka (4 číslice)</div>
-            <input type="text" id="saz-postal" maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
-              style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
-              placeholder="1234"
-              onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
-          </div>
-          <div style="margin-bottom:1.2rem">
-            <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">IC jméno pěstitele</div>
-            <input type="text" id="saz-ic"
-              style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
-              placeholder="Christopher Sinclair"
-              onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
-          </div>
-          <div id="saz-error" style="display:none;padding:0.6rem 0.9rem;background:rgba(180,0,0,0.10);border:1px solid rgba(180,0,0,0.30);font-size:0.75rem;color:#CC5555;margin-bottom:0.9rem"></div>
-          <button onclick="sazeniPotvrd()"
-            style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#004A1A 0%,#007A2C 50%,#005A1E 100%);color:#C8FFD8;border:1px solid rgba(0,200,80,0.22);font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.32em;text-transform:uppercase;cursor:pointer;transition:all 0.22s;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))"
-            onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter='none'">
-            Zasadit &amp; spustit odpočet
-          </button>
+        <div style="font-size:0.76rem;color:var(--text-dim);line-height:1.8;margin-bottom:1.2rem">
+          Zadej postal políčka a jméno pěstitele. Více lidí může sázet současně.
         </div>
-        <div id="sazeni-countdown-wrap" style="display:none">
-          <div style="text-align:center;padding:0.6rem 0 1.2rem">
-            <div style="font-size:0.55rem;letter-spacing:0.38em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.5rem">Kytky rostou</div>
-            <div style="font-family:'Cinzel',serif;font-size:0.78rem;color:var(--text-dim);margin-bottom:0.3rem">Postal: <span id="cd-postal" style="color:var(--gold)"></span></div>
-            <div style="font-family:'Cinzel',serif;font-size:0.78rem;color:var(--text-dim);margin-bottom:1.2rem">Pěstitel: <span id="cd-ic" style="color:var(--gold)"></span></div>
-            <div id="cd-display"
-              style="font-family:'Cinzel',serif;font-size:2.2rem;color:#00C853;letter-spacing:0.06em;text-shadow:0 0 24px rgba(0,200,80,0.45);margin-bottom:0.3rem">
-              20:00:00
-            </div>
-            <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted)">do sklizně</div>
-            <div style="margin:1.2rem 0;height:6px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden">
-              <div id="cd-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#007A2C,#00C853);transition:width 1s linear;border-radius:3px"></div>
-            </div>
-            <div id="cd-done" style="display:none;padding:0.7rem;background:rgba(0,200,80,0.10);border:1px solid rgba(0,200,80,0.30);font-size:0.78rem;color:#00C853;font-family:'Cinzel',serif;letter-spacing:0.15em">
-              ✓ KYTKY JSOU PŘIPRAVENY KE SKLIZNI
-            </div>
-          </div>
-          <button onclick="sazeniReset()"
-            style="width:100%;padding:0.65rem;background:transparent;border:1px solid rgba(0,200,80,0.18);color:rgba(0,200,80,0.6);font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.28em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;margin-top:0.4rem"
-            onmouseover="this.style.background='rgba(0,200,80,0.06)'" onmouseout="this.style.background='transparent'">
-            Nové sázení
-          </button>
+        <div style="margin-bottom:0.9rem">
+          <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">Postal políčka (4 číslice)</div>
+          <input type="text" id="saz-postal" maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
+            style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
+            placeholder="1234"
+            onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
         </div>
+        <div style="margin-bottom:1.2rem">
+          <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">IC jméno pěstitele</div>
+          <input type="text" id="saz-ic"
+            style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
+            placeholder="Christopher Sinclair"
+            onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
+        </div>
+        <div id="saz-error" style="display:none;padding:0.6rem 0.9rem;background:rgba(180,0,0,0.10);border:1px solid rgba(180,0,0,0.30);font-size:0.75rem;color:#CC5555;margin-bottom:0.9rem"></div>
+        <button onclick="sazeniPotvrd()"
+          style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#004A1A 0%,#007A2C 50%,#005A1E 100%);color:#C8FFD8;border:1px solid rgba(0,200,80,0.22);font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.32em;text-transform:uppercase;cursor:pointer;transition:all 0.22s;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))"
+          onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter='none'">
+          Zasadit &amp; spustit odpočet
+        </button>
       </div>
 
       <div class="card">
@@ -3783,6 +3813,13 @@ function renderSazeni(req) {
           <input type="range" class="slider" id="kytkySlider" min="1" max="200" value="10" oninput="sliderChange(this.value)" style="--pct:4.5%">
           <div class="slider-labels"><span>1</span><span>50</span><span>100</span><span>150</span><span>200 kytek</span></div>
         </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:1.5rem">
+      <div class="card-header"><span class="card-title">Aktivní sázení</span><span class="card-badge" id="saz-count-badge">0 aktivních</span></div>
+      <div id="sazeni-list">
+        <div style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>
       </div>
     </div>
 
@@ -3942,11 +3979,11 @@ function renderSazeni(req) {
     function profitSliderChange(v) { document.getElementById('profitKytky').value=v; profitFromKytky(v); }
     updateProfit(10);
 
-    // ── Sázení — odpočet 20 hodin ──────────────────────────────────────────
+    // ── Sázení — více uživatelů, každý má svůj odpočet ────────────────────
     const GROW_MS = 20 * 60 * 60 * 1000;
-    let cdInterval = null;
+    const cdIntervals = {}; // id -> intervalId
 
-    function sazeniPotvrd() {
+    async function sazeniPotvrd() {
       const postal = document.getElementById('saz-postal').value.trim();
       const ic     = document.getElementById('saz-ic').value.trim();
       const errEl  = document.getElementById('saz-error');
@@ -3959,44 +3996,134 @@ function renderSazeni(req) {
         errEl.textContent = 'Zadej IC jméno pěstitele.';
         errEl.style.display = 'block'; return;
       }
-      const endsAt = Date.now() + GROW_MS;
-      document.getElementById('cd-postal').textContent = postal;
-      document.getElementById('cd-ic').textContent     = ic;
-      document.getElementById('sazeni-form-wrap').style.display      = 'none';
-      document.getElementById('sazeni-countdown-wrap').style.display = 'block';
-      document.getElementById('cd-done').style.display = 'none';
-      startCountdown(endsAt);
+      const ends_at = Date.now() + GROW_MS;
+      try {
+        const resp = await fetch('/api/sazeni', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ postal, ic, ends_at })
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          errEl.textContent = err.error || 'Chyba při ukládání na server.';
+          errEl.style.display = 'block'; return;
+        }
+        const row = await resp.json();
+        document.getElementById('saz-postal').value = '';
+        document.getElementById('saz-ic').value = '';
+        addCountdownCard(row);
+      } catch (e) {
+        errEl.textContent = 'Chyba při ukládání na server.';
+        errEl.style.display = 'block';
+      }
     }
 
-    function startCountdown(endsAt) {
-      if (cdInterval) clearInterval(cdInterval);
+    function fmtLeft(left) {
+      const h = Math.floor(left / 3600000);
+      const m = Math.floor((left % 3600000) / 60000);
+      const s = Math.floor((left % 60000) / 1000);
+      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }
+
+    function addCountdownCard(row) {
+      const list = document.getElementById('sazeni-list');
+      // Odstraň placeholder
+      const placeholder = list.querySelector('[data-placeholder]');
+      if (placeholder) placeholder.remove();
+
+      const card = document.createElement('div');
+      card.id = 'cd-card-' + row.id;
+      card.style.cssText = 'padding:1rem;border:1px solid rgba(0,200,80,0.18);margin-bottom:0.8rem;background:rgba(0,0,0,0.2)';
+      card.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.8rem">' +
+          '<div>' +
+            '<div style="font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.25rem">Kytky rostou</div>' +
+            '<div style="font-family:Cinzel,serif;font-size:0.78rem;color:var(--text-dim)">Postal: <span style="color:var(--gold)">' + row.postal + '</span></div>' +
+            '<div style="font-family:Cinzel,serif;font-size:0.78rem;color:var(--text-dim)">P\u011bstitel: <span style="color:var(--gold)">' + row.ic + '</span></div>' +
+          '</div>' +
+          '<div style="text-align:right">' +
+            '<div id="cd-display-' + row.id + '" style="font-family:Cinzel,serif;font-size:1.6rem;color:#00C853;letter-spacing:0.06em;text-shadow:0 0 16px rgba(0,200,80,0.4)">20:00:00</div>' +
+            '<div style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted)">do skliznE\u030c</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="height:5px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;margin-bottom:0.6rem">' +
+          '<div id="cd-bar-' + row.id + '" style="height:100%;width:0%;background:linear-gradient(90deg,#007A2C,#00C853);transition:width 1s linear;border-radius:3px"></div>' +
+        '</div>' +
+        '<div id="cd-done-' + row.id + '" style="display:none;padding:0.5rem 0.7rem;background:rgba(0,200,80,0.10);border:1px solid rgba(0,200,80,0.30);font-size:0.72rem;color:#00C853;font-family:Cinzel,serif;letter-spacing:0.12em;margin-bottom:0.6rem">\u2713 P\u0158IPRAVENO KE SKLIZNL</div>' +
+        '<button onclick="sazeniRemove(' + row.id + ')"' +
+          ' style="width:100%;padding:0.5rem;background:transparent;border:1px solid rgba(200,50,50,0.25);color:rgba(200,80,80,0.7);font-family:Cinzel,serif;font-size:0.56rem;letter-spacing:0.24em;text-transform:uppercase;cursor:pointer;transition:all 0.2s"' +
+          ' onmouseover="this.style.background=\'rgba(200,50,50,0.08)\'" onmouseout="this.style.background=\'transparent\'">' +
+          'Odstranit' +
+        '</button>';
+      list.appendChild(card);
+      updateBadge();
+      startCountdownFor(row.id, row.ends_at);
+    }
+
+    function startCountdownFor(id, endsAt) {
+      if (cdIntervals[id]) clearInterval(cdIntervals[id]);
       function tick() {
         const left = Math.max(0, endsAt - Date.now());
-        const h = Math.floor(left / 3600000);
-        const m = Math.floor((left % 3600000) / 60000);
-        const s = Math.floor((left % 60000) / 1000);
-        document.getElementById('cd-display').textContent =
-          String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-        const pct = ((GROW_MS - left) / GROW_MS * 100).toFixed(2);
-        document.getElementById('cd-bar').style.width = pct + '%';
+        const dispEl = document.getElementById('cd-display-' + id);
+        const barEl  = document.getElementById('cd-bar-' + id);
+        const doneEl = document.getElementById('cd-done-' + id);
+        if (!dispEl) { clearInterval(cdIntervals[id]); return; }
+        dispEl.textContent = fmtLeft(left);
+        barEl.style.width = ((GROW_MS - left) / GROW_MS * 100).toFixed(2) + '%';
         if (left === 0) {
-          clearInterval(cdInterval);
-          document.getElementById('cd-done').style.display = 'block';
-          document.getElementById('cd-display').style.color = '#00FF88';
+          clearInterval(cdIntervals[id]);
+          doneEl.style.display = 'block';
+          dispEl.style.color = '#00FF88';
         }
       }
       tick();
-      cdInterval = setInterval(tick, 1000);
+      cdIntervals[id] = setInterval(tick, 1000);
     }
 
-    function sazeniReset() {
-      if (cdInterval) clearInterval(cdInterval);
-      document.getElementById('saz-postal').value = '';
-      document.getElementById('saz-ic').value     = '';
-      document.getElementById('saz-error').style.display = 'none';
-      document.getElementById('sazeni-form-wrap').style.display      = 'block';
-      document.getElementById('sazeni-countdown-wrap').style.display = 'none';
+    async function sazeniRemove(id) {
+      if (cdIntervals[id]) clearInterval(cdIntervals[id]);
+      await fetch('/api/sazeni/' + id, { method: 'DELETE' }).catch(() => {});
+      const card = document.getElementById('cd-card-' + id);
+      if (card) card.remove();
+      const list = document.getElementById('sazeni-list');
+      if (!list.children.length) {
+        list.innerHTML = '<div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>';
+      }
+      updateBadge();
     }
+
+    function updateBadge() {
+      const count = document.querySelectorAll('#sazeni-list > [id^="cd-card-"]').length;
+      document.getElementById('saz-count-badge').textContent = count + ' aktivních';
+    }
+
+    // ── SSE live aktualizace od ostatních uživatelů ─────────────────────────
+    const evtSource = new EventSource('/api/events');
+    evtSource.addEventListener('sazeniUpdate', e => {
+      const d = JSON.parse(e.data);
+      if (d.action === 'add') {
+        if (!document.getElementById('cd-card-' + d.row.id)) addCountdownCard(d.row);
+      } else if (d.action === 'remove') {
+        const card = document.getElementById('cd-card-' + d.id);
+        if (card) { card.remove(); updateBadge(); }
+        const list = document.getElementById('sazeni-list');
+        if (!list.children.length) list.innerHTML = '<div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>';
+      } else if (d.action === 'reset') {
+        Object.keys(cdIntervals).forEach(id => clearInterval(cdIntervals[id]));
+        document.getElementById('sazeni-list').innerHTML = '<div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>';
+        updateBadge();
+      }
+    });
+
+    // ── Obnovení stavu ze serveru po načtení stránky ────────────────────────
+    (async function sazeniRestore() {
+      try {
+        const res  = await fetch('/api/sazeni');
+        const rows = await res.json();
+        if (!Array.isArray(rows) || !rows.length) return;
+        rows.forEach(row => addCountdownCard(row));
+      } catch (e) {}
+    })();
   </script>
   </body></html>`;
 }
