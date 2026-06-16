@@ -1901,6 +1901,7 @@ function renderNav(req, active) {
       document.addEventListener('click', () => {});
       let newCount = 0;
       const evtSource = new EventSource('/api/events');
+      window.evtSource = evtSource;
       evtSource.addEventListener('nastenska', (e) => {
         const d = JSON.parse(e.data);
         newCount++;
@@ -3828,7 +3829,7 @@ function renderSazeni(req) {
     <div class="card" style="margin-top:1.5rem">
       <div class="card-header"><span class="card-title">Aktivní sázení</span><span class="card-badge" id="saz-count-badge">0 aktivních</span></div>
       <div id="sazeni-list">
-        <div style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>
+        <div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>
       </div>
     </div>
 
@@ -4131,6 +4132,7 @@ function renderSazeni(req) {
         const rows = await res.json();
         if (!Array.isArray(rows) || !rows.length) return;
         rows.forEach(row => addCountdownCard(row));
+        updateBadge();
       } catch (e) {}
     })();
   </script>
