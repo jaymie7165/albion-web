@@ -45,4 +45,12 @@ const db = {
   }),
 };
 
+// Zaznamenání posledního přihlášení uživatele (aktivita na webu)
+db.setLastLogin = (id, iso) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.last_login_at = iso; save(users); return true; }
+  return false;
+};
+
 module.exports = db;
