@@ -552,11 +552,19 @@ app.get('/api/audit', requireAuth, async (req, res) => {
       else                  { if (valuta === 'USD') s.vydaj_usd += castka; else s.vydaj_pesos += castka; }
     }
 
-    events.sort((a, b) => {
-      const ta = a.cas || '';
-      const tb = b.cas || '';
-      return tb.localeCompare(ta);
-    });
+    // Parsuje CZ timestamp "9. 6. 2026, 18:12:26" nebo ISO "2026-06-09T18:12:26" na ms
+    const parseCas = (cas) => {
+      if (!cas) return 0;
+      const s = cas.toString().trim();
+      // ISO formát (bot)
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s).getTime() || 0;
+      // CZ formát: "D. M. YYYY, HH:MM:SS" nebo "D.M.YYYY, HH:MM:SS"
+      const m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4}),?\s*(\d{1,2}):(\d{2}):(\d{2})/);
+      if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
+      return 0;
+    };
+
+    events.sort((a, b) => parseCas(b.cas) - parseCas(a.cas));
 
     res.json({ ok: true, events: events.slice(0, 200), ucetSouhrn });
   } catch (e) {
@@ -661,7 +669,7 @@ app.post('/api/sazeni', requireAuth, (req, res) => {
   const result = db.prepare(
     'INSERT INTO sazeni_countdowns (postal, ic, ends_at) VALUES (?, ?, ?)'
   ).run(postal, ic, Number(ends_at));
-  const newRow = { id: result.lastInsertRowid, postal, ic, ends_at: Number(ends_at) };
+  const newRow = { id: Number(result.lastInsertRowid), postal, ic, ends_at: Number(ends_at) };
   broadcastSSE('sazeniUpdate', { action: 'add', row: newRow });
   res.json(newRow);
 });
