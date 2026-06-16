@@ -4107,7 +4107,7 @@ function renderSazeni(req) {
     }
 
     // ── SSE live aktualizace od ostatních uživatelů ─────────────────────────
-    const evtSource = new EventSource('/api/events');
+    // Pozn.: evtSource je již vytvořen v renderNav — zde přidáme jen listener
     evtSource.addEventListener('sazeniUpdate', e => {
       const d = JSON.parse(e.data);
       if (d.action === 'add') {
