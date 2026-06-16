@@ -5,6 +5,7 @@ const session = require('express-session');
 const bcrypt  = require('bcryptjs');
 const axios   = require('axios');
 const path    = require('path');
+const fs      = require('fs');
 
 const db      = require('./db');
 const sheets  = require('./sheets');
@@ -68,6 +69,40 @@ const CONFIG = {
     "12-gauge":               { prodej: 200 },
   },
 };
+
+// ── WEED SÁZENÍ — recept a ceny na jednu kytku ────────────────────────────────
+// Každá položka: kolik kusů je potřeba na 1 kytku a kolik to celkem stojí.
+const WEED_PLANT = {
+  // qty = počet kusů na 1 kytku, unit = cena za 1 kus
+  items: [
+    { key: 'seed',            name: 'Seed',             qty: 1, unit: 50 },
+    { key: 'hnojivo',         name: 'Hnojivo',          qty: 1, unit: 25 },
+    { key: 'konev',           name: 'Konev s vodou',    qty: 1, unit: 20 },
+    { key: 'kvalitniHnojivo', name: 'Kvalitní hnojivo', qty: 4, unit: 50 },
+    { key: 'vyzivovaVoda',    name: 'Výživová voda',    qty: 4, unit: 40 },
+  ],
+  bagsPerPlant: 4,    // z 1 kytky vznikají 4 sáčky
+  bagPrice:     150,  // prodejní hodnota 1 sáčku
+  growHours:    20,   // doba růstu jedné kytky
+};
+WEED_PLANT.items.forEach(it => { it.cost = it.qty * it.unit; });                          // cena za danou položku na 1 kytku
+WEED_PLANT.costPerPlant    = WEED_PLANT.items.reduce((a, it) => a + it.cost, 0);          // 455
+WEED_PLANT.revenuePerPlant = WEED_PLANT.bagsPerPlant * WEED_PLANT.bagPrice;               // 600
+WEED_PLANT.profitPerPlant  = WEED_PLANT.revenuePerPlant - WEED_PLANT.costPerPlant;        // 145
+WEED_PLANT.growMs          = WEED_PLANT.growHours * 60 * 60 * 1000;
+
+// ── ÚLOŽIŠTĚ ODPOČTŮ PĚSTOVÁNÍ (sdílené pro všechny uživatele) ─────────────────
+const WEED_TIMERS_FILE = path.join(__dirname, 'weed-timers.json');
+
+function loadWeedTimers() {
+  try {
+    if (!fs.existsSync(WEED_TIMERS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(WEED_TIMERS_FILE, 'utf8')) || [];
+  } catch { return []; }
+}
+function saveWeedTimers(timers) {
+  try { fs.writeFileSync(WEED_TIMERS_FILE, JSON.stringify(timers, null, 2)); } catch (e) { console.error('[WEED-TIMERS]', e.message); }
+}
 
 // ── SSE — živé notifikace ─────────────────────────────────────────────────────
 const sseClients = new Set();
@@ -177,6 +212,7 @@ app.post('/login/password', async (req, res) => {
   req.session.icName = user.ic_name;
   req.session.discordUsername = user.discord_username;
   req.session.pendingDiscord = null;
+  try { db.setLastLogin(user.id, new Date().toISOString()); } catch (e) { console.error('[LOGIN]', e.message); }
   res.redirect('/home');
 });
 
@@ -248,6 +284,48 @@ app.post('/api/chemky', requireAuth, async (req, res) => {
   await discord.notifyChemky(typ, chemikalie, qty, uzivatel);
   await discord.notifyAudit('Chemky', uzivatel, discordUser, `${typ} — ${chemikalie} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'chemky', typ, chemikalie, qty, uzivatel, cas });
+  res.json({ ok: true });
+});
+
+// ── API — WEED SÁZENÍ (odpočty růstu, sdílené pro všechny) ────────────────────
+app.get('/api/weed-timers', requireAuth, (req, res) => {
+  const timers = loadWeedTimers().sort((a, b) => a.endsAt - b.endsAt);
+  res.json({ ok: true, timers, now: Date.now(), growMs: WEED_PLANT.growMs });
+});
+
+app.post('/api/weed-timers', requireAuth, (req, res) => {
+  let { icName, postal, plants } = req.body;
+  icName = (icName || '').toString().trim();
+  postal = (postal || '').toString().trim();
+  const pocet = Math.max(1, parseInt(plants) || 1);
+  if (!icName) return res.json({ ok: false, error: 'Vyplň IC jméno' });
+  if (!/^\d{4}$/.test(postal)) return res.json({ ok: false, error: 'Postal musí být 4 číslice' });
+
+  const now = Date.now();
+  const timer = {
+    id: `${now}-${Math.floor((now % 100000))}-${(loadWeedTimers().length + 1)}`,
+    icName,
+    postal,
+    plants: pocet,
+    startedAt: now,
+    endsAt: now + WEED_PLANT.growMs,
+    createdBy: req.session.icName,
+  };
+  const timers = loadWeedTimers();
+  timers.push(timer);
+  saveWeedTimers(timers);
+  broadcastSSE('weedTimer', { action: 'add', timer });
+  res.json({ ok: true, timer });
+});
+
+app.post('/api/weed-timers/remove', requireAuth, (req, res) => {
+  const { id } = req.body;
+  let timers = loadWeedTimers();
+  const before = timers.length;
+  timers = timers.filter(t => t.id !== id);
+  if (timers.length === before) return res.json({ ok: false, error: 'Odpočet nenalezen' });
+  saveWeedTimers(timers);
+  broadcastSSE('weedTimer', { action: 'remove', id });
   res.json({ ok: true });
 });
 
@@ -588,6 +666,286 @@ app.get('/api/debug-sheets', requireAuth, async (req, res) => {
   }
 });
 
+// ── API — BLACKBOOK (reporty z dostupných dat: sheets + web/discord účty) ──────
+app.get('/api/blackbook', requireAuth, async (req, res) => {
+  try {
+    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
+      sheets.getRows('Zbraně').catch(() => []),
+      sheets.getRows('Weed').catch(() => []),
+      sheets.getRows('Drogy').catch(() => []),
+      sheets.getRows('Účetnictví').catch(() => []),
+      sheets.getRows('Chemky').catch(() => []),
+    ]);
+
+    // ── Normalizace jmen (web/discord účty) ──
+    const allUsers = db.prepare('SELECT * FROM users').all();
+    const nameMap = {};
+    const icToDiscord = {};
+    allUsers.forEach(u => {
+      if (u.ic_name) {
+        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
+        if (u.discord_username) { nameMap[u.discord_username.toLowerCase()] = u.ic_name; icToDiscord[u.ic_name] = u.discord_username; }
+        if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
+        if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
+      }
+    });
+    const norm = (name) => {
+      if (!name || name === '—' || name === '-') return null;
+      const lower = name.toString().trim().toLowerCase();
+      if (nameMap[lower]) return nameMap[lower];
+      for (const [key, ic] of Object.entries(nameMap)) { if (key.includes(lower) || lower.includes(key)) return ic; }
+      return name.toString().trim();
+    };
+
+    const parseCas = (cas) => {
+      if (!cas) return 0;
+      const s = cas.toString().trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s).getTime() || 0;
+      const m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4}),?\s*(\d{1,2}):(\d{2}):(\d{2})/);
+      if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
+      const m2 = s.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+      if (m2) return new Date(+m2[3], +m2[2]-1, +m2[1]).getTime();
+      return 0;
+    };
+
+    // ── Ceníky ──
+    const WEED_SELL = 150;
+    const DROGY_P = {}; Object.entries(CONFIG.drogyCeny).forEach(([k,v]) => DROGY_P[k] = v.prodej);
+    const ZBRANE_P = {}; Object.entries(CONFIG.zbraneCeny).forEach(([k,v]) => ZBRANE_P[k] = v.prodej);
+
+    // ── Sjednocený proud událostí ──
+    const ev = []; // {ts, cas, sekce, typ, member, item, qty, kat, castka, valuta, hodnota, pozn, ucel}
+    const push = (o) => ev.push(o);
+
+    for (let i = 1; i < zbraneRows.length; i++) {
+      const r = zbraneRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
+      const member = norm(r[5]); const qty = parseInt(r[3]) || 0;
+      const kat = (r[4]||'').toString().toLowerCase();
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Zbraně', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, kat, ucel: (r[6] && r[6] !== '-') ? r[6] : '', hodnota: (ZBRANE_P[r[2]]||0)*qty });
+    }
+    for (let i = 1; i < weedRows.length; i++) {
+      const r = weedRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
+      const member = norm((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6])); const qty = parseInt(r[3]) || 0;
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Weed', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, hodnota: WEED_SELL*qty });
+    }
+    for (let i = 1; i < drogyRows.length; i++) {
+      const r = drogyRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
+      const member = norm((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6])); const qty = parseInt(r[3]) || 0;
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Drogy', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, hodnota: (DROGY_P[r[2]]||0)*qty });
+    }
+    for (let i = 1; i < chemkyRows.length; i++) {
+      const r = chemkyRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
+      const member = norm(r[4]); const qty = parseInt(r[3]) || 0;
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Chemky', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty });
+    }
+    for (let i = 1; i < ucetRows.length; i++) {
+      const r = ucetRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
+      const member = norm(r[5]); const castka = parseFloat((r[2]||'0').toString().replace(',','.')) || 0;
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Účetnictví', typ: (r[1]||'').toUpperCase(), member, item: r[4]||'', castka, valuta: (r[3]||'USD').toUpperCase(), pozn: r[4]||'' });
+    }
+
+    const now = Date.now();
+    const DAY = 86400000;
+    const inWindow = (ts, days) => ts > 0 && (now - ts) <= days * DAY;
+    const isVklad = (t) => t === 'VKLAD' || t === 'PŘÍJEM';
+    const stockSekce = ['Zbraně','Weed','Drogy','Chemky'];
+
+    // ════════ 1) FINANČNÍ REPORT ════════
+    const emptyFin = () => ({ prijem_usd:0, vydaj_usd:0, prijem_pesos:0, vydaj_pesos:0 });
+    const finance = { day: emptyFin(), week: emptyFin(), month: emptyFin(), total: emptyFin() };
+    const ucetEv = ev.filter(e => e.sekce === 'Účetnictví');
+    ucetEv.forEach(e => {
+      const buckets = ['total'];
+      if (inWindow(e.ts, 1)) buckets.push('day');
+      if (inWindow(e.ts, 7)) buckets.push('week');
+      if (inWindow(e.ts, 30)) buckets.push('month');
+      buckets.forEach(b => {
+        const f = finance[b];
+        const usd = e.valuta === 'USD';
+        if (e.typ === 'PŘÍJEM') f[usd?'prijem_usd':'prijem_pesos'] += e.castka;
+        else f[usd?'vydaj_usd':'vydaj_pesos'] += e.castka;
+      });
+    });
+
+    // Časová osa zůstatku účtu (kumulativně, USD)
+    const balanceTimeline = [];
+    let runUsd = 0, runPesos = 0;
+    ucetEv.filter(e => e.ts > 0).sort((a,b) => a.ts - b.ts).forEach(e => {
+      const sign = e.typ === 'PŘÍJEM' ? 1 : -1;
+      if (e.valuta === 'USD') runUsd += sign * e.castka; else runPesos += sign * e.castka;
+      balanceTimeline.push({ ts: e.ts, cas: e.cas, usd: runUsd, pesos: runPesos });
+    });
+
+    // Časová osa hodnoty skladu (kumulativně)
+    const stockTimeline = [];
+    let runStock = 0;
+    ev.filter(e => stockSekce.includes(e.sekce) && e.ts > 0 && e.hodnota).sort((a,b) => a.ts - b.ts).forEach(e => {
+      runStock += (isVklad(e.typ) ? 1 : -1) * (e.hodnota || 0);
+      stockTimeline.push({ ts: e.ts, cas: e.cas, value: runStock });
+    });
+
+    // Kdo vydělal nejvíc (příjem USD)
+    const earnAgg = {};
+    ucetEv.forEach(e => {
+      if (!e.member) return;
+      if (!earnAgg[e.member]) earnAgg[e.member] = { prijem_usd:0, vydaj_usd:0, prijem_pesos:0, vydaj_pesos:0 };
+      const usd = e.valuta === 'USD';
+      if (e.typ === 'PŘÍJEM') earnAgg[e.member][usd?'prijem_usd':'prijem_pesos'] += e.castka;
+      else earnAgg[e.member][usd?'vydaj_usd':'vydaj_pesos'] += e.castka;
+    });
+    const topEarners = Object.entries(earnAgg).map(([member, s]) => ({ member, ...s, net: s.prijem_usd - s.vydaj_usd }))
+      .sort((a,b) => b.prijem_usd - a.prijem_usd).slice(0, 15);
+
+    // ════════ 2) AKTIVITA ČLENŮ ════════
+    const memberActivity = {};
+    const ensureMA = (m) => { if (m && !memberActivity[m]) memberActivity[m] = { member: m, discord: icToDiscord[m]||null, lastTs: 0, lastCas: '', lastWebLoginTs: 0, lastWebLoginCas: '', pohyby: 0, vklady: 0, vybery: 0, ucetVkladUsd: 0 }; };
+    // registrovaní bez aktivity ať jsou taky vidět + poslední webové přihlášení
+    allUsers.forEach(u => {
+      if (!u.ic_name) return;
+      ensureMA(u.ic_name);
+      const ma = memberActivity[u.ic_name];
+      const loginTs = u.last_login_at ? (new Date(u.last_login_at).getTime() || 0) : 0;
+      if (loginTs) {
+        ma.lastWebLoginTs = loginTs;
+        ma.lastWebLoginCas = new Date(loginTs).toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' });
+      }
+    });
+    ev.forEach(e => {
+      if (!e.member) return; ensureMA(e.member);
+      const ma = memberActivity[e.member];
+      ma.pohyby++;
+      if (e.ts > ma.lastTs) { ma.lastTs = e.ts; ma.lastCas = e.cas; }
+      if (e.sekce !== 'Účetnictví') { if (isVklad(e.typ)) ma.vklady++; else ma.vybery++; }
+      else if (e.typ === 'PŘÍJEM' && e.valuta === 'USD') ma.ucetVkladUsd += e.castka;
+    });
+    // Aktivita = nejnovější z {poslední pohyb v tabulkách, poslední přihlášení na web}
+    const aktivita = Object.values(memberActivity).map(ma => {
+      let lastTs = ma.lastTs, lastCas = ma.lastCas, lastZdroj = ma.lastTs ? 'sklad/finance' : null;
+      if (ma.lastWebLoginTs > lastTs) { lastTs = ma.lastWebLoginTs; lastCas = ma.lastWebLoginCas; lastZdroj = 'web (přihlášení)'; }
+      return {
+        ...ma,
+        lastTs, lastCas, lastZdroj,
+        daysSince: lastTs ? Math.floor((now - lastTs) / DAY) : null,
+        inactive: !lastTs || (now - lastTs) > 7 * DAY,
+      };
+    }).sort((a,b) => (b.lastTs||0) - (a.lastTs||0));
+    const inactiveCount = aktivita.filter(a => a.inactive).length;
+
+    // ════════ 3) INVENTURA A SKLAD ════════
+    const stockByItem = {}; // item -> {sekce, current, vklad, vyber}
+    ev.filter(e => stockSekce.includes(e.sekce)).forEach(e => {
+      const k = e.sekce + '|' + e.item;
+      if (!stockByItem[k]) stockByItem[k] = { item: e.item, sekce: e.sekce, current: 0, vklad: 0, vyber: 0 };
+      const s = stockByItem[k];
+      if (isVklad(e.typ)) { s.current += e.qty; s.vklad += e.qty; } else { s.current -= e.qty; s.vyber += e.qty; }
+    });
+    const stockList = Object.values(stockByItem).sort((a,b) => b.current - a.current);
+
+    // Kdo nejvíc vkládal / vybíral (kusy napříč skladem)
+    const moveAgg = {};
+    ev.filter(e => stockSekce.includes(e.sekce) && e.member).forEach(e => {
+      if (!moveAgg[e.member]) moveAgg[e.member] = { member: e.member, vklad: 0, vyber: 0 };
+      if (isVklad(e.typ)) moveAgg[e.member].vklad += e.qty; else moveAgg[e.member].vyber += e.qty;
+    });
+    const topVklad = Object.values(moveAgg).filter(m => m.vklad).sort((a,b) => b.vklad - a.vklad).slice(0, 10);
+    const topVyber = Object.values(moveAgg).filter(m => m.vyber).sort((a,b) => b.vyber - a.vyber).slice(0, 10);
+
+    // Predikce došlých zásob (na základě čisté spotřeby za posledních 30 dní)
+    const predikce = Object.values(stockByItem).map(s => {
+      const recent = ev.filter(e => e.sekce === s.sekce && e.item === s.item && inWindow(e.ts, 30));
+      let net = 0; recent.forEach(e => { net += (isVklad(e.typ) ? 1 : -1) * e.qty; });
+      const perDay = net / 30; // záporné = ubývá
+      let daysLeft = null;
+      if (perDay < 0 && s.current > 0) daysLeft = Math.max(0, Math.round(s.current / Math.abs(perDay)));
+      return { item: s.item, sekce: s.sekce, current: s.current, perDay: +perDay.toFixed(2), daysLeft };
+    }).filter(p => p.daysLeft !== null).sort((a,b) => a.daysLeft - b.daysLeft);
+
+    // Podezřelé pohyby skladu: výběr výrazně nad průměr, nebo výběr přes dostupné množství
+    const qtyBySekce = {};
+    ev.filter(e => stockSekce.includes(e.sekce) && !isVklad(e.typ)).forEach(e => {
+      (qtyBySekce[e.sekce] = qtyBySekce[e.sekce] || []).push(e.qty);
+    });
+    const avgVyber = {}; Object.entries(qtyBySekce).forEach(([s, arr]) => avgVyber[s] = arr.reduce((a,b)=>a+b,0)/arr.length);
+    const podezreleSklad = ev.filter(e => stockSekce.includes(e.sekce) && !isVklad(e.typ))
+      .filter(e => e.qty >= Math.max(10, (avgVyber[e.sekce]||0) * 3))
+      .sort((a,b) => b.ts - a.ts).slice(0, 20)
+      .map(e => ({ cas: e.cas, sekce: e.sekce, item: e.item, qty: e.qty, member: e.member, duvod: `Velký výběr (${e.qty} ks, průměr ${Math.round(avgVyber[e.sekce]||0)})` }));
+
+    const recentMoves = ev.filter(e => stockSekce.includes(e.sekce)).sort((a,b) => b.ts - a.ts).slice(0, 25)
+      .map(e => ({ cas: e.cas, sekce: e.sekce, typ: e.typ, item: e.item, qty: e.qty, member: e.member }));
+
+    // ════════ 4) ZBRANĚ ════════
+    const onlyZbrane = ev.filter(e => e.sekce === 'Zbraně' && (e.kat === 'zbraň' || e.kat === 'zbrane' || e.kat === '' || e.kat === 'střelivo' || e.kat === 'akce'));
+    const zbWeapons = ev.filter(e => e.sekce === 'Zbraně' && (e.kat === 'zbraň' || e.kat === 'zbrane'));
+    const zbVyberAgg = {};
+    zbWeapons.filter(e => !isVklad(e.typ)).forEach(e => { zbVyberAgg[e.member] = (zbVyberAgg[e.member]||0) + e.qty; });
+    const zbTopVyber = Object.entries(zbVyberAgg).filter(([m]) => m).map(([member, qty]) => ({ member, qty })).sort((a,b) => b.qty - a.qty).slice(0, 10);
+    const zbHistorie = ev.filter(e => e.sekce === 'Zbraně' && !isVklad(e.typ)).sort((a,b) => b.ts - a.ts).slice(0, 30)
+      .map(e => ({ cas: e.cas, item: e.item, qty: e.qty, member: e.member, ucel: e.ucel, kat: e.kat }));
+    // Nevrácené: člen × zbraň, čistý zůstatek (výběr - vklad) > 0
+    const zbNet = {};
+    zbWeapons.forEach(e => {
+      if (!e.member) return;
+      const k = e.member + '|' + e.item;
+      if (!zbNet[k]) zbNet[k] = { member: e.member, item: e.item, vyber: 0, vklad: 0 };
+      if (isVklad(e.typ)) zbNet[k].vklad += e.qty; else zbNet[k].vyber += e.qty;
+    });
+    const zbNevraceno = Object.values(zbNet).map(z => ({ ...z, outstanding: z.vyber - z.vklad })).filter(z => z.outstanding > 0).sort((a,b) => b.outstanding - a.outstanding);
+
+    // ════════ 5) DROGY A VÝROBY ════════
+    const drogyEv = ev.filter(e => e.sekce === 'Drogy');
+    const weedEv  = ev.filter(e => e.sekce === 'Weed');
+    const drugProd = {}, drugVyber = {}, drugZisk = {};
+    drogyEv.forEach(e => {
+      if (isVklad(e.typ)) { drugProd[e.item] = (drugProd[e.item]||0) + e.qty; }
+      else { drugVyber[e.item] = (drugVyber[e.item]||0) + e.qty; drugZisk[e.item] = (drugZisk[e.item]||0) + e.hodnota; }
+    });
+    let weedProd = 0, weedVyber = 0, weedZisk = 0;
+    weedEv.forEach(e => { if (isVklad(e.typ)) weedProd += e.qty; else { weedVyber += e.qty; weedZisk += e.hodnota; } });
+    const chemSpotreba = {};
+    ev.filter(e => e.sekce === 'Chemky' && !isVklad(e.typ)).forEach(e => { chemSpotreba[e.item] = (chemSpotreba[e.item]||0) + e.qty; });
+    const variciAgg = {};
+    [...drogyEv, ...weedEv].filter(e => isVklad(e.typ) && e.member).forEach(e => { variciAgg[e.member] = (variciAgg[e.member]||0) + e.qty; });
+    const topVarici = Object.entries(variciAgg).map(([member, qty]) => ({ member, qty })).sort((a,b) => b.qty - a.qty).slice(0, 10);
+
+    // ════════ 6) AUDIT A BEZPEČNOST ════════
+    // Podezřelé finanční transakce: velký výdaj (nad 3× průměr výdajů)
+    const vydaje = ucetEv.filter(e => e.typ === 'VÝDAJ').map(e => e.castka);
+    const avgVydaj = vydaje.length ? vydaje.reduce((a,b)=>a+b,0)/vydaje.length : 0;
+    const podezreleTransakce = ucetEv.filter(e => e.typ === 'VÝDAJ' && e.castka >= Math.max(5000, avgVydaj * 3))
+      .sort((a,b) => b.ts - a.ts).slice(0, 20)
+      .map(e => ({ cas: e.cas, member: e.member, castka: e.castka, valuta: e.valuta, pozn: e.pozn, duvod: `Velký výdaj (průměr ${Math.round(avgVydaj)})` }));
+
+    // Dlužníci: hodnota vybraných drog+weedu vs. vložené peníze (USD příjem)
+    const dluhAgg = {};
+    [...drogyEv, ...weedEv].filter(e => !isVklad(e.typ) && e.member).forEach(e => {
+      if (!dluhAgg[e.member]) dluhAgg[e.member] = { member: e.member, goodsValue: 0, deposited: 0 };
+      dluhAgg[e.member].goodsValue += e.hodnota;
+    });
+    ucetEv.filter(e => e.typ === 'PŘÍJEM' && e.valuta === 'USD' && e.member).forEach(e => {
+      if (!dluhAgg[e.member]) dluhAgg[e.member] = { member: e.member, goodsValue: 0, deposited: 0 };
+      dluhAgg[e.member].deposited += e.castka;
+    });
+    const dluznici = Object.values(dluhAgg).map(d => ({ ...d, dluh: Math.round(d.goodsValue - d.deposited) }))
+      .filter(d => d.dluh > 0).sort((a,b) => b.dluh - a.dluh);
+
+    res.json({
+      ok: true,
+      generatedAt: sheets.timestamp(),
+      recipe: WEED_PLANT,
+      finance: { periods: finance, balanceTimeline, stockTimeline, topEarners },
+      aktivita: { members: aktivita, inactiveCount, total: aktivita.length },
+      sklad: { stockList, topVklad, topVyber, predikce, podezrele: podezreleSklad, recent: recentMoves },
+      zbrane: { topVyber: zbTopVyber, historie: zbHistorie, nevraceno: zbNevraceno },
+      drogy: { drugProd, drugVyber, drugZisk, weedProd, weedVyber, weedZisk, chemSpotreba, topVarici },
+      bezpecnost: { podezreleTransakce, dluznici },
+    });
+  } catch (e) {
+    console.error('[BLACKBOOK]', e);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 
 app.get('/home', requireAuth, async (req, res) => {
   try {
@@ -628,6 +986,8 @@ app.get('/sklad', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/weed-sazeni', requireAuth, (req, res) => res.send(renderWeedSazeni(req)));
+app.get('/blackbook', requireAuth, (req, res) => res.send(renderBlackbook(req)));
 app.get('/nastenska', requireAuth, (req, res) => res.send(renderNastenska(req)));
 app.get('/kodex', requireAuth, (req, res) => res.send(renderKodex(req)));
 app.get('/audit', requireAuth, (req, res) => res.send(renderAudit(req)));
@@ -1703,7 +2063,7 @@ function baseStyles() {
 
 function renderNav(req, active) {
   const ic = req.session.icName;
-  const skladPages = ['sklad'];
+  const skladPages = ['sklad','weed-sazeni'];
   const infoPages  = ['nastenska','kodex','lore','hierarchy'];
   const dataPages  = ['audit','statistiky'];
 
@@ -1723,8 +2083,12 @@ function renderNav(req, active) {
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
-            <a href="/sklad" class="${active==='sklad'?'active':''}">⚙️ Správa skladu</a>          </div>
+            <a href="/sklad" class="${active==='sklad'?'active':''}">⚙️ Správa skladu</a>
+            <a href="/weed-sazeni" class="${active==='weed-sazeni'?'active':''}">🌱 Weed sázení</a>
+          </div>
         </li>
+
+        <li><a href="/blackbook" class="${active==='blackbook'?'active':''}">Blackbook<span class="nav-desc">Reporty &amp; analýzy</span></a></li>
 
         <li class="nav-dropdown ${dataPages.includes(active)?'open':''}">
           <a href="/audit" class="nav-drop-trigger ${dataPages.includes(active)?'active':''}">
@@ -1829,6 +2193,10 @@ function renderNav(req, active) {
       evtSource.addEventListener('ucetUpdate', (e) => {
         const d = JSON.parse(e.data);
         showToast('[Finance] ' + d.typ + ' — ' + (d.valuta === 'USD' ? 'SAD ' : '₱') + d.castka);
+      });
+      evtSource.addEventListener('weedTimer', (e) => {
+        const d = JSON.parse(e.data);
+        if (d.action === 'add' && d.timer) showToast('[Weed sázení] Nová sázenice — ' + d.timer.icName + ' (' + d.timer.postal + ')');
       });
       function showToast(msg, isError) {
         let t = document.getElementById('toast');
@@ -3458,6 +3826,442 @@ function renderHierarchy(req) {
       </div>`).join('')}
     </div>
   </main>
+  </body></html>`;
+}
+
+// ── RENDER WEED SÁZENÍ ────────────────────────────────────────────────────────
+function renderWeedSazeni(req) {
+  const icName = req.session.icName;
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Weed sázení</title>
+  ${baseStyles()}
+  </head><body>
+  ${renderNav(req, 'weed-sazeni')}
+  <main>
+    <div class="page-header">
+      <div>
+        <div class="page-label">Albion — Sklad</div>
+        <h1 class="page-title">🌱 Weed sázení</h1>
+        <p class="page-sub">Ceník, kalkulačka materiálu a sdílené odpočty růstu</p>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V8M12 8c0-3 2-5 5-5 0 3-2 5-5 5zM12 12c0-3-2-5-5-5 0 3 2 5 5 5z"/></svg></div>
+      <div class="page-info-body">
+        <div class="page-info-title">Pěstování weedu</div>
+        <div class="page-info-text">Na jednu kytku potřebuješ daný materiál. Z jedné kytky vzniknou <strong>${WEED_PLANT.bagsPerPlant} sáčky</strong> (1 sáček = $${WEED_PLANT.bagPrice}). Kytka roste <strong>${WEED_PLANT.growHours} hodin</strong>. Kalkulačka spočítá materiál i zisk podle počtu kytek nebo rozpočtu. Spuštěné odpočty vidí všichni členové.</div>
+      </div>
+    </div>
+
+    <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat"><div class="stat-label">Náklad / kytka</div><div class="stat-value">$${WEED_PLANT.costPerPlant}</div><div class="stat-sub">materiál</div></div>
+      <div class="stat" style="border-top-color:var(--gold)"><div class="stat-label">Tržba / kytka</div><div class="stat-value" style="color:var(--gold)">$${WEED_PLANT.revenuePerPlant}</div><div class="stat-sub">${WEED_PLANT.bagsPerPlant} × $${WEED_PLANT.bagPrice}</div></div>
+      <div class="stat" style="border-top-color:#00C853"><div class="stat-label">Zisk / kytka</div><div class="stat-value" style="color:#00C853">$${WEED_PLANT.profitPerPlant}</div><div class="stat-sub">tržba − náklad</div></div>
+      <div class="stat" style="border-top-color:#7EC8E3"><div class="stat-label">Doba růstu</div><div class="stat-value" style="color:#7EC8E3">${WEED_PLANT.growHours}h</div><div class="stat-sub">na 1 kytku</div></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <!-- CENÍK -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Ceník na 1 kytku</span><span class="card-badge">Materiál</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Položka</th><th style="text-align:center">Množství</th><th style="text-align:right">Cena/ks</th><th style="text-align:right">Celkem</th></tr></thead>
+            <tbody>
+              ${WEED_PLANT.items.map(it => `<tr><td>${it.name}</td><td style="text-align:center">${it.qty}×</td><td style="text-align:right;color:var(--text-muted)">$${it.unit}</td><td style="text-align:right;color:var(--gold)">$${it.cost}</td></tr>`).join('')}
+              <tr style="border-top:2px solid var(--border-gold)"><td style="font-weight:600">Celkem</td><td></td><td></td><td style="text-align:right;font-weight:700;color:var(--gold)">$${WEED_PLANT.costPerPlant}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="info-box" style="display:block;margin-top:1rem">Výnos: 1 kytka → ${WEED_PLANT.bagsPerPlant} sáčky × $${WEED_PLANT.bagPrice} = <strong style="color:var(--gold)">$${WEED_PLANT.revenuePerPlant}</strong> &ensp;|&ensp; čistý zisk <strong style="color:#00C853">$${WEED_PLANT.profitPerPlant}</strong></div>
+      </div>
+
+      <!-- KALKULAČKA -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Kalkulačka</span><span class="card-badge">Výpočet</span></div>
+        <div class="form-row">
+          <div class="form-group"><label>Počet kytek</label><input type="number" id="calc-plants" min="0" value="1"></div>
+          <div class="form-group"><label>Rozpočet $ (volitelné)</label><input type="number" id="calc-budget" min="0" placeholder="napiš peníze"></div>
+        </div>
+        <div class="table-wrap" style="margin-top:0.5rem">
+          <table>
+            <thead><tr><th>Materiál</th><th style="text-align:right">Potřeba</th></tr></thead>
+            <tbody id="calc-mat"></tbody>
+          </table>
+        </div>
+        <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-top:1rem">
+          <div class="stat"><div class="stat-label">Náklad</div><div class="stat-value" id="calc-cost" style="font-size:1.2rem">$0</div></div>
+          <div class="stat" style="border-top-color:var(--gold)"><div class="stat-label">Tržba</div><div class="stat-value" id="calc-rev" style="font-size:1.2rem;color:var(--gold)">$0</div></div>
+          <div class="stat" style="border-top-color:#00C853"><div class="stat-label">Zisk</div><div class="stat-value" id="calc-profit" style="font-size:1.2rem;color:#00C853">$0</div></div>
+        </div>
+        <div class="info-box" id="calc-note" style="display:block;margin-top:1rem"></div>
+      </div>
+    </div>
+
+    <!-- ODPOČTY -->
+    <div class="card" style="margin-top:0.5rem">
+      <div class="card-header"><span class="card-title">⏱️ Odpočty růstu</span><span class="card-badge">Sdílené — vidí všichni</span></div>
+      <div class="form-row">
+        <div class="form-group"><label>IC jméno</label><input type="text" id="t-icname" value="${icName ? icName.replace(/"/g,'&quot;') : ''}" placeholder="Jméno postavy"></div>
+        <div class="form-group"><label>Postal (4 číslice)</label><input type="text" id="t-postal" maxlength="4" inputmode="numeric" placeholder="1234"></div>
+        <div class="form-group"><label>Počet kytek</label><input type="number" id="t-plants" min="1" value="1"></div>
+      </div>
+      <button class="btn-submit" onclick="startTimer()">Spustit odpočet (${WEED_PLANT.growHours}h)</button>
+      <div id="timers-list" style="margin-top:1.5rem"><p style="color:var(--text-muted);font-size:0.84rem">Načítám odpočty...</p></div>
+    </div>
+  </main>
+  <div class="toast" id="toast"></div>
+  <script>
+    const RECIPE = ${JSON.stringify(WEED_PLANT)};
+    const money = n => '$' + Math.round(n).toLocaleString('cs-CZ');
+
+    // ── KALKULAČKA ──
+    function recalc(source) {
+      const plantsInput = document.getElementById('calc-plants');
+      const budgetInput = document.getElementById('calc-budget');
+      let plants = parseInt(plantsInput.value) || 0;
+      if (source === 'budget') {
+        const budget = parseFloat(budgetInput.value) || 0;
+        plants = Math.floor(budget / RECIPE.costPerPlant);
+        plantsInput.value = plants;
+      }
+      const cost = plants * RECIPE.costPerPlant;
+      const rev = plants * RECIPE.revenuePerPlant;
+      const profit = rev - cost;
+      document.getElementById('calc-mat').innerHTML = RECIPE.items.map(it =>
+        \`<tr><td>\${it.name}</td><td style="text-align:right">\${it.qty * plants}× <span style="color:var(--text-muted)">($\${it.cost * plants})</span></td></tr>\`
+      ).join('') + \`<tr><td style="color:var(--text-muted)">Sáčky na prodej</td><td style="text-align:right;color:var(--gold)">\${plants * RECIPE.bagsPerPlant}×</td></tr>\`;
+      document.getElementById('calc-cost').textContent = money(cost);
+      document.getElementById('calc-rev').textContent = money(rev);
+      document.getElementById('calc-profit').textContent = money(profit);
+      const budgetVal = parseFloat(budgetInput.value) || 0;
+      let note = plants + ' kytek · roste ' + RECIPE.growHours + 'h · ' + (plants * RECIPE.bagsPerPlant) + ' sáčků';
+      if (source === 'budget' && budgetVal) {
+        const zbytek = budgetVal - cost;
+        note += ' · z rozpočtu ' + money(budgetVal) + ' zbude ' + money(zbytek);
+      }
+      document.getElementById('calc-note').textContent = note;
+    }
+    document.getElementById('calc-plants').addEventListener('input', () => recalc('plants'));
+    document.getElementById('calc-budget').addEventListener('input', () => recalc('budget'));
+    recalc('plants');
+
+    // ── ODPOČTY ──
+    let serverOffset = 0;
+    let timers = [];
+    function fmtRemain(ms) {
+      if (ms <= 0) return 'Hotovo';
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      return (h>0?h+'h ':'') + String(m).padStart(2,'0') + 'm ' + String(s).padStart(2,'0') + 's';
+    }
+    function renderTimers() {
+      const wrap = document.getElementById('timers-list');
+      if (!timers.length) { wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Žádné probíhající odpočty.</p>'; return; }
+      wrap.innerHTML = timers.map(t => {
+        const dur = t.endsAt - t.startedAt;
+        return \`<div class="card" style="padding:1.1rem;margin-bottom:0.9rem">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+            <div>
+              <div style="font-family:'Cinzel',serif;font-size:0.95rem;color:var(--text)">🌱 \${t.icName} <span style="color:var(--text-muted);font-size:0.8rem">· Postal \${t.postal}</span></div>
+              <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.25rem">\${t.plants} kytek · spustil \${t.createdBy||'—'}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="cd-remain" data-ends="\${t.endsAt}" style="font-family:'Cinzel',serif;font-size:1.25rem;color:var(--gold)">–</div>
+              <button onclick="removeTimer('\${t.id}')" style="margin-top:0.4rem;background:none;border:1px solid var(--border);color:var(--text-muted);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer;border-radius:3px">Smazat</button>
+            </div>
+          </div>
+          <div style="height:7px;background:var(--border);border-radius:4px;margin-top:0.9rem;overflow:hidden">
+            <div class="cd-bar" data-start="\${t.startedAt}" data-ends="\${t.endsAt}" style="height:100%;width:0%;background:linear-gradient(90deg,#00C853,var(--gold));transition:width 1s linear"></div>
+          </div>
+        </div>\`;
+      }).join('');
+      tick();
+    }
+    function tick() {
+      const nowS = Date.now() + serverOffset;
+      document.querySelectorAll('.cd-remain').forEach(el => {
+        const ends = parseInt(el.dataset.ends);
+        const rem = ends - nowS;
+        el.textContent = fmtRemain(rem);
+        el.style.color = rem <= 0 ? '#00C853' : 'var(--gold)';
+        if (rem <= 0) el.textContent = '✅ Hotovo';
+      });
+      document.querySelectorAll('.cd-bar').forEach(el => {
+        const start = parseInt(el.dataset.start), ends = parseInt(el.dataset.ends);
+        const pct = Math.min(100, Math.max(0, ((nowS - start) / (ends - start)) * 100));
+        el.style.width = pct + '%';
+      });
+    }
+    async function loadTimers() {
+      try {
+        const res = await fetch('/api/weed-timers');
+        const d = await res.json();
+        timers = d.timers || [];
+        serverOffset = (d.now || Date.now()) - Date.now();
+        renderTimers();
+      } catch (e) { /* ignore */ }
+    }
+    async function startTimer() {
+      const icName = document.getElementById('t-icname').value.trim();
+      const postal = document.getElementById('t-postal').value.trim();
+      const plants = document.getElementById('t-plants').value;
+      if (!icName) return showToast('✗ Vyplň IC jméno', true);
+      if (!/^\\d{4}$/.test(postal)) return showToast('✗ Postal musí být 4 číslice', true);
+      const res = await fetch('/api/weed-timers', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({icName,postal,plants})});
+      const d = await res.json();
+      if (d.ok) { showToast('✓ Odpočet spuštěn'); document.getElementById('t-postal').value=''; loadTimers(); }
+      else showToast('✗ ' + d.error, true);
+    }
+    async function removeTimer(id) {
+      const res = await fetch('/api/weed-timers/remove', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+      const d = await res.json();
+      if (d.ok) loadTimers(); else showToast('✗ ' + d.error, true);
+    }
+    loadTimers();
+    setInterval(tick, 1000);
+    const evtT = new EventSource('/api/events');
+    evtT.addEventListener('weedTimer', () => setTimeout(loadTimers, 300));
+  </script>
+  </body></html>`;
+}
+
+// ── RENDER BLACKBOOK ──────────────────────────────────────────────────────────
+function renderBlackbook(req) {
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Blackbook</title>
+  ${baseStyles()}
+  <style>
+    .bb-tabs{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:1.5rem}
+    .bb-tab{flex:none;padding:0.45rem 1rem;font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:4px;transition:all 0.15s;font-family:inherit}
+    .bb-tab.active{background:var(--crimson-glow);border-color:var(--border-gold);color:var(--text)}
+    .bb-section{display:none}
+    .bb-section.active{display:block}
+    .bb-mini-label{font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin:1.5rem 0 0.8rem;opacity:0.85}
+    .bb-bar-row{display:flex;align-items:center;gap:0.8rem;margin:0.35rem 0;font-size:0.8rem}
+    .bb-bar-name{flex:0 0 38%;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bb-bar-track{flex:1;height:14px;background:var(--border);border-radius:3px;overflow:hidden}
+    .bb-bar-fill{height:100%;background:linear-gradient(90deg,var(--crimson-light),var(--gold))}
+    .bb-bar-val{flex:0 0 auto;color:var(--silver-bright);font-weight:600;min-width:70px;text-align:right}
+  </style>
+  </head><body>
+  ${renderNav(req, 'blackbook')}
+  <main>
+    <div class="page-header">
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">📓 Blackbook</h1>
+        <p class="page-sub">Reporty a analýzy z dostupných dat — sklad, finance, členové</p>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div id="bb-generated" style="font-size:0.68rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase"></div>
+      </div>
+    </div>
+    <div class="page-info">
+      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+      <div class="page-info-body">
+        <div class="page-info-title">Analytické reporty</div>
+        <div class="page-info-text">Blackbook generuje reporty výhradně z dat dostupných na webu a v tabulkách (Google Sheets) — finance, sklad, zbraně, drogy a aktivita členů. Aktivita členů se počítá z posledního zaznamenaného pohybu člena. Vyber report v záložkách níže.</div>
+      </div>
+    </div>
+
+    <div class="bb-tabs">
+      <button class="bb-tab active" data-sec="finance" onclick="bbTab('finance')">💰 Finanční</button>
+      <button class="bb-tab" data-sec="aktivita" onclick="bbTab('aktivita')">👥 Aktivita členů</button>
+      <button class="bb-tab" data-sec="sklad" onclick="bbTab('sklad')">📦 Inventura a sklad</button>
+      <button class="bb-tab" data-sec="zbrane" onclick="bbTab('zbrane')">🔫 Zbraně</button>
+      <button class="bb-tab" data-sec="drogy" onclick="bbTab('drogy')">💊 Drogy a výroby</button>
+      <button class="bb-tab" data-sec="bezpecnost" onclick="bbTab('bezpecnost')">🛡️ Audit a bezpečnost</button>
+    </div>
+
+    <div id="bb-loading" style="color:var(--text-muted);font-size:0.85rem">Generuji reporty…</div>
+    <div id="bb-finance" class="bb-section active"></div>
+    <div id="bb-aktivita" class="bb-section"></div>
+    <div id="bb-sklad" class="bb-section"></div>
+    <div id="bb-zbrane" class="bb-section"></div>
+    <div id="bb-drogy" class="bb-section"></div>
+    <div id="bb-bezpecnost" class="bb-section"></div>
+  </main>
+  <script>
+    let D = null;
+    const money = n => '$' + Math.round(n||0).toLocaleString('cs-CZ');
+    const pesos = n => '₱' + Math.round(n||0).toLocaleString('cs-CZ');
+    const esc = s => (s==null?'':String(s)).replace(/</g,'&lt;');
+
+    function bbTab(sec) {
+      document.querySelectorAll('.bb-tab').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
+      document.querySelectorAll('.bb-section').forEach(s => s.classList.toggle('active', s.id === 'bb-' + sec));
+    }
+
+    function barChart(rows, max, color) {
+      if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem">Žádná data</p>';
+      const mx = max || Math.max(...rows.map(r => r.val), 1);
+      return rows.map(r => \`<div class="bb-bar-row">
+        <span class="bb-bar-name">\${esc(r.name)}</span>
+        <span class="bb-bar-track"><span class="bb-bar-fill" style="width:\${Math.max(2,(r.val/mx)*100)}%\${color?';background:'+color:''}"></span></span>
+        <span class="bb-bar-val">\${r.label||r.val}</span>
+      </div>\`).join('');
+    }
+
+    function lineChart(points, key, color, fmt) {
+      if (!points || points.length < 2) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:1rem 0">Nedostatek dat pro graf</p>';
+      const W = 760, H = 180, pad = 8;
+      const vals = points.map(p => p[key]);
+      const min = Math.min(...vals, 0), max = Math.max(...vals, 1);
+      const range = (max - min) || 1;
+      const n = points.length;
+      const x = i => pad + (i / (n - 1)) * (W - 2*pad);
+      const y = v => H - pad - ((v - min) / range) * (H - 2*pad);
+      const pts = points.map((p,i) => x(i).toFixed(1) + ',' + y(p[key]).toFixed(1)).join(' ');
+      const area = 'M' + x(0).toFixed(1) + ',' + (H-pad) + ' L' + pts.split(' ').join(' L') + ' L' + x(n-1).toFixed(1) + ',' + (H-pad) + ' Z';
+      const last = vals[vals.length-1];
+      return \`<div style="overflow-x:auto"><svg viewBox="0 0 \${W} \${H}" style="width:100%;min-width:480px;height:auto;display:block">
+        <path d="\${area}" fill="\${color}" opacity="0.12"/>
+        <polyline points="\${pts}" fill="none" stroke="\${color}" stroke-width="2"/>
+        <line x1="\${pad}" y1="\${y(0).toFixed(1)}" x2="\${W-pad}" y2="\${y(0).toFixed(1)}" stroke="var(--border)" stroke-dasharray="3 3"/>
+      </svg></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.66rem;color:var(--text-muted);margin-top:0.3rem">
+        <span>min \${(fmt||money)(min)}</span><span>aktuálně \${(fmt||money)(last)}</span><span>max \${(fmt||money)(max)}</span></div>\`;
+    }
+
+    function finCard(title, f) {
+      const netUsd = f.prijem_usd - f.vydaj_usd, netPesos = f.prijem_pesos - f.vydaj_pesos;
+      return \`<div class="card" style="padding:1.2rem">
+        <div style="font-size:0.55rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--gold);margin-bottom:0.7rem">\${title}</div>
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.2rem 0"><span style="color:var(--text-muted)">Příjem SAD</span><strong style="color:#00CC66">\${money(f.prijem_usd)}</strong></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.2rem 0"><span style="color:var(--text-muted)">Výdaj SAD</span><strong style="color:#FF5555">\${money(f.vydaj_usd)}</strong></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.3rem 0;border-top:1px solid var(--border)"><span style="color:var(--text-muted)">Net SAD</span><strong style="color:\${netUsd>=0?'#00CC66':'#FF5555'}">\${netUsd>=0?'+':''}\${money(netUsd)}</strong></div>
+        \${(f.prijem_pesos||f.vydaj_pesos)?\`<div style="display:flex;justify-content:space-between;font-size:0.74rem;padding:0.2rem 0;margin-top:0.3rem"><span style="color:var(--text-muted)">Net Pesos</span><strong style="color:\${netPesos>=0?'#00CC66':'#FF5555'}">\${netPesos>=0?'+':''}\${pesos(netPesos)}</strong></div>\`:''}
+      </div>\`;
+    }
+
+    function tbl(headers, rows) {
+      if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.8rem 0">Žádné záznamy</p>';
+      return \`<div class="table-wrap"><table><thead><tr>\${headers.map(h=>'<th'+(h.r?' style="text-align:right"':'')+'>'+h.t+'</th>').join('')}</tr></thead>
+        <tbody>\${rows.map(r=>'<tr>'+r.map((c,i)=>'<td'+(headers[i]&&headers[i].r?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>').join('')}</tbody></table></div>\`;
+    }
+
+    function renderFinance() {
+      const f = D.finance;
+      let h = '<div class="bb-mini-label">Příjmy a výdaje za období</div>';
+      h += '<div class="grid" style="grid-template-columns:repeat(4,1fr)">' + finCard('Dnes', f.periods.day) + finCard('Týden', f.periods.week) + finCard('Měsíc', f.periods.month) + finCard('Celkem', f.periods.total) + '</div>';
+      h += '<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:0.5rem">';
+      h += '<div class="card"><div class="card-header"><span class="card-title">Vývoj zůstatku účtu (SAD)</span></div>' + lineChart(f.balanceTimeline, 'usd', '#C9A84C') + '</div>';
+      h += '<div class="card"><div class="card-header"><span class="card-title">Vývoj hodnoty skladu</span></div>' + lineChart(f.stockTimeline, 'value', '#7EC8E3') + '</div>';
+      h += '</div>';
+      h += '<div class="bb-mini-label">Kdo vydělal nejvíc (příjem SAD)</div><div class="card">';
+      h += barChart(f.topEarners.map(e => ({ name: e.member, val: e.prijem_usd, label: money(e.prijem_usd) })), null, null) + '</div>';
+      document.getElementById('bb-finance').innerHTML = h;
+    }
+
+    function renderAktivita() {
+      const a = D.aktivita;
+      let h = \`<div class="stats" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat"><div class="stat-label">Členů celkem</div><div class="stat-value">\${a.total}</div></div>
+        <div class="stat" style="border-top-color:#FF5555"><div class="stat-label">Neaktivní (7+ dní)</div><div class="stat-value" style="color:#FF5555">\${a.inactiveCount}</div></div>
+        <div class="stat" style="border-top-color:#00C853"><div class="stat-label">Aktivní</div><div class="stat-value" style="color:#00C853">\${a.total - a.inactiveCount}</div></div>
+      </div>\`;
+      h += '<div class="bb-mini-label">Členové podle poslední aktivity (web přihlášení + pohyby v tabulkách)</div><div class="card">';
+      h += tbl([{t:'Člen'},{t:'Poslední aktivita'},{t:'Zdroj'},{t:'Web login'},{t:'Neaktivní',r:true},{t:'Pohyby',r:true},{t:'Vklady/Výběry',r:true},{t:'Vklad SAD',r:true}],
+        a.members.map(m => [
+          esc(m.member) + (m.discord?' <span style="color:var(--text-muted);font-size:0.7rem">'+esc(m.discord)+'</span>':''),
+          m.lastCas ? esc(m.lastCas) : '<span style="color:var(--text-muted)">nikdy</span>',
+          m.lastZdroj ? '<span style="color:var(--text-muted);font-size:0.72rem">'+esc(m.lastZdroj)+'</span>' : '—',
+          m.lastWebLoginCas ? '<span style="color:var(--silver);font-size:0.74rem">'+esc(m.lastWebLoginCas)+'</span>' : '<span style="color:var(--text-muted)">—</span>',
+          m.inactive ? '<span class="badge vyber">'+(m.daysSince!=null?m.daysSince+' dní':'—')+'</span>' : '<span class="badge vklad">aktivní</span>',
+          m.pohyby,
+          '<span style="color:#00CC66">'+m.vklady+'</span> / <span style="color:#FF5555">'+m.vybery+'</span>',
+          money(m.ucetVkladUsd)
+        ])) + '</div>';
+      document.getElementById('bb-aktivita').innerHTML = h;
+    }
+
+    function renderSklad() {
+      const s = D.sklad;
+      const bySekce = {};
+      s.stockList.forEach(i => { (bySekce[i.sekce] = bySekce[i.sekce] || []).push(i); });
+      let h = '<div class="bb-mini-label">Aktuální stav skladu</div><div class="grid" style="grid-template-columns:repeat(2,1fr)">';
+      Object.entries(bySekce).forEach(([sek, items]) => {
+        h += '<div class="card"><div class="card-header"><span class="card-title">'+sek+'</span></div>' +
+          items.map(i => '<div class="sklad-row"><span>'+esc(i.item)+'</span><span style="color:'+(i.current<=0?'#FF5555':'var(--text)')+'">'+i.current+' ks</span></div>').join('') + '</div>';
+      });
+      h += '</div>';
+      h += '<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:0.5rem">';
+      h += '<div class="card"><div class="card-header"><span class="card-title">Nejvíc ukládali</span></div>' + barChart(s.topVklad.map(m=>({name:m.member,val:m.vklad,label:m.vklad+' ks'})),null,'#00C853') + '</div>';
+      h += '<div class="card"><div class="card-header"><span class="card-title">Nejvíc vybírali</span></div>' + barChart(s.topVyber.map(m=>({name:m.member,val:m.vyber,label:m.vyber+' ks'})),null,'#FF5555') + '</div>';
+      h += '</div>';
+      h += '<div class="bb-mini-label">Predikce došlých zásob (dle spotřeby za 30 dní)</div><div class="card">';
+      h += tbl([{t:'Položka'},{t:'Sekce'},{t:'Stav',r:true},{t:'Spotřeba/den',r:true},{t:'Dojde za',r:true}],
+        s.predikce.length ? s.predikce.map(p => [esc(p.item), p.sekce, p.current+' ks', p.perDay+' ks', '<span style="color:'+(p.daysLeft<=3?'#FF5555':p.daysLeft<=7?'var(--gold)':'var(--text)')+'">'+p.daysLeft+' dní</span>']) : []);
+      h += '</div>';
+      h += '<div class="bb-mini-label">Podezřelé pohyby (velké výběry)</div><div class="card">';
+      h += tbl([{t:'Čas'},{t:'Sekce'},{t:'Položka'},{t:'Množ.',r:true},{t:'Člen'},{t:'Důvod'}],
+        s.podezrele.map(p => [esc(p.cas), p.sekce, esc(p.item), p.qty, esc(p.member), '<span style="color:var(--gold)">'+esc(p.duvod)+'</span>']));
+      h += '</div>';
+      document.getElementById('bb-sklad').innerHTML = h;
+    }
+
+    function renderZbrane() {
+      const z = D.zbrane;
+      let h = '<div class="bb-mini-label">Kdo vybral nejvíc zbraní</div><div class="card">';
+      h += barChart(z.topVyber.map(m=>({name:m.member,val:m.qty,label:m.qty+' ks'})),null,'#FF5555') + '</div>';
+      h += '<div class="bb-mini-label">Nevrácené zbraně (čistý zůstatek výběr − vklad)</div><div class="card">';
+      h += tbl([{t:'Člen'},{t:'Zbraň'},{t:'Nevráceno',r:true}],
+        z.nevraceno.map(n => [esc(n.member), esc(n.item), '<span class="badge vyber">'+n.outstanding+' ks</span>']));
+      h += '</div>';
+      h += '<div class="bb-mini-label">Historie vydání zbraní</div><div class="card">';
+      h += tbl([{t:'Čas'},{t:'Položka'},{t:'Množ.',r:true},{t:'Člen'},{t:'Účel'}],
+        z.historie.map(e => [esc(e.cas), esc(e.item), e.qty, esc(e.member), esc(e.ucel)||'—']));
+      h += '</div>';
+      document.getElementById('bb-zbrane').innerHTML = h;
+    }
+
+    function renderDrogy() {
+      const d = D.drogy;
+      const drugs = [...new Set([...Object.keys(d.drugProd), ...Object.keys(d.drugVyber)])];
+      let h = '<div class="bb-mini-label">Výroba, prodej a ziskovost drog</div><div class="card">';
+      h += tbl([{t:'Droga'},{t:'Vyrobeno',r:true},{t:'Vybráno/prodáno',r:true},{t:'Hodnota prodeje',r:true}],
+        drugs.map(dr => [esc(dr), '<span style="color:#00CC66">'+(d.drugProd[dr]||0)+'</span>', '<span style="color:#FF5555">'+(d.drugVyber[dr]||0)+'</span>', '<span style="color:var(--gold)">'+money(d.drugZisk[dr]||0)+'</span>']));
+      h += '</div>';
+      h += \`<div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:0.5rem">
+        <div class="stat"><div class="stat-label">Weed vyrobeno</div><div class="stat-value" style="color:#00C853">\${d.weedProd}</div><div class="stat-sub">kusů</div></div>
+        <div class="stat" style="border-top-color:#FF5555"><div class="stat-label">Weed vybráno</div><div class="stat-value" style="color:#FF5555">\${d.weedVyber}</div><div class="stat-sub">kusů</div></div>
+        <div class="stat" style="border-top-color:var(--gold)"><div class="stat-label">Weed — hodnota prodeje</div><div class="stat-value" style="color:var(--gold);font-size:1.3rem">\${money(d.weedZisk)}</div></div>
+      </div>\`;
+      h += '<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:0.5rem">';
+      h += '<div class="card"><div class="card-header"><span class="card-title">Kdo nejvíc navařil (drogy + weed)</span></div>' + barChart(d.topVarici.map(m=>({name:m.member,val:m.qty,label:m.qty+' ks'})),null,'#00C853') + '</div>';
+      const chem = Object.entries(d.chemSpotreba).map(([k,v])=>({name:k,val:v,label:v+' ks'})).sort((a,b)=>b.val-a.val);
+      h += '<div class="card"><div class="card-header"><span class="card-title">Spotřeba chemikálií</span></div>' + barChart(chem,null,'#7EC8E3') + '</div>';
+      h += '</div>';
+      document.getElementById('bb-drogy').innerHTML = h;
+    }
+
+    function renderBezpecnost() {
+      const b = D.bezpecnost;
+      let h = '<div class="bb-mini-label">Dlužníci — vybral zboží (weed/drogy), ale nevložil dost peněz</div><div class="card">';
+      h += tbl([{t:'Člen'},{t:'Hodnota vybraného zboží',r:true},{t:'Vložené peníze (SAD)',r:true},{t:'Dluh',r:true}],
+        b.dluznici.map(d => [esc(d.member), money(d.goodsValue), money(d.deposited), '<span class="badge vyber">'+money(d.dluh)+'</span>']));
+      h += '</div>';
+      h += '<div class="bb-mini-label">Podezřelé transakce (velké výdaje)</div><div class="card">';
+      h += tbl([{t:'Čas'},{t:'Člen'},{t:'Částka',r:true},{t:'Poznámka'},{t:'Důvod'}],
+        b.podezreleTransakce.map(t => [esc(t.cas), esc(t.member), (t.valuta==='USD'?money(t.castka):pesos(t.castka)), esc(t.pozn), '<span style="color:var(--gold)">'+esc(t.duvod)+'</span>']));
+      h += '</div>';
+      document.getElementById('bb-bezpecnost').innerHTML = h;
+    }
+
+    async function loadBlackbook() {
+      try {
+        const res = await fetch('/api/blackbook');
+        D = await res.json();
+        if (!D.ok) { document.getElementById('bb-loading').textContent = 'Chyba načtení dat: ' + (D.error||'neznámá'); return; }
+        document.getElementById('bb-loading').style.display = 'none';
+        document.getElementById('bb-generated').textContent = 'Vygenerováno ' + (D.generatedAt||'');
+        renderFinance(); renderAktivita(); renderSklad(); renderZbrane(); renderDrogy(); renderBezpecnost();
+      } catch (e) {
+        document.getElementById('bb-loading').textContent = 'Chyba: ' + e.message;
+      }
+    }
+    loadBlackbook();
+  </script>
   </body></html>`;
 }
 
