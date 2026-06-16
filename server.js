@@ -9,16 +9,6 @@ const path    = require('path');
 const db      = require('./db');
 const sheets  = require('./sheets');
 
-// ── Tabulka pro sázení odpočty ────────────────────────────────────────────────
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS sazeni_countdowns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    postal TEXT NOT NULL,
-    ic TEXT NOT NULL,
-    ends_at INTEGER NOT NULL,
-    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
-  )
-`).run();
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 
@@ -644,51 +634,6 @@ app.get('/audit', requireAuth, (req, res) => res.send(renderAudit(req)));
 app.get('/statistiky', requireAuth, (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
-app.get('/sazeni', requireAuth, (req, res) => res.send(renderSazeni(req)));
-
-// ── API: Sázení odpočty ───────────────────────────────────────────────────────
-// Načti všechny aktivní odpočty
-app.get('/api/sazeni', requireAuth, (req, res) => {
-  const rows = db.prepare('SELECT * FROM sazeni_countdowns ORDER BY ends_at ASC').all();
-  res.json(rows);
-});
-
-// Ulož nový odpočet (každý uživatel může přidat svůj vlastní)
-app.post('/api/sazeni', requireAuth, (req, res) => {
-  const { postal, ic, ends_at } = req.body;
-  if (!/^[0-9]{4}$/.test(postal) || !ic || !ends_at) {
-    return res.status(400).json({ error: 'Neplatná data' });
-  }
-  // Kontrola: stejný postal už nesmí mít aktivní odpočet
-  const existing = db.prepare(
-    'SELECT * FROM sazeni_countdowns WHERE postal = ? AND ends_at > ?'
-  ).get(postal, Date.now());
-  if (existing) {
-    return res.status(409).json({ error: `Postal ${postal} už má aktivní odpočet.` });
-  }
-  const result = db.prepare(
-    'INSERT INTO sazeni_countdowns (postal, ic, ends_at) VALUES (?, ?, ?)'
-  ).run(postal, ic, Number(ends_at));
-  const newRow = { id: Number(result.lastInsertRowid), postal, ic, ends_at: Number(ends_at) };
-  broadcastSSE('sazeniUpdate', { action: 'add', row: newRow });
-  res.json(newRow);
-});
-
-// Smaž konkrétní odpočet podle id
-app.delete('/api/sazeni/:id', requireAuth, (req, res) => {
-  const id = parseInt(req.params.id);
-  if (!id) return res.status(400).json({ error: 'Chybí id' });
-  db.prepare('DELETE FROM sazeni_countdowns WHERE id = ?').run(id);
-  broadcastSSE('sazeniUpdate', { action: 'remove', id });
-  res.json({ ok: true });
-});
-
-// Zpětná kompatibilita — DELETE bez id smaže vše (reset)
-app.delete('/api/sazeni', requireAuth, (req, res) => {
-  db.prepare('DELETE FROM sazeni_countdowns').run();
-  broadcastSSE('sazeniUpdate', { action: 'reset' });
-  res.json({ ok: true });
-});
 
 
 // ── BASE STYLES ───────────────────────────────────────────────────────────────
@@ -1462,13 +1407,6 @@ function baseStyles() {
         transition:border-color 0.2s,color 0.2s;
       }
       .rank-right-tag:hover{border-color:var(--crimson-light);color:var(--text)}
-
-      /* ── SÁZENÍ EXTRA ── */
-      .sazeni-hero{
-        background:linear-gradient(135deg,rgba(0,80,30,0.14),rgba(0,40,15,0.06));
-        border:1px solid rgba(0,200,80,0.14);
-        padding:2rem;margin-bottom:2rem;position:relative;overflow:hidden;
-      }
       body.light .stat{
         background:linear-gradient(160deg,var(--bg-card2) 0%,var(--bg-card3) 100%);
         box-shadow:var(--shadow-card), inset 1px 0 0 rgba(160,24,24,0.08);
@@ -1486,31 +1424,6 @@ function baseStyles() {
         border-top:1px solid var(--border-gold);
         box-shadow:var(--shadow),var(--red-glow), inset 0 1px 0 rgba(255,255,255,0.4);
       }
-      body.light .sazeni-hero{
-        background:linear-gradient(135deg,rgba(0,100,30,0.08),rgba(0,60,15,0.04));
-        border-color:rgba(0,150,60,0.18);
-      }
-      .cost-table{width:100%;border-collapse:collapse;margin:1rem 0}
-      .cost-table th{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:600;color:var(--silver);padding:0.8rem 1rem;text-align:left;border-bottom:1px solid var(--border-silver)}
-      .cost-table td{padding:0.75rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.9rem}
-      .cost-table tr:last-child td{border-bottom:none;font-weight:600;color:var(--text)}
-      .cost-table .total-row td{border-top:2px solid rgba(0,200,80,0.22);color:var(--text);font-family:'Cinzel',serif}
-      .cost-amount{color:var(--gold);font-weight:600}
-      .kalk-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem}
-      .kalk-block{background:var(--bg-mid);border:1px solid var(--border-hover);padding:1.5rem;position:relative}
-      .kalk-block-label{font-size:0.62rem;letter-spacing:0.25em;text-transform:uppercase;font-weight:600;color:var(--silver);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem}
-      .kalk-block-label::before{content:'';display:inline-block;width:3px;height:13px;background:var(--crimson-light)}
-      .kalk-input{
-        background:var(--input-bg);border:1px solid var(--border-hover);
-        color:var(--text);padding:0.9rem 1rem;
-        font-family:'Cinzel',serif;font-size:1.5rem;
-        width:100%;outline:none;transition:border-color 0.2s,box-shadow 0.2s;text-align:center;
-      }
-      .kalk-input:focus{border-color:rgba(0,200,80,0.4);box-shadow:0 0 0 3px rgba(0,200,80,0.08)}
-      .kalk-result{margin-top:1rem;padding:1rem;background:rgba(0,200,80,0.05);border:1px solid rgba(0,200,80,0.14);text-align:center}
-      .kalk-result-num{font-family:'Cinzel',serif;font-size:2.1rem;color:#00C853;line-height:1.1}
-      .kalk-result-label{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:500;color:var(--text-muted);margin-top:0.35rem}
-      .kalk-arrow{text-align:center;font-size:1.5rem;display:flex;align-items:center;justify-content:center;color:var(--text-muted);opacity:0.35}
       .breakdown-row{display:flex;justify-content:space-between;padding:0.45rem 0;font-size:0.88rem;color:var(--text-dim);border-bottom:1px solid var(--border)}
       .breakdown-row:last-child{border-bottom:none;color:var(--text);padding-top:0.7rem;margin-top:0.3rem}
       .breakdown-row .green{color:#00C853}
@@ -1638,7 +1551,7 @@ function baseStyles() {
 
       @media(max-width:1200px){.nav-menu a .nav-desc{display:none}}
       @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
-      @media(max-width:768px){.kalk-grid{grid-template-columns:1fr}.kalk-arrow{transform:rotate(90deg)}.profit-grid{grid-template-columns:repeat(2,1fr)}main{padding:1.5rem 1rem}}
+      @media(max-width:768px){.profit-grid{grid-template-columns:repeat(2,1fr)}main{padding:1.5rem 1rem}}
 
       /* ── NAV DROPDOWN ── */
       .nav-dropdown{position:relative;height:100%}
@@ -1791,7 +1704,7 @@ function baseStyles() {
 function renderNav(req, active) {
   const ic = req.session.icName;
   const skladPages = ['sklad'];
-  const infoPages  = ['nastenska','kodex','lore','hierarchy','sazeni'];
+  const infoPages  = ['nastenska','kodex','lore','hierarchy'];
   const dataPages  = ['audit','statistiky'];
 
   return `
@@ -1810,9 +1723,7 @@ function renderNav(req, active) {
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
-            <a href="/sklad" class="${active==='sklad'?'active':''}">⚙️ Správa skladu</a>
-            <a href="/sazeni" class="${active==='sazeni'?'active':''}">🌱 Weed sázení</a>
-          </div>
+            <a href="/sklad" class="${active==='sklad'?'active':''}">⚙️ Správa skladu</a>          </div>
         </li>
 
         <li class="nav-dropdown ${dataPages.includes(active)?'open':''}">
@@ -2396,12 +2307,7 @@ function renderHome(req, data) {
           <a href="/statistiky" class="quick-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span>Statistiky</span>
-          </a>
-          <a href="/sazeni" class="quick-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-            <span>Sázení</span>
-          </a>
-          <a href="/lore" class="quick-btn">
+          </a>          <a href="/lore" class="quick-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             <span>Lore</span>
           </a>
@@ -3727,416 +3633,6 @@ function renderAuth(page, error, data) {
   if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Aplikace: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required><label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="auth-btn">Dokončit registraci</button></form></div></body></html>`;
   if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Aplikace: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="auth-btn">Přihlásit se</button></form></div></body></html>`;
   return '<h1>404</h1>';
-}
-
-// ── RENDER SÁZENÍ ─────────────────────────────────────────────────────────────
-function renderSazeni(req) {
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Sázení</title>
-  ${baseStyles()}
-  </head><body>
-  ${renderNav(req, 'sazeni')}
-  <main>
-    <div class="page-header">
-      <div>
-        <div class="page-label">Albion — Produkce</div>
-        <h1 class="page-title">Sázení trávy</h1>
-        <p class="page-sub">Kalkulačka nákladů na pěstování cannabisu</p>
-      </div>
-    </div>
-
-    <div class="sazeni-hero">
-      <div style="font-size:0.55rem;letter-spacing:0.38em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.5rem">Informace o produkci</div>
-      <div style="font-family:'Cinzel',serif;font-size:1.1rem;margin-bottom:0.5rem">Náklady na jednu kytku</div>
-      <div style="font-size:0.8rem;color:var(--text-dim);line-height:1.85">
-        Přesný rozpis všeho, co potřebuješ na vypěstování jedné rostliny trávy. Kalkulačka spočítá náklady na libovolný počet kytek nebo zjistí, kolik jich zvládneš za daný rozpočet.
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.5rem">
-      <div class="card">
-        <div class="card-header"><span class="card-title">Rozpis nákladů / 1 kytka</span><span class="card-badge">Fixní ceny</span></div>
-        <table class="cost-table">
-          <thead><tr><th>Položka</th><th>Množství</th><th>Cena / ks</th><th>Celkem</th></tr></thead>
-          <tbody>
-            <tr><td>Konev s vodou</td><td>1×</td><td class="cost-amount">$20</td><td class="cost-amount">$20</td></tr>
-            <tr><td>Semínko</td><td>1×</td><td class="cost-amount">$50</td><td class="cost-amount">$50</td></tr>
-            <tr><td>Hnojivo</td><td>1×</td><td class="cost-amount">$25</td><td class="cost-amount">$25</td></tr>
-            <tr><td>Kvalitní hnojivo</td><td>4×</td><td class="cost-amount">$50</td><td class="cost-amount">$200</td></tr>
-            <tr><td>Výživná voda</td><td>4×</td><td class="cost-amount">$40</td><td class="cost-amount">$160</td></tr>
-            <tr class="total-row"><td colspan="3" style="font-size:0.72rem;letter-spacing:0.15em">CELKEM NA KYTKU</td><td class="cost-amount" style="font-size:1.1rem">$455</td></tr>
-          </tbody>
-        </table>
-        <div style="margin-top:1rem;padding:0.8rem 1rem;background:var(--gold-dim);border:1px solid var(--border-gold);font-size:0.76rem;color:var(--text-dim)">
-          Cena <strong style="color:var(--gold)">$455</strong> je náklad na jednu rostlinu.
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Zasadit kytky</span><span class="card-badge">⏱ 20h růst</span></div>
-        <div style="font-size:0.76rem;color:var(--text-dim);line-height:1.8;margin-bottom:1.2rem">
-          Zadej postal políčka a jméno pěstitele. Více lidí může sázet současně.
-        </div>
-        <div style="margin-bottom:0.9rem">
-          <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">Postal políčka (4 číslice)</div>
-          <input type="text" id="saz-postal" maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
-            style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
-            placeholder="1234"
-            onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
-        </div>
-        <div style="margin-bottom:1.2rem">
-          <div style="font-size:0.56rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--silver);margin-bottom:0.4rem;font-family:'Cinzel',serif">IC jméno pěstitele</div>
-          <input type="text" id="saz-ic"
-            style="width:100%;padding:0.75rem 1rem;background:rgba(0,0,0,0.35);border:1px solid rgba(0,200,80,0.15);border-bottom:1px solid rgba(0,200,80,0.35);color:var(--text);font-family:'Inter',sans-serif;font-size:0.9rem;outline:none;box-sizing:border-box;transition:border-color 0.2s"
-            placeholder="Christopher Sinclair"
-            onfocus="this.style.borderColor='rgba(0,200,80,0.55)'" onblur="this.style.borderColor='rgba(0,200,80,0.15)'">
-        </div>
-        <div id="saz-error" style="display:none;padding:0.6rem 0.9rem;background:rgba(180,0,0,0.10);border:1px solid rgba(180,0,0,0.30);font-size:0.75rem;color:#CC5555;margin-bottom:0.9rem"></div>
-        <button onclick="sazeniPotvrd()"
-          style="width:100%;padding:0.8rem;background:linear-gradient(135deg,#004A1A 0%,#007A2C 50%,#005A1E 100%);color:#C8FFD8;border:1px solid rgba(0,200,80,0.22);font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.32em;text-transform:uppercase;cursor:pointer;transition:all 0.22s;position:relative;overflow:hidden"
-          onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter='none'">
-          Zasadit &amp; spustit odpočet
-        </button>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Rychlá kalkulačka</span><span class="card-badge">Interaktivní</span></div>
-        <div class="kalk-grid">
-          <div class="kalk-block">
-            <div class="kalk-block-label">Počet kytek</div>
-            <input type="number" class="kalk-input" id="inputKytky" min="1" max="9999" value="10" oninput="calcFromKytky(this.value)">
-            <div class="kalk-result">
-              <div class="kalk-result-num" id="outCena">$4 550</div>
-              <div class="kalk-result-label">celkový náklad</div>
-            </div>
-          </div>
-          <div class="kalk-arrow">⇄</div>
-          <div class="kalk-block">
-            <div class="kalk-block-label">Dostupný budget</div>
-            <input type="number" class="kalk-input" id="inputBudget" min="0" value="4550" oninput="calcFromBudget(this.value)" style="border-color:rgba(0,200,80,0.18)">
-            <div class="kalk-result" style="background:rgba(0,200,80,0.05);border-color:rgba(0,200,80,0.14)">
-              <div class="kalk-result-num" id="outKytky" style="color:#00C853">10</div>
-              <div class="kalk-result-label">kytek lze zasadit</div>
-            </div>
-          </div>
-        </div>
-        <div class="slider-wrap">
-          <input type="range" class="slider" id="kytkySlider" min="1" max="200" value="10" oninput="sliderChange(this.value)" style="--pct:4.5%">
-          <div class="slider-labels"><span>1</span><span>50</span><span>100</span><span>150</span><span>200 kytek</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:1.5rem">
-      <div class="card-header"><span class="card-title">Aktivní sázení</span><span class="card-badge" id="saz-count-badge">0 aktivních</span></div>
-      <div id="sazeni-list">
-        <div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:1.5rem">
-      <div class="card-header"><span class="card-title">Detailní rozpad nákladů</span><span class="card-badge" id="bdKytkyLabel">10 kytek</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">
-        <div>
-          <div style="font-size:0.55rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Položky celkem</div>
-          <div class="breakdown-row"><div class="bd-label">Konev s vodou <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-konev-qty">(10×)</span></div><div class="green" id="bd-konev">$200</div></div>
-          <div class="breakdown-row"><div class="bd-label">Semínko <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-seminko-qty">(10×)</span></div><div class="green" id="bd-seminko">$500</div></div>
-          <div class="breakdown-row"><div class="bd-label">Hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-hnojivo-qty">(10×)</span></div><div class="green" id="bd-hnojivo">$250</div></div>
-          <div class="breakdown-row"><div class="bd-label">Kvalitní hnojivo <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-khnojivo-qty">(40×)</span></div><div class="green" id="bd-khnojivo">$2 000</div></div>
-          <div class="breakdown-row"><div class="bd-label">Výživná voda <span style="color:var(--text-muted);margin-left:0.3rem" id="bd-voda-qty">(40×)</span></div><div class="green" id="bd-voda">$1 600</div></div>
-          <div class="breakdown-row"><div class="bd-label" style="font-family:'Cinzel',serif">CELKEM</div><div style="font-family:'Cinzel',serif;color:var(--gold)" id="bd-total">$4 550</div></div>
-        </div>
-        <div>
-          <div style="font-size:0.55rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);margin-bottom:0.8rem">Přehled investice</div>
-          <div class="breakdown-row"><div class="bd-label">Celkový náklad</div><div style="color:var(--gold)" id="ov-naklad">$4 550</div></div>
-          <div class="breakdown-row"><div class="bd-label">Počet kytek</div><div id="ov-kytky">10</div></div>
-          <div class="breakdown-row"><div class="bd-label">Náklad / kytka</div><div>$455</div></div>
-          <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)">
-            <div style="font-size:0.55rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--silver);margin-bottom:0.6rem">Největší položka</div>
-            <div class="profit-bar"><div class="profit-fill" id="profitFill" style="width:44%"></div></div>
-            <div style="font-size:0.64rem;color:var(--text-muted);margin-top:0.4rem">Kvalitní hnojivo (44% nákladů)</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:1.5rem">
-      <div class="card-header"><span class="card-title">Kalkulačka prodeje &amp; zisku</span><span class="card-badge">4 sáčky / kytka · $150 / sáček</span></div>
-      <div style="font-size:0.8rem;color:var(--text-dim);line-height:1.85;margin-bottom:1.4rem">
-        Z jedné vypěstované kytky se dá udělat přibližně <strong style="color:var(--text)">4 sáčky weedu</strong>. Ty se prodávají členům za <strong style="color:var(--text)">$150 / sáček</strong> a výdělek nad rámec nákladů jde rovnou členům do kapsy. Zadej počet kytek nebo částku, kterou chceš do pěstování investovat, a kalkulačka spočítá počet sáčků, tržbu z prodeje a čistý zisk po odečtení nákladů.
-      </div>
-      <div class="kalk-grid">
-        <div class="kalk-block">
-          <div class="kalk-block-label">Počet kytek</div>
-          <input type="number" class="kalk-input" id="profitKytky" min="1" max="9999" value="10" oninput="profitFromKytky(this.value)">
-          <div class="kalk-result">
-            <div class="kalk-result-num" id="profitSacky">40</div>
-            <div class="kalk-result-label">sáčků weedu</div>
-          </div>
-        </div>
-        <div class="kalk-arrow">⇄</div>
-        <div class="kalk-block">
-          <div class="kalk-block-label">Investice do pěstování</div>
-          <input type="number" class="kalk-input" id="profitInvest" min="0" value="4550" oninput="profitFromInvest(this.value)" style="border-color:rgba(0,200,80,0.18)">
-          <div class="kalk-result" style="background:rgba(0,200,80,0.05);border-color:rgba(0,200,80,0.14)">
-            <div class="kalk-result-num" id="profitTrzba" style="color:#00C853">$6 000</div>
-            <div class="kalk-result-label">tržba z prodeje</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="slider-wrap">
-        <input type="range" class="slider" id="profitSlider" min="1" max="200" value="10" oninput="profitSliderChange(this.value)" style="--pct:4.5%">
-        <div class="slider-labels"><span>1</span><span>50</span><span>100</span><span>150</span><span>200 kytek</span></div>
-      </div>
-
-      <div class="profit-grid">
-        <div class="profit-stat">
-          <div class="profit-stat-label">Náklady na pěstování</div>
-          <div class="profit-stat-num" id="profitNaklady">$4 550</div>
-        </div>
-        <div class="profit-stat" style="border-color:rgba(0,200,80,0.14);background:rgba(0,200,80,0.04)">
-          <div class="profit-stat-label">Čistý zisk celkem</div>
-          <div class="profit-stat-num" style="color:#00C853" id="profitZisk">$1 450</div>
-        </div>
-        <div class="profit-stat">
-          <div class="profit-stat-label">Zisk / 1 kytka</div>
-          <div class="profit-stat-num" id="profitZiskKytka">$145</div>
-        </div>
-        <div class="profit-stat">
-          <div class="profit-stat-label">Návratnost (ROI)</div>
-          <div class="profit-stat-num" id="profitROI">+31,9 %</div>
-        </div>
-      </div>
-
-      <div style="margin-top:1.2rem;padding:0.8rem 1rem;background:var(--gold-dim);border:1px solid var(--border-gold);font-size:0.76rem;color:var(--text-dim);line-height:1.8">
-        Z <strong style="color:var(--gold)" id="profitInfoKytky">10</strong> kytek vyrobíš <strong style="color:var(--gold)" id="profitInfoSacky">40</strong> sáčků weedu. Za jejich prodej dostaneš <strong style="color:var(--gold)" id="profitInfoTrzba">$6 000</strong>, po odečtení nákladů na pěstování ve výši <strong style="color:var(--gold)" id="profitInfoNaklady">$4 550</strong> zbyde čistý zisk <strong style="color:var(--gold)" id="profitInfoZisk">$1 450</strong>.
-      </div>
-    </div>
-
-  </main>
-  <script>
-    const COST_PER = 455;
-    const ITEMS = [
-      { id:'konev',    qty:1, unit:20 },
-      { id:'seminko',  qty:1, unit:50 },
-      { id:'hnojivo',  qty:1, unit:25 },
-      { id:'khnojivo', qty:4, unit:50 },
-      { id:'voda',     qty:4, unit:40 },
-    ];
-
-    function fmt(n) { return '$' + Math.round(n).toLocaleString('cs-CZ'); }
-
-    function updateAll(kytky) {
-      kytky = Math.max(1, Math.floor(kytky));
-      const total = kytky * COST_PER;
-      document.getElementById('outCena').textContent = fmt(total);
-      document.getElementById('outKytky').textContent = kytky.toLocaleString('cs-CZ');
-      document.getElementById('bdKytkyLabel').textContent = kytky + ' kytek';
-      ITEMS.forEach(it => {
-        const tq = it.qty * kytky;
-        document.getElementById('bd-' + it.id).textContent = fmt(tq * it.unit);
-        document.getElementById('bd-' + it.id + '-qty').textContent = '(' + tq + '×)';
-      });
-      document.getElementById('bd-total').textContent = fmt(total);
-      document.getElementById('ov-naklad').textContent = fmt(total);
-      document.getElementById('ov-kytky').textContent = kytky.toLocaleString('cs-CZ');
-      const slider = document.getElementById('kytkySlider');
-      const clamped = Math.min(kytky, 200);
-      slider.value = clamped;
-      slider.style.setProperty('--pct', ((clamped - 1) / 199 * 100).toFixed(1) + '%');
-    }
-
-    function calcFromKytky(v) { const k=parseInt(v)||1; document.getElementById('inputBudget').value=k*COST_PER; updateAll(k); }
-    function calcFromBudget(v) { const k=Math.max(1,Math.floor((parseFloat(v)||0)/COST_PER)); document.getElementById('inputKytky').value=k; updateAll(k); }
-    function sliderChange(v) { document.getElementById('inputKytky').value=v; calcFromKytky(v); }
-    updateAll(10);
-
-    // ── Kalkulačka prodeje & zisku ─────────────────────────────────────────
-    const SACKY_PER_KYTKA  = 4;
-    const PRICE_PER_SACEK  = 150;
-    const REVENUE_PER_KYTKA = SACKY_PER_KYTKA * PRICE_PER_SACEK; // $600
-    const PROFIT_PER_KYTKA  = REVENUE_PER_KYTKA - COST_PER;      // $145
-
-    function updateProfit(kytky) {
-      kytky = Math.max(1, Math.floor(kytky));
-      const naklady = kytky * COST_PER;
-      const sacky   = kytky * SACKY_PER_KYTKA;
-      const trzba   = sacky * PRICE_PER_SACEK;
-      const zisk    = trzba - naklady;
-      const roi     = (zisk / naklady) * 100;
-
-      document.getElementById('profitSacky').textContent  = sacky.toLocaleString('cs-CZ');
-      document.getElementById('profitTrzba').textContent  = fmt(trzba);
-      document.getElementById('profitNaklady').textContent = fmt(naklady);
-      document.getElementById('profitZisk').textContent   = (zisk >= 0 ? '+' : '') + fmt(zisk);
-      document.getElementById('profitZiskKytka').textContent = (PROFIT_PER_KYTKA >= 0 ? '+' : '') + fmt(PROFIT_PER_KYTKA);
-      document.getElementById('profitROI').textContent = (roi >= 0 ? '+' : '') + roi.toFixed(1).replace('.', ',') + ' %';
-
-      document.getElementById('profitInfoKytky').textContent   = kytky.toLocaleString('cs-CZ');
-      document.getElementById('profitInfoSacky').textContent   = sacky.toLocaleString('cs-CZ');
-      document.getElementById('profitInfoTrzba').textContent   = fmt(trzba);
-      document.getElementById('profitInfoNaklady').textContent = fmt(naklady);
-      document.getElementById('profitInfoZisk').textContent    = fmt(zisk);
-
-      const slider = document.getElementById('profitSlider');
-      const clamped = Math.min(kytky, 200);
-      slider.value = clamped;
-      slider.style.setProperty('--pct', ((clamped - 1) / 199 * 100).toFixed(1) + '%');
-    }
-
-    function profitFromKytky(v) { const k=parseInt(v)||1; document.getElementById('profitInvest').value=k*COST_PER; updateProfit(k); }
-    function profitFromInvest(v) { const k=Math.max(1,Math.floor((parseFloat(v)||0)/COST_PER)); document.getElementById('profitKytky').value=k; updateProfit(k); }
-    function profitSliderChange(v) { document.getElementById('profitKytky').value=v; profitFromKytky(v); }
-    updateProfit(10);
-
-    // ── Sázení — více uživatelů, každý má svůj odpočet ────────────────────
-    const GROW_MS = 20 * 60 * 60 * 1000;
-    const cdIntervals = {}; // id -> intervalId
-
-    async function sazeniPotvrd() {
-      const postal = document.getElementById('saz-postal').value.trim();
-      const ic     = document.getElementById('saz-ic').value.trim();
-      const errEl  = document.getElementById('saz-error');
-      errEl.style.display = 'none';
-      if (!/^[0-9]{4}$/.test(postal)) {
-        errEl.textContent = 'Postal musí obsahovat přesně 4 číslice.';
-        errEl.style.display = 'block'; return;
-      }
-      if (!ic) {
-        errEl.textContent = 'Zadej IC jméno pěstitele.';
-        errEl.style.display = 'block'; return;
-      }
-      const ends_at = Date.now() + GROW_MS;
-      try {
-        const resp = await fetch('/api/sazeni', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ postal, ic, ends_at })
-        });
-        if (!resp.ok) {
-          const err = await resp.json();
-          errEl.textContent = err.error || 'Chyba při ukládání na server.';
-          errEl.style.display = 'block'; return;
-        }
-        const row = await resp.json();
-        document.getElementById('saz-postal').value = '';
-        document.getElementById('saz-ic').value = '';
-        addCountdownCard(row);
-      } catch (e) {
-        errEl.textContent = 'Chyba při ukládání na server.';
-        errEl.style.display = 'block';
-      }
-    }
-
-    function fmtLeft(left) {
-      const h = Math.floor(left / 3600000);
-      const m = Math.floor((left % 3600000) / 60000);
-      const s = Math.floor((left % 60000) / 1000);
-      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-    }
-
-    function addCountdownCard(row) {
-      const list = document.getElementById('sazeni-list');
-      // Odstraň placeholder
-      const placeholder = list.querySelector('[data-placeholder]');
-      if (placeholder) placeholder.remove();
-
-      const card = document.createElement('div');
-      card.id = 'cd-card-' + row.id;
-      card.style.cssText = 'padding:1rem;border:1px solid rgba(0,200,80,0.18);margin-bottom:0.8rem;background:rgba(0,0,0,0.2)';
-      card.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.8rem">' +
-          '<div>' +
-            '<div style="font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:rgba(0,200,80,0.7);margin-bottom:0.25rem">Kytky rostou</div>' +
-            '<div style="font-family:Cinzel,serif;font-size:0.78rem;color:var(--text-dim)">Postal: <span style="color:var(--gold)">' + row.postal + '</span></div>' +
-            '<div style="font-family:Cinzel,serif;font-size:0.78rem;color:var(--text-dim)">P\u011bstitel: <span style="color:var(--gold)">' + row.ic + '</span></div>' +
-          '</div>' +
-          '<div style="text-align:right">' +
-            '<div id="cd-display-' + row.id + '" style="font-family:Cinzel,serif;font-size:1.6rem;color:#00C853;letter-spacing:0.06em;text-shadow:0 0 16px rgba(0,200,80,0.4)">20:00:00</div>' +
-            '<div style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted)">do skliznE\u030c</div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="height:5px;background:rgba(0,0,0,0.3);border-radius:3px;overflow:hidden;margin-bottom:0.6rem">' +
-          '<div id="cd-bar-' + row.id + '" style="height:100%;width:0%;background:linear-gradient(90deg,#007A2C,#00C853);transition:width 1s linear;border-radius:3px"></div>' +
-        '</div>' +
-        '<div id="cd-done-' + row.id + '" style="display:none;padding:0.5rem 0.7rem;background:rgba(0,200,80,0.10);border:1px solid rgba(0,200,80,0.30);font-size:0.72rem;color:#00C853;font-family:Cinzel,serif;letter-spacing:0.12em;margin-bottom:0.6rem">\u2713 P\u0158IPRAVENO KE SKLIZNI</div>' +
-        '<button onclick="sazeniRemove(' + row.id + ')"' +
-          ' style="width:100%;padding:0.5rem;background:transparent;border:1px solid rgba(200,50,50,0.25);color:rgba(200,80,80,0.7);font-family:Cinzel,serif;font-size:0.56rem;letter-spacing:0.24em;text-transform:uppercase;cursor:pointer;transition:all 0.2s"' +
-          ' onmouseover="this.style.background=\'rgba(200,50,50,0.08)\'" onmouseout="this.style.background=\'transparent\'">' +
-          'Odstranit' +
-        '</button>';
-      list.appendChild(card);
-      updateBadge();
-      startCountdownFor(row.id, row.ends_at);
-    }
-
-    function startCountdownFor(id, endsAt) {
-      if (cdIntervals[id]) clearInterval(cdIntervals[id]);
-      function tick() {
-        const left = Math.max(0, endsAt - Date.now());
-        const dispEl = document.getElementById('cd-display-' + id);
-        const barEl  = document.getElementById('cd-bar-' + id);
-        const doneEl = document.getElementById('cd-done-' + id);
-        if (!dispEl) { clearInterval(cdIntervals[id]); return; }
-        dispEl.textContent = fmtLeft(left);
-        barEl.style.width = ((GROW_MS - left) / GROW_MS * 100).toFixed(2) + '%';
-        if (left === 0) {
-          clearInterval(cdIntervals[id]);
-          doneEl.style.display = 'block';
-          dispEl.style.color = '#00FF88';
-        }
-      }
-      tick();
-      cdIntervals[id] = setInterval(tick, 1000);
-    }
-
-    async function sazeniRemove(id) {
-      if (cdIntervals[id]) clearInterval(cdIntervals[id]);
-      await fetch('/api/sazeni/' + id, { method: 'DELETE' }).catch(() => {});
-      const card = document.getElementById('cd-card-' + id);
-      if (card) card.remove();
-      const list = document.getElementById('sazeni-list');
-      if (!list.children.length) {
-        list.innerHTML = '<div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>';
-      }
-      updateBadge();
-    }
-
-    function updateBadge() {
-      const count = document.querySelectorAll('#sazeni-list > [id^="cd-card-"]').length;
-      document.getElementById('saz-count-badge').textContent = count + ' aktivních';
-    }
-
-    // ── SSE live aktualizace od ostatních uživatelů ─────────────────────────
-    // Pozn.: evtSource je již vytvořen v renderNav — zde přidáme jen listener
-    evtSource.addEventListener('sazeniUpdate', e => {
-      const d = JSON.parse(e.data);
-      if (d.action === 'add') {
-        if (!document.getElementById('cd-card-' + d.row.id)) addCountdownCard(d.row);
-      } else if (d.action === 'remove') {
-        const card = document.getElementById('cd-card-' + d.id);
-        if (card) { card.remove(); updateBadge(); }
-        const list = document.getElementById('sazeni-list');
-        if (!list.children.length) list.innerHTML = '<div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>';
-      } else if (d.action === 'reset') {
-        Object.keys(cdIntervals).forEach(id => clearInterval(cdIntervals[id]));
-        document.getElementById('sazeni-list').innerHTML = '<div data-placeholder style="font-size:0.78rem;color:var(--text-muted);padding:1rem 0;text-align:center">Žádné aktivní sázení.</div>';
-        updateBadge();
-      }
-    });
-
-    // ── Obnovení stavu ze serveru po načtení stránky ────────────────────────
-    (async function sazeniRestore() {
-      try {
-        const res  = await fetch('/api/sazeni');
-        const rows = await res.json();
-        if (!Array.isArray(rows) || !rows.length) return;
-        rows.forEach(row => addCountdownCard(row));
-        updateBadge();
-      } catch (e) {}
-    })();
-  </script>
-  </body></html>`;
 }
 
 
