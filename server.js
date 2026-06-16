@@ -1486,6 +1486,7 @@ function baseStyles() {
         border-top:1px solid var(--border-gold);
         box-shadow:var(--shadow),var(--red-glow), inset 0 1px 0 rgba(255,255,255,0.4);
       }
+      body.light .sazeni-hero{
         background:linear-gradient(135deg,rgba(0,100,30,0.08),rgba(0,60,15,0.04));
         border-color:rgba(0,150,60,0.18);
       }
