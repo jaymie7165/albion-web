@@ -1038,7 +1038,7 @@ function baseStyles() {
         --shadow:0 12px 60px rgba(0,0,0,0.98);
         --shadow-card:0 4px 32px rgba(0,0,0,0.88);
         --red-glow:0 0 50px rgba(180,0,0,0.28), 0 0 100px rgba(100,0,0,0.12);
-        --nav-w:230px;
+        --nav-h:64px;
         /* noise texture overlay */
         --noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
       }
@@ -1179,62 +1179,55 @@ function baseStyles() {
       ::-webkit-scrollbar-thumb{background:rgba(120,0,0,0.5);border-radius:2px}
       ::-webkit-scrollbar-thumb:hover{background:rgba(160,0,0,0.7)}
 
-      /* ── NAV (LEVÝ SVISLÝ SIDEBAR) ── */
+      /* ── NAV ── */
       nav{
         background:rgba(4,3,2,0.98);
-        border-bottom:none;
-        border-right:1px solid rgba(160,0,0,0.20);
-        padding:1.2rem 0;
+        border-bottom:1px solid rgba(160,0,0,0.20);
+        padding:0 2rem;
         display:flex;
-        flex-direction:column;
-        align-items:stretch;
-        justify-content:flex-start;
-        position:fixed;
-        top:0;left:0;bottom:0;
+        align-items:center;
+        justify-content:space-between;
+        position:sticky;
+        top:0;
         z-index:200;
-        width:var(--nav-w);
-        height:100vh;
-        overflow-y:auto;
+        height:var(--nav-h);
         backdrop-filter:blur(40px) saturate(160%) brightness(0.4);
         -webkit-backdrop-filter:blur(40px) saturate(160%) brightness(0.4);
         transition:background 0.4s,border-color 0.4s;
-        box-shadow:1px 0 0 rgba(160,0,0,0.25), 4px 0 60px rgba(0,0,0,0.95), 8px 0 80px rgba(0,0,0,0.6);
+        box-shadow:0 1px 0 rgba(160,0,0,0.25), 0 4px 60px rgba(0,0,0,0.95), 0 8px 80px rgba(0,0,0,0.6);
       }
       nav::after{
         content:'';
         position:absolute;
-        top:0;bottom:0;right:0;
-        width:1px;
-        background:linear-gradient(180deg,transparent 0%,rgba(100,0,0,0.8) 20%,rgba(180,0,0,0.9) 50%,rgba(100,0,0,0.8) 80%,transparent 100%);
+        bottom:0;left:0;right:0;
+        height:1px;
+        background:linear-gradient(90deg,transparent 0%,rgba(100,0,0,0.8) 20%,rgba(180,0,0,0.9) 50%,rgba(100,0,0,0.8) 80%,transparent 100%);
         opacity:0.7;
         pointer-events:none;
       }
       nav::before{
         content:'';
         position:absolute;
-        top:0;bottom:0;left:0;
-        width:1px;
-        background:linear-gradient(180deg,transparent,rgba(255,255,255,0.025) 40%,rgba(255,255,255,0.025) 60%,transparent);
+        top:0;left:0;right:0;
+        height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.025) 40%,rgba(255,255,255,0.025) 60%,transparent);
         pointer-events:none;
       }
       body.light nav{
         background:rgba(242,236,224,0.96);
-        border-right-color:rgba(60,40,15,0.12);
-        box-shadow:1px 0 20px rgba(40,25,10,0.08);
+        border-bottom-color:rgba(60,40,15,0.12);
+        box-shadow:0 1px 20px rgba(40,25,10,0.08);
       }
       body.crystal nav{
         background:rgba(4,10,18,0.95);
-        border-right-color:rgba(126,200,227,0.18);
-        box-shadow:1px 0 30px rgba(0,100,180,0.15), 0 0 1px rgba(192,57,43,0.3);
+        border-bottom-color:rgba(126,200,227,0.18);
+        box-shadow:0 1px 30px rgba(0,100,180,0.15), 0 0 1px rgba(192,57,43,0.3);
       }
-      nav::-webkit-scrollbar{width:6px}
-      nav::-webkit-scrollbar-thumb{background:rgba(160,0,0,0.25);border-radius:3px}
-      nav::-webkit-scrollbar-track{background:transparent}
 
       .nav-logo{
         font-family:'Cinzel',serif;
-        letter-spacing:0.32em;
-        font-size:0.95rem;
+        letter-spacing:0.42em;
+        font-size:1.1rem;
         font-weight:600;
         text-decoration:none;
         background:linear-gradient(135deg,var(--gold) 0%,var(--silver-bright) 35%,var(--crimson-light) 70%,var(--gold) 100%);
@@ -1242,18 +1235,14 @@ function baseStyles() {
         color:transparent;-webkit-text-fill-color:transparent;
         text-shadow:none;
         display:flex;
-        flex-direction:column;
         align-items:center;
-        gap:0.6rem;
+        gap:0.85rem;
         flex-shrink:0;
-        padding:0 1rem 1.2rem;
-        margin-bottom:0.6rem;
-        border-bottom:1px solid var(--border);
         transition:opacity 0.2s;
       }
       .nav-logo:hover{opacity:0.8}
       .nav-logo-img{
-        width:38px;height:38px;
+        width:32px;height:32px;
         object-fit:contain;
         filter:drop-shadow(0 0 10px var(--crimson-light));
         transition:filter 0.3s,transform 0.3s;
@@ -1267,21 +1256,19 @@ function baseStyles() {
         text-shadow:0 0 18px var(--crimson-glow);
       }
 
-      .nav-menu{display:flex;flex-direction:column;gap:0.1rem;list-style:none;width:100%;padding:0 0.6rem}
-      .nav-menu li{width:100%}
+      .nav-menu{display:flex;gap:0;list-style:none;height:100%}
+      .nav-menu li{height:100%}
       .nav-menu a{
-        display:flex;align-items:flex-start;flex-direction:column;justify-content:center;
-        padding:0.65rem 0.9rem;
-        width:100%;
+        display:flex;align-items:center;flex-direction:column;justify-content:center;
+        padding:0 1.1rem;
+        height:100%;
         font-size:0.68rem;
-        letter-spacing:0.14em;
+        letter-spacing:0.16em;
         text-transform:uppercase;
         font-weight:500;
         color:var(--text-muted);
         text-decoration:none;
-        border-bottom:none;
-        border-left:2px solid transparent;
-        border-radius:2px;
+        border-bottom:2px solid transparent;
         transition:color 0.2s,border-color 0.2s,background 0.2s;
         white-space:nowrap;
         position:relative;
@@ -1299,7 +1286,7 @@ function baseStyles() {
       .nav-menu a:hover::before{opacity:0.55}
       .nav-menu a.active{
         color:var(--text);
-        border-left-color:var(--crimson-light);
+        border-bottom-color:var(--crimson-light);
         background:var(--crimson-glow);
       }
       body.light .nav-menu a.active{color:var(--text)}
@@ -1309,8 +1296,8 @@ function baseStyles() {
         font-weight:300;line-height:1;
       }
 
-      .nav-right{display:flex;flex-direction:column;align-items:stretch;gap:0.6rem;flex-shrink:0;width:100%;padding:1rem 0.9rem 0;margin-top:0.8rem;border-top:1px solid var(--border)}
-      .nav-user{font-size:0.68rem;color:var(--text-muted);letter-spacing:0.05em;white-space:normal;text-align:center}
+      .nav-right{display:flex;align-items:center;gap:0.75rem;flex-shrink:0}
+      .nav-user{font-size:0.72rem;color:var(--text-muted);letter-spacing:0.05em;white-space:nowrap}
       .nav-user strong{color:var(--silver-bright);font-weight:500}
       .nav-logout{
         font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:500;
@@ -1320,7 +1307,7 @@ function baseStyles() {
         transition:all 0.2s;
       }
       .nav-logout:hover{background:var(--crimson-glow);border-color:var(--crimson-light)}
-      .theme-switcher{display:flex;align-items:center;justify-content:center;gap:6px}
+      .theme-switcher{display:flex;align-items:center;gap:6px}
       .theme-dot-btn{
         width:14px;height:14px;border-radius:50%;border:2px solid transparent;
         cursor:pointer;transition:transform 0.18s,border-color 0.18s,box-shadow 0.18s;
@@ -1331,7 +1318,7 @@ function baseStyles() {
       .notif-bell{
         position:relative;cursor:pointer;background:none;border:none;
         color:var(--text-muted);padding:0.3rem;transition:color 0.2s;
-        display:flex;align-items:center;justify-content:center;
+        display:flex;align-items:center;
       }
       .notif-bell svg{width:18px;height:18px;transition:transform 0.2s}
       .notif-bell:hover{color:var(--crimson-bright)}
@@ -1345,7 +1332,7 @@ function baseStyles() {
       .notif-badge.visible{display:flex}
 
       /* ── LAYOUT ── */
-      main{max-width:1480px;margin:0 auto;padding:2.5rem 2rem 5rem;position:relative;z-index:1;margin-left:var(--nav-w)}
+      main{max-width:1480px;margin:0 auto;padding:2.5rem 2rem 5rem;position:relative;z-index:1}
 
       /* ── PAGE HEADER ── */
       .page-header{
@@ -1720,7 +1707,7 @@ function baseStyles() {
       .chapter-text{font-family:'Cormorant Garamond',serif;font-size:1.12rem;line-height:2;color:var(--text-dim)}
       .sidebar{
         background:var(--bg-card);border:1px solid var(--border-silver);
-        padding:2rem;position:sticky;top:1.5rem;
+        padding:2rem;position:sticky;top:calc(var(--nav-h) + 1.5rem);
         box-shadow:var(--shadow-card);
       }
       .sidebar-title{
@@ -1923,77 +1910,72 @@ function baseStyles() {
       .mini-stock-qty{font-size:0.78rem;color:var(--text);font-weight:500;min-width:36px;text-align:right;flex-shrink:0}
 
       @media(max-width:1200px){.nav-menu a .nav-desc{display:none}}
-      @media(max-width:900px){
-        .grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}
-        :root{--nav-w:170px}
-        .nav-desc{display:none}
-        .nav-logo{padding:0 0.8rem 1rem}
-        .nav-logo-text{font-size:0.85rem;letter-spacing:0.2em}
-        .nav-menu{padding:0 0.5rem}
-        .nav-menu a,.nav-drop-trigger{padding:0.6rem 0.6rem;white-space:normal}
-        .nav-user{font-size:0.6rem}
-      }
-      @media(max-width:768px){.profit-grid{grid-template-columns:repeat(2,1fr)}main{padding:1.5rem 1rem 5rem}}
+      @media(max-width:900px){.grid,.stats{grid-template-columns:1fr}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
+      @media(max-width:768px){.profit-grid{grid-template-columns:repeat(2,1fr)}main{padding:1.5rem 1rem}}
 
-      /* ── NAV DROPDOWN (ROZBALOVÁNÍ V SIDEBARU) ── */
-      .nav-dropdown{position:relative;width:100%}
+      /* ── NAV DROPDOWN ── */
+      .nav-dropdown{position:relative;height:100%}
       .nav-drop-trigger{
-        display:flex;align-items:center;flex-direction:row;justify-content:space-between;
-        padding:0.65rem 0.9rem;width:100%;
-        font-size:0.68rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:500;
+        display:flex;align-items:center;flex-direction:column;justify-content:center;
+        padding:0 1.1rem;height:100%;
+        font-size:0.68rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:500;
         color:var(--text-muted);text-decoration:none;
-        border-left:2px solid transparent;
-        border-radius:2px;
+        border-bottom:2px solid transparent;
         transition:color 0.2s,border-color 0.2s,background 0.2s;
-        white-space:nowrap;position:relative;gap:0.6rem;cursor:pointer;
-        box-sizing:border-box;
+        white-space:nowrap;position:relative;gap:0.2rem;cursor:pointer;
       }
-      .nav-drop-trigger .nav-drop-label{display:flex;flex-direction:column;gap:0.2rem;align-items:flex-start}
       .nav-drop-trigger::before{
         content:'';position:absolute;inset:0;
         background:var(--crimson-glow);opacity:0;transition:opacity 0.2s;
       }
-      .nav-drop-trigger:hover{color:var(--silver-bright)}
-      .nav-drop-trigger:hover::before{opacity:0.55}
-      .nav-drop-trigger.active{color:var(--text);border-left-color:var(--crimson-light);background:var(--crimson-glow)}
-      .nav-drop-arrow{width:9px;height:6px;margin-top:1px;opacity:0.4;transition:transform 0.2s,opacity 0.2s;flex-shrink:0}
+      .nav-drop-trigger:hover,.nav-dropdown:hover .nav-drop-trigger{color:var(--silver-bright)}
+      .nav-drop-trigger:hover::before,.nav-dropdown:hover .nav-drop-trigger::before{opacity:0.55}
+      .nav-drop-trigger.active{color:var(--text);border-bottom-color:var(--crimson-light);background:var(--crimson-glow)}
+      .nav-drop-arrow{width:9px;height:6px;margin-top:2px;opacity:0.4;transition:transform 0.2s,opacity 0.2s;flex-shrink:0}
       .nav-dropdown.open .nav-drop-arrow{transform:rotate(180deg);opacity:0.7}
       .nav-dropdown-menu{
-        position:relative;
-        background:rgba(0,0,0,0.18);
-        border:none;
-        max-height:0;
-        overflow:hidden;
-        opacity:0;
-        transition:max-height 0.22s ease,opacity 0.18s;
-        z-index:1;
-        width:100%;
+        position:absolute;top:100%;left:50%;transform:translateX(-50%);
+        background:rgba(4,3,2,0.98);
+        border:1px solid rgba(160,0,0,0.25);
+        border-top:1px solid rgba(180,0,0,0.5);
+        min-width:190px;
+        box-shadow:0 8px 40px rgba(0,0,0,0.95),0 2px 0 rgba(160,0,0,0.3);
+        backdrop-filter:blur(40px);
+        opacity:0;pointer-events:none;
+        transform:translateX(-50%) translateY(-6px);
+        transition:opacity 0.18s,transform 0.18s;
+        z-index:300;
       }
       body.light .nav-dropdown-menu{
-        background:rgba(0,0,0,0.04);
+        background:rgba(242,236,224,0.98);
+        border-color:rgba(60,40,15,0.15);
+        box-shadow:0 8px 30px rgba(40,25,10,0.15);
       }
       body.crystal .nav-dropdown-menu{
-        background:rgba(0,0,0,0.18);
+        background:rgba(4,10,18,0.98);
+        border-color:rgba(126,200,227,0.22);
       }
       .nav-dropdown.open .nav-dropdown-menu{
-        opacity:1;
-        max-height:500px;
+        opacity:1;pointer-events:all;
+        transform:translateX(-50%) translateY(0);
       }
       .nav-dropdown-menu a{
-        display:block;padding:0.55rem 0.9rem 0.55rem 2rem;
-        font-size:0.66rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:500;
+        display:block;padding:0.7rem 1.2rem;
+        font-size:0.7rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:500;
         color:var(--text-muted);text-decoration:none;
-        border-bottom:none;
+        border-bottom:1px solid var(--border);
         transition:color 0.15s,background 0.15s,padding-left 0.15s;
         white-space:nowrap;
       }
       .nav-dropdown-menu a:last-child{border-bottom:none}
-      .nav-dropdown-menu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:2.3rem}
+      .nav-dropdown-menu a:hover{color:var(--silver-bright);background:var(--crimson-glow);padding-left:1.5rem}
       .nav-dropdown-menu a.active{color:var(--crimson-light);background:rgba(160,0,0,0.08)}
 
       .nav-dropdown-menu.mega{
-        width:100%;
-        padding:0.2rem 0;
+        min-width:220px;
+        width:max-content;
+        max-width:96vw;
+        padding:0.4rem;
       }
       .bb-group{position:relative}
       .bb-group-title{
@@ -2096,7 +2078,8 @@ function renderNav(req, active) {
 
         <li class="nav-dropdown ${skladPages.includes(active)?'open':''}">
           <a href="/sklad" class="nav-drop-trigger ${skladPages.includes(active)?'active':''}">
-            <span class="nav-drop-label">Sklad<span class="nav-desc">Zbrane · Weed · Drogy · Chemky</span></span>
+            Sklad
+            <span class="nav-desc">Zbrane · Weed · Drogy · Chemky</span>
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
@@ -2109,7 +2092,8 @@ function renderNav(req, active) {
 
         <li class="nav-dropdown ${dataPages.includes(active)?'open':''}">
           <a href="/audit" class="nav-drop-trigger ${dataPages.includes(active)?'active':''}">
-            <span class="nav-drop-label">Záznamy<span class="nav-desc">Audit · Statistiky</span></span>
+            Záznamy
+            <span class="nav-desc">Audit · Statistiky</span>
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
@@ -2120,7 +2104,8 @@ function renderNav(req, active) {
 
         <li class="nav-dropdown ${infoPages.includes(active)?'open':''}">
           <a href="#" class="nav-drop-trigger ${infoPages.includes(active)?'active':''}">
-            <span class="nav-drop-label">Organizace<span class="nav-desc">Nástěnka · Kodex · Lore</span></span>
+            Organizace
+            <span class="nav-desc">Nástěnka · Kodex · Lore</span>
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
@@ -2133,21 +2118,21 @@ function renderNav(req, active) {
 
       </ul>
       <div class="nav-right">
+        <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-badge" id="notifBadge">0</span>
+        </button>
         <div class="theme-switcher" title="Přepnout téma">
           <button class="theme-dot-btn" id="td-dark"    style="background:#0A0A0A;border:1.5px solid #CC2020" onclick="setTheme('dark')"    title="Černá"></button>
           <button class="theme-dot-btn" id="td-light"   style="background:#F5F5F5;border:1.5px solid #CC1818" onclick="setTheme('light')"   title="Světlá"></button>
           <button class="theme-dot-btn" id="td-crystal" style="background:#06111A;border:1.5px solid #7EC8E3;box-shadow:0 0 6px rgba(126,200,227,0.5)" onclick="setTheme('crystal')" title="Krystal"></button>
         </div>
-        <button class="notif-bell" id="notifBell" title="Notifikace" onclick="window.location='/nastenska'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="notif-badge" id="notifBadge">0</span>
-        </button>
         <span class="nav-user">přihlášen jako <strong>${ic}</strong></span>
-        <a href="/logout" class="nav-logout" style="text-align:center">Odhlásit</a>
+        <a href="/logout" class="nav-logout">Odhlásit</a>
       </div>
     </nav>
     <script>
-      // ── DROPDOWN NAV (klik = rozbalit/zabalit v sidebaru) ──
+      // ── DROPDOWN NAV ──
       document.querySelectorAll('.nav-dropdown').forEach(dd => {
         const trigger = dd.querySelector('.nav-drop-trigger');
         trigger.addEventListener('click', (e) => {
@@ -2157,6 +2142,9 @@ function renderNav(req, active) {
           e.preventDefault();
           dd.classList.toggle('open');
         });
+        // hover open
+        dd.addEventListener('mouseenter', () => dd.classList.add('open'));
+        dd.addEventListener('mouseleave', () => dd.classList.remove('open'));
       });
       // Close dropdowns on outside click
       document.addEventListener('click', (e) => {
