@@ -1443,7 +1443,21 @@ function baseStyles() {
       @keyframes hudSweep{0%{top:-120px}100%{top:100vh}}
       body.light .hud-scan{opacity:0.18}
 
-      /* ── HUD CORNER READOUT — quiet "system telemetry" strip, bottom-left ── */
+      /* ── RANDOM GLITCH TEARS — horizontal noise lines ── */
+      .hud-scan::before{
+        content:'';position:absolute;inset:0;pointer-events:none;
+        background:transparent;
+        animation:hudTears 7s steps(1) infinite;
+      }
+      @keyframes hudTears{
+        0%,92%{box-shadow:none}
+        93%{box-shadow:0 calc(20vh + 0px) 0 100vw rgba(0,255,65,0.06)}
+        94%{box-shadow:0 calc(55vh + 0px) 0 100vw rgba(229,62,62,0.06)}
+        95%{box-shadow:0 calc(35vh + 0px) 0 100vw rgba(0,255,65,0.04), 0 calc(70vh) 0 100vw rgba(229,62,62,0.04)}
+        96%,100%{box-shadow:none}
+      }
+
+      /* ── HUD CORNER READOUT ── */
       .hud-readout{
         position:fixed;left:14px;bottom:12px;z-index:50;
         font-family:'Share Tech Mono',monospace;
@@ -1462,7 +1476,17 @@ function baseStyles() {
       @keyframes hudPulse{0%,100%{opacity:1}50%{opacity:0.35}}
       @media(max-width:768px){ .hud-readout{display:none} }
 
-      /* ── GLITCH REVEAL — for wordmarks / headline text on first paint ── */
+      /* ── CORNER STATUS TOP-RIGHT ── */
+      .hud-corner-tr{
+        position:fixed;top:76px;right:14px;z-index:50;
+        font-family:'Share Tech Mono',monospace;font-size:0.58rem;letter-spacing:0.05em;
+        color:rgba(0,255,65,0.35);pointer-events:none;user-select:none;line-height:1.8;text-align:right;
+        animation:hudCornerFlicker 8s steps(1) infinite;
+      }
+      @keyframes hudCornerFlicker{0%,88%{opacity:1}89%{opacity:0.1}90%{opacity:0.9}91%{opacity:0.3}92%,100%{opacity:1}}
+      @media(max-width:1200px){.hud-corner-tr{display:none}}
+
+      /* ── GLITCH REVEAL ── */
       @keyframes glitchIn{
         0%{opacity:0;transform:translateX(0);clip-path:inset(0 0 0 0)}
         8%{opacity:1;transform:translateX(-2px);clip-path:inset(10% 0 60% 0)}
@@ -1473,12 +1497,54 @@ function baseStyles() {
       }
       .glitch-in{animation:glitchIn 0.7s steps(2,jump-end) 1}
 
-      /* ── ONE-SHOT POWER-ON FLICKER — plays once when a page loads ── */
+      /* ── POWER-ON FLICKER ── */
       @keyframes bootFlicker{
         0%{opacity:0}
         4%{opacity:1}8%{opacity:0.2}12%{opacity:1}
         16%{opacity:0.4}20%{opacity:1}
         100%{opacity:1}
+      }
+
+      /* ── NAV GLITCH on hover ── */
+      nav{
+        animation:navGlitch 12s steps(1) infinite;
+      }
+      @keyframes navGlitch{
+        0%,96%{filter:none}
+        97%{filter:brightness(1.1) hue-rotate(5deg)}
+        98%{filter:none;transform:translateX(-1px)}
+        99%{filter:none;transform:none}
+        100%{filter:none}
+      }
+
+      /* ── PAGE TITLE glitch ── */
+      .page-title{
+        position:relative;
+        animation:pageTitleGlitch 8s steps(2) 2s infinite;
+      }
+      @keyframes pageTitleGlitch{
+        0%,92%{text-shadow:none;transform:none}
+        93%{text-shadow:-2px 0 rgba(0,255,65,0.5),2px 0 rgba(229,62,62,0.5);transform:translateX(-1px)}
+        94%{text-shadow:1px 0 rgba(229,62,62,0.4);transform:translateX(1px) skewX(0.3deg)}
+        95%,100%{text-shadow:none;transform:none}
+      }
+
+      /* ── CARD border glitch ── */
+      .card{
+        position:relative;
+        transition:border-color 0.2s,box-shadow 0.2s,transform 0.1s;
+      }
+      .card::before{
+        content:'';position:absolute;inset:-1px;border-radius:11px;pointer-events:none;
+        border:1px solid transparent;
+        animation:cardBorderGlitch 9s steps(1) infinite;
+        z-index:1;
+      }
+      @keyframes cardBorderGlitch{
+        0%,94%{border-color:transparent;opacity:0}
+        95%{border-color:rgba(0,255,65,0.2);opacity:1}
+        96%{border-color:rgba(229,62,62,0.2)}
+        97%,100%{border-color:transparent;opacity:0}
       }
 
       /* ── SCROLLBAR ── */
@@ -2244,6 +2310,12 @@ function renderNav(req, active) {
       <div class="hud-line" id="hudUptime">UPTIME 00:00:00</div>
       <div class="hud-line" id="hudNode">NODE #${(Math.floor(Math.random()*8999)+1000)} · LAT <span id="hudLat">--</span>ms</div>
     </div>
+    <div class="hud-corner-tr" id="hudCornerTR">
+      SYS_STATUS: BREACH_ACTIVE<br>
+      ENC: AES-256-CTR<br>
+      PROXY: <span id="hudProxyChain">--</span><br>
+      TRACE: <span style="color:rgba(229,62,62,0.5)">SCRAMBLED</span>
+    </div>
     <nav>
       <a href="/dashboard" class="nav-logo">
         <img src="/logo.png" class="nav-logo-img" alt="Albion">
@@ -2399,15 +2471,42 @@ function renderNav(req, active) {
         const t0 = Date.now();
         const uptimeEl = document.getElementById('hudUptime');
         const latEl = document.getElementById('hudLat');
+        const proxyEl = document.getElementById('hudProxyChain');
         function pad(n){ return n.toString().padStart(2,'0'); }
+        // generate fake proxy chain
+        function fakeIP(){ return (Math.floor(Math.random()*220)+10)+'.'+(Math.floor(Math.random()*250)+1)+'.'+(Math.floor(Math.random()*250)+1)+'.'+(Math.floor(Math.random()*250)+1); }
+        const proxyChain = [fakeIP(), fakeIP(), fakeIP()];
+        var proxyIdx = 0;
         function tick(){
           const s = Math.floor((Date.now()-t0)/1000);
           const hh = Math.floor(s/3600), mm = Math.floor((s%3600)/60), ss = s%60;
           if (uptimeEl) uptimeEl.textContent = 'UPTIME ' + pad(hh) + ':' + pad(mm) + ':' + pad(ss);
           if (latEl) latEl.textContent = (12 + Math.floor(Math.random()*9));
+          if (proxyEl) {
+            proxyIdx = (proxyIdx+1) % proxyChain.length;
+            proxyEl.textContent = proxyChain[proxyIdx];
+          }
         }
         tick();
         setInterval(tick, 1000);
+
+        // ── random full-page glitch tear — every 15-25s
+        function scheduleGlitch(){
+          var delay = 15000 + Math.random()*10000;
+          setTimeout(function(){
+            var el = document.createElement('div');
+            el.style.cssText='position:fixed;top:'+(20+Math.random()*60)+'%;left:0;width:100%;height:'+(1+Math.random()*3)+'px;background:rgba(0,255,65,0.18);z-index:9999;pointer-events:none;mix-blend-mode:screen';
+            document.body.appendChild(el);
+            setTimeout(function(){ el.remove(); }, 60 + Math.random()*80);
+            // second tear
+            var el2 = document.createElement('div');
+            el2.style.cssText='position:fixed;top:'+(10+Math.random()*80)+'%;left:0;width:100%;height:'+(1+Math.random()*2)+'px;background:rgba(229,62,62,0.14);z-index:9999;pointer-events:none;mix-blend-mode:screen';
+            document.body.appendChild(el2);
+            setTimeout(function(){ el2.remove(); }, 40 + Math.random()*60);
+            scheduleGlitch();
+          }, delay);
+        }
+        scheduleGlitch();
       })();
     </script>
   `;
@@ -4692,21 +4791,23 @@ function renderAuth(page, error, data) {
         --border-gold:rgba(229,62,62,0.30);
       }
       body{
-        background:#050302;color:#EDE9E0;
+        background:#040201;color:#EDE9E0;
         font-family:'Inter',sans-serif;font-weight:300;
         min-height:100vh;display:flex;align-items:center;justify-content:center;
         position:relative;overflow:hidden;
+        animation:authBodyFlicker 0.6s linear;
       }
-      /* Logo watermark */
+      @keyframes authBodyFlicker{0%{opacity:0}5%{opacity:1}9%{opacity:0.3}14%{opacity:1}18%{opacity:0.6}22%{opacity:1}100%{opacity:1}}
+
+      /* scanlines on top */
       body::after{
         content:'';position:fixed;inset:0;
-        background-image:url('/logo.png');
-        background-repeat:no-repeat;
-        background-position:center center;
-        background-size:min(70vw,70vh);
-        opacity:0.035;
+        background-image:url('/logo.png'),
+          repeating-linear-gradient(0deg,rgba(0,255,60,0.025) 0px,rgba(0,255,60,0.025) 1px,transparent 1px,transparent 4px);
+        background-repeat:no-repeat,repeat;
+        background-position:center center,0 0;
+        background-size:min(70vw,70vh),100%;
         pointer-events:none;z-index:0;
-        filter:grayscale(100%) contrast(1.4) sepia(0.3);
         mix-blend-mode:luminosity;
       }
       /* Cartel ambient — blood from top, jungle shadow from bottom */
@@ -4802,91 +4903,210 @@ function renderAuth(page, error, data) {
       .auth-divider::before{left:0}.auth-divider::after{right:0}
       .auth-sep{height:1px;background:rgba(160,0,0,0.07);margin:1.2rem 0}
 
-      /* ── BOOT SEQUENCE — plays once on first entry, like a system intrusion ── */
+      /* ── BOOT SEQUENCE — darkweb cartel intrusion ── */
       body.booting{overflow:hidden}
       .auth-reveal{transition:opacity 0.6s ease}
       body.booting .auth-reveal{opacity:0}
       .boot-screen{
-        position:fixed;inset:0;z-index:999;background:#020100;
+        position:fixed;inset:0;z-index:999;background:#000;
         display:flex;align-items:center;justify-content:center;
         transition:opacity 0.5s ease, visibility 0.5s ease;
       }
       .boot-screen.boot-hidden{opacity:0;visibility:hidden;pointer-events:none}
-      .boot-term{
-        width:90%;max-width:560px;color:#7CFF8A;
-        font-family:'JetBrains Mono',monospace;
-        font-size:0.82rem;line-height:1.95;
-        text-shadow:0 0 8px rgba(124,255,138,0.35);
+      .boot-screen::before{
+        content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
+        background:repeating-linear-gradient(0deg,rgba(0,255,60,0.04) 0px,rgba(0,255,60,0.04) 1px,transparent 1px,transparent 4px);
+        animation:bootScanMove 3s linear infinite;
       }
-      .boot-term .boot-line{white-space:pre-wrap;word-break:break-word}
-      .boot-cursor{display:inline-block;width:8px;height:1em;background:#7CFF8A;vertical-align:-2px;animation:bootCursor 0.9s steps(1) infinite}
+      @keyframes bootScanMove{0%{background-position:0 0}100%{background-position:0 40px}}
+      .boot-screen::after{
+        content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
+        background:radial-gradient(ellipse 80% 70% at 50% 50%, transparent 40%, rgba(0,0,0,0.85) 100%);
+      }
+      .boot-term{
+        width:90%;max-width:620px;color:#00FF41;
+        font-family:'JetBrains Mono',monospace;
+        font-size:0.85rem;line-height:2;
+        text-shadow:0 0 10px rgba(0,255,65,0.7),0 0 20px rgba(0,255,65,0.3);
+        position:relative;z-index:2;
+      }
+      .boot-term .boot-line{white-space:pre-wrap;word-break:break-word;animation:bootLineIn 0.05s ease}
+      @keyframes bootLineIn{from{opacity:0;filter:blur(2px)}to{opacity:1;filter:none}}
+      .boot-line.err{color:#FF3B3B;text-shadow:0 0 10px rgba(255,59,59,0.7)}
+      .boot-line.warn{color:#FFB800;text-shadow:0 0 10px rgba(255,184,0,0.6)}
+      .boot-line.dim{color:#1a6a1a;text-shadow:none}
+      .boot-line.white{color:#cccccc;text-shadow:none}
+      .boot-cursor{display:inline-block;width:9px;height:1.1em;background:#00FF41;vertical-align:-3px;animation:bootCursor 0.7s steps(1) infinite;box-shadow:0 0 8px #00FF41}
       @keyframes bootCursor{0%,49%{opacity:1}50%,100%{opacity:0}}
       .boot-skip{
-        position:absolute;bottom:24px;right:28px;
-        color:#3a4a3a;font-size:0.58rem;letter-spacing:0.16em;text-transform:uppercase;
-        font-family:'Inter',sans-serif;
+        position:absolute;bottom:24px;right:28px;z-index:2;
+        color:#1a3a1a;font-size:0.58rem;letter-spacing:0.16em;text-transform:uppercase;
+        font-family:'JetBrains Mono',monospace;
       }
-      /* ── wordmark glitch-in ── */
+      .boot-progress{margin-top:1.4rem;height:2px;background:rgba(0,255,65,0.1);position:relative;overflow:hidden}
+      .boot-progress-fill{height:100%;background:#00FF41;box-shadow:0 0 12px #00FF41;transition:width 0.15s linear;width:0%}
+
+      /* ── AUTH BOX glitch ── */
+      @keyframes authBoxGlitch{
+        0%,93%{transform:none;filter:none}
+        94%{transform:translateX(-2px);filter:hue-rotate(20deg)}
+        95%{transform:translateX(2px) skewX(0.4deg)}
+        96%{transform:translateX(-1px) skewX(-0.3deg);filter:none}
+        97%,100%{transform:none;filter:none}
+      }
+      .auth-box{animation:boxIn 0.4s cubic-bezier(0.22,1,0.36,1), authBoxGlitch 5s steps(2) 1s infinite !important}
+      .auth-box::before{
+        display:block !important;content:'';position:absolute;inset:-1px;border-radius:10px;pointer-events:none;
+        border:1px solid rgba(229,62,62,0);
+        animation:authBorderPulse 3.5s ease-in-out infinite;z-index:0;
+      }
+      @keyframes authBorderPulse{0%,100%{border-color:rgba(229,62,62,0);box-shadow:none}50%{border-color:rgba(229,62,62,0.4);box-shadow:0 0 20px rgba(229,62,62,0.12) inset}}
+      .auth-box::after{
+        display:block !important;content:'';position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:0;
+        background:
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) top left/14px 1px no-repeat,
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) top left/1px 14px no-repeat,
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) top right/14px 1px no-repeat,
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) top right/1px 14px no-repeat,
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) bottom left/14px 1px no-repeat,
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) bottom left/1px 14px no-repeat,
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) bottom right/14px 1px no-repeat,
+          linear-gradient(var(--crimson,#e53e3e),var(--crimson,#e53e3e)) bottom right/1px 14px no-repeat;
+        opacity:0.6;animation:cornersFlicker 6s steps(1) infinite;
+      }
+      @keyframes cornersFlicker{0%,95%{opacity:0.6}96%{opacity:0.1}97%{opacity:0.8}98%{opacity:0.3}100%{opacity:0.6}}
+
+      /* ── TITLE glitch ── */
       @keyframes authGlitch{
         0%{opacity:0;clip-path:inset(0 0 0 0)}
-        10%{opacity:1;clip-path:inset(20% 0 55% 0);transform:translateX(-2px)}
-        20%{clip-path:inset(55% 0 10% 0);transform:translateX(2px)}
-        30%{clip-path:inset(10% 0 40% 0);transform:translateX(-1px)}
+        10%{opacity:1;clip-path:inset(20% 0 55% 0);transform:translateX(-3px)}
+        20%{clip-path:inset(55% 0 10% 0);transform:translateX(3px)}
+        30%{clip-path:inset(10% 0 40% 0);transform:translateX(-2px)}
         45%{clip-path:inset(0 0 0 0);transform:translateX(0)}
         100%{opacity:1;clip-path:inset(0 0 0 0)}
       }
-      .auth-logo h1{animation:authGlitch 0.8s steps(2,jump-end) 1}
+      @keyframes titleGlitchLoop{
+        0%,88%{text-shadow:none;transform:none}
+        89%{text-shadow:-2px 0 rgba(0,255,65,0.8),2px 0 rgba(229,62,62,0.8);transform:translateX(-2px)}
+        91%{text-shadow:2px 0 rgba(0,255,65,0.5);transform:translateX(1px) skewX(1deg)}
+        93%{text-shadow:none;transform:none}
+        95%{text-shadow:-1px 0 rgba(229,62,62,0.9);transform:translateX(-1px)}
+        97%,100%{text-shadow:none;transform:none}
+      }
+      .auth-logo h1{animation:authGlitch 0.8s steps(2,jump-end) 1, titleGlitchLoop 4.5s steps(2) 1.5s infinite}
+
+      /* ── STATUS bar ── */
+      .auth-status-bar{
+        display:flex;align-items:center;gap:0.6rem;margin-bottom:1.6rem;padding:0.6rem 0.9rem;
+        background:rgba(0,255,65,0.04);border:1px solid rgba(0,255,65,0.18);
+        font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.06em;color:#00AA2A;
+      }
+      .auth-status-dot{width:6px;height:6px;border-radius:50%;background:#00FF41;box-shadow:0 0 8px #00FF41;animation:authDotPulse 1.5s ease-in-out infinite;flex-shrink:0}
+      @keyframes authDotPulse{0%,100%{box-shadow:0 0 4px #00FF41}50%{box-shadow:0 0 14px #00FF41,0 0 24px rgba(0,255,65,0.4)}}
+
+      /* ── INPUT glitch focus ── */
+      .auth-input:focus{border-color:rgba(0,255,65,0.5)!important;box-shadow:0 0 0 2px rgba(0,255,65,0.08),0 0 12px rgba(0,255,65,0.12)!important}
+
+      /* ── BUTTON sweep ── */
+      .auth-btn{position:relative;overflow:hidden}
+      .auth-btn::before{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:btnSweep 3s ease-in-out 2s infinite}
+      @keyframes btnSweep{0%,60%{left:-100%}100%{left:220%}}
     </style>
   `;
 
   const logoHtml = `<div class="auth-logo"><img src="/logo.png" class="auth-logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1>`;
 
   const bootScreen = `
+    <canvas id="matrixCanvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.10"></canvas>
     <div class="boot-screen" id="bootScreen">
-      <div class="boot-term" id="bootTerm"><span class="boot-cursor"></span></div>
-      <div class="boot-skip">stiskni klávesu pro přeskočení</div>
+      <div class="boot-term" id="bootTerm">
+        <div class="boot-progress"><div class="boot-progress-fill" id="bootBar"></div></div>
+        <br>
+        <span class="boot-cursor"></span>
+      </div>
+      <div class="boot-skip">[ click / stiskni klávesu — přeskočit ]</div>
     </div>
     <script>
       (function(){
+        // ── matrix canvas ──
+        (function(){
+          var c=document.getElementById('matrixCanvas');
+          if(!c) return;
+          var ctx=c.getContext('2d');
+          function resize(){c.width=window.innerWidth;c.height=window.innerHeight;}
+          resize(); window.addEventListener('resize',resize);
+          var cols=Math.floor(window.innerWidth/14);
+          var drops=Array.from({length:cols},()=>Math.random()*-50);
+          var chars='01アイウエオカキクケコサシスセソABCDEF!@#$%^&*<>[]{}';
+          function draw(){
+            ctx.fillStyle='rgba(0,0,0,0.05)';ctx.fillRect(0,0,c.width,c.height);
+            ctx.fillStyle='#00FF41';ctx.font='12px JetBrains Mono,monospace';
+            drops.forEach(function(y,i){
+              var ch=chars[Math.floor(Math.random()*chars.length)];
+              ctx.fillText(ch,i*14,y*14);
+              if(y*14>c.height&&Math.random()>0.975) drops[i]=0;
+              drops[i]+=0.5;
+            });
+          }
+          setInterval(draw,50);
+        })();
+
         var boot = document.getElementById('bootScreen');
         var term = document.getElementById('bootTerm');
+        var bar  = document.getElementById('bootBar');
         if (!boot || !term) return;
         if (sessionStorage.getItem('albion_booted')) {
           boot.remove();
           document.body.classList.remove('booting');
           return;
         }
+        var tid = Math.floor(Math.random()*8999)+1000;
+        var ip  = '192.168.' + (Math.floor(Math.random()*254)+1) + '.' + (Math.floor(Math.random()*254)+1);
         var lines = [
-          '> ESTABLISHING SECURE CHANNEL...',
-          '> NODE VERIFIED :: ALBION-NET',
-          '> DECRYPTING ACCESS LAYER... [OK]',
-          '> SKENOVÁNÍ STOPY... ŽÁDNÁ HROZBA',
-          '> TERMINÁL #' + (Math.floor(Math.random()*8999)+1000) + ' AUTENTIZOVÁN',
-          '> SPOJENÍ NAVÁZÁNO.',
-          '> VÍTEJ ZPĚT, BRATŘE.'
+          { text: '> INITIALIZING SECURE TUNNEL...', cls: 'ok', delay: 80 },
+          { text: '> TARGET: ALBION-NET CORE [' + ip + ']', cls: 'dim', delay: 60 },
+          { text: '> BYPASSING FIREWALL LAYER 1... [████████] 100%', cls: 'ok', delay: 55 },
+          { text: '> BYPASSING FIREWALL LAYER 2... [██████░░] 75%', cls: 'warn', delay: 70 },
+          { text: '! INTRUSION DETECTED — spoofing identity...', cls: 'err', delay: 40 },
+          { text: '> IDENTITY SPOOFED [OK] — resuming...', cls: 'ok', delay: 60 },
+          { text: '> DECRYPTING ACCESS KEYS... AES-256... [OK]', cls: 'ok', delay: 50 },
+          { text: '> NODE HANDSHAKE :: ALBION-NET [ESTABLISHED]', cls: 'ok', delay: 50 },
+          { text: '> SKENOVÁNÍ STOPY............. ČISTÉ', cls: 'ok', delay: 60 },
+          { text: '> SESSION TOKEN: ALB-' + tid + '-' + Math.random().toString(36).slice(2,8).toUpperCase(), cls: 'dim', delay: 40 },
+          { text: '> PŘÍSTUP UDĚLEN — VÍTEJ, BRATŘE.', cls: 'white', delay: 80 },
         ];
         var cursor = term.querySelector('.boot-cursor');
         var li = 0;
         function nextLine(){
           if (li >= lines.length) { return finish(); }
+          var ln = lines[li];
           var div = document.createElement('div');
-          div.className = 'boot-line';
+          div.className = 'boot-line ' + (ln.cls||'ok');
           term.insertBefore(div, cursor);
-          var i = 0, text = lines[li];
+          if (bar) bar.style.width = Math.round((li/lines.length)*100) + '%';
+          var i = 0, text = ln.text;
+          // occasional random char corruption then correct
           var typer = setInterval(function(){
-            div.textContent = text.slice(0, ++i);
-            if (i >= text.length) { clearInterval(typer); li++; setTimeout(nextLine, 160); }
-          }, 13);
+            var ch = text.slice(0,++i);
+            if (Math.random() < 0.06) {
+              var glitchChars='01#@!%$<>[]{}'; 
+              div.textContent = ch + glitchChars[Math.floor(Math.random()*glitchChars.length)];
+            } else {
+              div.textContent = ch;
+            }
+            if (i >= text.length) { div.textContent = text; clearInterval(typer); li++; setTimeout(nextLine, ln.delay||120); }
+          }, 11);
         }
         function finish(){
+          if (bar) bar.style.width = '100%';
           sessionStorage.setItem('albion_booted', '1');
           setTimeout(function(){
             boot.classList.add('boot-hidden');
             document.body.classList.remove('booting');
             setTimeout(function(){ boot.remove(); }, 600);
-          }, 450);
+          }, 500);
         }
-        function skip(){ term.innerHTML = ''; finish(); }
+        function skip(){ finish(); }
         boot.addEventListener('click', skip);
         document.addEventListener('keydown', skip, { once: true });
         nextLine();
@@ -4894,7 +5114,7 @@ function renderAuth(page, error, data) {
     </script>
   `;
 
-  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body class="booting">${bootScreen}<div class="auth-reveal"><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Přihlášení do systému</p></div>${errMsg}<a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes aplikaci</a><div class="auth-divider">nebo</div><a href="/register" class="auth-btn secondary">Registrovat se</a></div>${successReg}</div></body></html>`;
+  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body class="booting">${bootScreen}<div class="auth-reveal"><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Přihlášení do systému</p></div><div class="auth-status-bar"><div class="auth-status-dot"></div><span>ZABEZPEČENÝ KANÁL AKTIVNÍ &nbsp;// ŠIFROVÁNÍ AES-256 // SESSION: ${Math.random().toString(36).slice(2,8).toUpperCase()}</span></div>${errMsg}<a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes aplikaci</a><div class="auth-divider">nebo</div><a href="/register" class="auth-btn secondary">Registrovat se</a></div>${successReg}</div></body></html>`;
   if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body class="booting">${bootScreen}<div class="auth-reveal"><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;line-height:1.75;margin-bottom:1.5rem">Pro registraci musíš být členem aplikace serveru Albion.</p><a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes aplikaci</a><div class="auth-sep"></div><a href="/login" class="auth-btn secondary">Zpět na přihlášení</a></div></div></body></html>`;
   if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Aplikace: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required><label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="auth-btn">Dokončit registraci</button></form></div></body></html>`;
   if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.78rem;color:#3A3A50;margin-bottom:1.5rem">Aplikace: <strong style="color:#ECEEF6">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="auth-btn">Přihlásit se</button></form></div></body></html>`;
