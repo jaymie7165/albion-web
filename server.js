@@ -5055,11 +5055,7 @@ function renderAuth(page, error, data) {
         var term = document.getElementById('bootTerm');
         var bar  = document.getElementById('bootBar');
         if (!boot || !term) return;
-        if (sessionStorage.getItem('albion_booted')) {
-          boot.remove();
-          document.body.classList.remove('booting');
-          return;
-        }
+        // always show boot on every load
         var tid = Math.floor(Math.random()*8999)+1000;
         var ip  = '192.168.' + (Math.floor(Math.random()*254)+1) + '.' + (Math.floor(Math.random()*254)+1);
         var lines = [
@@ -5099,7 +5095,6 @@ function renderAuth(page, error, data) {
         }
         function finish(){
           if (bar) bar.style.width = '100%';
-          sessionStorage.setItem('albion_booted', '1');
           setTimeout(function(){
             boot.classList.add('boot-hidden');
             document.body.classList.remove('booting');
