@@ -1306,7 +1306,20 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 
 
-// ── BASE STYLES ───────────────────────────────────────────────────────────────
+// ── LEDGER EMPTY STATE — shared "unwritten page" illustration ──────────────────
+function ledgerEmpty(text, compact) {
+  return `<div class="ledger-empty${compact ? ' compact' : ''}">
+    <svg viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="2" width="58" height="44" rx="2" stroke="var(--border-brass)" stroke-width="1.5"/>
+      <line x1="12" y1="14" x2="44" y2="14" stroke="var(--border)" stroke-width="1.5"/>
+      <line x1="12" y1="22" x2="52" y2="22" stroke="var(--border)" stroke-width="1.5"/>
+      <line x1="12" y1="30" x2="38" y2="30" stroke="var(--border)" stroke-width="1.5"/>
+      <line x1="12" y1="38" x2="48" y2="38" stroke="var(--border)" stroke-width="1.5"/>
+    </svg>
+    <div class="ledger-empty-text">${text}</div>
+  </div>`;
+}
+
 // ── BASE STYLES ───────────────────────────────────────────────────────────────
 function baseStyles() {
   return `
@@ -1623,6 +1636,15 @@ function baseStyles() {
       }
       .theme-dot-btn:hover{transform:scale(1.25)}
       .theme-dot-btn.active{border-color:var(--vellum);box-shadow:0 0 0 1px var(--bg),0 0 6px rgba(201,162,39,0.3)}
+      .nav-shortcut-hint{
+        font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.05em;
+        color:var(--text-muted);border:1px solid var(--border);
+        padding:0.22rem 0.5rem;border-radius:2px;cursor:default;
+        opacity:0.6;transition:opacity 0.2s,border-color 0.2s;
+        flex-shrink:0;
+      }
+      .nav-shortcut-hint:hover{opacity:1;border-color:var(--border-brass)}
+      @media(max-width:880px){.nav-shortcut-hint{display:none}}
       .notif-bell{
         position:relative;cursor:pointer;background:none;border:none;
         color:var(--text-muted);padding:0.3rem;transition:color 0.2s;
@@ -2293,6 +2315,17 @@ function baseStyles() {
         50%{box-shadow:0 0 0 6px var(--seal-glow);opacity:1}
       }
 
+      /* ── LEDGER EMPTY STATE — an unwritten page ── */
+      .ledger-empty{
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        gap:0.9rem;padding:2.2rem 1.5rem;text-align:center;
+      }
+      .ledger-empty svg{width:64px;height:48px;opacity:0.5;flex-shrink:0}
+      .ledger-empty-text{font-size:0.82rem;color:var(--text-muted);font-family:var(--font-mono);letter-spacing:0.02em}
+      .ledger-empty.compact{padding:1.1rem 0.5rem;gap:0.6rem}
+      .ledger-empty.compact svg{width:42px;height:32px}
+      .ledger-empty.compact .ledger-empty-text{font-size:0.76rem}
+
       /* ── SELECT EXPANDABLE ── */
       .form-group{position:relative}
       .select-expandable{padding-right:2.8rem!important;cursor:pointer;border-color:var(--border-brass)!important}
@@ -2396,6 +2429,7 @@ function renderNav(req, active) {
           <button class="theme-dot-btn" id="td-light"   style="background:#F3EEE3;border:1.5px solid #A1271F" onclick="setTheme('light')"   title="Pergamen"></button>
           <button class="theme-dot-btn" id="td-crystal" style="background:#070B10;border:1.5px solid #6FA8C9;box-shadow:0 0 6px rgba(111,168,201,0.5)" onclick="setTheme('crystal')" title="Šifrovaný kanál"></button>
         </div>
+        <span class="nav-shortcut-hint" title="Zkratky: g+h Přehled · g+s Sklad · g+b Blackbook · g+a Audit · g+t Statistiky · g+n Nástěnka · g+k Kodex · g+l Historie · g+o Hierarchie · g+w Weed sázení · / Hledat v auditu">g·_</span>
         <span class="nav-user">člen <strong>${ic}</strong></span>
         <a href="/logout" class="nav-logout">Odhlásit</a>
       </div>
@@ -2509,6 +2543,56 @@ function renderNav(req, active) {
         t._timer = setTimeout(() => t.className = 'toast', 3500);
       }
       window.showToast = showToast;
+      window.ledgerEmptyHTML = function(text, compact) {
+        return '<div class="ledger-empty' + (compact ? ' compact' : '') + '">' +
+          '<svg viewBox="0 0 64 48" fill="none">' +
+          '<rect x="3" y="2" width="58" height="44" rx="2" stroke="var(--border-brass)" stroke-width="1.5"/>' +
+          '<line x1="12" y1="14" x2="44" y2="14" stroke="var(--border)" stroke-width="1.5"/>' +
+          '<line x1="12" y1="22" x2="52" y2="22" stroke="var(--border)" stroke-width="1.5"/>' +
+          '<line x1="12" y1="30" x2="38" y2="30" stroke="var(--border)" stroke-width="1.5"/>' +
+          '<line x1="12" y1="38" x2="48" y2="38" stroke="var(--border)" stroke-width="1.5"/>' +
+          '</svg><div class="ledger-empty-text">' + text + '</div></div>';
+      };
+
+      // ── RITUAL SHORTCUTS — g+letter to navigate, / to search ──
+      (function(){
+        const ROUTES = {
+          h: '/home', s: '/sklad', b: '/blackbook', p: '/profit-centrum',
+          a: '/audit', t: '/statistiky', n: '/nastenska', k: '/kodex',
+          l: '/lore', o: '/hierarchy', w: '/weed-sazeni',
+        };
+        let awaitingSecond = false;
+        let chordTimer = null;
+        function isTyping(el) {
+          if (!el) return false;
+          const tag = el.tagName;
+          return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+        }
+        document.addEventListener('keydown', (e) => {
+          if (e.metaKey || e.ctrlKey || e.altKey) return;
+          if (isTyping(e.target)) {
+            if (e.key === 'Escape') e.target.blur();
+            return;
+          }
+          if (awaitingSecond) {
+            awaitingSecond = false;
+            clearTimeout(chordTimer);
+            const dest = ROUTES[e.key.toLowerCase()];
+            if (dest) { e.preventDefault(); window.location.href = dest; }
+            return;
+          }
+          if (e.key.toLowerCase() === 'g') {
+            awaitingSecond = true;
+            clearTimeout(chordTimer);
+            chordTimer = setTimeout(() => { awaitingSecond = false; }, 900);
+            return;
+          }
+          if (e.key === '/') {
+            const target = document.getElementById('audit-search');
+            if (target) { e.preventDefault(); target.focus(); }
+          }
+        });
+      })();
     </script>
   `;
 }
@@ -2586,7 +2670,7 @@ function renderHome(req, data) {
         <div class="af-meta">${ev.sekce} · <strong>${ev.kdo}</strong> · ${ev.cas}</div>
       </div>
     </div>`;
-  }).join('') : '<div class="af-empty">Zatím žádná aktivita</div>';
+  }).join('') : ledgerEmpty('Zatím žádná aktivita', true);
 
   // ── Finance recent
   const financeHtml = recentUcet.length ? recentUcet.map(r => {
@@ -2598,7 +2682,7 @@ function renderHome(req, data) {
       <div class="fin-amount" style="color:${isIn?'#6FBF52':'var(--seal-bright)'}">${sym}${r[2]}</div>
       <div class="fin-cur">${(r[3]||'').replace('USD','SAD')}</div>
     </div>`;
-  }).join('') : '<div style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Žádné záznamy</div>';
+  }).join('') : ledgerEmpty('Žádné záznamy', true);
 
   // ── Donut chart data — podle množství (ks), ne hodnoty, protože ceny drog/zbraní nejsou veřejné
   const weedVal  = Object.entries(weed).reduce((s,[k,q])=>s+(q>0&&WEED_P[k]?q*WEED_P[k]:0),0);
@@ -3181,7 +3265,7 @@ function renderDashboard(req, data) {
 
   const formatSklad = (obj, ceny) => {
     const entries = Object.entries(obj).filter(([,q]) => q > 0);
-    if (!entries.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Sklad je prázdný</p>';
+    if (!entries.length) return ledgerEmpty('Sklad je prázdný', true);
     return entries.map(([item, qty]) => {
       const hodnota = ceny && ceny[item] ? qty * ceny[item].prodej : null;
       return `<div class="sklad-row"><span>${item}</span><span>${qty} ks${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
@@ -3189,7 +3273,7 @@ function renderDashboard(req, data) {
   };
 
   const formatUcet = (rows) => {
-    if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">Žádné záznamy</p>';
+    if (!rows.length) return ledgerEmpty('Žádné záznamy', true);
     return rows.map(r => {
       const [cas, typ, castka, valuta, pozn] = r;
       const isIn = typ === 'PŘÍJEM';
@@ -3358,6 +3442,46 @@ function renderDashboard(req, data) {
   <script>
     // ── MODAL ──────────────────────────────────────────────────────────────
     let _pendingAction = null;
+    let _sealAudioCtx = null;
+    function playSealThud() {
+      try {
+        _sealAudioCtx = _sealAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = _sealAudioCtx;
+        if (ctx.state === 'suspended') ctx.resume();
+        const now = ctx.currentTime;
+        // Low thud body
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(48, now + 0.16);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.5, now + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+        osc.connect(gain);
+        // Brief noise burst for the wax "press" texture
+        const bufferSize = ctx.sampleRate * 0.06;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.value = 900;
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.22, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+        noise.connect(noiseFilter).connect(noiseGain);
+        const master = ctx.createGain();
+        master.gain.value = 0.9;
+        gain.connect(master);
+        noiseGain.connect(master);
+        master.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.34);
+        noise.start(now);
+      } catch (e) { /* audio not available — silent fail, purely decorative */ }
+    }
     function showModal(title, subtitle, details, actionFn) {
       document.getElementById('modalTitle').textContent = title;
       document.getElementById('modalSubtitle').textContent = subtitle;
@@ -3384,6 +3508,7 @@ function renderDashboard(req, data) {
       // Slam the wax seal down onto the ledger entry
       btn.classList.add('stamped','thud');
       seal.classList.add('slam');
+      setTimeout(playSealThud, 340); // synced to the impact point of the slam keyframe (~55% of 620ms)
       await new Promise(r => setTimeout(r, 560));
       confirmBtn.textContent = 'Odesílám…';
       await _pendingAction();
@@ -3562,7 +3687,7 @@ function renderNastenska(req) {
       const data = await res.json();
       const list = document.getElementById('nastenska-list');
       if (!data.messages || !data.messages.length) {
-        list.innerHTML = '<div style="color:var(--text-muted);font-size:0.84rem;text-align:center;padding:3rem">Žádná oznámení</div>';
+        list.innerHTML = ledgerEmptyHTML('Žádná oznámení');
         return;
       }
       const newest = data.messages[0]?.id || '0';
@@ -3686,6 +3811,13 @@ function renderAudit(req) {
     </div>
 
     <div class="card">
+      <div style="display:flex;gap:0.8rem;margin-bottom:1.2rem;flex-wrap:wrap;align-items:center">
+        <div class="audit-search-wrap" style="position:relative;flex:1;min-width:220px;max-width:340px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="position:absolute;left:0.75rem;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text-muted);pointer-events:none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="audit-search" placeholder="Hledat jméno nebo detail…" style="width:100%;padding:0.55rem 0.8rem 0.55rem 2.1rem;font-size:0.82rem">
+        </div>
+        <span id="audit-result-count" style="font-size:0.66rem;letter-spacing:0.08em;color:var(--text-muted);font-family:var(--font-mono)"></span>
+      </div>
       <div style="display:flex;gap:0.4rem;margin-bottom:1.5rem;flex-wrap:wrap">
         <button class="typ-btn active-vklad" onclick="filterAudit('vse')" id="filter-vse" style="flex:none;padding:0.4rem 1rem">Vše</button>
         <button class="typ-btn" onclick="filterAudit('Zbraně')" id="filter-zbrane" style="flex:none;padding:0.4rem 1rem">Zbraně</button>
@@ -3710,13 +3842,14 @@ function renderAudit(req) {
     let allEvents = [];
     let ucetSouhrn = {};
     let activeFilter = 'vse';
+    let searchTerm = '';
 
     async function loadAudit() {
       const res = await fetch('/api/audit');
       const data = await res.json();
       allEvents = data.events || [];
       ucetSouhrn = data.ucetSouhrn || {};
-      renderTable(allEvents);
+      applyAuditFilters();
       renderUcetSouhrn();
     }
 
@@ -3756,7 +3889,7 @@ function renderAudit(req) {
 
     function renderTable(events) {
       const tbody = document.getElementById('audit-body');
-      if (!events.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2.5rem">Žádné záznamy</td></tr>'; return; }
+      if (!events.length) { tbody.innerHTML = '<tr><td colspan="6" style="padding:1.5rem">' + ledgerEmptyHTML('Žádné záznamy', true) + '</td></tr>'; return; }
       const SEKCE_MONO = {
         'Zbraně':      { letter: 'Z', color: 'var(--brass)' },
         'Weed':        { letter: 'W', color: '#7A9A4A' },
@@ -3782,6 +3915,20 @@ function renderAudit(req) {
       }).join('');
     }
 
+    function applyAuditFilters() {
+      let filtered = activeFilter === 'vse' ? allEvents : allEvents.filter(e => e.sekce === activeFilter);
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        filtered = filtered.filter(e =>
+          (e.uzivatel || '').toLowerCase().includes(q) ||
+          (e.detail || '').toLowerCase().includes(q)
+        );
+      }
+      renderTable(filtered);
+      const countEl = document.getElementById('audit-result-count');
+      if (countEl) countEl.textContent = searchTerm ? (filtered.length + ' / ' + allEvents.length + ' záznamů') : '';
+    }
+
     function filterAudit(sekce) {
       activeFilter = sekce;
       document.querySelectorAll('[id^=filter-]').forEach(b => b.className = 'typ-btn');
@@ -3791,10 +3938,19 @@ function renderAudit(req) {
       else btnId = 'filter-' + sekce.toLowerCase().replace('ě','e').replace('í','i').replace('č','c').replace('ú','u');
       const btn = document.getElementById(btnId);
       if (btn) btn.className = 'typ-btn active-vklad';
-      const filtered = sekce === 'vse' ? allEvents : allEvents.filter(e => e.sekce === sekce);
-      renderTable(filtered);
+      applyAuditFilters();
       document.getElementById('ucet-souhrn-wrap').style.display = (sekce === 'vse' || sekce === 'Účetnictví') ? 'block' : 'none';
     }
+
+    const auditSearchInput = document.getElementById('audit-search');
+    let _auditSearchDebounce = null;
+    auditSearchInput.addEventListener('input', (e) => {
+      clearTimeout(_auditSearchDebounce);
+      _auditSearchDebounce = setTimeout(() => {
+        searchTerm = e.target.value.trim();
+        applyAuditFilters();
+      }, 150);
+    });
 
     loadAudit();
     const evtSrc = new EventSource('/api/events');
@@ -3851,7 +4007,7 @@ function renderStatistiky(req) {
       const container = document.getElementById('stats-container');
       const stats = data.stats || {};
       const users = Object.keys(stats);
-      if (!users.length) { container.innerHTML = '<div style="color:var(--text-muted)">Žádná data</div>'; return; }
+      if (!users.length) { container.innerHTML = ledgerEmptyHTML('Žádná data'); return; }
       container.innerHTML = users.map(icName => {
         const s = stats[icName];
         const hasZbrane = Object.keys({...s.zbrane.vklad,...s.zbrane.vyber}).length > 0;
@@ -3881,7 +4037,7 @@ function renderStatistiky(req) {
             \${s.ucet.vydaj_pesos ? \`<div class="stat-row"><span>Výdaje Pesos</span><strong style="color:var(--seal-bright)">₱\${s.ucet.vydaj_pesos.toLocaleString('cs-CZ')}</strong></div>\` : ''}
           \` : ''}
           \${!hasZbrane && !hasNaboje && !hasAkce && !hasWeed && !hasDrogy && !hasChemky && !hasUcet
-            ? '<div style="font-size:0.77rem;color:var(--text-muted);padding:0.5rem 0">Zatím žádná aktivita</div>'
+            ? ledgerEmptyHTML('Zatím žádná aktivita', true)
             : ''}
         </div>\`;
       }).join('');
@@ -4160,7 +4316,7 @@ function renderWeedSazeni(req) {
     }
     function renderTimers() {
       const wrap = document.getElementById('timers-list');
-      if (!timers.length) { wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Žádné probíhající odpočty.</p>'; return; }
+      if (!timers.length) { wrap.innerHTML = ledgerEmptyHTML('Žádné probíhající odpočty', true); return; }
       wrap.innerHTML = timers.map(t => {
         const dur = t.endsAt - t.startedAt;
         return \`<div class="card" style="padding:1.1rem;margin-bottom:0.9rem">
@@ -4302,7 +4458,7 @@ function renderBlackbook(req) {
     }
 
     function barChart(rows, max, color) {
-      if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem">Žádná data</p>';
+      if (!rows.length) return ledgerEmptyHTML('Žádná data', true);
       const mx = max || Math.max(...rows.map(r => r.val), 1);
       return rows.map(r => \`<div class="bb-bar-row">
         <span class="bb-bar-name">\${esc(r.name)}</span>
@@ -4378,7 +4534,7 @@ function renderBlackbook(req) {
     }
 
     function tbl(headers, rows) {
-      if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.8rem 0">Žádné záznamy</p>';
+      if (!rows.length) return ledgerEmptyHTML('Žádné záznamy', true);
       return \`<div class="table-wrap"><table><thead><tr>\${headers.map(h=>'<th'+(h.r?' style="text-align:right"':'')+'>'+h.t+'</th>').join('')}</tr></thead>
         <tbody>\${rows.map(r=>'<tr>'+r.map((c,i)=>'<td'+(headers[i]&&headers[i].r?' style="text-align:right"':'')+'>'+c+'</td>').join('')+'</tr>').join('')}</tbody></table></div>\`;
     }
@@ -4613,7 +4769,7 @@ function renderProfitCentrum(req) {
     }
 
     function rankList(rows, nameKey, valKey, emptyTxt) {
-      if (!rows.length) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:0.5rem 0">' + emptyTxt + '</p>';
+      if (!rows.length) return ledgerEmptyHTML(emptyTxt, true);
       return rows.slice(0, 6).map(function(r, i) {
         return '<div class="pc-rank-row"><span class="pc-rank-num">#' + (i+1) + '</span><span class="pc-rank-name">' + esc(r[nameKey]) + '</span><span class="pc-rank-val">' + money(r[valKey]) + '</span></div>';
       }).join('');
