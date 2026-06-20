@@ -1739,8 +1739,8 @@ function baseStyles() {
       .page-label::before{content:'§';color:var(--seal);font-family:var(--font-display);font-size:1.1em}
       .page-title{
         font-family:var(--font-display);
-        font-size:2.5rem;color:var(--vellum-bright);font-weight:600;letter-spacing:0.005em;
-        position:relative;
+        font-size:clamp(2.2rem,4.2vw,3.1rem);color:var(--vellum-bright);font-weight:600;letter-spacing:0.005em;
+        position:relative;line-height:1.05;
       }
       .page-title::after{
         content:'';display:block;width:52px;height:2px;margin-top:0.6rem;
@@ -1752,7 +1752,7 @@ function baseStyles() {
         margin-top:0.55rem;font-size:0.98rem;
       }
 
-      /* ── PAGE INFO BOX — marginalia / annotation ── */
+      /* ── PAGE INFO BOX — marginalia / annotation (legacy, used on some pages) ── */
       .page-info{
         background:var(--gold-dim);
         border:1px solid var(--border-brass);
@@ -1771,6 +1771,13 @@ function baseStyles() {
         color:var(--brass-bright);margin-bottom:0.4rem;
       }
       .page-info-text{font-size:0.85rem;color:var(--text-dim);line-height:1.85}
+
+      /* ── FOLIO FOOTNOTE — boxless marginal annotation, preferred over .page-info ── */
+      .folio-footnote{
+        font-family:'Inter',sans-serif;font-size:0.88rem;color:var(--text-dim);line-height:1.85;
+        max-width:680px;margin:0 0 2.2rem;padding-left:1rem;border-left:2px solid var(--border-brass);
+      }
+      .folio-footnote strong{color:var(--vellum);font-weight:600}
 
       /* ── CARDS — bound ledger pages ── */
       .card{
@@ -1961,26 +1968,41 @@ function baseStyles() {
       .kodex-rule strong{color:var(--vellum);font-weight:600}
       .kodex-divider{height:1px;background:var(--border);margin:1.8rem 0}
 
-      /* ── STATISTIKY ── */
-      .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5rem}
+      /* ── STATISTIKY — personnel dossiers, not dashboard cards ── */
+      .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:2rem 1.6rem}
       .stat-card{
-        background:var(--bg-card);border:1px solid var(--border);border-radius:6px;
-        padding:1.8rem;transition:border-color 0.2s,transform 0.2s;box-shadow:var(--shadow-card);
-        position:relative;overflow:hidden;
+        background:var(--bg-card);border:1px solid var(--border);border-radius:2px 8px 8px 8px;
+        padding:1.7rem 1.7rem 1.5rem;transition:border-color 0.25s,transform 0.25s;
+        box-shadow:var(--shadow-card);
+        position:relative;overflow:visible;
+        margin-top:0.4rem;
       }
-      .stat-card:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+      .stat-card::before{
+        content:'';position:absolute;left:0;right:0;bottom:-5px;height:5px;
+        background:var(--bg-card3);border-radius:0 0 6px 6px;opacity:0.6;
+        z-index:-1;
+      }
+      .stat-card:hover{border-color:var(--border-hover);transform:translateY(-3px)}
+      .stat-card-tab{
+        position:absolute;top:-0.4rem;right:1.4rem;
+        background:var(--seal);color:var(--vellum-bright);
+        font-family:var(--font-mono);font-size:0.6rem;font-weight:700;letter-spacing:0.08em;
+        padding:0.22rem 0.6rem;border-radius:2px 2px 0 0;
+        box-shadow:0 -1px 0 var(--brass) inset;
+      }
       .stat-card-header{
         display:flex;justify-content:space-between;align-items:flex-start;
-        margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--border);
+        margin-bottom:1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--border-brass);
+        padding-right:2.6rem;
       }
-      .stat-card-name{font-family:var(--font-display);font-size:1.05rem;color:var(--vellum);font-weight:600}
-      .stat-card-discord{font-size:0.68rem;letter-spacing:0.04em;color:var(--text-muted);margin-top:0.25rem;font-family:var(--font-mono)}
+      .stat-card-name{font-family:var(--font-display);font-size:1.18rem;color:var(--vellum-bright);font-weight:600}
+      .stat-card-discord{font-size:0.66rem;letter-spacing:0.04em;color:var(--text-muted);margin-top:0.3rem;font-family:var(--font-mono)}
       .stat-row{display:flex;justify-content:space-between;font-size:0.86rem;padding:0.35rem 0;color:var(--text-dim)}
       .stat-row strong{color:var(--text);font-weight:600}
       .stat-section-label{
-        font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass);font-weight:700;
+        font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);font-weight:700;
         margin-top:0.9rem;margin-bottom:0.4rem;
-        padding-top:0.65rem;border-top:1px solid var(--border);
+        padding-top:0.65rem;border-top:1px dotted var(--border-hover);
         font-family:var(--font-mono);
       }
       .stat-section-label:first-of-type{border-top:none;margin-top:0}
@@ -2215,7 +2237,6 @@ function baseStyles() {
       @media(max-width:768px){.profit-grid{grid-template-columns:repeat(2,1fr)!important}main{padding:1.5rem 1rem}}
       @media(max-width:640px){
         .page-header{flex-direction:column;align-items:flex-start;gap:0.8rem}
-        .page-title{font-size:1.9rem}
         .form-row{grid-template-columns:1fr}
         .stats{grid-template-columns:repeat(2,1fr)!important}
         .profit-grid{grid-template-columns:1fr 1fr!important}
@@ -2325,6 +2346,115 @@ function baseStyles() {
       .ledger-empty.compact{padding:1.1rem 0.5rem;gap:0.6rem}
       .ledger-empty.compact svg{width:42px;height:32px}
       .ledger-empty.compact .ledger-empty-text{font-size:0.76rem}
+
+      /* ══════════════════════════════════════════════════════════════════
+         FOLIO SYSTEM — the page-as-document primitives.
+         Not dashboard widgets: a register you read, not a grid you scan.
+         ══════════════════════════════════════════════════════════════════ */
+
+      /* ── Oversized figures — the number does the talking ── */
+      .folio-mega{
+        font-family:var(--font-display);
+        font-weight:600;
+        font-size:clamp(3.8rem, 11vw, 8.5rem);
+        line-height:0.92;
+        color:var(--vellum-bright);
+        letter-spacing:-0.01em;
+        font-variant-numeric:oldstyle-nums;
+      }
+      .folio-mega .unit{
+        font-size:0.32em;font-family:var(--font-mono);font-weight:500;
+        color:var(--brass);letter-spacing:0.02em;margin-left:0.15em;
+        vertical-align:0.18em;
+      }
+      .folio-mega.seal-tint{color:var(--seal-bright)}
+
+      /* ── Marginalia — small annotations that live in the margin, not in a box ── */
+      .marginalia{
+        font-family:var(--font-mono);
+        font-size:0.68rem;
+        letter-spacing:0.06em;
+        color:var(--text-muted);
+        line-height:1.9;
+        border-left:1px solid var(--border);
+        padding-left:1rem;
+      }
+      .marginalia strong{color:var(--brass);font-weight:600}
+      .marginalia .m-line{display:flex;justify-content:space-between;gap:1rem;padding:0.3rem 0;border-bottom:1px solid var(--border)}
+      .marginalia .m-line:last-child{border-bottom:none}
+      .marginalia .m-line .m-val{color:var(--vellum);font-weight:500}
+
+      /* ── Folio rule — a full-bleed line like a newspaper column break ── */
+      .folio-rule{
+        height:1px;background:linear-gradient(90deg,var(--seal) 0%,var(--border) 40%,var(--border) 60%,var(--brass) 100%);
+        opacity:0.4;margin:2.5rem 0;
+      }
+      .folio-rule.tight{margin:1.4rem 0;opacity:0.25}
+
+      /* ── Folio label — small caps running head, like a chapter marker ── */
+      .folio-label{
+        font-family:var(--font-mono);
+        font-size:0.64rem;letter-spacing:0.3em;text-transform:uppercase;
+        color:var(--seal-bright);font-weight:600;
+        display:flex;align-items:center;gap:0.8em;
+      }
+      .folio-label::after{content:'';flex:1;height:1px;background:var(--border);margin-top:1px}
+
+      /* ── Asymmetric two-column folio — text dominant, figures in margin ── */
+      .folio-spread{
+        display:grid;
+        grid-template-columns:1fr 280px;
+        gap:3.5rem;
+        align-items:start;
+      }
+      .folio-spread.reverse{grid-template-columns:280px 1fr}
+
+      /* ── Drop-stat — a number that overlaps its own label, no box around it ── */
+      .drop-stat{position:relative;padding-top:0.3rem}
+      .drop-stat-label{
+        font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.18em;
+        text-transform:uppercase;color:var(--text-muted);margin-bottom:-0.3em;
+        position:relative;z-index:2;
+      }
+      .drop-stat-value{
+        font-family:var(--font-display);font-weight:700;
+        font-size:clamp(2.2rem,5vw,3.4rem);line-height:1;color:var(--vellum);
+        position:relative;z-index:1;
+      }
+      .drop-stat-sub{font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);margin-top:0.4rem}
+
+      /* ── Seal-anchor — the wax seal as a structural element bridging two blocks ── */
+      .seal-anchor{
+        width:56px;height:56px;border-radius:50%;flex-shrink:0;
+        border:1.5px solid var(--brass);
+        display:flex;align-items:center;justify-content:center;
+        font-family:var(--font-display);font-weight:700;font-size:1.3rem;color:var(--brass);
+        background:var(--ink);
+        box-shadow:0 0 0 5px var(--bg), 0 0 20px var(--seal-glow);
+        position:relative;z-index:3;
+      }
+      .seal-anchor::before{content:'';position:absolute;inset:5px;border-radius:50%;border:1px solid var(--border-brass)}
+
+      /* ── Manifest row — a ledger line with running dots, like a table of contents ── */
+      .manifest-row{
+        display:flex;align-items:baseline;gap:0.6rem;
+        padding:0.85rem 0;border-bottom:1px solid var(--border);
+        font-size:0.92rem;
+      }
+      .manifest-row:last-child{border-bottom:none}
+      .manifest-row .mr-name{color:var(--vellum);font-family:var(--font-display);font-weight:500;flex-shrink:0}
+      .manifest-row .mr-dots{flex:1;border-bottom:1px dotted var(--border-hover);transform:translateY(-0.35em);min-width:1rem}
+      .manifest-row .mr-val{font-family:var(--font-mono);color:var(--text-dim);flex-shrink:0;font-size:0.85rem}
+      .manifest-row:hover .mr-name{color:var(--seal-bright)}
+
+      /* ── Folio panel — replaces .card for document-style sections (no box, just rule) ── */
+      .folio-panel{position:relative;padding-top:0.5rem}
+      .folio-panel + .folio-panel{margin-top:2.2rem}
+
+      @media(max-width:900px){
+        .folio-spread,.folio-spread.reverse{grid-template-columns:1fr;gap:1.8rem}
+        .folio-mega{font-size:clamp(2.6rem,14vw,4.5rem)}
+      }
 
       /* ── SELECT EXPANDABLE ── */
       .form-group{position:relative}
@@ -2613,359 +2743,191 @@ function renderHome(req, data) {
   const totalWeed   = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalDrogy  = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalZbrane = Object.values(zbrane).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalChemky = Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0);
 
-  // ── Top items pro mini-grafy
-  const topItems = (obj, priceMap, limit=6) => Object.entries(obj)
+  const topItems = (obj, priceMap, limit=5) => Object.entries(obj)
     .filter(([,q])=>q>0)
     .sort((a,b)=>b[1]-a[1])
     .slice(0,limit)
     .map(([item,qty]) => ({ item, qty, value: priceMap[item] ? qty*priceMap[item] : 0 }));
 
   const topWeed   = topItems(weed, WEED_P);
-  const topDrogy  = topItems(drogy, {});   // ceny drog se nezobrazují
-  const topZbrane = topItems(zbrane, {});  // ceny zbraní se nezobrazují
-  const maxWeedQty   = topWeed.reduce((m,x)=>Math.max(m,x.qty),1);
-  const maxDrogyQty  = topDrogy.reduce((m,x)=>Math.max(m,x.qty),1);
-  const maxZbraneQty = topZbrane.reduce((m,x)=>Math.max(m,x.qty),1);
+  const topDrogy  = topItems(drogy, {});
+  const topZbrane = topItems(zbrane, {});
 
-  // Ledger palette — sealed wax red, brass gold, document green
-  const COL_WEED   = '#7A9A4A';
-  const COL_DROGY  = '#B23B3B';
-  const COL_ZBRANE = '#C9A227';
-
-  const miniStockBars = (items, maxQty, color) => items.length
+  const manifestRows = (items, fallback) => items.length
     ? items.map(({item,qty,value}) => `
-      <div class="msb-row">
-        <div class="msb-label">${item}</div>
-        <div class="msb-track">
-          <div class="msb-fill" style="width:${Math.max(4,Math.round(qty/maxQty*100))}%;background:${color}22;border-right:2px solid ${color}99"></div>
-        </div>
-        <div class="msb-qty">${qty}<span class="msb-val">${value?'$'+value.toLocaleString('cs-CZ'):''}</span></div>
+      <div class="manifest-row">
+        <span class="mr-name">${item}</span>
+        <span class="mr-dots"></span>
+        <span class="mr-val">${qty} ks${value?' · $'+value.toLocaleString('cs-CZ'):''}</span>
       </div>`).join('')
-    : '<div class="msb-empty">Sklad prázdný</div>';
+    : `<div class="manifest-row"><span class="mr-name" style="color:var(--text-muted);font-style:italic">${fallback}</span><span class="mr-dots"></span><span class="mr-val">—</span></div>`;
 
-  // ── Poslední aktivity
+  // ── Poslední aktivity (kept as a thin stream, not a card)
   const allRecent = [
-    ...recentZbrane.map(r => ({ icon:'⛓', sekce:'Zbraně', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[5]||'—', cas:r[0]||'' })),
-    ...recentWeed.map(r => ({ icon:'❀', sekce:'Weed', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
-    ...recentDrogy.map(r => ({ icon:'◆', sekce:'Drogy', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
-    ...(recentChemky||[]).map(r => ({ icon:'⚗', sekce:'Chemky', typ:r[1]||'', detail:`${r[2]||'?'} (${r[3]||'?'} ks)`, kdo:r[4]||'—', cas:r[0]||'' })),
+    ...recentZbrane.map(r => ({ sekce:'Zbraně', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[5]||'—', cas:r[0]||'' })),
+    ...recentWeed.map(r => ({ sekce:'Weed', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
+    ...recentDrogy.map(r => ({ sekce:'Drogy', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
+    ...(recentChemky||[]).map(r => ({ sekce:'Chemky', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[4]||'—', cas:r[0]||'' })),
     ...recentUcet.map(r => {
       const sym=(r[3]||'')==='USD'?'SAD ':'₱';
-      return { icon:'§', sekce:'Finance', typ:r[1]||'', detail:`${sym}${r[2]||'?'} — ${r[4]||'—'}`, kdo:r[5]||'—', cas:r[0]||'' };
+      return { sekce:'Finance', typ:r[1]||'', detail:`${sym}${r[2]||'?'} — ${r[4]||'—'}`, kdo:r[5]||'—', cas:r[0]||'' };
     }),
-  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,3);
+  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,5);
 
-  const activityHtml = allRecent.length ? allRecent.map(ev => {
+  const activityHtml = allRecent.length ? allRecent.map((ev,i) => {
     const isIn = /VKLAD|PŘÍJEM/.test((ev.typ||'').toUpperCase());
-    const typColor = isIn ? '#6FBF52' : 'var(--seal-bright)';
-    const typBg    = isIn ? 'rgba(111,191,82,0.10)' : 'var(--seal-glow)';
-    return `<div class="af-item">
-      <div class="af-icon">${ev.icon}</div>
-      <div class="af-body">
-        <div class="af-main">
-          <span class="af-typ" style="color:${typColor};background:${typBg}">${ev.typ}</span>
-          <span class="af-detail">${ev.detail}</span>
-        </div>
-        <div class="af-meta">${ev.sekce} · <strong>${ev.kdo}</strong> · ${ev.cas}</div>
-      </div>
+    return `<div class="stream-entry">
+      <span class="stream-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="stream-typ" style="color:${isIn?'#6FBF52':'var(--seal-bright)'}">${ev.typ}</span>
+      <span class="stream-detail">${ev.detail}</span>
+      <span class="stream-who">${ev.kdo}</span>
+      <span class="stream-cas">${ev.cas}</span>
     </div>`;
-  }).join('') : ledgerEmpty('Zatím žádná aktivita', true);
-
-  // ── Finance recent
-  const financeHtml = recentUcet.length ? recentUcet.map(r => {
-    const isIn = r[1]==='PŘÍJEM';
-    const sym  = (r[3]||'')==='USD'?'$':'₱';
-    return `<div class="fin-row">
-      <div class="fin-dot" style="background:${isIn?'#6FBF52':'var(--seal-bright)'}"></div>
-      <div class="fin-desc">${r[4]||'—'}</div>
-      <div class="fin-amount" style="color:${isIn?'#6FBF52':'var(--seal-bright)'}">${sym}${r[2]}</div>
-      <div class="fin-cur">${(r[3]||'').replace('USD','SAD')}</div>
-    </div>`;
-  }).join('') : ledgerEmpty('Žádné záznamy', true);
-
-  // ── Donut chart data — podle množství (ks), ne hodnoty, protože ceny drog/zbraní nejsou veřejné
-  const weedVal  = Object.entries(weed).reduce((s,[k,q])=>s+(q>0&&WEED_P[k]?q*WEED_P[k]:0),0);
-  const drogyVal = 0;   // ceny drog nejsou zobrazovány na home
-  const zbraneVal= 0;   // ceny zbraní nejsou zobrazovány na home
-  const pieTotal = totalWeed + totalDrogy + totalZbrane || 1;
-  const pW = Math.round(totalWeed/pieTotal*100);
-  const pD = Math.round(totalDrogy/pieTotal*100);
-  const pZ = 100 - pW - pD;
+  }).join('') : ledgerEmpty('Rejstřík dosud beze zápisu', true);
 
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 12 ? 'Dobré ráno' : greetingHour < 18 ? 'Dobrý den' : 'Dobrý večer';
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Přehled</title>
+  <title>Albion — Rejstřík</title>
   ${baseStyles()}
   <style>
-    /* ── HOME HERO — the register's opening folio ── */
-    .home-hero{
+    /* ── OPENING FOLIO — a title page, not a hero banner ── */
+    .opening-folio{
+      display:flex;align-items:flex-start;justify-content:space-between;
+      gap:2.5rem;padding-bottom:2.4rem;margin-bottom:2.4rem;
+      border-bottom:1px solid var(--border);
       position:relative;
-      background:
-        linear-gradient(135deg, rgba(201,162,39,0.04) 0%, transparent 40%),
-        var(--bg-card);
-      border:1px solid var(--border-brass);
-      padding:2.9rem 3.2rem;
-      margin-bottom:2.2rem;
-      overflow:hidden;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:2rem;
-      border-radius:6px;
     }
-    .home-hero::before{
-      content:'';position:absolute;inset:0;pointer-events:none;
-      background:
-        radial-gradient(ellipse 60% 100% at 0% 50%, var(--seal-glow) 0%, transparent 55%),
-        radial-gradient(ellipse 45% 70% at 100% 50%, var(--gold-dim) 0%, transparent 55%);
+    .opening-left{flex:1;min-width:0}
+    .opening-tag{
+      font-family:var(--font-mono);font-size:0.64rem;letter-spacing:0.34em;
+      text-transform:uppercase;color:var(--seal-bright);margin-bottom:1.1rem;font-weight:600;
     }
-    .home-hero::after{
-      content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
-      background:linear-gradient(90deg,transparent,var(--seal) 30%,var(--brass) 70%,transparent);
-      opacity:0.6;
+    .opening-name{
+      font-family:var(--font-display);font-weight:600;
+      font-size:clamp(2.4rem,6vw,4.2rem);line-height:1.02;color:var(--vellum-bright);
+      letter-spacing:-0.005em;
     }
-    .home-hero .hero-seal{
-      position:absolute;top:1.3rem;right:1.5rem;
-      width:60px;height:60px;border-radius:50%;
+    .opening-name em{font-style:italic;color:var(--seal-bright);font-weight:500}
+    .opening-sub{
+      font-family:'Inter',sans-serif;color:var(--text-dim);font-size:1rem;
+      margin-top:1rem;max-width:480px;line-height:1.7;
+    }
+    .opening-right{
+      flex-shrink:0;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:1rem;
+    }
+    .opening-seal{
+      width:88px;height:88px;border-radius:50%;
       border:1.5px solid var(--brass);
-      display:flex;align-items:center;justify-content:center;
-      font-family:var(--font-display);font-size:0.46rem;letter-spacing:0.1em;font-weight:600;
-      color:var(--brass);text-align:center;line-height:1.25;
-      opacity:0.7;transform:rotate(-8deg);
-      box-shadow:0 0 16px var(--seal-glow), inset 0 0 10px rgba(201,162,39,0.1);
-      pointer-events:none;z-index:2;
-    }
-    .home-hero .hero-seal::before{
-      content:'';position:absolute;inset:5px;border-radius:50%;border:1px solid var(--border-brass);
-    }
-    .home-hero .hero-seal.live-pulse{
-      animation:heroSealPulse 1.1s ease-out 1;
-    }
-    @keyframes heroSealPulse{
-      0%{box-shadow:0 0 16px var(--seal-glow), inset 0 0 10px rgba(201,162,39,0.1);opacity:0.7}
-      30%{box-shadow:0 0 34px var(--seal-glow), 0 0 10px var(--seal-bright), inset 0 0 14px rgba(201,162,39,0.25);opacity:1;border-color:var(--seal-bright)}
-      100%{box-shadow:0 0 16px var(--seal-glow), inset 0 0 10px rgba(201,162,39,0.1);opacity:0.7;border-color:var(--brass)}
-    }
-    .hero-left{position:relative;z-index:1}
-    .hero-greeting{
-      font-size:0.62rem;letter-spacing:0.36em;text-transform:uppercase;
-      color:var(--seal-bright);margin-bottom:0.65rem;font-weight:600;font-family:var(--font-mono);
-    }
-    .hero-title{
-      font-family:var(--font-display);
-      font-size:2.5rem;font-weight:600;color:var(--vellum-bright);
-      letter-spacing:0.005em;line-height:1.15;
-    }
-    .hero-title .hero-name{color:var(--seal-bright);font-style:italic}
-    .hero-sub{
-      font-family:'Inter',sans-serif;
-      color:var(--text-dim);
-      font-size:0.95rem;margin-top:0.6rem;max-width:520px;
-    }
-    .hero-status{
-      display:inline-flex;align-items:center;gap:0.5rem;
-      margin-top:1.3rem;
-      font-size:0.62rem;letter-spacing:0.16em;text-transform:uppercase;
-      color:#6FBF52;font-weight:600;font-family:var(--font-mono);
-    }
-    .hero-status-dot{
-      width:6px;height:6px;border-radius:50%;
-      background:#6FBF52;box-shadow:0 0 8px #6FBF52;
-      animation:pulse-dot 2.2s infinite;
-    }
-    @keyframes pulse-dot{0%,100%{box-shadow:0 0 5px #6FBF52}50%{box-shadow:0 0 14px #6FBF52,0 0 24px rgba(111,191,82,0.4)}}
-
-    .quick-actions{display:flex;flex-wrap:wrap;gap:0.65rem;margin-top:1.7rem}
-    .quick-btn.primary{background:var(--seal);border-color:var(--seal);color:var(--vellum-bright)}
-
-    .hero-right{position:relative;z-index:1;text-align:right;flex-shrink:0}
-    .hero-clock{
-      font-family:var(--font-mono);
-      font-size:2.3rem;color:var(--vellum);
-      letter-spacing:0.05em;line-height:1;font-weight:500;
-      text-shadow:0 0 28px var(--seal-glow);
-    }
-    .hero-date{
-      font-family:var(--font-mono);
-      font-size:0.66rem;letter-spacing:0.16em;
-      color:var(--text-dim);text-transform:uppercase;margin-top:0.65rem;
-    }
-    .hero-dow{
-      font-family:var(--font-display);
-      font-style:italic;color:var(--brass);
-      font-size:1.02rem;margin-top:0.2rem;
-    }
-
-    /* ── KPI STRIP — ledger column totals ── */
-    .kpi-strip{
-      display:grid;
-      grid-template-columns:repeat(6,1fr);
-      gap:1px;
-      background:var(--border);
-      border:1px solid var(--border);
-      margin-bottom:2.2rem;
-      overflow:hidden;
-      border-radius:4px;
-    }
-    .kpi{
-      background:var(--bg-card);
-      padding:1.45rem 1.5rem;
-      cursor:pointer;
-      transition:background 0.22s;
+      display:flex;align-items:center;justify-content:center;flex-direction:column;
+      box-shadow:0 0 0 6px var(--bg),0 0 28px var(--seal-glow);
       position:relative;
-      overflow:hidden;
     }
-    .kpi::after{
-      content:'';position:absolute;top:0;left:0;right:0;height:2px;
-      background:var(--kpi-color,var(--seal));
-      transform:scaleX(0);transform-origin:left;transition:transform 0.3s;
+    .opening-seal::before{content:'';position:absolute;inset:7px;border-radius:50%;border:1px solid var(--border-brass)}
+    .opening-seal .os-letter{font-family:var(--font-display);font-weight:700;font-size:1.7rem;color:var(--brass);line-height:1}
+    .opening-seal .os-sub{font-family:var(--font-mono);font-size:0.42rem;letter-spacing:0.2em;color:var(--brass);opacity:0.8;margin-top:0.15rem}
+    .opening-seal.live-pulse{animation:heroSealPulse 1.1s ease-out 1}
+    .opening-clock{font-family:var(--font-mono);font-size:0.92rem;color:var(--text-dim);letter-spacing:0.04em}
+    .opening-date{font-family:var(--font-mono);font-size:0.64rem;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase}
+
+    /* ── THE LEDGER LINE — quick actions as a single typographic row, not buttons ── */
+    .ledger-line{
+      display:flex;flex-wrap:wrap;gap:0 1.6rem;margin-top:1.6rem;
     }
-    .kpi:hover::after{transform:scaleX(1)}
-    .kpi:hover{background:var(--bg-card2)}
-    .kpi-label{
-      font-size:0.56rem;letter-spacing:0.2em;text-transform:uppercase;
-      color:var(--text-muted);font-weight:600;margin-bottom:0.55rem;font-family:var(--font-mono);
+    .ledger-line a{
+      font-family:var(--font-mono);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;
+      color:var(--text-dim);text-decoration:none;padding:0.3rem 0;
+      border-bottom:1px solid transparent;transition:color 0.2s,border-color 0.2s;
     }
-    .kpi-value{
-      font-family:var(--font-display);
-      font-size:1.55rem;color:var(--vellum);font-weight:700;
-      letter-spacing:0.005em;line-height:1;transition:color 0.2s;
+    .ledger-line a:hover{color:var(--seal-bright);border-color:var(--seal-bright)}
+    .ledger-line a::before{content:'→ ';color:var(--brass);opacity:0.7}
+
+    /* ── PRIMARY FIGURE — the one number that owns the page ── */
+    .primary-figure{margin-bottom:3rem}
+    .pf-label{
+      font-family:var(--font-mono);font-size:0.66rem;letter-spacing:0.3em;text-transform:uppercase;
+      color:var(--text-muted);margin-bottom:0.4rem;
     }
-    .kpi:hover .kpi-value{color:var(--kpi-color,var(--seal-bright))}
-    .kpi-sub{font-size:0.64rem;color:var(--text-muted);margin-top:0.5rem;font-family:var(--font-mono)}
-    .kpi-icon{
-      position:absolute;right:1.2rem;top:50%;transform:translateY(-50%);
-      font-family:var(--font-display);font-size:1.7rem;opacity:0.08;transition:opacity 0.2s,transform 0.2s;
-      pointer-events:none;color:var(--brass);
+    .pf-value{
+      font-family:var(--font-display);font-weight:600;
+      font-size:clamp(3.6rem,10vw,7.5rem);line-height:0.9;color:var(--brass);
+      letter-spacing:-0.01em;display:flex;align-items:baseline;gap:0.3rem;
     }
-    .kpi:hover .kpi-icon{opacity:0.18;transform:translateY(-50%) scale(1.08)}
-
-    /* ── GRID LAYOUT ── */
-    .home-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1.5fr;gap:1.5rem;align-items:start;margin-bottom:1.5rem}
-    .home-bottom{display:grid;grid-template-columns:1.4fr 1fr 1.1fr;gap:1.5rem;align-items:start}
-
-    /* ── MINI STOCK BARS ── */
-    .msb-row{display:grid;grid-template-columns:1fr 1.8fr auto;gap:0.6rem;align-items:center;padding:0.45rem 0;border-bottom:1px solid var(--border)}
-    .msb-row:last-child{border-bottom:none}
-    .msb-label{font-size:0.76rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .msb-track{height:4px;background:var(--bg-mid);overflow:hidden;position:relative}
-    .msb-fill{height:100%;transition:width 0.6s cubic-bezier(0.22,1,0.36,1)}
-    .msb-qty{font-family:var(--font-mono);font-size:0.8rem;color:var(--vellum);text-align:right;white-space:nowrap;min-width:3.5rem}
-    .msb-val{display:block;font-family:var(--font-mono);font-size:0.6rem;color:var(--text-muted);margin-top:0.1rem}
-    .msb-empty{color:var(--text-muted);font-size:0.78rem;padding:0.8rem 0;text-align:center;letter-spacing:0.08em}
-
-    /* ── ACTIVITY FEED ── */
-    .af-item{display:flex;gap:0.9rem;align-items:flex-start;padding:0.8rem 0;border-bottom:1px solid var(--border);transition:background 0.18s,padding-left 0.18s}
-    .af-item:last-child{border-bottom:none}
-    .af-item:hover{padding-left:0.4rem;background:var(--seal-glow)}
-    .af-icon{
-      font-family:var(--font-display);font-size:1rem;flex-shrink:0;
-      width:28px;height:28px;display:flex;align-items:center;justify-content:center;
-      background:var(--bg-mid);border:1px solid var(--border);margin-top:0.1rem;color:var(--brass);
-      border-radius:50%;
+    .pf-value .pf-currency{font-size:0.4em;color:var(--text-muted);font-family:var(--font-mono)}
+    .pf-footnote{
+      font-family:'Inter',sans-serif;font-size:0.86rem;color:var(--text-dim);
+      margin-top:0.7rem;max-width:520px;line-height:1.7;
     }
-    .af-body{flex:1;min-width:0}
-    .af-main{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.2rem}
-    .af-typ{font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;padding:0.15rem 0.5rem;flex-shrink:0;font-family:var(--font-mono)}
-    .af-detail{font-size:0.84rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .af-meta{font-size:0.66rem;color:var(--text-muted);letter-spacing:0.04em;font-family:var(--font-mono)}
-    .af-meta strong{color:var(--text-dim);font-weight:500}
-    .af-empty{color:var(--text-muted);font-size:0.8rem;padding:1.5rem 0;text-align:center;letter-spacing:0.08em}
+    .pf-footnote strong{color:var(--vellum);font-weight:600}
 
-    /* ── FINANCE ROW ── */
-    .fin-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:0.6rem;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border);transition:background 0.18s}
-    .fin-row:last-child{border-bottom:none}
-    .fin-row:hover{background:var(--seal-glow);padding-left:0.3rem}
-    .fin-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-    .fin-desc{font-size:0.82rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .fin-amount{font-family:var(--font-mono);font-size:0.9rem;font-weight:600;white-space:nowrap}
-    .fin-cur{font-size:0.62rem;color:var(--text-muted);letter-spacing:0.08em;font-family:var(--font-mono)}
+    /* ── STOCK MANIFEST — three ledger columns of unequal visual weight ── */
+    .stock-manifest{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:0 3rem}
+    .manifest-col{padding-top:0.2rem}
+    .manifest-col-head{
+      display:flex;align-items:baseline;justify-content:space-between;
+      margin-bottom:0.9rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border-brass);
+    }
+    .manifest-col-title{font-family:var(--font-display);font-weight:600;font-size:1.15rem;color:var(--vellum)}
+    .manifest-col-count{font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted)}
 
-    /* ── PIE / DONUT ── */
-    .pie-wrap{display:flex;align-items:center;gap:2rem;padding:1rem 0}
-    .pie-donut{width:100px;height:100px;border-radius:50%;flex-shrink:0;position:relative}
-    .pie-legend{flex:1}
-    .pie-leg-item{display:flex;align-items:center;gap:0.6rem;padding:0.35rem 0;font-size:0.78rem;color:var(--text-dim)}
-    .pie-leg-dot{width:8px;height:8px;flex-shrink:0;border-radius:50%}
-    .pie-leg-pct{margin-left:auto;font-family:var(--font-mono);font-size:0.8rem;font-weight:600;color:var(--vellum)}
+    /* ── THE STREAM — recent activity as a typed log, no card ── */
+    .stream{margin-top:0.5rem}
+    .stream-entry{
+      display:grid;grid-template-columns:1.6rem auto 1fr auto auto;
+      gap:0.9rem;align-items:baseline;
+      padding:0.7rem 0;border-bottom:1px solid var(--border);
+      font-size:0.86rem;
+    }
+    .stream-entry:last-child{border-bottom:none}
+    .stream-num{font-family:var(--font-mono);color:var(--text-muted);font-size:0.74rem}
+    .stream-typ{font-family:var(--font-mono);font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:600}
+    .stream-detail{color:var(--vellum);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .stream-who{font-family:var(--font-mono);color:var(--text-dim);font-size:0.78rem;white-space:nowrap}
+    .stream-cas{font-family:var(--font-mono);color:var(--text-muted);font-size:0.72rem;white-space:nowrap}
 
-    /* ── BILANCE CARDS ── */
-    .bilance-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.2rem}
-    .bil-card{text-align:center;padding:1.4rem 1rem;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;transition:border-color 0.2s}
-    .bil-card:hover{border-color:var(--border-hover)}
-    .bil-label{font-size:0.54rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.4rem;font-family:var(--font-mono)}
-    .bil-value{font-family:var(--font-display);font-size:1.5rem;letter-spacing:0.005em;font-weight:700}
-
-    /* ── SECTION DIVIDER ── */
-    .sec-divider{display:flex;align-items:center;gap:1.2rem;margin:1.9rem 0 1.3rem}
-    .sec-divider-label{font-size:0.58rem;letter-spacing:0.32em;text-transform:uppercase;color:var(--seal-bright);font-weight:600;white-space:nowrap;flex-shrink:0;font-family:var(--font-mono)}
-    .sec-divider-line{flex:1;height:1px;background:linear-gradient(90deg,var(--seal-bright),transparent);opacity:0.3}
-
-    @media(max-width:1200px){.home-grid{grid-template-columns:1fr 1fr}.kpi-strip{grid-template-columns:repeat(3,1fr)}}
-    @media(max-width:768px){
-      .home-hero{flex-direction:column;padding:1.8rem}
-      .hero-right{text-align:left}
-      .kpi-strip{grid-template-columns:1fr 1fr}
-      .home-grid{grid-template-columns:1fr}
-      .home-bottom{grid-template-columns:1fr}
+    @media(max-width:900px){
+      .opening-folio{flex-direction:column;gap:1.6rem}
+      .opening-right{flex-direction:row;align-items:center;width:100%;justify-content:space-between}
+      .stock-manifest{grid-template-columns:1fr;gap:1.8rem}
+      .stream-entry{grid-template-columns:1.4rem auto 1fr;gap:0.5rem 0.7rem}
+      .stream-who,.stream-cas{grid-column:2 / -1;font-size:0.7rem}
     }
     @media(max-width:480px){
-      .home-hero .hero-seal{display:none}
-      .hero-title{font-size:1.7rem}
-      .hero-clock{font-size:1.8rem}
-      .kpi-strip{grid-template-columns:1fr}
-      .quick-actions{gap:0.5rem}
-      .quick-btn{padding:0.5rem 0.9rem;font-size:0.6rem}
-      .bilance-grid{grid-template-columns:1fr}
-      .pie-wrap{flex-direction:column;align-items:flex-start;gap:1.2rem}
+      .opening-seal{width:64px;height:64px}
+      .opening-seal .os-letter{font-size:1.2rem}
+      .ledger-line{gap:0.5rem 1.1rem}
     }
   </style>
   </head><body>
   ${renderNav(req, 'home')}
   <main>
 
-    <!-- ── HERO BANNER ── -->
-    <div class="home-hero">
-      <div class="hero-seal">ALBION<br>LOS&nbsp;SANTOS</div>
-      <div class="hero-left">
-        <div class="hero-greeting glitch-in">${greeting}, bratře</div>
-        <h1 class="hero-title glitch-in">Vítej zpět, <span class="hero-name">${icName}</span></h1>
-        <p class="hero-sub">Rejstřík Albionu je otevřen. Zásoby a transakce organizace se zapisují v reálném čase.</p>
-        <div class="hero-status">
-          <div class="hero-status-dot"></div>
-          Rejstřík otevřen · Živý záznam
-        </div>
-        <div class="quick-actions">
-          <a href="/sklad" class="quick-btn primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8h14M5 8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v.01M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/></svg>
-            <span>Správa skladu</span>
-          </a>
-          <a href="/audit" class="quick-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>
-            <span>Audit log</span>
-          </a>
-          <a href="/nastenska" class="quick-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span>Nástěnka</span>
-          </a>
-          <a href="/statistiky" class="quick-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            <span>Statistiky</span>
-          </a>          <a href="/lore" class="quick-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            <span>Lore</span>
-          </a>
+    <!-- ── OPENING FOLIO ── -->
+    <div class="opening-folio">
+      <div class="opening-left">
+        <div class="opening-tag glitch-in">Rejstřík Albionu · otevřeno</div>
+        <h1 class="opening-name glitch-in">${greeting}, <em>${icName}</em></h1>
+        <p class="opening-sub">Zásoby a finance organizace se zapisují v reálném čase. Toto je dnešní strana rejstříku, ${dateStr}.</p>
+        <div class="ledger-line">
+          <a href="/sklad">Správa skladu</a>
+          <a href="/audit">Audit zápisů</a>
+          <a href="/nastenska">Nástěnka</a>
+          <a href="/statistiky">Statistiky</a>
+          <a href="/lore">Historie rodu</a>
         </div>
       </div>
-      <div class="hero-right">
-        <div class="hero-clock" id="live-clock">--:--:--</div>
-        <div class="hero-date" id="live-date"></div>
-        <div class="hero-dow" id="live-dow"></div>
-        <div id="live-notif-count" style="display:none;margin-top:1rem;font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--seal-bright);padding:0.3rem 0.8rem;border:1px solid var(--border-seal);font-family:var(--font-mono)"></div>
+      <div class="opening-right">
+        <div class="opening-seal" id="heroSeal"><span class="os-letter">A</span><span class="os-sub">LOS SANTOS</span></div>
+        <div>
+          <div class="opening-clock" id="live-clock">--:--:--</div>
+          <div class="opening-date" id="live-date"></div>
+        </div>
       </div>
     </div>
 
@@ -2973,240 +2935,79 @@ function renderHome(req, data) {
       (function clock(){
         const c=document.getElementById('live-clock');
         const d=document.getElementById('live-date');
-        const w=document.getElementById('live-dow');
         function tick(){
           const n=new Date();
           if(c) c.textContent=n.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-          if(d) d.textContent=n.toLocaleDateString('cs-CZ',{day:'numeric',month:'long',year:'numeric'});
-          if(w) w.textContent=n.toLocaleDateString('cs-CZ',{weekday:'long'});
+          if(d) d.textContent=n.toLocaleDateString('cs-CZ',{weekday:'long'});
         }
         tick();setInterval(tick,1000);
       })();
     </script>
 
-    <!-- ── KPI STRIP ── -->
-    <div class="kpi-strip">
-      <div class="kpi" style="--kpi-color:#C9A227" onclick="location.href='/sklad'">
-        <div class="kpi-label">Zůstatek SAD</div>
-        <div class="kpi-value" style="color:var(--brass)">$${ucet.usd.toLocaleString('cs-CZ')}</div>
-        <div class="kpi-sub">San Andreas Dollar</div>
-        <div class="kpi-icon">$</div>
+    <!-- ── PRIMARY FIGURE + MARGINALIA — the dominant number, not a KPI tile ── -->
+    <div class="folio-spread">
+      <div class="primary-figure">
+        <div class="pf-label">Hotovostní zůstatek organizace</div>
+        <div class="pf-value">$${ucet.usd.toLocaleString('cs-CZ')}<span class="pf-currency">SAD</span></div>
+        <p class="pf-footnote">Vedle vede frakce účet i v <strong>₱${ucet.pesos.toLocaleString('cs-CZ')} pesos</strong>. Hodnota skladu (jen weed, dle prodejních cen) činí <strong>$${totalValue.toLocaleString('cs-CZ')}</strong>.</p>
       </div>
-      <div class="kpi" style="--kpi-color:#9C9484" onclick="location.href='/sklad'">
-        <div class="kpi-label">Zůstatek Pesos</div>
-        <div class="kpi-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
-        <div class="kpi-sub">Mexické peso</div>
-        <div class="kpi-icon">₱</div>
-      </div>
-      <div class="kpi" style="--kpi-color:${COL_WEED}" onclick="location.href='/sklad'">
-        <div class="kpi-label">Weed v skladu</div>
-        <div class="kpi-value" style="color:${COL_WEED}">${totalWeed}</div>
-        <div class="kpi-sub">${Object.keys(weed).filter(k=>weed[k]>0).length} odrůd · $${weedVal.toLocaleString('cs-CZ')}</div>
-        <div class="kpi-icon">❀</div>
-      </div>
-      <div class="kpi" style="--kpi-color:${COL_DROGY}" onclick="location.href='/sklad'">
-        <div class="kpi-label">Drogy v skladu</div>
-        <div class="kpi-value" style="color:${COL_DROGY}">${totalDrogy}</div>
-        <div class="kpi-sub">${Object.keys(drogy).filter(k=>drogy[k]>0).length} typů</div>
-        <div class="kpi-icon">◆</div>
-      </div>
-      <div class="kpi" style="--kpi-color:#6FA8C9" onclick="location.href='/sklad'">
-        <div class="kpi-label">Chemikálie</div>
-        <div class="kpi-value" style="color:#6FA8C9">${Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div>
-        <div class="kpi-sub">${Object.keys(chemky||{}).filter(k=>chemky[k]>0).length} druhů v skladu</div>
-        <div class="kpi-icon">⚗</div>
-      </div>
-      <div class="kpi" style="--kpi-color:var(--brass)" onclick="location.href='/sklad'">
-        <div class="kpi-label">Hodnota skladu</div>
-        <div class="kpi-value" style="font-size:1.32rem;color:var(--brass)">$${totalValue.toLocaleString('cs-CZ')}</div>
-        <div class="kpi-sub">Weed</div>
-        <div class="kpi-icon">§</div>
+      <div class="marginalia">
+        <div class="m-line"><span>Weed v skladu</span><span class="m-val">${totalWeed} ks</span></div>
+        <div class="m-line"><span>Drogy v skladu</span><span class="m-val">${totalDrogy} ks</span></div>
+        <div class="m-line"><span>Zbraně v skladu</span><span class="m-val">${totalZbrane} ks</span></div>
+        <div class="m-line"><span>Chemikálie</span><span class="m-val">${totalChemky} ks</span></div>
+        <div class="m-line"><span>Odrůd weedu</span><span class="m-val">${Object.keys(weed).filter(k=>weed[k]>0).length}</span></div>
+        <div class="m-line"><span>Typů drog</span><span class="m-val">${Object.keys(drogy).filter(k=>drogy[k]>0).length}</span></div>
       </div>
     </div>
 
-    <!-- ── MAIN GRID: Zásoby + Activity feed ── -->
-    <div class="home-grid">
+    <div class="folio-rule"></div>
 
-      <!-- Weed -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22V12M12 12C12 12 8 9 4 9c0 5 3.5 8 8 8M12 12c0 0 4-3 8-3 0 5-3.5 8-8 8M12 12C12 7 9 4 6 2c-1 4 1 8 6 10M12 12c0-5 3-8 6-10 1 4-1 8-6 10"/></svg>
-            Weed
-          </span>
-          <span class="card-badge" style="color:${COL_WEED};border-color:${COL_WEED}4D">${totalWeed} ks</span>
+    <!-- ── STOCK MANIFEST — three unequal ledger columns ── -->
+    <div class="folio-label">Stav skladu</div>
+    <div style="height:1.6rem"></div>
+    <div class="stock-manifest">
+      <div class="manifest-col">
+        <div class="manifest-col-head">
+          <span class="manifest-col-title">Weed</span>
+          <span class="manifest-col-count">${totalWeed} ks celkem</span>
         </div>
-        ${miniStockBars(topWeed, maxWeedQty, COL_WEED)}
-        <a href="/sklad" class="quick-btn" style="width:100%;justify-content:center;margin-top:1.2rem">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          <span>Spravovat</span>
-        </a>
+        ${manifestRows(topWeed, 'Sklad prázdný')}
       </div>
-
-      <!-- Drogy -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M12 6v12M6 12h12"/></svg>
-            Drogy
-          </span>
-          <span class="card-badge" style="color:${COL_DROGY};border-color:${COL_DROGY}4D">${totalDrogy} ks</span>
+      <div class="manifest-col">
+        <div class="manifest-col-head">
+          <span class="manifest-col-title">Drogy</span>
+          <span class="manifest-col-count">${totalDrogy} ks celkem</span>
         </div>
-        ${miniStockBars(topDrogy, maxDrogyQty, COL_DROGY)}
-        <a href="/sklad" class="quick-btn" style="width:100%;justify-content:center;margin-top:1.2rem">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          <span>Spravovat</span>
-        </a>
+        ${manifestRows(topDrogy, 'Sklad prázdný')}
       </div>
-
-      <!-- Zbraně -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h10l2-4h4v8H4z"/><path d="M8 12v4"/></svg>
-            Zbraně
-          </span>
-          <span class="card-badge" style="color:${COL_ZBRANE};border-color:${COL_ZBRANE}4D">${totalZbrane} ks</span>
+      <div class="manifest-col">
+        <div class="manifest-col-head">
+          <span class="manifest-col-title">Zbraně</span>
+          <span class="manifest-col-count">${totalZbrane} ks celkem</span>
         </div>
-        ${miniStockBars(topZbrane, maxZbraneQty, COL_ZBRANE)}
-        <a href="/sklad" class="quick-btn" style="width:100%;justify-content:center;margin-top:1.2rem">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          <span>Spravovat</span>
-        </a>
-      </div>
-
-      <!-- Activity feed -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Poslední aktivita
-          </span>
-          <a href="/audit" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--seal-bright);text-decoration:none;padding:0.22rem 0.65rem;border:1px solid var(--border-seal);transition:background 0.2s;white-space:nowrap;font-family:var(--font-mono)" onmouseover="this.style.background='var(--seal-glow)'" onmouseout="this.style.background='transparent'">Vše →</a>
-        </div>
-        <div id="activity-feed">${activityHtml}</div>
+        ${manifestRows(topZbrane, 'Sklad prázdný')}
       </div>
     </div>
 
-    <!-- ── BOTTOM ROW: Finance + Bilance ── -->
-    <div class="sec-divider">
-      <span class="sec-divider-label">Finance &amp; Přehled</span>
-      <div class="sec-divider-line"></div>
-    </div>
+    <div class="folio-rule"></div>
 
-    <div class="home-bottom">
-
-      <!-- Poslední transakce -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            Poslední transakce
-          </span>
-          <a href="/sklad" style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--seal-bright);text-decoration:none;padding:0.22rem 0.65rem;border:1px solid var(--border-seal);transition:background 0.2s;white-space:nowrap;font-family:var(--font-mono)" onmouseover="this.style.background='var(--seal-glow)'" onmouseout="this.style.background='transparent'">Přidat →</a>
-        </div>
-        ${financeHtml}
-      </div>
-
-      <!-- Bilance -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-            Bilance organizace
-          </span>
-        </div>
-        <div class="bilance-grid">
-          <div class="bil-card">
-            <div class="bil-label">SAD Balance</div>
-            <div class="bil-value" style="color:${ucet.usd>=0?'#6FBF52':'var(--seal-bright)'}">$${ucet.usd.toLocaleString('cs-CZ')}</div>
-          </div>
-          <div class="bil-card">
-            <div class="bil-label">Pesos Balance</div>
-            <div class="bil-value" style="color:${ucet.pesos>=0?'#6FBF52':'var(--seal-bright)'}">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
-          </div>
-        </div>
-        <div style="padding-top:0.8rem;border-top:1px solid var(--border)">
-          <div style="font-size:0.54rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.5rem;font-family:var(--font-mono)">Celková hodnota skladu</div>
-          <div style="font-family:var(--font-display);font-weight:700;font-size:1.5rem;color:var(--brass)">$${totalValue.toLocaleString('cs-CZ')}</div>
-          <div style="font-size:0.66rem;color:var(--text-muted);margin-top:0.3rem;font-family:var(--font-mono)">Weed · prodejní ceny</div>
-        </div>
-      </div>
-
-      <!-- Skladové složení (donut) -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
-            Složení skladu
-          </span>
-          <span class="card-badge">$${totalValue.toLocaleString('cs-CZ')}</span>
-        </div>
-        <div class="pie-wrap">
-          <div class="pie-donut" style="background:conic-gradient(${COL_WEED} 0% ${pW}%, ${COL_DROGY} ${pW}% ${pW+pD}%, ${COL_ZBRANE} ${pW+pD}% 100%);
-            box-shadow:0 0 0 8px var(--bg-card),0 0 0 9px var(--border);
-            border-radius:50%;position:relative;">
-            <div style="position:absolute;inset:18px;border-radius:50%;background:var(--bg-card);display:flex;align-items:center;justify-content:center;flex-direction:column">
-              <div style="font-family:var(--font-display);font-weight:700;font-size:1.05rem;color:var(--vellum)">${totalWeed+totalDrogy+totalZbrane}</div>
-              <div style="font-size:0.5rem;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase;font-family:var(--font-mono)">kusů</div>
-            </div>
-          </div>
-          <div class="pie-legend">
-            <div class="pie-leg-item">
-              <div class="pie-leg-dot" style="background:${COL_WEED}"></div>
-              Weed
-              <div class="pie-leg-pct">${pW}%</div>
-            </div>
-            <div class="pie-leg-item">
-              <div class="pie-leg-dot" style="background:${COL_DROGY}"></div>
-              Drogy
-              <div class="pie-leg-pct">${pD}%</div>
-            </div>
-            <div class="pie-leg-item">
-              <div class="pie-leg-dot" style="background:${COL_ZBRANE}"></div>
-              Zbraně
-              <div class="pie-leg-pct">${pZ}%</div>
-            </div>
-            <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border)">
-              <div style="font-size:0.62rem;color:var(--text-muted);font-family:var(--font-mono)">Hodnotově nejcennější</div>
-              <div style="font-size:0.82rem;color:var(--vellum);margin-top:0.2rem;font-family:var(--font-display)">
-                ${zbraneVal>=weedVal&&zbraneVal>=drogyVal?'Zbraně':weedVal>=drogyVal?'Weed':'Drogy'}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style="margin-top:0.8rem;padding-top:0.8rem;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;text-align:center">
-          <div>
-            <div style="font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:${COL_WEED};margin-bottom:0.2rem;font-family:var(--font-mono)">Weed</div>
-            <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--vellum)">$${weedVal.toLocaleString('cs-CZ')}</div>
-          </div>
-          <div>
-            <div style="font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:${COL_DROGY};margin-bottom:0.2rem;font-family:var(--font-mono)">Drogy</div>
-            <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--vellum)">$${drogyVal.toLocaleString('cs-CZ')}</div>
-          </div>
-          <div>
-            <div style="font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:${COL_ZBRANE};margin-bottom:0.2rem;font-family:var(--font-mono)">Zbraně</div>
-            <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--vellum)">$${zbraneVal.toLocaleString('cs-CZ')}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- ── THE STREAM — last entries in the register ── -->
+    <div class="folio-label">Poslední zápisy</div>
+    <div style="height:1.6rem"></div>
+    <div class="stream" id="activity-stream">${activityHtml}</div>
 
   </main>
   <div class="toast" id="toast"></div>
   <script>
-    // ── Live SSE
+    // ── Live SSE — re-stamps the seal and nudges a toast, nothing more ──
     const evtHome = new EventSource('/api/events');
-    let liveCount = 0;
     function bumpLive(msg) {
-      liveCount++;
-      const el = document.getElementById('live-notif-count');
-      if (el) { el.style.display=''; el.textContent = liveCount + ' nová aktualizace' + (liveCount>1?'':''); }
       showToast(msg);
-      const seal = document.querySelector('.hero-seal');
+      const seal = document.getElementById('heroSeal');
       if (seal) {
         seal.classList.remove('live-pulse');
-        void seal.offsetWidth; // restart animation if it fires again quickly
+        void seal.offsetWidth;
         seal.classList.add('live-pulse');
       }
     }
@@ -3232,28 +3033,6 @@ function renderHome(req, data) {
       t._timer=setTimeout(()=>t.className='toast',3500);
     }
     window.showToast=showToast;
-
-    // ── Animace KPI čísel při načtení
-    document.querySelectorAll('.kpi-value').forEach(el => {
-      el.style.opacity='0';el.style.transform='translateY(8px)';
-      el.style.transition='opacity 0.5s,transform 0.5s';
-    });
-    requestAnimationFrame(()=>{
-      let i=0;
-      document.querySelectorAll('.kpi-value').forEach(el=>{
-        setTimeout(()=>{
-          el.style.opacity='1';el.style.transform='translateY(0)';
-        }, i*80);
-        i++;
-      });
-    });
-
-    // ── Animace stock barů
-    document.querySelectorAll('.msb-fill').forEach(el => {
-      const target = el.style.width;
-      el.style.width = '0';
-      setTimeout(() => { el.style.width = target; }, 300);
-    });
   </script>
   </body></html>`;
 }
@@ -3284,25 +3063,33 @@ function renderDashboard(req, data) {
 
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Sklad</title>
   ${baseStyles()}
+  <style>
+    .sklad-opener{
+      display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;
+      padding-bottom:1.8rem;margin-bottom:2rem;border-bottom:1px solid var(--border);
+    }
+    .sklad-opener-tag{font-family:var(--font-mono);font-size:0.64rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--seal-bright);margin-bottom:0.7rem;font-weight:600}
+    .sklad-opener h1{font-family:var(--font-display);font-weight:600;font-size:clamp(1.9rem,4vw,2.6rem);color:var(--vellum-bright)}
+    .sklad-opener p{font-family:'Inter',sans-serif;color:var(--text-dim);margin-top:0.5rem;font-size:0.95rem;max-width:540px}
+    .ledger-tally{display:flex;gap:2.2rem;flex-wrap:wrap;margin:0 0 2.4rem}
+    .tally-item{padding-right:2.2rem;border-right:1px solid var(--border)}
+    .tally-item:last-child{border-right:none;padding-right:0}
+    .tally-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.45rem}
+    .tally-value{font-family:var(--font-display);font-weight:700;font-size:1.5rem;color:var(--vellum);line-height:1}
+    @media(max-width:768px){.sklad-opener{flex-direction:column;align-items:flex-start;gap:0.8rem}.ledger-tally{gap:1.2rem 1.6rem}.tally-item{padding-right:1.4rem}}
+  </style>
   </head><body>
   ${renderNav(req, 'sklad')}
   <main>
-    <div class="page-header">
+    <div class="sklad-opener">
       <div>
-        <div class="page-label">Albion — Centrální sklad</div>
-        <h1 class="page-title">Vítej, ${icName}</h1>
-        <p class="page-sub">Přehled skladu a účetnictví organizace</p>
+        <div class="sklad-opener-tag">Centrální sklad organizace</div>
+        <h1>Vítej, ${icName}</h1>
+        <p>Eviduj pohyb zbraní, weedu, drog, chemikálií a financí. Každý zápis se ihned promítne do tabulka a odešle se na Discord.</p>
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div id="live-clock" style="font-family:var(--font-mono);font-size:1.3rem;color:var(--vellum);letter-spacing:0.08em"></div>
         <div id="live-date" style="font-size:0.66rem;letter-spacing:0.14em;color:var(--text-dim);text-transform:uppercase;margin-top:0.3rem;font-family:var(--font-mono)"></div>
-      </div>
-    </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Centrální sklad organizace</div>
-        <div class="page-info-text">Zde eviduješ pohyb zbraní, weedu, drog a financí. Každý vklad nebo výběr se automaticky zaznamená do tabulka a odešle notifikaci do aplikace. Přepínač <strong>Uložit / Vybrat</strong> určuje směr pohybu zásob. U výběru zbraní nezapomeň vyplnit účel.</div>
       </div>
     </div>
     <script>
@@ -3313,16 +3100,13 @@ function renderDashboard(req, data) {
       }
       updateClock();setInterval(updateClock,1000);
     </script>
-    <div class="stats" style="grid-template-columns:repeat(6,1fr)">
-      <div class="stat"><div class="stat-label">Zůstatek SAD</div><div class="stat-value">${ucet.usd.toLocaleString('cs-CZ')}</div><div class="stat-sub">San Andreas Dollar</div></div>
-      <div class="stat"><div class="stat-label">Zůstatek Pesos</div><div class="stat-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div><div class="stat-sub">Mexické peso</div></div>
-      <div class="stat"><div class="stat-label">Položky Weed</div><div class="stat-value">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
-      <div class="stat"><div class="stat-label">Položky Drogy</div><div class="stat-value">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">Kusů celkem</div></div>
-      <div class="stat" style="border-top-color:#6FA8C9"><div class="stat-label">Chemikálie</div><div class="stat-value" style="color:#6FA8C9">${Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0)}</div><div class="stat-sub">${Object.keys(chemky||{}).filter(k=>chemky[k]>0).length} druhů</div></div>
-      <div class="stat" style="border-top-color:var(--brass)">
-        <div class="stat-label">Hodnota skladu</div>
-        <div class="stat-value" style="font-size:1.4rem;color:var(--brass)">
-          $${(() => {
+    <div class="ledger-tally">
+      <div class="tally-item"><div class="tally-label">Zůstatek SAD</div><div class="tally-value" style="color:var(--brass)">$${ucet.usd.toLocaleString('cs-CZ')}</div></div>
+      <div class="tally-item"><div class="tally-label">Zůstatek Pesos</div><div class="tally-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div></div>
+      <div class="tally-item"><div class="tally-label">Weed</div><div class="tally-value" style="color:#7A9A4A">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)} ks</div></div>
+      <div class="tally-item"><div class="tally-label">Drogy</div><div class="tally-value" style="color:var(--seal-bright)">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)} ks</div></div>
+      <div class="tally-item"><div class="tally-label">Chemikálie</div><div class="tally-value" style="color:#6FA8C9">${Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0)} ks</div></div>
+      <div class="tally-item"><div class="tally-label">Hodnota skladu</div><div class="tally-value" style="color:var(--brass)">$${(() => {
             const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
             const DROGY_P = {"Kapky":200,"Kokain":500,"Extáze":350,"Metamfetamin":450,"Benzo":300,"Joyka":250,"Heroin":600,"Speed":280,"LSD":400};
             const ZBRANE_P = {"Pump Shotgun":8000,"Pistol MK2":12000,"Pistol":5000,"Combat Pistol":7000,"Double Action Revolver":15000,"Navy Revolver":14000,"Vintage Pistol":6000,"Gusenberg":18000,"Dlouhé":25000,"9mm":100,"9mm Mk2":150,".75cal":300,".50cal":250,"12-gauge":200};
@@ -3331,10 +3115,7 @@ function renderDashboard(req, data) {
             Object.entries(drogy).forEach(([k,q]) => { if(q>0 && DROGY_P[k]) total += q * DROGY_P[k]; });
             Object.entries(zbrane).forEach(([k,q]) => { if(q>0 && ZBRANE_P[k]) total += q * ZBRANE_P[k]; });
             return total.toLocaleString('cs-CZ');
-          })()}
-        </div>
-        <div class="stat-sub">Weed + Drogy + Zbraně</div>
-      </div>
+          })()}</div></div>
     </div>
     <div class="grid" style="grid-template-columns:repeat(2,1fr)">
       <div class="card">
@@ -3656,13 +3437,7 @@ function renderNastenska(req) {
         <p class="page-sub">Oznámení z aplikace kanálu — synchronizováno v reálném čase</p>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Oznámení organizace</div>
-        <div class="page-info-text">Nástěnka zobrazuje zprávy přímo z interního kanálu Albionu a aktualizuje se každých 30 sekund. Nová oznámení jsou orámována pečetní barvou. Zprávu zde lze i odeslat — automaticky se publikuje do kanálu a upozorní ostatní členy.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Oznámení organizace.</strong> Nástěnka zobrazuje zprávy přímo z interního kanálu Albionu a aktualizuje se každých 30 sekund. Nová oznámení jsou orámována pečetní barvou. Zprávu zde lze i odeslat — automaticky se publikuje do kanálu a upozorní ostatní členy.</p>
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start">
       <div>
         <div id="nastenska-list" class="nastenska-list">
@@ -3754,13 +3529,7 @@ function renderKodex(req) {
         <p class="page-sub">Principy a zásady, které definují každého člena Albionu</p>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Závazný řád organizace</div>
-        <div class="page-info-text">Kodex Albionu je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Neznalost pravidel není omluvou. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení z organizace.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Závazný řád organizace.</strong> Kodex Albionu je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Neznalost pravidel není omluvou. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení z organizace.</p>
     <div class="lore-grid">
       <div class="chapters">
         ${articles.map(a => `
@@ -3797,13 +3566,7 @@ function renderAudit(req) {
         <p class="page-sub">Kompletní záznam všech akcí — posledních 200 záznamů</p>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Přehled všech transakcí</div>
-        <div class="page-info-text">Audit zobrazuje chronologicky seřazené záznamy všech akcí v systému — vklady a výběry ze skladu, finanční pohyby i jejich autory. Záznamy lze filtrovat podle sekce. Nahoře je zobrazen také finanční souhrn per člen, viditelný u filtrů Vše a Účetnictví.</div>
-      </div>
-    </div>
+    <p class="folio-footnote">Audit zobrazuje chronologicky seřazené záznamy všech akcí v systému — vklady a výběry ze skladu, finanční pohyby i jejich autory. Záznamy lze filtrovat podle sekce nebo hledat textem. Finanční souhrn per člen je vidět u filtrů <strong>Vše</strong> a <strong>Účetnictví</strong>.</p>
 
     <div id="ucet-souhrn-wrap" style="display:none;margin-bottom:2rem">
       <div style="font-size:0.58rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--brass);margin-bottom:0.8rem;opacity:0.9;font-family:var(--font-mono)">Účetnictví — souhrn per člen</div>
@@ -3973,13 +3736,7 @@ function renderStatistiky(req) {
         <p class="page-sub">Detailní přehled příspěvků každého člena organizace</p>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Individuální aktivita členů</div>
-        <div class="page-info-text">Statistiky zobrazují celkové příspěvky každého člena — kolik čeho vložil nebo vybral ze skladu a jak se pohybovaly jeho finance. Zelená čísla (+) označují vklady, pečetní červená (–) výběry. Data jsou načítána přímo z tabulka.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Individuální aktivita členů.</strong> Statistiky zobrazují celkové příspěvky každého člena — kolik čeho vložil nebo vybral ze skladu a jak se pohybovaly jeho finance. Zelená čísla (+) označují vklady, pečetní červená (–) výběry. Data jsou načítána přímo z tabulka.</p>
     <div id="stats-container" class="stats-grid">
       <div class="ledger-loading">Načítám statistiky...</div>
     </div>
@@ -4008,7 +3765,7 @@ function renderStatistiky(req) {
       const stats = data.stats || {};
       const users = Object.keys(stats);
       if (!users.length) { container.innerHTML = ledgerEmptyHTML('Žádná data'); return; }
-      container.innerHTML = users.map(icName => {
+      container.innerHTML = users.map((icName, idx) => {
         const s = stats[icName];
         const hasZbrane = Object.keys({...s.zbrane.vklad,...s.zbrane.vyber}).length > 0;
         const hasNaboje = Object.keys({...s.naboje.vklad,...s.naboje.vyber}).length > 0;
@@ -4018,6 +3775,7 @@ function renderStatistiky(req) {
         const hasChemky = s.chemky && Object.keys({...s.chemky.vklad,...s.chemky.vyber}).length > 0;
         const hasUcet   = s.ucet.prijem_usd || s.ucet.vydaj_usd || s.ucet.prijem_pesos || s.ucet.vydaj_pesos;
         return \`<div class="stat-card">
+          <div class="stat-card-tab">SPIS Č. \${String(idx+1).padStart(3,'0')}</div>
           <div class="stat-card-header">
             <div>
               <div class="stat-card-name">\${icName}</div>
@@ -4061,13 +3819,7 @@ function renderLore(req) {
         <p class="page-sub">Kronika organizace — od počátků po současnost</p>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Kronika Albionu</div>
-        <div class="page-info-text">Historie zaznamenává vznik a vývoj organizace Albion od prvních dnů Christophera Sinclaira v Los Santos po současnost. Každá kapitola popisuje klíčové momenty, které formovaly organizaci do podoby, jakou má dnes.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Kronika Albionu.</strong> Historie zaznamenává vznik a vývoj organizace Albion od prvních dnů Christophera Sinclaira v Los Santos po současnost. Každá kapitola popisuje klíčové momenty, které formovaly organizaci do podoby, jakou má dnes.</p>
     <div class="lore-grid">
       <div class="chapters">
         <div class="chapter">
@@ -4163,13 +3915,7 @@ function renderHierarchy(req) {
         <p class="page-sub">Struktura a řád organizace Albion</p>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 11 3 20 21 20 21 11"/><path d="M3 11L12 3l9 8"/><line x1="9" y1="20" x2="9" y2="14"/><line x1="15" y1="20" x2="15" y2="14"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Struktura organizace</div>
-        <div class="page-info-text">Hierarchie definuje pět úrovní členství v Albionu — od zakladatele po Associate. Každý rank nese specifické pravomoci a odpovědnosti. Postup v hierarchii závisí na prokazování loajality, schopností a přispívání k rozvoji organizace.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Struktura organizace.</strong> Hierarchie definuje pět úrovní členství v Albionu — od zakladatele po Associate. Každý rank nese specifické pravomoci a odpovědnosti. Postup v hierarchii závisí na prokazování loajality, schopností a přispívání k rozvoji organizace.</p>
     <div class="rank-list">
       ${ranks.map(r => `
       <div class="rank-item${r.isFounder?' founder':''}">
@@ -4203,13 +3949,7 @@ function renderWeedSazeni(req) {
         <p class="page-sub">Ceník, kalkulačka materiálu a sdílené odpočty růstu</p>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V8M12 8c0-3 2-5 5-5 0 3-2 5-5 5zM12 12c0-3-2-5-5-5 0 3 2 5 5 5z"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Pěstování weedu</div>
-        <div class="page-info-text">Na jednu kytku potřebuješ daný materiál. Z jedné kytky vzniknou <strong>${WEED_PLANT.bagsPerPlant} sáčky</strong> (1 sáček = $${WEED_PLANT.bagPrice}). Kytka roste <strong>${WEED_PLANT.growHours} hodin</strong>. Kalkulačka spočítá materiál i zisk podle počtu kytek nebo rozpočtu. Spuštěné odpočty vidí všichni členové.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Pěstování weedu.</strong> Na jednu kytku potřebuješ daný materiál. Z jedné kytky vzniknou <strong>${WEED_PLANT.bagsPerPlant} sáčky</strong> (1 sáček = $${WEED_PLANT.bagPrice}). Kytka roste <strong>${WEED_PLANT.growHours} hodin</strong>. Kalkulačka spočítá materiál i zisk podle počtu kytek nebo rozpočtu. Spuštěné odpočty vidí všichni členové.</p>
 
     <div class="stats" style="grid-template-columns:repeat(4,1fr)">
       <div class="stat"><div class="stat-label">Náklad / kytka</div><div class="stat-value">$${WEED_PLANT.costPerPlant}</div><div class="stat-sub">materiál</div></div>
@@ -4421,13 +4161,7 @@ function renderBlackbook(req) {
         <div id="bb-generated" style="font-size:0.68rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase"></div>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Analytické reporty</div>
-        <div class="page-info-text">Blackbook generuje reporty výhradně z dat dostupných na webu a v tabulkách (Google Sheets) — finance, sklad, zbraně, drogy a aktivita členů. Aktivita členů se počítá z posledního zaznamenaného pohybu člena. Vyber report v záložkách níže.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Analytické reporty.</strong> Blackbook generuje reporty výhradně z dat dostupných na webu a v tabulkách (Google Sheets) — finance, sklad, zbraně, drogy a aktivita členů. Aktivita členů se počítá z posledního zaznamenaného pohybu člena. Vyber report v záložkách níže.</p>
 
     <div class="bb-tabs">
       <button class="bb-tab active" data-sec="finance" onclick="bbTab('finance')">Finanční</button>
@@ -4707,13 +4441,7 @@ function renderProfitCentrum(req) {
         <div id="pc-generated" style="font-size:0.68rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase"></div>
       </div>
     </div>
-    <div class="page-info">
-      <div class="page-info-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5c0-1.4 1.3-2.5 3-2.5s3 1.1 3 2.5c0 1.6-1.4 2-3 2.5-1.6.5-3 .9-3 2.5 0 1.4 1.3 2.5 3 2.5s3-1.1 3-2.5"/></svg></div>
-      <div class="page-info-body">
-        <div class="page-info-title">Profit centrum</div>
-        <div class="page-info-text">Report se počítá výhradně z reálných dat z webu — Účetnictví (peníze) a sklady Drogy/Weed. „Zisk frakce“ = příjem − výdaj v Účetnictví za dané období. „Tržby ze skladu“ = hodnota vybraných (prodaných) drog a weedu dle aktuálního ceníku. Žebříčky níže lze přepínat podle období.</div>
-      </div>
-    </div>
+    <p class="folio-footnote"><strong>Profit centrum.</strong> Report se počítá výhradně z reálných dat z webu — Účetnictví (peníze) a sklady Drogy/Weed. „Zisk frakce“ = příjem − výdaj v Účetnictví za dané období. „Tržby ze skladu“ = hodnota vybraných (prodaných) drog a weedu dle aktuálního ceníku. Žebříčky níže lze přepínat podle období.</p>
 
     <div id="pc-loading" class="ledger-loading">Generuji report…</div>
 
