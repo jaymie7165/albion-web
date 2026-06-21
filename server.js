@@ -1698,7 +1698,7 @@ function baseStyles() {
         .nav-dropdown.open .nav-drop-arrow{transform:rotate(180deg)}
         .nav-dropdown-menu{
           position:static;transform:none!important;width:100%;min-width:0;
-          margin-top:0;border-radius:0;border:none;border-top:0;
+          margin-top:0;padding-top:0;border-radius:0;border:none;border-top:0;
           box-shadow:none;background:var(--bg-mid);
           max-height:0;overflow:hidden;opacity:1;pointer-events:none;
           transition:max-height 0.25s ease;
@@ -1919,17 +1919,21 @@ function baseStyles() {
       .toast.error{border-left-color:var(--seal-bright)}
 
       /* ── TABULKY — ledger rows ── */
-      .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:6px}
-      table{width:100%;border-collapse:collapse;font-size:0.88rem}
+      /* ── TABULKY — true ledger with column rules, not zebra-striped UI tables ── */
+      .table-wrap{overflow-x:auto}
+      table{width:100%;border-collapse:collapse;font-size:0.86rem;border-top:2px solid var(--brass);border-bottom:2px solid var(--brass)}
       th{
-        font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;
-        color:var(--text-dim);padding:0.85rem 1.1rem;text-align:left;
-        border-bottom:1px solid var(--border-brass);background:var(--bg-card2);
+        font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:700;
+        color:var(--brass);padding:0.75rem 1rem;text-align:left;
+        border-bottom:1px solid var(--border-brass);
         font-family:var(--font-mono);
+        background:transparent;
       }
-      td{padding:0.82rem 1.1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.88rem}
+      th + th{border-left:1px solid var(--border)}
+      td{padding:0.68rem 1rem;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:0.86rem}
+      td + td{border-left:1px solid var(--border)}
       tr:last-child td{border-bottom:none}
-      tbody tr:nth-child(even) td{background:var(--silver-dim)}
+      tbody tr:nth-child(even) td{background:transparent}
       tr:hover td{background:var(--seal-glow);color:var(--text)}
       .badge{
         font-size:0.6rem;padding:0.22rem 0.7rem;
@@ -2008,9 +2012,18 @@ function baseStyles() {
       .stat-section-label:first-of-type{border-top:none;margin-top:0}
       .stat-item-group{margin-left:0.5rem}
 
-      /* ── LORE / HIERARCHY ── */
-      .lore-grid{display:grid;grid-template-columns:1fr 320px;gap:3rem;align-items:start}
-      .chapters{display:flex;flex-direction:column;gap:3rem}
+      /* ── LORE / HIERARCHY — open-book spread with a spine shadow ── */
+      .lore-grid{
+        display:grid;grid-template-columns:1fr 320px;gap:0;align-items:start;
+        position:relative;
+      }
+      .lore-grid::before{
+        content:'';position:absolute;left:calc(100% - 320px - 1.6rem);top:0;bottom:0;width:3rem;
+        background:linear-gradient(90deg,transparent,rgba(0,0,0,0.18),transparent);
+        pointer-events:none;z-index:1;
+      }
+      body.light .lore-grid::before{background:linear-gradient(90deg,transparent,rgba(0,0,0,0.05),transparent)}
+      .chapters{display:flex;flex-direction:column;gap:3rem;padding-right:3rem}
       .chapter{
         border-left:2px solid var(--border);
         padding-left:2rem;position:relative;
@@ -2025,12 +2038,16 @@ function baseStyles() {
       }
       .chapter:hover::before{opacity:1}
       .chapter-meta{font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--seal-bright);margin-bottom:0.8rem;font-weight:600;font-family:var(--font-mono)}
-      .chapter-title{font-family:var(--font-display);font-size:1.4rem;color:var(--vellum);margin-bottom:1rem;font-weight:600}
-      .chapter-text{font-family:'Inter',sans-serif;font-size:0.95rem;line-height:2;color:var(--text-dim)}
+      .chapter-title{font-family:var(--font-display);font-size:1.5rem;color:var(--vellum);margin-bottom:1.1rem;font-weight:600}
+      .chapter-text{font-family:'Inter',sans-serif;font-size:0.95rem;line-height:2.05;color:var(--text-dim);white-space:pre-line}
+      .chapter-text.with-dropcap::first-letter{
+        font-family:var(--font-display);font-weight:700;font-size:3.6em;line-height:0.8;
+        float:left;padding:0.06em 0.1em 0 0;color:var(--brass);
+      }
       .sidebar{
         background:var(--bg-card);border:1px solid var(--border);border-radius:6px;
         padding:2rem;position:sticky;top:calc(var(--nav-h) + 1.5rem);
-        box-shadow:var(--shadow-card);
+        box-shadow:var(--shadow-card);margin-left:1.6rem;
       }
       .sidebar-title{
         font-family:var(--font-mono);font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:700;
@@ -2233,7 +2250,7 @@ function baseStyles() {
       .mini-stock-qty{font-size:0.78rem;color:var(--text);font-weight:500;min-width:36px;text-align:right;flex-shrink:0;font-family:var(--font-mono)}
 
       @media(max-width:1200px){.nav-menu a .nav-desc{display:none}}
-      @media(max-width:900px){.grid,.stats{grid-template-columns:1fr!important}.lore-grid{grid-template-columns:1fr}.sidebar{position:static}}
+      @media(max-width:900px){.grid,.stats{grid-template-columns:1fr!important}.lore-grid{grid-template-columns:1fr}.lore-grid::before{display:none}.chapters{padding-right:0}.sidebar{margin-left:0}.sidebar{position:static}}
       @media(max-width:768px){.profit-grid{grid-template-columns:repeat(2,1fr)!important}main{padding:1.5rem 1rem}}
       @media(max-width:640px){
         .page-header{flex-direction:column;align-items:flex-start;gap:0.8rem}
@@ -2270,18 +2287,21 @@ function baseStyles() {
       .nav-drop-arrow{width:9px;height:6px;margin-top:2px;opacity:0.4;transition:transform 0.2s,opacity 0.2s;flex-shrink:0}
       .nav-dropdown.open .nav-drop-arrow{transform:rotate(180deg);opacity:0.7}
       .nav-dropdown-menu{
-        position:absolute;top:100%;left:50%;transform:translateX(-50%);
+        position:absolute;top:100%;left:50%;
+        transform:translateX(-50%) translateY(-4px);
         background:var(--bg-card);
         border:1px solid var(--border-brass);
         border-radius:4px;
         min-width:190px;
-        margin-top:2px;
+        margin-top:0;
+        padding-top:8px;
         box-shadow:var(--shadow-card);
         opacity:0;pointer-events:none;
-        transform:translateX(-50%) translateY(-6px);
         transition:opacity 0.18s,transform 0.18s;
         z-index:300;
-        overflow:hidden;
+      }
+      .nav-dropdown-menu::before{
+        content:'';position:absolute;top:-8px;left:0;right:0;height:8px;
       }
       body.crystal .nav-dropdown-menu{backdrop-filter:blur(var(--crystal-blur));-webkit-backdrop-filter:blur(var(--crystal-blur))}
       .nav-dropdown.open .nav-dropdown-menu{opacity:1;pointer-events:all;transform:translateX(-50%) translateY(0)}
@@ -2293,7 +2313,8 @@ function baseStyles() {
         transition:color 0.15s,background 0.15s;
         white-space:nowrap;
       }
-      .nav-dropdown-menu a:last-child{border-bottom:none}
+      .nav-dropdown-menu a:first-child{border-radius:4px 4px 0 0}
+      .nav-dropdown-menu a:last-child{border-bottom:none;border-radius:0 0 4px 4px}
       .nav-dropdown-menu a:hover{color:var(--text);background:var(--silver-dim)}
       .nav-dropdown-menu a.active{color:var(--seal-bright);background:var(--seal-glow)}
 
@@ -2447,13 +2468,82 @@ function baseStyles() {
       .manifest-row .mr-val{font-family:var(--font-mono);color:var(--text-dim);flex-shrink:0;font-size:0.85rem}
       .manifest-row:hover .mr-name{color:var(--seal-bright)}
 
+      /* ── Manifest column — the heading above a manifest-row group ── */
+      .manifest-col{padding-top:0.2rem}
+      .manifest-col-head{
+        display:flex;align-items:baseline;justify-content:space-between;
+        margin-bottom:0.9rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border-brass);
+      }
+      .manifest-col-title{font-family:var(--font-display);font-weight:600;font-size:1.15rem;color:var(--vellum)}
+      .manifest-col-count{font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted)}
+      .manifest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 2.6rem}
+
       /* ── Folio panel — replaces .card for document-style sections (no box, just rule) ── */
       .folio-panel{position:relative;padding-top:0.5rem}
       .folio-panel + .folio-panel{margin-top:2.2rem}
 
+      /* ── Ledger bar — a hand-ruled bar chart row, not a UI progress bar ── */
+      .ledger-bar-row{
+        display:grid;grid-template-columns:1fr 2.6fr auto;gap:1rem;
+        align-items:baseline;padding:0.55rem 0;border-bottom:1px solid var(--border);
+      }
+      .ledger-bar-row:last-child{border-bottom:none}
+      .ledger-bar-name{font-family:var(--font-display);font-size:0.92rem;color:var(--vellum);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .ledger-bar-track{position:relative;height:1px;background:var(--border);align-self:center}
+      .ledger-bar-fill{position:absolute;top:-3px;bottom:-3px;left:0;background:linear-gradient(90deg,var(--seal) 0%,var(--brass) 100%);opacity:0.85}
+      .ledger-bar-fill::after{content:'';position:absolute;right:-1px;top:0;bottom:0;width:1px;background:var(--brass-bright)}
+      .ledger-bar-val{font-family:var(--font-mono);font-size:0.82rem;color:var(--vellum);text-align:right;white-space:nowrap}
+
+      /* ── Report figure row — replaces the 4-box "Today/Week/Month/Total" card strip ── */
+      .report-figures{
+        display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+        border-top:1px solid var(--border-brass);border-bottom:1px solid var(--border-brass);
+        margin:1.6rem 0 2.2rem;
+      }
+      .report-figure{padding:1.2rem 1.5rem;border-left:1px solid var(--border)}
+      .report-figure:first-child{border-left:none}
+      .report-figure-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.6rem}
+      .report-figure-net{font-family:var(--font-display);font-weight:700;font-size:1.5rem;line-height:1;margin-bottom:0.55rem}
+      .report-figure-line{display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-dim);padding:0.12rem 0;font-family:var(--font-mono)}
+
+      /* ── Recommendation entry — replaces the boxed .bb-tip ── */
+      .recommendation{
+        display:flex;gap:1rem;align-items:flex-start;
+        padding:0.9rem 0;border-bottom:1px solid var(--border);
+      }
+      .recommendation:last-child{border-bottom:none}
+      .recommendation-mark{
+        font-family:var(--font-display);font-weight:700;font-size:1rem;
+        width:1.6rem;height:1.6rem;border-radius:50%;flex-shrink:0;
+        display:flex;align-items:center;justify-content:center;border:1px solid currentColor;
+        margin-top:0.1rem;
+      }
+      .recommendation-cat{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:0.3rem}
+      .recommendation-text{font-size:0.86rem;color:var(--vellum);line-height:1.7}
+
+      /* ── Report section — replaces tab-button bar with a folio running-head selector ── */
+      .report-nav{display:flex;flex-wrap:wrap;gap:0 2rem;margin-bottom:0.4rem;border-bottom:1px solid var(--border)}
+      .report-nav-item{
+        font-family:var(--font-mono);font-size:0.66rem;letter-spacing:0.1em;text-transform:uppercase;
+        color:var(--text-muted);padding:0.7rem 0;cursor:pointer;background:none;border:none;
+        border-bottom:2px solid transparent;transition:color 0.2s,border-color 0.2s;
+        white-space:nowrap;
+      }
+      .report-nav-item:hover{color:var(--text-dim)}
+      .report-nav-item.active{color:var(--seal-bright);border-bottom-color:var(--seal)}
+      .report-section{display:none}
+      .report-section.active{display:block;animation:fadeReveal 0.35s ease-out 1}
+
       @media(max-width:900px){
         .folio-spread,.folio-spread.reverse{grid-template-columns:1fr;gap:1.8rem}
         .folio-mega{font-size:clamp(2.6rem,14vw,4.5rem)}
+        .report-figures{grid-template-columns:1fr 1fr}
+        .report-figure:nth-child(3){border-left:none}
+      }
+      @media(max-width:640px){
+        .ledger-bar-row{grid-template-columns:1fr;gap:0.3rem}
+        .ledger-bar-track{display:none}
+        .report-figures{grid-template-columns:1fr 1fr}
       }
 
       /* ── SELECT EXPANDABLE ── */
@@ -2596,6 +2686,7 @@ function renderNav(req, active) {
       window.addEventListener('resize', () => { placeNavRight(); if (window.innerWidth > 880) closeMobileNav(); });
       document.querySelectorAll('.nav-dropdown').forEach(dd => {
         const trigger = dd.querySelector('.nav-drop-trigger');
+        let closeTimer = null;
         trigger.addEventListener('click', (e) => {
           // Only intercept the click if it's on the trigger itself (not a child link with href)
           const href = trigger.getAttribute('href');
@@ -2606,9 +2697,18 @@ function renderNav(req, active) {
           e.preventDefault();
           dd.classList.toggle('open');
         });
-        // hover open (desktop only)
-        dd.addEventListener('mouseenter', () => { if (window.innerWidth > 880) dd.classList.add('open'); });
-        dd.addEventListener('mouseleave', () => { if (window.innerWidth > 880) dd.classList.remove('open'); });
+        // hover open (desktop only) — close is delayed so a brief cursor wobble
+        // between the trigger and the menu doesn't slam the dropdown shut.
+        dd.addEventListener('mouseenter', () => {
+          if (window.innerWidth <= 880) return;
+          clearTimeout(closeTimer);
+          dd.classList.add('open');
+        });
+        dd.addEventListener('mouseleave', () => {
+          if (window.innerWidth <= 880) return;
+          clearTimeout(closeTimer);
+          closeTimer = setTimeout(() => dd.classList.remove('open'), 300);
+        });
       });
       // Close dropdowns on outside click
       document.addEventListener('click', (e) => {
@@ -2866,15 +2966,8 @@ function renderHome(req, data) {
     }
     .pf-footnote strong{color:var(--vellum);font-weight:600}
 
-    /* ── STOCK MANIFEST — three ledger columns of unequal visual weight ── */
+    /* ── STOCK MANIFEST GRID — three-column layout, home-page specific weighting ── */
     .stock-manifest{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:0 3rem}
-    .manifest-col{padding-top:0.2rem}
-    .manifest-col-head{
-      display:flex;align-items:baseline;justify-content:space-between;
-      margin-bottom:0.9rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border-brass);
-    }
-    .manifest-col-title{font-family:var(--font-display);font-weight:600;font-size:1.15rem;color:var(--vellum)}
-    .manifest-col-count{font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted)}
 
     /* ── THE STREAM — recent activity as a typed log, no card ── */
     .stream{margin-top:0.5rem}
@@ -3077,6 +3170,28 @@ function renderDashboard(req, data) {
     .tally-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-muted);margin-bottom:0.45rem}
     .tally-value{font-family:var(--font-display);font-weight:700;font-size:1.5rem;color:var(--vellum);line-height:1}
     @media(max-width:768px){.sklad-opener{flex-direction:column;align-items:flex-start;gap:0.8rem}.ledger-tally{gap:1.2rem 1.6rem}.tally-item{padding-right:1.4rem}}
+    .sklad-asym{
+      display:grid;
+      grid-template-columns:1.4fr 1fr;
+      grid-template-areas:
+        "ucet ucet"
+        "zbrane weed"
+        "drogy chemky";
+      gap:1.5rem;
+    }
+    .sklad-asym .area-ucet{grid-area:ucet}
+    .sklad-asym .area-zbrane{grid-area:zbrane}
+    .sklad-asym .area-weed{grid-area:weed}
+    .sklad-asym .area-drogy{grid-area:drogy}
+    .sklad-asym .area-chemky{grid-area:chemky}
+    .card.card-lead{
+      border-top:2px solid var(--brass);
+      background:linear-gradient(135deg,var(--gold-dim) 0%,var(--bg-card) 45%);
+    }
+    .card.card-lead .card-title{font-size:1.05rem}
+    @media(max-width:900px){
+      .sklad-asym{grid-template-columns:1fr;grid-template-areas:"ucet" "zbrane" "weed" "drogy" "chemky"}
+    }
   </style>
   </head><body>
   ${renderNav(req, 'sklad')}
@@ -3117,8 +3232,25 @@ function renderDashboard(req, data) {
             return total.toLocaleString('cs-CZ');
           })()}</div></div>
     </div>
-    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="card">
+    <div class="sklad-asym">
+      <div class="card card-lead area-ucet">
+        <div class="card-header"><span class="card-title">Účetnictví organizace</span><span class="card-badge">Finance · vede rejstřík</span></div>
+        ${formatUcet(recentUcet)}
+        <div class="form-section">
+          <div class="typ-toggle">
+            <button class="typ-btn active-vklad" onclick="setTyp('ucet','PŘÍJEM',this)">Příjem</button>
+            <button class="typ-btn" onclick="setTyp('ucet','VÝDAJ',this)">Výdaj</button>
+          </div>
+          <input type="hidden" id="ucet-typ" value="PŘÍJEM">
+          <div class="form-row">
+            <div class="form-group"><label>Částka</label><input type="number" id="ucet-castka" min="1" placeholder="1000"></div>
+            <div class="form-group"><label>Valuta</label><select id="ucet-valuta"><option value="USD">SAD</option><option value="PESOS">Pesos</option></select></div>
+          </div>
+          <div class="form-group" style="margin-bottom:0.5rem"><label>Poznámka</label><input type="text" id="ucet-poznamka" placeholder="Prodej zboží, plat..."></div>
+          <button class="btn-submit" onclick="submitUcet()">Potvrdit transakci</button>
+        </div>
+      </div>
+      <div class="card area-zbrane">
         <div class="card-header"><span class="card-title">Zbraně & Střelivo</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(zbrane, null)}
         <div class="form-section">
@@ -3138,7 +3270,7 @@ function renderDashboard(req, data) {
           <button class="btn-submit" onclick="submitZbrane()">Potvrdit akci</button>
         </div>
       </div>
-      <div class="card">
+      <div class="card area-weed">
         <div class="card-header"><span class="card-title">Weed</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(weed, {"Žlutý kanabis":{prodej:150},"Zelený kanabis":{prodej:150},"Kanabis":{prodej:150},"Červený kanabis":{prodej:150},"Modrý kanabis":{prodej:150}})}
         <div class="form-section">
@@ -3155,7 +3287,7 @@ function renderDashboard(req, data) {
           <button class="btn-submit" onclick="submitWeed()">Potvrdit akci</button>
         </div>
       </div>
-      <div class="card">
+      <div class="card area-drogy">
         <div class="card-header"><span class="card-title">Drogy</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(drogy, null)}
         <div class="form-section">
@@ -3171,24 +3303,7 @@ function renderDashboard(req, data) {
           <button class="btn-submit" onclick="submitDrogy()">Potvrdit akci</button>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">Účetnictví</span><span class="card-badge">Finance</span></div>
-        ${formatUcet(recentUcet)}
-        <div class="form-section">
-          <div class="typ-toggle">
-            <button class="typ-btn active-vklad" onclick="setTyp('ucet','PŘÍJEM',this)">Příjem</button>
-            <button class="typ-btn" onclick="setTyp('ucet','VÝDAJ',this)">Výdaj</button>
-          </div>
-          <input type="hidden" id="ucet-typ" value="PŘÍJEM">
-          <div class="form-row">
-            <div class="form-group"><label>Částka</label><input type="number" id="ucet-castka" min="1" placeholder="1000"></div>
-            <div class="form-group"><label>Valuta</label><select id="ucet-valuta"><option value="USD">SAD</option><option value="PESOS">Pesos</option></select></div>
-          </div>
-          <div class="form-group" style="margin-bottom:0.5rem"><label>Poznámka</label><input type="text" id="ucet-poznamka" placeholder="Prodej zboží, plat..."></div>
-          <button class="btn-submit" onclick="submitUcet()">Potvrdit transakci</button>
-        </div>
-      </div>
-      <div class="card">
+      <div class="card area-chemky">
         <div class="card-header"><span class="card-title">Chemikálie</span><span class="card-badge">Sklad</span></div>
         ${formatSklad(chemky||{}, null)}
         <div class="form-section">
@@ -3458,7 +3573,7 @@ function renderNastenska(req) {
     let lastSeenId = localStorage.getItem(LAST_ID_KEY) || '0';
 
     async function loadAnnouncements() {
-      const res = await fetch('/api/nastenska');
+      const res = await fetch('/api/nastenska', { cache: 'no-store' });
       const data = await res.json();
       const list = document.getElementById('nastenska-list');
       if (!data.messages || !data.messages.length) {
@@ -3532,11 +3647,11 @@ function renderKodex(req) {
     <p class="folio-footnote"><strong>Závazný řád organizace.</strong> Kodex Albionu je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Neznalost pravidel není omluvou. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení z organizace.</p>
     <div class="lore-grid">
       <div class="chapters">
-        ${articles.map(a => `
+        ${articles.map((a,i) => `
         <div class="chapter">
           <div class="chapter-meta">Článek ${a.num}</div>
           <div class="chapter-title">${a.title}</div>
-          <div class="chapter-text">${a.text}</div>
+          <div class="chapter-text${i===0?' with-dropcap':''}">${a.text}</div>
         </div>
         `).join('')}
       </div>
@@ -3608,7 +3723,7 @@ function renderAudit(req) {
     let searchTerm = '';
 
     async function loadAudit() {
-      const res = await fetch('/api/audit');
+      const res = await fetch('/api/audit', { cache: 'no-store' });
       const data = await res.json();
       allEvents = data.events || [];
       ucetSouhrn = data.ucetSouhrn || {};
@@ -3759,7 +3874,7 @@ function renderStatistiky(req) {
     }
 
     async function loadStats() {
-      const res = await fetch('/api/stats');
+      const res = await fetch('/api/stats', { cache: 'no-store' });
       const data = await res.json();
       const container = document.getElementById('stats-container');
       const stats = data.stats || {};
@@ -3825,7 +3940,7 @@ function renderLore(req) {
         <div class="chapter">
           <div class="chapter-meta">Počátky</div>
           <div class="chapter-title">Vznik organizace</div>
-          <div class="chapter-text">Albion vznikl krátce po příchodu Christophera Sinclaira do Los Santos. Po přesunu ze Spojeného království se Sinclair snažil začlenit do místního prostředí a navázat kontakty, které by mu umožnily vybudovat vlastní podnikatelské zázemí. Během prvních měsíců ve městě však zjistil, že samotné vzdělání, zkušenosti ani kapitál často nestačí. Los Santos fungovalo na osobních vazbách, vzájemných službách a důvěře mezi jednotlivci, kteří byli schopni táhnout za jeden provaz.
+          <div class="chapter-text with-dropcap">Albion vznikl krátce po příchodu Christophera Sinclaira do Los Santos. Po přesunu ze Spojeného království se Sinclair snažil začlenit do místního prostředí a navázat kontakty, které by mu umožnily vybudovat vlastní podnikatelské zázemí. Během prvních měsíců ve městě však zjistil, že samotné vzdělání, zkušenosti ani kapitál často nestačí. Los Santos fungovalo na osobních vazbách, vzájemných službách a důvěře mezi jednotlivci, kteří byli schopni táhnout za jeden provaz.
 
 Právě během tohoto období se kolem něj začala formovat skupina lidí s podobným pohledem na svět. Nešlo o jedince stejné národnosti ani stejného původu. Někteří pocházeli z Evropy, jiní ze Spojených států a další z úplně odlišných částí světa. Spojovala je především ambice vybudovat si v Los Santos vlastní postavení a nechtít být závislí na cizích organizacích nebo zájmech.
 
@@ -4094,7 +4209,7 @@ function renderWeedSazeni(req) {
     }
     async function loadTimers() {
       try {
-        const res = await fetch('/api/weed-timers');
+        const res = await fetch('/api/weed-timers', { cache: 'no-store' });
         const d = await res.json();
         timers = d.timers || [];
         serverOffset = (d.now || Date.now()) - Date.now();
@@ -4129,25 +4244,6 @@ function renderWeedSazeni(req) {
 function renderBlackbook(req) {
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Blackbook</title>
   ${baseStyles()}
-  <style>
-    .bb-tabs{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:1.5rem}
-    .bb-tab{flex:none;padding:0.45rem 1rem;font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:4px;transition:all 0.15s;font-family:inherit}
-    .bb-tab.active{background:var(--silver-dim);border-color:var(--seal);color:var(--vellum)}
-    .bb-section{display:none}
-    .bb-section.active{display:block}
-    .bb-mini-label{font-size:0.58rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--brass);margin:1.5rem 0 0.8rem;opacity:0.9;font-family:var(--font-mono)}
-    .bb-bar-row{display:flex;align-items:center;gap:0.8rem;margin:0.35rem 0;font-size:0.8rem}
-    .bb-bar-name{flex:0 0 38%;color:var(--vellum);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .bb-bar-track{flex:1;height:14px;background:var(--border);border-radius:3px;overflow:hidden}
-    .bb-bar-fill{height:100%;background:linear-gradient(90deg,var(--seal-bright),var(--brass))}
-    .bb-bar-val{flex:0 0 auto;color:var(--vellum);font-weight:600;min-width:70px;text-align:right;font-family:var(--font-mono)}
-    .bb-tip{display:flex;gap:0.8rem;align-items:flex-start;padding:0.85rem 1.1rem;margin:0.5rem 0;border:1px solid var(--border);border-radius:2px;background:rgba(255,255,255,0.015)}
-    .bb-tip-icon{flex-shrink:0;font-size:1.05rem;line-height:1.5}
-    .bb-tip-cat{font-size:0.55rem;letter-spacing:0.22em;text-transform:uppercase;opacity:0.85;margin-bottom:0.3rem}
-    .bb-tip-text{font-size:0.82rem;color:var(--text);line-height:1.65}
-    .bb-legend{display:flex;gap:1.2rem;font-size:0.66rem;color:var(--text-muted);margin-top:0.4rem}
-    .bb-legend-dash{display:inline-block;width:16px;border-top:2px solid;vertical-align:middle;margin-right:5px}
-  </style>
   </head><body>
   ${renderNav(req, 'blackbook')}
   <main>
@@ -4158,27 +4254,27 @@ function renderBlackbook(req) {
         <p class="page-sub">Reporty a analýzy z dostupných dat — sklad, finance, členové</p>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div id="bb-generated" style="font-size:0.68rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase"></div>
+        <div id="bb-generated" style="font-size:0.64rem;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase;font-family:var(--font-mono)"></div>
       </div>
     </div>
-    <p class="folio-footnote"><strong>Analytické reporty.</strong> Blackbook generuje reporty výhradně z dat dostupných na webu a v tabulkách (Google Sheets) — finance, sklad, zbraně, drogy a aktivita členů. Aktivita členů se počítá z posledního zaznamenaného pohybu člena. Vyber report v záložkách níže.</p>
+    <p class="folio-footnote"><strong>Analytické reporty.</strong> Blackbook generuje reporty výhradně z dat dostupných na webu a v tabulkách (Google Sheets) — finance, sklad, zbraně, drogy a aktivita členů. Vyber kapitolu rejstříku níže.</p>
 
-    <div class="bb-tabs">
-      <button class="bb-tab active" data-sec="finance" onclick="bbTab('finance')">Finanční</button>
-      <button class="bb-tab" data-sec="aktivita" onclick="bbTab('aktivita')">Aktivita členů</button>
-      <button class="bb-tab" data-sec="sklad" onclick="bbTab('sklad')">Inventura a sklad</button>
-      <button class="bb-tab" data-sec="zbrane" onclick="bbTab('zbrane')">Zbraně</button>
-      <button class="bb-tab" data-sec="drogy" onclick="bbTab('drogy')">Drogy a výroby</button>
-      <button class="bb-tab" data-sec="bezpecnost" onclick="bbTab('bezpecnost')">Audit a bezpečnost</button>
+    <div class="report-nav">
+      <button class="report-nav-item active" data-sec="finance" onclick="bbTab('finance')">I. Finanční</button>
+      <button class="report-nav-item" data-sec="aktivita" onclick="bbTab('aktivita')">II. Aktivita členů</button>
+      <button class="report-nav-item" data-sec="sklad" onclick="bbTab('sklad')">III. Inventura a sklad</button>
+      <button class="report-nav-item" data-sec="zbrane" onclick="bbTab('zbrane')">IV. Zbraně</button>
+      <button class="report-nav-item" data-sec="drogy" onclick="bbTab('drogy')">V. Drogy a výroby</button>
+      <button class="report-nav-item" data-sec="bezpecnost" onclick="bbTab('bezpecnost')">VI. Audit a bezpečnost</button>
     </div>
 
-    <div id="bb-loading" class="ledger-loading">Generuji reporty…</div>
-    <div id="bb-finance" class="bb-section active"></div>
-    <div id="bb-aktivita" class="bb-section"></div>
-    <div id="bb-sklad" class="bb-section"></div>
-    <div id="bb-zbrane" class="bb-section"></div>
-    <div id="bb-drogy" class="bb-section"></div>
-    <div id="bb-bezpecnost" class="bb-section"></div>
+    <div id="bb-loading" class="ledger-loading" style="margin-top:1.5rem">Generuji reporty…</div>
+    <div id="bb-finance" class="report-section active"></div>
+    <div id="bb-aktivita" class="report-section"></div>
+    <div id="bb-sklad" class="report-section"></div>
+    <div id="bb-zbrane" class="report-section"></div>
+    <div id="bb-drogy" class="report-section"></div>
+    <div id="bb-bezpecnost" class="report-section"></div>
   </main>
   <script>
     let D = null;
@@ -4187,23 +4283,24 @@ function renderBlackbook(req) {
     const esc = s => (s==null?'':String(s)).replace(/</g,'&lt;');
 
     function bbTab(sec) {
-      document.querySelectorAll('.bb-tab').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
-      document.querySelectorAll('.bb-section').forEach(s => s.classList.toggle('active', s.id === 'bb-' + sec));
+      document.querySelectorAll('.report-nav-item').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
+      document.querySelectorAll('.report-section').forEach(s => s.classList.toggle('active', s.id === 'bb-' + sec));
     }
 
-    function barChart(rows, max, color) {
+    // ── Ledger bar — a hand-ruled row, not a progress-bar widget ──
+    function ledgerBars(rows, max) {
       if (!rows.length) return ledgerEmptyHTML('Žádná data', true);
       const mx = max || Math.max(...rows.map(r => r.val), 1);
-      return rows.map(r => \`<div class="bb-bar-row">
-        <span class="bb-bar-name">\${esc(r.name)}</span>
-        <span class="bb-bar-track"><span class="bb-bar-fill" style="width:\${Math.max(2,(r.val/mx)*100)}%\${color?';background:'+color:''}"></span></span>
-        <span class="bb-bar-val">\${r.label||r.val}</span>
+      return rows.map(r => \`<div class="ledger-bar-row">
+        <span class="ledger-bar-name">\${esc(r.name)}</span>
+        <span class="ledger-bar-track"><span class="ledger-bar-fill" style="width:\${Math.max(1.5,(r.val/mx)*100)}%"></span></span>
+        <span class="ledger-bar-val">\${r.label||r.val}</span>
       </div>\`).join('');
     }
 
     function lineChart(points, key, color, fmt) {
-      if (!points || points.length < 2) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:1rem 0">Nedostatek dat pro graf</p>';
-      const W = 760, H = 180, pad = 8;
+      if (!points || points.length < 2) return ledgerEmptyHTML('Nedostatek dat pro graf', true);
+      const W = 760, H = 160, pad = 8;
       const vals = points.map(p => p[key]);
       const min = Math.min(...vals, 0), max = Math.max(...vals, 1);
       const range = (max - min) || 1;
@@ -4214,17 +4311,17 @@ function renderBlackbook(req) {
       const area = 'M' + x(0).toFixed(1) + ',' + (H-pad) + ' L' + pts.split(' ').join(' L') + ' L' + x(n-1).toFixed(1) + ',' + (H-pad) + ' Z';
       const last = vals[vals.length-1];
       return \`<div style="overflow-x:auto"><svg viewBox="0 0 \${W} \${H}" style="width:100%;min-width:480px;height:auto;display:block">
-        <path d="\${area}" fill="\${color}" opacity="0.12"/>
-        <polyline points="\${pts}" fill="none" stroke="\${color}" stroke-width="2"/>
-        <line x1="\${pad}" y1="\${y(0).toFixed(1)}" x2="\${W-pad}" y2="\${y(0).toFixed(1)}" stroke="var(--border)" stroke-dasharray="3 3"/>
+        <path d="\${area}" fill="\${color}" opacity="0.08"/>
+        <polyline points="\${pts}" fill="none" stroke="\${color}" stroke-width="1.5"/>
+        <line x1="\${pad}" y1="\${y(0).toFixed(1)}" x2="\${W-pad}" y2="\${y(0).toFixed(1)}" stroke="var(--border)" stroke-dasharray="1 4"/>
       </svg></div>
-      <div style="display:flex;justify-content:space-between;font-size:0.66rem;color:var(--text-muted);margin-top:0.3rem">
-        <span>min \${(fmt||money)(min)}</span><span>aktuálně \${(fmt||money)(last)}</span><span>max \${(fmt||money)(max)}</span></div>\`;
+      <div style="display:flex;justify-content:space-between;font-size:0.64rem;color:var(--text-muted);margin-top:0.4rem;font-family:var(--font-mono);border-top:1px solid var(--border);padding-top:0.5rem">
+        <span>min \${(fmt||money)(min)}</span><span style="color:var(--brass)">aktuálně \${(fmt||money)(last)}</span><span>max \${(fmt||money)(max)}</span></div>\`;
     }
 
     function dualLineChart(points, keyA, keyB, colorA, colorB, labelA, labelB) {
-      if (!points || points.length < 2) return '<p style="color:var(--text-muted);font-size:0.8rem;padding:1rem 0">Nedostatek dat pro graf</p>';
-      const W = 760, H = 180, pad = 8;
+      if (!points || points.length < 2) return ledgerEmptyHTML('Nedostatek dat pro graf', true);
+      const W = 760, H = 160, pad = 8;
       const allVals = points.flatMap(p => [p[keyA], p[keyB]]);
       const min = Math.min(...allVals, 0), max = Math.max(...allVals, 1);
       const range = (max - min) || 1;
@@ -4234,36 +4331,36 @@ function renderBlackbook(req) {
       const ptsA = points.map((p,i) => x(i).toFixed(1) + ',' + y(p[keyA]).toFixed(1)).join(' ');
       const ptsB = points.map((p,i) => x(i).toFixed(1) + ',' + y(p[keyB]).toFixed(1)).join(' ');
       return \`<div style="overflow-x:auto"><svg viewBox="0 0 \${W} \${H}" style="width:100%;min-width:480px;height:auto;display:block">
-        <polyline points="\${ptsA}" fill="none" stroke="\${colorA}" stroke-width="2"/>
-        <polyline points="\${ptsB}" fill="none" stroke="\${colorB}" stroke-width="2" stroke-dasharray="4 3"/>
-        <line x1="\${pad}" y1="\${y(0).toFixed(1)}" x2="\${W-pad}" y2="\${y(0).toFixed(1)}" stroke="var(--border)" stroke-dasharray="3 3"/>
+        <polyline points="\${ptsA}" fill="none" stroke="\${colorA}" stroke-width="1.5"/>
+        <polyline points="\${ptsB}" fill="none" stroke="\${colorB}" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line x1="\${pad}" y1="\${y(0).toFixed(1)}" x2="\${W-pad}" y2="\${y(0).toFixed(1)}" stroke="var(--border)" stroke-dasharray="1 4"/>
       </svg></div>
-      <div class="bb-legend">
-        <span><span class="bb-legend-dash" style="border-top-color:\${colorA}"></span>\${labelA}</span>
-        <span><span class="bb-legend-dash" style="border-top-color:\${colorB};border-top-style:dashed"></span>\${labelB}</span>
+      <div class="bb-legend" style="display:flex;gap:1.4rem;font-size:0.64rem;color:var(--text-muted);margin-top:0.4rem;font-family:var(--font-mono)">
+        <span><span style="display:inline-block;width:14px;border-top:1.5px solid \${colorA};vertical-align:middle;margin-right:5px"></span>\${labelA}</span>
+        <span><span style="display:inline-block;width:14px;border-top:1.5px dashed \${colorB};vertical-align:middle;margin-right:5px"></span>\${labelB}</span>
       </div>\`;
     }
 
     function renderTips(tips) {
-      if (!tips || !tips.length) return '<p style="color:var(--text-muted);font-size:0.8rem">Žádná doporučení</p>';
+      if (!tips || !tips.length) return ledgerEmptyHTML('Žádná doporučení', true);
       const cfg = { good: { icon: '+', color: '#6FBF52' }, warning: { icon: '!', color: 'var(--seal-bright)' }, info: { icon: '§', color: 'var(--brass)' } };
       return tips.map(t => {
         const c = cfg[t.type] || cfg.info;
-        return \`<div class="bb-tip" style="border-left:3px solid \${c.color}">
-          <span class="bb-tip-icon">\${c.icon}</span>
-          <div><div class="bb-tip-cat" style="color:\${c.color}">\${esc(t.cat)}</div><div class="bb-tip-text">\${esc(t.text)}</div></div>
+        return \`<div class="recommendation">
+          <span class="recommendation-mark" style="color:\${c.color}">\${c.icon}</span>
+          <div><div class="recommendation-cat" style="color:\${c.color}">\${esc(t.cat)}</div><div class="recommendation-text">\${esc(t.text)}</div></div>
         </div>\`;
       }).join('');
     }
 
-    function finCard(title, f) {
+    function reportFigure(title, f) {
       const netUsd = f.prijem_usd - f.vydaj_usd, netPesos = f.prijem_pesos - f.vydaj_pesos;
-      return \`<div class="card" style="padding:1.2rem">
-        <div style="font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--brass);margin-bottom:0.7rem;font-family:var(--font-mono)">\${title}</div>
-        <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.2rem 0"><span style="color:var(--text-muted)">Příjem SAD</span><strong style="color:#6FBF52">\${money(f.prijem_usd)}</strong></div>
-        <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.2rem 0"><span style="color:var(--text-muted)">Výdaj SAD</span><strong style="color:var(--seal-bright)">\${money(f.vydaj_usd)}</strong></div>
-        <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:0.3rem 0;border-top:1px solid var(--border)"><span style="color:var(--text-muted)">Net SAD</span><strong style="color:\${netUsd>=0?'#6FBF52':'var(--seal-bright)'}">\${netUsd>=0?'+':''}\${money(netUsd)}</strong></div>
-        \${(f.prijem_pesos||f.vydaj_pesos)?\`<div style="display:flex;justify-content:space-between;font-size:0.74rem;padding:0.2rem 0;margin-top:0.3rem"><span style="color:var(--text-muted)">Net Pesos</span><strong style="color:\${netPesos>=0?'#6FBF52':'var(--seal-bright)'}">\${netPesos>=0?'+':''}\${pesos(netPesos)}</strong></div>\`:''}
+      return \`<div class="report-figure">
+        <div class="report-figure-label">\${title}</div>
+        <div class="report-figure-net" style="color:\${netUsd>=0?'#6FBF52':'var(--seal-bright)'}">\${netUsd>=0?'+':''}\${money(netUsd)}</div>
+        <div class="report-figure-line"><span>Příjem</span><span style="color:#6FBF52">\${money(f.prijem_usd)}</span></div>
+        <div class="report-figure-line"><span>Výdaj</span><span style="color:var(--seal-bright)">\${money(f.vydaj_usd)}</span></div>
+        \${(f.prijem_pesos||f.vydaj_pesos)?\`<div class="report-figure-line"><span>Net Pesos</span><span style="color:\${netPesos>=0?'#6FBF52':'var(--seal-bright)'}">\${netPesos>=0?'+':''}\${pesos(netPesos)}</span></div>\`:''}
       </div>\`;
     }
 
@@ -4275,41 +4372,48 @@ function renderBlackbook(req) {
 
     function renderFinance() {
       const f = D.finance;
-      let h = '<div class="bb-mini-label">Příjmy a výdaje za období</div>';
-      h += '<div class="grid" style="grid-template-columns:repeat(4,1fr)">' + finCard('Dnes', f.periods.day) + finCard('Týden', f.periods.week) + finCard('Měsíc', f.periods.month) + finCard('Celkem', f.periods.total) + '</div>';
-      h += '<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:0.5rem">';
-      h += '<div class="card"><div class="card-header"><span class="card-title">Vývoj zůstatku účtu (SAD)</span></div>' + lineChart(f.balanceTimeline, 'usd', '#C9A227') + '</div>';
-      h += '<div class="card"><div class="card-header"><span class="card-title">Vývoj hodnoty skladu</span></div>' + lineChart(f.stockTimeline, 'value', '#6FA8C9') + '</div>';
-      h += '</div>';
-      h += '<div class="bb-mini-label">Kdo vydělal nejvíc (příjem SAD)</div><div class="card">';
-      h += barChart(f.topEarners.map(e => ({ name: e.member, val: e.prijem_usd, label: money(e.prijem_usd) })), null, null) + '</div>';
-      h += '<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:0.5rem">';
-      h += '<div class="card"><div class="card-header"><span class="card-title">Výkonnost — příjmy vs. výdaje (8 týdnů)</span></div>' + dualLineChart(f.weeklyTrend, 'income', 'expense', '#6FBF52', '#B23B3B', 'Příjem', 'Výdaj') + '</div>';
-      h += '<div class="card"><div class="card-header"><span class="card-title">Kde se vydělává — tržby podle kategorie</span></div>' + barChart(f.revenueByCategory.map(r => ({ name: r.sekce, val: r.value, label: money(r.value) })), null, '#C9A227') + '</div>';
-      h += '</div>';
-      h += '<div class="bb-mini-label">Tipy na vylepšení</div><div class="card">' + renderTips(f.tips) + '</div>';
+      let h = '<div class="folio-label">Příjmy a výdaje za období</div>';
+      h += '<div class="report-figures">' + reportFigure('Dnes', f.periods.day) + reportFigure('Týden', f.periods.week) + reportFigure('Měsíc', f.periods.month) + reportFigure('Celkem', f.periods.total) + '</div>';
+
+      h += '<div class="folio-spread"><div class="folio-panel"><div class="folio-label">Vývoj zůstatku účtu (SAD)</div><div style="height:1rem"></div>' + lineChart(f.balanceTimeline, 'usd', '#C9A227') + '</div>';
+      h += '<div class="marginalia"><div class="m-line"><span>Záznamů v historii</span><span class="m-val">' + (f.balanceTimeline.length||0) + '</span></div></div></div>';
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Vývoj hodnoty skladu</div><div style="height:1rem"></div>' + lineChart(f.stockTimeline, 'value', '#6FA8C9');
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Kdo vydělal nejvíc (příjem SAD)</div><div style="height:1rem"></div>';
+      h += ledgerBars(f.topEarners.map(e => ({ name: e.member, val: e.prijem_usd, label: money(e.prijem_usd) })));
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-spread"><div class="folio-panel"><div class="folio-label">Výkonnost — příjmy vs. výdaje (8 týdnů)</div><div style="height:1rem"></div>' + dualLineChart(f.weeklyTrend, 'income', 'expense', '#6FBF52', '#B23B3B', 'Příjem', 'Výdaj') + '</div>';
+      h += '<div class="folio-panel"><div class="folio-label">Tržby podle kategorie</div><div style="height:1rem"></div>' + ledgerBars(f.revenueByCategory.map(r => ({ name: r.sekce, val: r.value, label: money(r.value) }))) + '</div></div>';
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Doporučení rejstříku</div><div style="height:1rem"></div>' + renderTips(f.tips);
       document.getElementById('bb-finance').innerHTML = h;
     }
 
     function renderAktivita() {
       const a = D.aktivita;
-      let h = \`<div class="stats" style="grid-template-columns:repeat(3,1fr)">
-        <div class="stat"><div class="stat-label">Členů celkem</div><div class="stat-value">\${a.total}</div></div>
-        <div class="stat" style="border-top-color:#B23B3B"><div class="stat-label">Neaktivní (7+ dní)</div><div class="stat-value" style="color:#B23B3B">\${a.inactiveCount}</div></div>
-        <div class="stat" style="border-top-color:#6FBF52"><div class="stat-label">Aktivní</div><div class="stat-value" style="color:#6FBF52">\${a.total - a.inactiveCount}</div></div>
+      let h = \`<div class="report-figures">
+        <div class="report-figure"><div class="report-figure-label">Členů celkem</div><div class="report-figure-net" style="color:var(--vellum)">\${a.total}</div></div>
+        <div class="report-figure"><div class="report-figure-label">Neaktivní (7+ dní)</div><div class="report-figure-net" style="color:var(--seal-bright)">\${a.inactiveCount}</div></div>
+        <div class="report-figure"><div class="report-figure-label">Aktivní</div><div class="report-figure-net" style="color:#6FBF52">\${a.total - a.inactiveCount}</div></div>
+        <div class="report-figure"></div>
       </div>\`;
-      h += '<div class="bb-mini-label">Členové podle poslední aktivity (web přihlášení + pohyby v tabulkách)</div><div class="card">';
-      h += tbl([{t:'Člen'},{t:'Poslední aktivita'},{t:'Zdroj'},{t:'Web login'},{t:'Neaktivní',r:true},{t:'Pohyby',r:true},{t:'Vklady/Výběry',r:true},{t:'Vklad SAD',r:true}],
+      h += '<div class="folio-label">Členové podle poslední aktivity</div><div style="height:1rem"></div>';
+      h += tbl([{t:'Člen'},{t:'Poslední aktivita'},{t:'Zdroj'},{t:'Web login'},{t:'Stav',r:true},{t:'Pohyby',r:true},{t:'Vklady/Výběry',r:true},{t:'Vklad SAD',r:true}],
         a.members.map(m => [
           esc(m.member) + (m.discord?' <span style="color:var(--text-muted);font-size:0.7rem">'+esc(m.discord)+'</span>':''),
           m.lastCas ? esc(m.lastCas) : '<span style="color:var(--text-muted)">nikdy</span>',
           m.lastZdroj ? '<span style="color:var(--text-muted);font-size:0.72rem">'+esc(m.lastZdroj)+'</span>' : '—',
-          m.lastWebLoginCas ? '<span style="color:var(--silver);font-size:0.74rem">'+esc(m.lastWebLoginCas)+'</span>' : '<span style="color:var(--text-muted)">—</span>',
+          m.lastWebLoginCas ? '<span style="color:var(--text-dim);font-size:0.74rem">'+esc(m.lastWebLoginCas)+'</span>' : '<span style="color:var(--text-muted)">—</span>',
           m.inactive ? '<span class="badge vyber">'+(m.daysSince!=null?m.daysSince+' dní':'—')+'</span>' : '<span class="badge vklad">aktivní</span>',
           m.pohyby,
           '<span style="color:#6FBF52">'+m.vklady+'</span> / <span style="color:#B23B3B">'+m.vybery+'</span>',
           money(m.ucetVkladUsd)
-        ])) + '</div>';
+        ]));
       document.getElementById('bb-aktivita').innerHTML = h;
     }
 
@@ -4317,78 +4421,83 @@ function renderBlackbook(req) {
       const s = D.sklad;
       const bySekce = {};
       s.stockList.forEach(i => { (bySekce[i.sekce] = bySekce[i.sekce] || []).push(i); });
-      let h = '<div class="bb-mini-label">Aktuální stav skladu</div><div class="grid" style="grid-template-columns:repeat(2,1fr)">';
+      let h = '<div class="folio-label">Aktuální stav skladu</div><div style="height:1rem"></div>';
+      h += '<div class="manifest-grid">';
       Object.entries(bySekce).forEach(([sek, items]) => {
-        h += '<div class="card"><div class="card-header"><span class="card-title">'+sek+'</span></div>' +
-          items.map(i => '<div class="sklad-row"><span>'+esc(i.item)+'</span><span style="color:'+(i.current<=0?'#B23B3B':'var(--text)')+'">'+i.current+' ks</span></div>').join('') + '</div>';
+        h += '<div class="manifest-col"><div class="manifest-col-head"><span class="manifest-col-title">'+sek+'</span></div>' +
+          items.map(i => '<div class="manifest-row"><span class="mr-name">'+esc(i.item)+'</span><span class="mr-dots"></span><span class="mr-val" style="color:'+(i.current<=0?'var(--seal-bright)':'var(--text-dim)')+'">'+i.current+' ks</span></div>').join('') + '</div>';
       });
       h += '</div>';
-      h += '<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:0.5rem">';
-      h += '<div class="card"><div class="card-header"><span class="card-title">Nejvíc ukládali</span></div>' + barChart(s.topVklad.map(m=>({name:m.member,val:m.vklad,label:m.vklad+' ks'})),null,'#6FBF52') + '</div>';
-      h += '<div class="card"><div class="card-header"><span class="card-title">Nejvíc vybírali</span></div>' + barChart(s.topVyber.map(m=>({name:m.member,val:m.vyber,label:m.vyber+' ks'})),null,'#B23B3B') + '</div>';
-      h += '</div>';
-      h += '<div class="bb-mini-label">Predikce došlých zásob (dle spotřeby za 30 dní)</div><div class="card">';
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-spread"><div class="folio-panel"><div class="folio-label">Nejvíc ukládali</div><div style="height:1rem"></div>' + ledgerBars(s.topVklad.map(m=>({name:m.member,val:m.vklad,label:m.vklad+' ks'}))) + '</div>';
+      h += '<div class="folio-panel"><div class="folio-label">Nejvíc vybírali</div><div style="height:1rem"></div>' + ledgerBars(s.topVyber.map(m=>({name:m.member,val:m.vyber,label:m.vyber+' ks'}))) + '</div></div>';
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Predikce došlých zásob (dle spotřeby za 30 dní)</div><div style="height:1rem"></div>';
       h += tbl([{t:'Položka'},{t:'Sekce'},{t:'Stav',r:true},{t:'Spotřeba/den',r:true},{t:'Dojde za',r:true}],
-        s.predikce.length ? s.predikce.map(p => [esc(p.item), p.sekce, p.current+' ks', p.perDay+' ks', '<span style="color:'+(p.daysLeft<=3?'#B23B3B':p.daysLeft<=7?'var(--gold)':'var(--text)')+'">'+p.daysLeft+' dní</span>']) : []);
-      h += '</div>';
-      h += '<div class="bb-mini-label">Podezřelé pohyby (velké výběry)</div><div class="card">';
+        s.predikce.length ? s.predikce.map(p => [esc(p.item), p.sekce, p.current+' ks', p.perDay+' ks', '<span style="color:'+(p.daysLeft<=3?'var(--seal-bright)':p.daysLeft<=7?'var(--brass)':'var(--text-dim)')+'">'+p.daysLeft+' dní</span>']) : []);
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Podezřelé pohyby (velké výběry)</div><div style="height:1rem"></div>';
       h += tbl([{t:'Čas'},{t:'Sekce'},{t:'Položka'},{t:'Množ.',r:true},{t:'Člen'},{t:'Důvod'}],
-        s.podezrele.map(p => [esc(p.cas), p.sekce, esc(p.item), p.qty, esc(p.member), '<span style="color:var(--gold)">'+esc(p.duvod)+'</span>']));
-      h += '</div>';
+        s.podezrele.map(p => [esc(p.cas), p.sekce, esc(p.item), p.qty, esc(p.member), '<span style="color:var(--brass)">'+esc(p.duvod)+'</span>']));
       document.getElementById('bb-sklad').innerHTML = h;
     }
 
     function renderZbrane() {
       const z = D.zbrane;
-      let h = '<div class="bb-mini-label">Kdo vybral nejvíc zbraní</div><div class="card">';
-      h += barChart(z.topVyber.map(m=>({name:m.member,val:m.qty,label:m.qty+' ks'})),null,'#B23B3B') + '</div>';
-      h += '<div class="bb-mini-label">Nevrácené zbraně (čistý zůstatek výběr − vklad)</div><div class="card">';
+      let h = '<div class="folio-label">Kdo vybral nejvíc zbraní</div><div style="height:1rem"></div>';
+      h += ledgerBars(z.topVyber.map(m=>({name:m.member,val:m.qty,label:m.qty+' ks'})));
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Nevrácené zbraně (čistý zůstatek výběr − vklad)</div><div style="height:1rem"></div>';
       h += tbl([{t:'Člen'},{t:'Zbraň'},{t:'Nevráceno',r:true}],
         z.nevraceno.map(n => [esc(n.member), esc(n.item), '<span class="badge vyber">'+n.outstanding+' ks</span>']));
-      h += '</div>';
-      h += '<div class="bb-mini-label">Historie vydání zbraní</div><div class="card">';
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Historie vydání zbraní</div><div style="height:1rem"></div>';
       h += tbl([{t:'Čas'},{t:'Položka'},{t:'Množ.',r:true},{t:'Člen'},{t:'Účel'}],
         z.historie.map(e => [esc(e.cas), esc(e.item), e.qty, esc(e.member), esc(e.ucel)||'—']));
-      h += '</div>';
       document.getElementById('bb-zbrane').innerHTML = h;
     }
 
     function renderDrogy() {
       const d = D.drogy;
       const drugs = [...new Set([...Object.keys(d.drugProd), ...Object.keys(d.drugVyber)])];
-      let h = '<div class="bb-mini-label">Výroba, prodej a ziskovost drog</div><div class="card">';
+      let h = '<div class="folio-label">Výroba, prodej a ziskovost drog</div><div style="height:1rem"></div>';
       h += tbl([{t:'Droga'},{t:'Vyrobeno',r:true},{t:'Vybráno/prodáno',r:true},{t:'Hodnota prodeje',r:true}],
-        drugs.map(dr => [esc(dr), '<span style="color:#6FBF52">'+(d.drugProd[dr]||0)+'</span>', '<span style="color:#B23B3B">'+(d.drugVyber[dr]||0)+'</span>', '<span style="color:var(--gold)">'+money(d.drugZisk[dr]||0)+'</span>']));
-      h += '</div>';
-      h += \`<div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:0.5rem">
-        <div class="stat"><div class="stat-label">Weed vyrobeno</div><div class="stat-value" style="color:#6FBF52">\${d.weedProd}</div><div class="stat-sub">kusů</div></div>
-        <div class="stat" style="border-top-color:#B23B3B"><div class="stat-label">Weed vybráno</div><div class="stat-value" style="color:#B23B3B">\${d.weedVyber}</div><div class="stat-sub">kusů</div></div>
-        <div class="stat" style="border-top-color:var(--gold)"><div class="stat-label">Weed — hodnota prodeje</div><div class="stat-value" style="color:var(--gold);font-size:1.3rem">\${money(d.weedZisk)}</div></div>
+        drugs.map(dr => [esc(dr), '<span style="color:#6FBF52">'+(d.drugProd[dr]||0)+'</span>', '<span style="color:#B23B3B">'+(d.drugVyber[dr]||0)+'</span>', '<span style="color:var(--brass)">'+money(d.drugZisk[dr]||0)+'</span>']));
+
+      h += \`<div class="report-figures">
+        <div class="report-figure"><div class="report-figure-label">Weed vyrobeno</div><div class="report-figure-net" style="color:#6FBF52">\${d.weedProd}</div></div>
+        <div class="report-figure"><div class="report-figure-label">Weed vybráno</div><div class="report-figure-net" style="color:#B23B3B">\${d.weedVyber}</div></div>
+        <div class="report-figure"><div class="report-figure-label">Hodnota prodeje</div><div class="report-figure-net" style="color:var(--brass)">\${money(d.weedZisk)}</div></div>
+        <div class="report-figure"></div>
       </div>\`;
-      h += '<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:0.5rem">';
-      h += '<div class="card"><div class="card-header"><span class="card-title">Kdo nejvíc navařil (drogy + weed)</span></div>' + barChart(d.topVarici.map(m=>({name:m.member,val:m.qty,label:m.qty+' ks'})),null,'#6FBF52') + '</div>';
+
+      h += '<div class="folio-spread"><div class="folio-panel"><div class="folio-label">Kdo nejvíc navařil (drogy + weed)</div><div style="height:1rem"></div>' + ledgerBars(d.topVarici.map(m=>({name:m.member,val:m.qty,label:m.qty+' ks'}))) + '</div>';
       const chem = Object.entries(d.chemSpotreba).map(([k,v])=>({name:k,val:v,label:v+' ks'})).sort((a,b)=>b.val-a.val);
-      h += '<div class="card"><div class="card-header"><span class="card-title">Spotřeba chemikálií</span></div>' + barChart(chem,null,'#6FA8C9') + '</div>';
-      h += '</div>';
+      h += '<div class="folio-panel"><div class="folio-label">Spotřeba chemikálií</div><div style="height:1rem"></div>' + ledgerBars(chem) + '</div></div>';
       document.getElementById('bb-drogy').innerHTML = h;
     }
 
     function renderBezpecnost() {
       const b = D.bezpecnost;
-      let h = '<div class="bb-mini-label">Dlužníci — vybral zboží (weed/drogy), ale nevložil dost peněz</div><div class="card">';
+      let h = '<div class="folio-label">Dlužníci — vybral zboží (weed/drogy), ale nevložil dost peněz</div><div style="height:1rem"></div>';
       h += tbl([{t:'Člen'},{t:'Hodnota vybraného zboží',r:true},{t:'Vložené peníze (SAD)',r:true},{t:'Dluh',r:true}],
         b.dluznici.map(d => [esc(d.member), money(d.goodsValue), money(d.deposited), '<span class="badge vyber">'+money(d.dluh)+'</span>']));
-      h += '</div>';
-      h += '<div class="bb-mini-label">Podezřelé transakce (velké výdaje)</div><div class="card">';
+
+      h += '<div class="folio-rule tight"></div>';
+      h += '<div class="folio-label">Podezřelé transakce (velké výdaje)</div><div style="height:1rem"></div>';
       h += tbl([{t:'Čas'},{t:'Člen'},{t:'Částka',r:true},{t:'Poznámka'},{t:'Důvod'}],
-        b.podezreleTransakce.map(t => [esc(t.cas), esc(t.member), (t.valuta==='USD'?money(t.castka):pesos(t.castka)), esc(t.pozn), '<span style="color:var(--gold)">'+esc(t.duvod)+'</span>']));
-      h += '</div>';
+        b.podezreleTransakce.map(t => [esc(t.cas), esc(t.member), (t.valuta==='USD'?money(t.castka):pesos(t.castka)), esc(t.pozn), '<span style="color:var(--brass)">'+esc(t.duvod)+'</span>']));
       document.getElementById('bb-bezpecnost').innerHTML = h;
     }
 
     async function loadBlackbook() {
       try {
-        const res = await fetch('/api/blackbook');
+        const res = await fetch('/api/blackbook', { cache: 'no-store' });
         D = await res.json();
         if (!D.ok) { document.getElementById('bb-loading').textContent = 'Chyba načtení dat: ' + (D.error||'neznámá'); return; }
         document.getElementById('bb-loading').style.display = 'none';
@@ -4407,26 +4516,27 @@ function renderProfitCentrum(req) {
   return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Profit centrum</title>
   ${baseStyles()}
   <style>
-    .pc-tabs{display:flex;gap:0.4rem;flex-wrap:wrap;margin:1.2rem 0 1.4rem}
-    .pc-tab{flex:none;padding:0.45rem 1rem;font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:4px;transition:all 0.15s;font-family:inherit}
-    .pc-tab.active{background:var(--silver-dim);border-color:var(--seal);color:var(--vellum)}
-    .pc-mini-label{font-size:0.58rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--brass);margin:1.8rem 0 0.8rem;opacity:0.9;font-family:var(--font-mono)}
-    .pc-earn-card{padding:1.2rem}
-    .pc-earn-label{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem;font-family:var(--font-mono)}
-    .pc-earn-value{font-family:var(--font-display);font-weight:700;font-size:1.6rem;line-height:1;margin-bottom:0.7rem}
-    .pc-earn-row{display:flex;justify-content:space-between;font-size:0.74rem;padding:0.18rem 0;color:var(--text-dim)}
-    .pc-earn-row strong{color:var(--vellum)}
-    .pc-earn-foot{margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border);font-size:0.7rem;color:var(--text-muted)}
-    .pc-podium{padding:1.4rem;text-align:center}
-    .pc-podium-icon{font-family:var(--font-display);font-size:1.7rem;margin-bottom:0.4rem;color:var(--brass)}
-    .pc-podium-name{font-family:var(--font-display);font-weight:600;font-size:1.05rem;color:var(--vellum);margin-bottom:0.3rem;min-height:1.3rem}
-    .pc-podium-value{font-size:1.5rem;color:var(--brass);font-weight:700;font-family:var(--font-display)}
-    .pc-podium-sub{font-size:0.66rem;color:var(--text-muted);margin-top:0.4rem;text-transform:uppercase;letter-spacing:0.08em}
-    .pc-rank-row{display:flex;align-items:center;gap:0.7rem;font-size:0.78rem;padding:0.4rem 0;border-top:1px solid var(--border)}
-    .pc-rank-row:first-child{border-top:none}
-    .pc-rank-num{flex:0 0 20px;color:var(--text-muted);font-size:0.7rem}
-    .pc-rank-name{flex:1;color:var(--vellum);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .pc-rank-val{flex:0 0 auto;color:var(--vellum);font-weight:600;font-family:var(--font-mono)}
+    .pc-podium{text-align:left;padding:1.6rem 0 1.2rem;border-bottom:2px solid var(--border-brass)}
+    .pc-podium-icon{font-family:var(--font-display);font-size:1.3rem;margin-bottom:0.5rem;color:var(--brass);width:2.2rem;height:2.2rem;border:1px solid var(--border-brass);border-radius:50%;display:flex;align-items:center;justify-content:center}
+    .pc-podium-name{font-family:var(--font-display);font-weight:600;font-size:1.3rem;color:var(--vellum-bright);margin-bottom:0.3rem;min-height:1.5rem;line-height:1.15}
+    .pc-podium-value{font-size:2.1rem;color:var(--brass);font-weight:700;font-family:var(--font-display);line-height:1}
+    .pc-podium-sub{font-size:0.64rem;color:var(--text-muted);margin-top:0.5rem;text-transform:uppercase;letter-spacing:0.12em;font-family:var(--font-mono)}
+    .pc-rank-row{display:flex;align-items:baseline;gap:0.7rem;font-size:0.84rem;padding:0.55rem 0;border-bottom:1px solid var(--border)}
+    .pc-rank-row:last-child{border-bottom:none}
+    .pc-rank-num{flex:0 0 1.4rem;color:var(--text-muted);font-size:0.68rem;font-family:var(--font-mono)}
+    .pc-rank-name{flex:1;color:var(--vellum);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-display)}
+    .pc-rank-val{flex:0 0 auto;color:var(--text-dim);font-weight:600;font-family:var(--font-mono);font-size:0.8rem}
+    .pc-leaderboard-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+    .pc-leaderboard-col{padding:0 2rem}
+    .pc-leaderboard-col:first-child{padding-left:0}
+    .pc-leaderboard-col:last-child{padding-right:0}
+    .pc-leaderboard-col + .pc-leaderboard-col{border-left:1px solid var(--border)}
+    @media(max-width:900px){
+      .pc-leaderboard-grid{grid-template-columns:1fr;border-top:none;border-bottom:none}
+      .pc-leaderboard-col{padding:1.4rem 0;border-top:1px solid var(--border)}
+      .pc-leaderboard-col + .pc-leaderboard-col{border-left:none}
+      .pc-leaderboard-col:first-child{border-top:none}
+    }
   </style>
   </head><body>
   ${renderNav(req, 'profit-centrum')}
@@ -4438,37 +4548,39 @@ function renderProfitCentrum(req) {
         <p class="page-sub">Přehled ziskovosti organizace — počítáno z účetnictví a skladů</p>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div id="pc-generated" style="font-size:0.68rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase"></div>
+        <div id="pc-generated" style="font-size:0.64rem;letter-spacing:0.1em;color:var(--text-muted);text-transform:uppercase;font-family:var(--font-mono)"></div>
       </div>
     </div>
-    <p class="folio-footnote"><strong>Profit centrum.</strong> Report se počítá výhradně z reálných dat z webu — Účetnictví (peníze) a sklady Drogy/Weed. „Zisk frakce“ = příjem − výdaj v Účetnictví za dané období. „Tržby ze skladu“ = hodnota vybraných (prodaných) drog a weedu dle aktuálního ceníku. Žebříčky níže lze přepínat podle období.</p>
+    <p class="folio-footnote"><strong>Profit centrum.</strong> Report se počítá výhradně z reálných dat z webu — Účetnictví (peníze) a sklady Drogy/Weed. „Zisk frakce“ = příjem − výdaj v Účetnictví za dané období. „Tržby ze skladu“ = hodnota vybraných (prodaných) drog a weedu dle aktuálního ceníku.</p>
 
     <div id="pc-loading" class="ledger-loading">Generuji report…</div>
 
     <div id="pc-content" style="display:none">
-      <div class="pc-mini-label">Kolik vydělala frakce</div>
-      <div class="grid" id="pc-earn-cards" style="grid-template-columns:repeat(4,1fr)"></div>
+      <div class="folio-label">Kolik vydělala frakce</div>
+      <div class="report-figures" id="pc-earn-cards"></div>
 
-      <div class="pc-mini-label">Žebříčky — vyber období</div>
-      <div class="pc-tabs">
-        <button class="pc-tab" data-p="day" onclick="pcTab('day')">Dnes</button>
-        <button class="pc-tab" data-p="week" onclick="pcTab('week')">Tento týden</button>
-        <button class="pc-tab" data-p="month" onclick="pcTab('month')">Tento měsíc</button>
-        <button class="pc-tab active" data-p="total" onclick="pcTab('total')">Celkem</button>
+      <div class="folio-rule tight"></div>
+
+      <div class="report-nav" id="pc-period-nav">
+        <button class="report-nav-item" data-p="day" onclick="pcTab('day')">Dnes</button>
+        <button class="report-nav-item" data-p="week" onclick="pcTab('week')">Tento týden</button>
+        <button class="report-nav-item" data-p="month" onclick="pcTab('month')">Tento měsíc</button>
+        <button class="report-nav-item active" data-p="total" onclick="pcTab('total')">Celkem</button>
       </div>
+      <div style="height:1.6rem"></div>
 
-      <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-        <div>
-          <div class="card pc-podium" id="pc-dealer-top"></div>
-          <div class="card" style="margin-top:0.6rem" id="pc-dealer-list"></div>
+      <div class="pc-leaderboard-grid">
+        <div class="pc-leaderboard-col">
+          <div class="pc-podium" id="pc-dealer-top"></div>
+          <div id="pc-dealer-list"></div>
         </div>
-        <div>
-          <div class="card pc-podium" id="pc-drug-top"></div>
-          <div class="card" style="margin-top:0.6rem" id="pc-drug-list"></div>
+        <div class="pc-leaderboard-col">
+          <div class="pc-podium" id="pc-drug-top"></div>
+          <div id="pc-drug-list"></div>
         </div>
-        <div>
-          <div class="card pc-podium" id="pc-member-top"></div>
-          <div class="card" style="margin-top:0.6rem" id="pc-member-list"></div>
+        <div class="pc-leaderboard-col">
+          <div class="pc-podium" id="pc-member-top"></div>
+          <div id="pc-member-list"></div>
         </div>
       </div>
     </div>
@@ -4480,18 +4592,18 @@ function renderProfitCentrum(req) {
     const pesos = n => '₱' + Math.round(n||0).toLocaleString('cs-CZ');
     const esc = s => (s==null?'':String(s)).replace(/</g,'&lt;');
 
-    function earnCard(title, p) {
+    function earnFigure(title, p) {
       const zisk = p.zisk;
       const color = zisk >= 0 ? '#6FBF52' : '#B23B3B';
-      let h = '<div class="card pc-earn-card">';
-      h += '<div class="pc-earn-label">' + esc(title) + '</div>';
-      h += '<div class="pc-earn-value" style="color:' + color + '">' + (zisk>=0?'+':'') + money(zisk) + '</div>';
-      h += '<div class="pc-earn-row"><span>Příjem SAD</span><strong style="color:#6FBF52">' + money(p.prijem_usd) + '</strong></div>';
-      h += '<div class="pc-earn-row"><span>Výdaj SAD</span><strong style="color:#B23B3B">' + money(p.vydaj_usd) + '</strong></div>';
+      let h = '<div class="report-figure">';
+      h += '<div class="report-figure-label">' + esc(title) + '</div>';
+      h += '<div class="report-figure-net" style="color:' + color + '">' + (zisk>=0?'+':'') + money(zisk) + '</div>';
+      h += '<div class="report-figure-line"><span>Příjem</span><strong style="color:#6FBF52">' + money(p.prijem_usd) + '</strong></div>';
+      h += '<div class="report-figure-line"><span>Výdaj</span><strong style="color:#B23B3B">' + money(p.vydaj_usd) + '</strong></div>';
       if (p.prijem_pesos || p.vydaj_pesos) {
-        h += '<div class="pc-earn-row"><span>Pesos příjem/výdaj</span><strong>' + pesos(p.prijem_pesos) + ' / ' + pesos(p.vydaj_pesos) + '</strong></div>';
+        h += '<div class="report-figure-line"><span>Pesos</span><strong>' + pesos(p.prijem_pesos) + ' / ' + pesos(p.vydaj_pesos) + '</strong></div>';
       }
-      h += '<div class="pc-earn-foot">Tržby ze skladu (drogy+weed): <strong style="color:var(--brass)">' + money(p.trzby_sklad) + '</strong></div>';
+      h += '<div class="report-figure-line" style="border-top:1px dotted var(--border);padding-top:0.3rem;margin-top:0.2rem"><span>Tržby skladu</span><strong style="color:var(--brass)">' + money(p.trzby_sklad) + '</strong></div>';
       h += '</div>';
       return h;
     }
@@ -4499,12 +4611,12 @@ function renderProfitCentrum(req) {
     function rankList(rows, nameKey, valKey, emptyTxt) {
       if (!rows.length) return ledgerEmptyHTML(emptyTxt, true);
       return rows.slice(0, 6).map(function(r, i) {
-        return '<div class="pc-rank-row"><span class="pc-rank-num">#' + (i+1) + '</span><span class="pc-rank-name">' + esc(r[nameKey]) + '</span><span class="pc-rank-val">' + money(r[valKey]) + '</span></div>';
+        return '<div class="pc-rank-row"><span class="pc-rank-num">' + String(i+1).padStart(2,'0') + '</span><span class="pc-rank-name">' + esc(r[nameKey]) + '</span><span class="pc-rank-val">' + money(r[valKey]) + '</span></div>';
       }).join('');
     }
 
     function podium(icon, name, value, sub) {
-      const nameHtml = name ? esc(name) : '<span style="color:var(--text-muted)">— žádná data —</span>';
+      const nameHtml = name ? esc(name) : '<span style="color:var(--text-muted);font-style:italic">— žádná data —</span>';
       return '<div class="pc-podium-icon">' + icon + '</div>' +
         '<div class="pc-podium-name">' + nameHtml + '</div>' +
         '<div class="pc-podium-value">' + value + '</div>' +
@@ -4514,18 +4626,18 @@ function renderProfitCentrum(req) {
     function renderEarnCards() {
       const p = PD.periods;
       document.getElementById('pc-earn-cards').innerHTML =
-        earnCard('Dnes', p.day) + earnCard('Tento týden', p.week) + earnCard('Tento měsíc', p.month) + earnCard('Celkem', p.total);
+        earnFigure('Dnes', p.day) + earnFigure('Tento týden', p.week) + earnFigure('Tento měsíc', p.month) + earnFigure('Celkem', p.total);
     }
 
     function renderLeaderboards() {
       const lb = PD.leaderboards[pcPeriod];
 
       const d0 = lb.dealers[0];
-      document.getElementById('pc-dealer-top').innerHTML = podium('§', d0 ? d0.member : null, d0 ? money(d0.trzby) : '—', d0 ? (d0.qty + ' ks prodáno') : 'Nejlepší dealer');
+      document.getElementById('pc-dealer-top').innerHTML = podium('§', d0 ? d0.member : null, d0 ? money(d0.trzby) : '—', d0 ? (d0.qty + ' ks prodáno · Nejlepší dealer') : 'Nejlepší dealer');
       document.getElementById('pc-dealer-list').innerHTML = rankList(lb.dealers, 'member', 'trzby', 'Žádné prodeje v tomto období');
 
       const dr0 = lb.drugs[0];
-      document.getElementById('pc-drug-top').innerHTML = podium('◆', dr0 ? dr0.droga : null, dr0 ? money(dr0.trzby) : '—', dr0 ? (dr0.qty + ' ks prodáno') : 'Nejvýdělečnější droga');
+      document.getElementById('pc-drug-top').innerHTML = podium('◆', dr0 ? dr0.droga : null, dr0 ? money(dr0.trzby) : '—', dr0 ? (dr0.qty + ' ks prodáno · Nejvýdělečnější droga') : 'Nejvýdělečnější droga');
       document.getElementById('pc-drug-list').innerHTML = rankList(lb.drugs, 'droga', 'trzby', 'Žádné prodeje v tomto období');
 
       const m0 = lb.members[0];
@@ -4535,13 +4647,13 @@ function renderProfitCentrum(req) {
 
     function pcTab(p) {
       pcPeriod = p;
-      document.querySelectorAll('.pc-tab').forEach(function(b){ b.classList.toggle('active', b.dataset.p === p); });
+      document.querySelectorAll('#pc-period-nav .report-nav-item').forEach(function(b){ b.classList.toggle('active', b.dataset.p === p); });
       renderLeaderboards();
     }
 
     async function loadProfitCentrum() {
       try {
-        const res = await fetch('/api/profit-centrum');
+        const res = await fetch('/api/profit-centrum', { cache: 'no-store' });
         PD = await res.json();
         if (!PD.ok) { document.getElementById('pc-loading').textContent = 'Chyba načtení dat: ' + (PD.error||'neznámá'); return; }
         document.getElementById('pc-loading').style.display = 'none';
@@ -4574,11 +4686,11 @@ function renderAuth(page, error, data) {
     exists: 'Účet již existuje.',
   };
   const errMsg = error && errors[error] ? `<div class="auth-alert">${errors[error]}</div>` : '';
-  const successReg = page === 'login' ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Registrace proběhla úspěšně. Přihlaš se.';document.querySelector('.auth-box').prepend(a);}<\/script>` : '';
+  const successReg = page === 'login' ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Registrace proběhla úspěšně. Přihlaš se.';document.querySelector('.auth-form-col').prepend(a);}<\/script>` : '';
 
   const style = `
     <link rel="icon" type="image/png" href="/logo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500;1,9..144,600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,500;1,9..144,600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
       :root{
@@ -4588,70 +4700,84 @@ function renderAuth(page, error, data) {
         --font-display:'Fraunces',serif;
         --font-mono:'JetBrains Mono',monospace;
       }
+      html,body{height:100%}
       body{
-        background:#08070600;
         background-color:#070605;
         color:#E8E2D5;
         font-family:'Inter',sans-serif;font-weight:300;
-        min-height:100vh;display:flex;align-items:center;justify-content:center;
-        position:relative;overflow:hidden;
+        min-height:100vh;
+        position:relative;overflow-x:hidden;
         animation:authBodyFlicker 0.7s linear;
       }
       @keyframes authBodyFlicker{0%{opacity:0}6%{opacity:1}10%{opacity:0.4}15%{opacity:1}100%{opacity:1}}
 
-      /* candle-lit vignette behind the seal */
-      body::after{
-        content:'';position:fixed;inset:0;
-        background-image:url('/logo.png'),
-          radial-gradient(ellipse 60% 55% at 50% 38%, rgba(201,162,39,0.10), transparent 70%);
-        background-repeat:no-repeat,no-repeat;
-        background-position:center center,center center;
-        background-size:min(60vw,60vh),cover;
-        pointer-events:none;z-index:0;
-        mix-blend-mode:luminosity;
-        opacity:0.85;
-      }
-      /* leather-and-candlelight ambient */
+      /* leather-and-candlelight ambient, asymmetric — light source from the left where the seal sits */
       body::before{
-        content:'';position:fixed;inset:0;
+        content:'';position:fixed;inset:0;z-index:0;
         background:
-          radial-gradient(ellipse 90% 55% at 50% -8%, rgba(139,26,26,0.16) 0%, transparent 62%),
-          radial-gradient(ellipse 70% 50% at 50% 112%, rgba(5,4,3,0.7) 0%, transparent 62%),
-          radial-gradient(ellipse 35% 28% at 18% 50%, rgba(201,162,39,0.05) 0%, transparent 55%);
+          radial-gradient(ellipse 50% 70% at 12% 45%, rgba(201,162,39,0.13) 0%, transparent 60%),
+          radial-gradient(ellipse 60% 50% at 100% 0%, rgba(139,26,26,0.10) 0%, transparent 55%),
+          radial-gradient(ellipse 70% 60% at 50% 110%, rgba(5,4,3,0.8) 0%, transparent 65%);
         pointer-events:none;
       }
       .bg-grid{
-        position:fixed;inset:0;
+        position:fixed;inset:0;z-index:0;
         background-image:
-          linear-gradient(rgba(201,162,39,0.015) 1px,transparent 1px),
-          linear-gradient(90deg,rgba(201,162,39,0.01) 1px,transparent 1px);
+          linear-gradient(rgba(201,162,39,0.014) 1px,transparent 1px),
+          linear-gradient(90deg,rgba(201,162,39,0.009) 1px,transparent 1px);
         background-size:100px 100px;
         pointer-events:none;
         animation:gridDrift 70s linear infinite;
-        z-index:0;
       }
       @keyframes gridDrift{from{background-position:0 0}to{background-position:100px 100px}}
 
-      .auth-box{
-        width:100%;max-width:420px;
-        padding:3rem 2.5rem;
-        background:#15120F;
-        border:1px solid rgba(201,162,39,0.14);
-        border-top:2px solid var(--seal);
-        backdrop-filter:blur(20px);
-        box-shadow:0 20px 80px rgba(0,0,0,0.85);
-        position:relative;z-index:1;border-radius:6px;
-        animation:boxIn 0.45s cubic-bezier(0.22,1,0.36,1);
+      /* ── FRONTISPIECE LAYOUT — asymmetric title page, not a centered card ── */
+      .frontispiece{
+        position:relative;z-index:1;
+        min-height:100vh;
+        display:grid;
+        grid-template-columns:1fr 1px 460px;
+        align-items:center;
       }
-      @keyframes boxIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-      .auth-logo{text-align:center;margin-bottom:2.5rem}
-      .auth-logo-img{
-        width:64px;height:64px;object-fit:contain;margin-bottom:1.1rem;
-        filter:drop-shadow(0 0 10px rgba(201,162,39,0.3));
+      .auth-seal-col{
+        display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
+        padding:3rem 5vw;text-align:right;
+        gap:2.2rem;
       }
-      .auth-logo h1{font-family:var(--font-display);font-size:1.85rem;letter-spacing:0.16em;font-weight:700;text-transform:uppercase;color:#F5F0E4}
-      .auth-logo .b-red{color:var(--seal)}
-      .auth-logo p{font-size:0.62rem;letter-spacing:0.36em;text-transform:uppercase;color:#9C9484;margin-top:0.6rem;font-family:var(--font-mono)}
+      .auth-seal-monolith{
+        width:min(220px,28vw);height:min(220px,28vw);border-radius:50%;
+        border:2px solid var(--brass);position:relative;
+        display:flex;align-items:center;justify-content:center;flex-direction:column;
+        box-shadow:0 0 0 10px #070605, 0 0 70px var(--seal-glow);
+        animation:sealBreathe 3.2s ease-in-out infinite;
+      }
+      .auth-seal-monolith::before{content:'';position:absolute;inset:14px;border-radius:50%;border:1px solid rgba(201,162,39,0.4)}
+      .auth-seal-monolith::after{content:'';position:absolute;inset:26px;border-radius:50%;border:1px dotted rgba(201,162,39,0.25)}
+      .auth-seal-letter{font-family:var(--font-display);font-weight:800;font-size:min(5rem,11vw);color:var(--brass);line-height:1}
+      .auth-seal-sub{font-family:var(--font-mono);font-size:0.56rem;letter-spacing:0.32em;color:var(--brass);opacity:0.85;margin-top:0.3rem}
+      @keyframes sealBreathe{0%,100%{box-shadow:0 0 0 10px #070605,0 0 50px var(--seal-glow)}50%{box-shadow:0 0 0 10px #070605,0 0 90px var(--seal-glow)}}
+      .auth-tagline{
+        font-family:var(--font-display);font-style:italic;font-weight:500;
+        font-size:1.15rem;color:#9C9484;max-width:340px;line-height:1.55;
+      }
+      .auth-tagline strong{color:var(--brass-bright);font-style:normal;font-weight:600}
+      .frontispiece-rule{
+        width:1px;height:62vh;background:linear-gradient(180deg,transparent,var(--seal) 20%,var(--brass) 50%,var(--seal) 80%,transparent);
+        opacity:0.5;justify-self:center;
+      }
+
+      .auth-form-col{padding:3rem 5vw;width:100%;max-width:460px}
+      .auth-eyebrow{
+        font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.3em;text-transform:uppercase;
+        color:var(--seal-bright);margin-bottom:0.9rem;font-weight:600;
+      }
+      .auth-h1{
+        font-family:var(--font-display);font-weight:700;font-size:clamp(1.8rem,4vw,2.3rem);
+        color:#F5F0E4;letter-spacing:0.005em;line-height:1.1;margin-bottom:0.6rem;
+      }
+      .auth-h1 .b-red{color:var(--seal)}
+      .auth-subcopy{font-size:0.86rem;color:#9C9484;line-height:1.7;margin-bottom:2rem;max-width:380px}
+
       .auth-btn{
         display:block;width:100%;padding:0.9rem;
         background:var(--seal);
@@ -4690,21 +4816,39 @@ function renderAuth(page, error, data) {
       }
       .auth-success{background:rgba(111,191,82,0.08);border-color:rgba(111,191,82,0.25);border-left-color:#6FBF52;color:#9BD686}
       .auth-divider{
-        text-align:center;font-size:0.6rem;letter-spacing:0.26em;
+        text-align:left;font-size:0.6rem;letter-spacing:0.26em;
         text-transform:uppercase;color:#5A5346;margin:1.4rem 0;
         position:relative;font-family:var(--font-mono);
+        display:flex;align-items:center;gap:1rem;
       }
-      .auth-divider::before,.auth-divider::after{
-        content:'';position:absolute;top:50%;width:40%;height:1px;
-        background:rgba(201,162,39,0.12);
-      }
-      .auth-divider::before{left:0}.auth-divider::after{right:0}
+      .auth-divider::after{content:'';flex:1;height:1px;background:rgba(201,162,39,0.12)}
       .auth-sep{height:1px;background:rgba(201,162,39,0.08);margin:1.2rem 0}
+
+      .auth-status-bar{
+        display:inline-flex;align-items:center;gap:0.6rem;margin-bottom:1.8rem;padding:0.5rem 0.85rem;
+        background:rgba(201,162,39,0.07);border:1px solid rgba(201,162,39,0.22);
+        font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass-bright);
+      }
+      .auth-status-dot{width:6px;height:6px;border-radius:50%;background:var(--seal);box-shadow:0 0 8px var(--seal);animation:authDotPulse 1.8s ease-in-out infinite;flex-shrink:0}
+      @keyframes authDotPulse{0%,100%{box-shadow:0 0 4px var(--seal)}50%{box-shadow:0 0 12px var(--seal),0 0 20px rgba(139,26,26,0.35)}}
+      .auth-btn::before{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.10),transparent);animation:btnSweep 3.2s ease-in-out 2s infinite}
+      @keyframes btnSweep{0%,60%{left:-100%}100%{left:220%}}
+
+      @keyframes authReveal{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
+      .auth-h1{animation:authReveal 0.6s ease-out 1}
+      .auth-reveal{transition:opacity 0.7s ease}
+      body.booting .auth-reveal{opacity:0}
+
+      @media(max-width:900px){
+        .frontispiece{grid-template-columns:1fr;display:flex;flex-direction:column;padding:3rem 0 2.5rem}
+        .auth-seal-col{align-items:center;text-align:center;padding:1.5rem 6vw 0.5rem}
+        .frontispiece-rule{display:none}
+        .auth-form-col{margin:0 auto;padding:2rem 6vw}
+        .auth-tagline{max-width:100%}
+      }
 
       /* ── SEAL RITUAL — opening of the register, not a hacker boot ── */
       body.booting{overflow:hidden}
-      .auth-reveal{transition:opacity 0.7s ease}
-      body.booting .auth-reveal{opacity:0}
       .boot-screen{
         position:fixed;inset:0;z-index:999;background:#050403;
         display:flex;align-items:center;justify-content:center;
@@ -4726,11 +4870,11 @@ function renderAuth(page, error, data) {
         display:flex;align-items:center;justify-content:center;
         position:relative;
         box-shadow:0 0 0 1px #050403 inset, 0 0 24px var(--seal-glow);
-        animation:sealBreathe 2.4s ease-in-out infinite;
+        animation:sealBreatheSm 2.4s ease-in-out infinite;
       }
       .boot-seal-wax::before{content:'';position:absolute;inset:6px;border-radius:50%;border:1px solid rgba(201,162,39,0.4)}
       .boot-seal-wax span{font-family:var(--font-display);font-weight:700;font-size:1.7rem;color:var(--brass);letter-spacing:0.02em}
-      @keyframes sealBreathe{0%,100%{box-shadow:0 0 0 1px #050403 inset,0 0 16px var(--seal-glow)}50%{box-shadow:0 0 0 1px #050403 inset,0 0 34px var(--seal-glow)}}
+      @keyframes sealBreatheSm{0%,100%{box-shadow:0 0 0 1px #050403 inset,0 0 16px var(--seal-glow)}50%{box-shadow:0 0 0 1px #050403 inset,0 0 34px var(--seal-glow)}}
       .boot-term{
         width:88%;max-width:560px;color:#C9A227;
         font-family:var(--font-mono);
@@ -4753,45 +4897,19 @@ function renderAuth(page, error, data) {
       }
       .boot-progress{width:88%;max-width:280px;height:2px;background:rgba(139,26,26,0.18);position:relative;overflow:hidden;border-radius:1px}
       .boot-progress-fill{height:100%;background:linear-gradient(90deg,var(--seal),var(--brass));box-shadow:0 0 10px var(--seal-glow);transition:width 0.18s linear;width:0%}
-
-      .auth-box::before{
-        content:'';position:absolute;inset:-1px;border-radius:6px;pointer-events:none;
-        border:1px solid rgba(139,26,26,0);
-        animation:authBorderPulse 3.8s ease-in-out infinite;z-index:0;
-      }
-      @keyframes authBorderPulse{0%,100%{border-color:rgba(139,26,26,0);box-shadow:none}50%{border-color:rgba(139,26,26,0.35);box-shadow:0 0 22px rgba(139,26,26,0.10) inset}}
-      .auth-box::after{
-        content:'';position:absolute;inset:0;border-radius:6px;pointer-events:none;z-index:0;
-        background:
-          linear-gradient(var(--brass),var(--brass)) top left/14px 1px no-repeat,
-          linear-gradient(var(--brass),var(--brass)) top left/1px 14px no-repeat,
-          linear-gradient(var(--brass),var(--brass)) top right/14px 1px no-repeat,
-          linear-gradient(var(--brass),var(--brass)) top right/1px 14px no-repeat,
-          linear-gradient(var(--brass),var(--brass)) bottom left/14px 1px no-repeat,
-          linear-gradient(var(--brass),var(--brass)) bottom left/1px 14px no-repeat,
-          linear-gradient(var(--brass),var(--brass)) bottom right/14px 1px no-repeat,
-          linear-gradient(var(--brass),var(--brass)) bottom right/1px 14px no-repeat;
-        opacity:0.55;animation:cornersFlicker 7s steps(1) infinite;
-      }
-      @keyframes cornersFlicker{0%,96%{opacity:0.55}97%{opacity:0.15}98%{opacity:0.7}99%{opacity:0.3}100%{opacity:0.55}}
-
-      @keyframes authReveal{0%{opacity:0;transform:translateY(6px) scale(0.98)}100%{opacity:1;transform:translateY(0) scale(1)}}
-      .auth-logo h1{animation:authReveal 0.65s ease-out 1}
-
-      .auth-status-bar{
-        display:flex;align-items:center;gap:0.6rem;margin-bottom:1.6rem;padding:0.6rem 0.9rem;
-        background:rgba(201,162,39,0.07);border:1px solid rgba(201,162,39,0.22);
-        font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass-bright);
-      }
-      .auth-status-dot{width:6px;height:6px;border-radius:50%;background:var(--seal);box-shadow:0 0 8px var(--seal);animation:authDotPulse 1.8s ease-in-out infinite;flex-shrink:0}
-      @keyframes authDotPulse{0%,100%{box-shadow:0 0 4px var(--seal)}50%{box-shadow:0 0 12px var(--seal),0 0 20px rgba(139,26,26,0.35)}}
-
-      .auth-btn::before{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.10),transparent);animation:btnSweep 3.2s ease-in-out 2s infinite}
-      @keyframes btnSweep{0%,60%{left:-100%}100%{left:220%}}
     </style>
   `;
 
-  const logoHtml = `<div class="auth-logo"><img src="/logo.png" class="auth-logo-img" alt="Albion"><h1>AL<span class="b-red">B</span>ION</h1>`;
+  const sealColHtml = `
+    <div class="auth-seal-col">
+      <div class="auth-seal-monolith">
+        <span class="auth-seal-letter">A</span>
+        <span class="auth-seal-sub">LOS SANTOS</span>
+      </div>
+      <p class="auth-tagline">Albion nepotřebuje být <strong>hlasitý</strong>. Stačí, že je <strong>zapečetěný</strong>.</p>
+    </div>
+    <div class="frontispiece-rule"></div>
+  `;
 
   const bootScreen = `
     <div class="boot-screen" id="bootScreen">
@@ -4850,10 +4968,51 @@ function renderAuth(page, error, data) {
     </script>
   `;
 
-  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body class="booting">${bootScreen}<div class="auth-reveal"><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Přihlášení do rejstříku</p></div><div class="auth-status-bar"><div class="auth-status-dot"></div><span>Kanál zapečetěn · Přístup pouze pro členy</span></div>${errMsg}<a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a><div class="auth-divider">nebo</div><a href="/register" class="auth-btn secondary">Registrovat se</a></div>${successReg}</div></body></html>`;
-  if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body class="booting">${bootScreen}<div class="auth-reveal"><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Registrace nového člena</p></div>${errMsg}<p style="font-size:0.78rem;color:#9C9484;line-height:1.8;margin-bottom:1.5rem">Pro registraci musíš být členem Discord serveru Albion.</p><a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a><div class="auth-sep"></div><a href="/login" class="auth-btn secondary">Zpět na přihlášení</a></div></div></body></html>`;
-  if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Dokončení registrace</p></div>${errMsg}<p style="font-size:0.78rem;color:#9C9484;margin-bottom:1.5rem">Discord: <strong style="color:#E8E2D5">${data?.username||''}</strong></p><form method="POST" action="/register/complete"><label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required><label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required><button type="submit" class="auth-btn">Dokončit registraci</button></form></div></body></html>`;
-  if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="auth-box">${logoHtml}<p>Zadej heslo</p></div>${errMsg}<p style="font-size:0.78rem;color:#9C9484;margin-bottom:1.5rem">Discord: <strong style="color:#E8E2D5">${data?.username||''}</strong></p><form method="POST" action="/login/password"><label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus><button type="submit" class="auth-btn">Přihlásit se</button></form></div></body></html>`;
+  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body class="booting">${bootScreen}<div class="bg-grid"></div><div class="frontispiece auth-reveal">${sealColHtml}<div class="auth-form-col">
+    <div class="auth-eyebrow">Rejstřík Albionu</div>
+    <h1 class="auth-h1">Vstup pro <span class="b-red">členy</span></h1>
+    <p class="auth-subcopy">Přihlášení vyžaduje příslušnost k organizaci na Discordu a heslo do interního rejstříku.</p>
+    <div class="auth-status-bar"><div class="auth-status-dot"></div><span>Kanál zapečetěn</span></div>
+    ${errMsg}
+    <a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a>
+    <div class="auth-divider">nebo</div>
+    <a href="/register" class="auth-btn secondary">Registrovat se</a>
+  </div></div>${successReg}</body></html>`;
+
+  if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body class="booting">${bootScreen}<div class="bg-grid"></div><div class="frontispiece auth-reveal">${sealColHtml}<div class="auth-form-col">
+    <div class="auth-eyebrow">Rejstřík Albionu</div>
+    <h1 class="auth-h1">Žádost o <span class="b-red">členství</span></h1>
+    <p class="auth-subcopy">Pro registraci musíš být členem Discord serveru Albion. Po ověření tě rejstřík vyzve k zápisu jména a heslu.</p>
+    ${errMsg}
+    <a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a>
+    <div class="auth-sep"></div>
+    <a href="/login" class="auth-btn secondary">Zpět na přihlášení</a>
+  </div></div></body></html>`;
+
+  if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="frontispiece">${sealColHtml}<div class="auth-form-col">
+    <div class="auth-eyebrow">Rejstřík Albionu</div>
+    <h1 class="auth-h1">Zápis do <span class="b-red">rejstříku</span></h1>
+    <p class="auth-subcopy">Discord: <strong style="color:#E8E2D5">${data?.username||''}</strong></p>
+    ${errMsg}
+    <form method="POST" action="/register/complete">
+      <label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required>
+      <label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required>
+      <label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required>
+      <button type="submit" class="auth-btn">Dokončit registraci</button>
+    </form>
+  </div></div></body></html>`;
+
+  if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="frontispiece">${sealColHtml}<div class="auth-form-col">
+    <div class="auth-eyebrow">Rejstřík Albionu</div>
+    <h1 class="auth-h1">Potvrzení <span class="b-red">totožnosti</span></h1>
+    <p class="auth-subcopy">Discord: <strong style="color:#E8E2D5">${data?.username||''}</strong></p>
+    ${errMsg}
+    <form method="POST" action="/login/password">
+      <label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus>
+      <button type="submit" class="auth-btn">Přihlásit se</button>
+    </form>
+  </div></div></body></html>`;
+
   return '<h1>404</h1>';
 }
 
