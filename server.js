@@ -4367,6 +4367,17 @@ function renderGaraz(req) {
   <div class="toast" id="toast"></div>
 
   <script>
+    // Bezpečné globální wrappery — button onclick je zaregistruje hned,
+    // skutečné funkce se napojí po DOMContentLoaded.
+    var _garageHandlers = {};
+    window.openCarModal  = function()  { _garageHandlers.open  && _garageHandlers.open(); };
+    window.closeCarModal = function()  { _garageHandlers.close && _garageHandlers.close(); };
+    window.editCar       = function(id){ _garageHandlers.edit  && _garageHandlers.edit(id); };
+    window.deleteCar     = function(id){ _garageHandlers.del   && _garageHandlers.del(id); };
+    window.submitCar     = function()  { _garageHandlers.submit&& _garageHandlers.submit(); };
+    window.clearCarImage = function(e) { _garageHandlers.clearImg && _garageHandlers.clearImg(e); };
+
+    document.addEventListener('DOMContentLoaded', function() {
     let CARS = [];
     let editingCarId = null;
     let pendingImageData = null; // base64 data URL, null = no change, '' = cleared
@@ -4479,13 +4490,13 @@ function renderGaraz(req) {
       reader.onload = () => cb(reader.result);
       reader.readAsDataURL(file);
     }
-    // Exponujeme funkce do globálního scope — onclick atributy v HTML je potřebují na window.*
-    window.openCarModal = openCarModal;
-    window.closeCarModal = closeCarModal;
-    window.editCar = editCar;
-    window.deleteCar = deleteCar;
-    window.submitCar = submitCar;
-    window.clearCarImage = clearCarImage;
+    // Napojíme handlery na skutečné funkce
+    _garageHandlers.open     = openCarModal;
+    _garageHandlers.close    = closeCarModal;
+    _garageHandlers.edit     = editCar;
+    _garageHandlers.del      = deleteCar;
+    _garageHandlers.submit   = submitCar;
+    _garageHandlers.clearImg = clearCarImage;
 
     const uploadZone = document.getElementById('uploadZone');
     const carImageFile = document.getElementById('carImageFile');
@@ -4570,6 +4581,7 @@ function renderGaraz(req) {
     // Nasloucháme garageUpdate přes sdílený evtSource z renderNav (window.evtSource),
     // abychom nevytvářeli druhé SSE připojení k /api/events.
     (window.evtSource || new EventSource('/api/events')).addEventListener('garageUpdate', () => setTimeout(loadGarage, 400));
+    }); // end DOMContentLoaded
   </script>
   </body></html>`;
 }
