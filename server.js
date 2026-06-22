@@ -531,6 +531,13 @@ app.put('/api/garage/:id', requireAuth, (req, res) => {
   car.kupil = kupil || car.kupil;
   car.ucel = ucel || '';
   if (image) car.image = saveGarageImage(image, car.image);
+  else if (image === '') {
+    // Uživatel smazal fotku — odstraníme starý soubor a vynulujeme cestu
+    if (car.image && car.image.startsWith('/garage-uploads/')) {
+      fs.unlink(path.join(GARAGE_UPLOADS_DIR, path.basename(car.image)), () => {});
+    }
+    car.image = null;
+  }
   car.updatedAt = Date.now();
 
   saveGarage(cars);
@@ -4474,7 +4481,13 @@ function renderGaraz(req) {
     }
     const uploadZone = document.getElementById('uploadZone');
     const carImageFile = document.getElementById('carImageFile');
-    uploadZone.addEventListener('click', () => carImageFile.click());
+    uploadZone.addEventListener('click', (e) => {
+      // Klik na uploadClear se zastaví pomocí stopPropagation — sem se tedy nedostane.
+      // Spustíme file picker jen pokud je modal otevřený (obrana před bubbling edge-cases).
+      if (document.getElementById('carModal').classList.contains('open')) {
+        carImageFile.click();
+      }
+    });
     carImageFile.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       fileToDataUrl(file, (dataUrl) => { pendingImageData = dataUrl; setUploadPreview(dataUrl); });
@@ -4518,7 +4531,10 @@ function renderGaraz(req) {
       btn.textContent = 'Ukládám…';
 
       const payload = { spz, cena, nazev, kupil, ucel };
-      if (pendingImageData) payload.image = pendingImageData;
+      // pendingImageData === null  → beze změny (nový vůz bez fotky, nebo edit bez změny fotky)
+      // pendingImageData === ''    → uživatel smazal fotku přes ✕ → pošleme prázdný řetězec
+      // pendingImageData === 'data:...' → nová fotka
+      if (pendingImageData !== null) payload.image = pendingImageData;
 
       try {
         const url = editingCarId ? '/api/garage/' + editingCarId : '/api/garage';
@@ -4542,9 +4558,18 @@ function renderGaraz(req) {
     document.getElementById('carModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCarModal(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.getElementById('carModal').classList.contains('open')) closeCarModal(); });
 
+    // Exponujeme funkce do globálního scope — onclick atributy v HTML je potřebují na window.*
+    window.openCarModal = openCarModal;
+    window.closeCarModal = closeCarModal;
+    window.editCar = editCar;
+    window.deleteCar = deleteCar;
+    window.submitCar = submitCar;
+    window.clearCarImage = clearCarImage;
+
     loadGarage();
-    const evtGarage = new EventSource('/api/events');
-    evtGarage.addEventListener('garageUpdate', () => setTimeout(loadGarage, 400));
+    // Nasloucháme garageUpdate přes sdílený evtSource z renderNav (window.evtSource),
+    // abychom nevytvářeli druhé SSE připojení k /api/events.
+    (window.evtSource || new EventSource('/api/events')).addEventListener('garageUpdate', () => setTimeout(loadGarage, 400));
   </script>
   </body></html>`;
 }
