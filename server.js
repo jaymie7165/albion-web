@@ -16,8 +16,8 @@ const { requireAuth } = require('./middleware/auth');
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 // Logo is served from public/logo.png via express.static above
 app.use(session({
@@ -102,6 +102,43 @@ function loadWeedTimers() {
 }
 function saveWeedTimers(timers) {
   try { fs.writeFileSync(WEED_TIMERS_FILE, JSON.stringify(timers, null, 2)); } catch (e) { console.error('[WEED-TIMERS]', e.message); }
+}
+
+// ── GARÁŽ — vozový park organizace (sdílené pro všechny uživatele) ────────────
+const GARAGE_FILE = path.join(__dirname, 'garage.json');
+const GARAGE_UPLOADS_DIR = path.join(__dirname, 'public', 'garage-uploads');
+if (!fs.existsSync(GARAGE_UPLOADS_DIR)) { try { fs.mkdirSync(GARAGE_UPLOADS_DIR, { recursive: true }); } catch (e) { console.error('[GARAGE]', e.message); } }
+
+function loadGarage() {
+  try {
+    if (!fs.existsSync(GARAGE_FILE)) return [];
+    return JSON.parse(fs.readFileSync(GARAGE_FILE, 'utf8')) || [];
+  } catch { return []; }
+}
+function saveGarage(cars) {
+  try { fs.writeFileSync(GARAGE_FILE, JSON.stringify(cars, null, 2)); } catch (e) { console.error('[GARAGE]', e.message); }
+}
+// Uloží base64 obrázek (data URL) na disk a vrátí veřejnou cestu, nebo null při chybě/neplatném vstupu.
+function saveGarageImage(dataUrl, existingPath) {
+  if (!dataUrl || typeof dataUrl !== 'string') return existingPath || null;
+  const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) return existingPath || null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  const buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 8 * 1024 * 1024) return existingPath || null; // 8MB strop
+  const filename = `car_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`;
+  try {
+    fs.writeFileSync(path.join(GARAGE_UPLOADS_DIR, filename), buffer);
+    // Smaž starý obrázek, pokud existuje a je z naší upload složky
+    if (existingPath && existingPath.startsWith('/garage-uploads/')) {
+      const oldFile = path.join(GARAGE_UPLOADS_DIR, path.basename(existingPath));
+      fs.unlink(oldFile, () => {});
+    }
+    return `/garage-uploads/${filename}`;
+  } catch (e) {
+    console.error('[GARAGE] Chyba uložení obrázku:', e.message);
+    return existingPath || null;
+  }
 }
 
 // ── SSE — živé notifikace ─────────────────────────────────────────────────────
@@ -428,6 +465,89 @@ app.post('/api/weed-timers/remove', requireAuth, (req, res) => {
   if (timers.length === before) return res.json({ ok: false, error: 'Odpočet nenalezen' });
   saveWeedTimers(timers);
   broadcastSSE('weedTimer', { action: 'remove', id });
+  res.json({ ok: true });
+});
+
+// ── API — GARÁŽ (vozový park) ──────────────────────────────────────────────────
+app.get('/api/garage', requireAuth, (req, res) => {
+  const cars = loadGarage().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  res.json({ ok: true, cars });
+});
+
+app.post('/api/garage', requireAuth, (req, res) => {
+  let { spz, nazev, cena, kupil, ucel, image } = req.body;
+  const ucelRaw = ucel;
+  spz = sanitizeText(spz, 12);
+  nazev = sanitizeText(nazev, 80);
+  ucel = ucelRaw ? sanitizeText(ucelRaw, 400) : null;
+  kupil = sanitizeText(kupil, 80) || req.session.icName;
+  const cenaNum = parseFloat(cena);
+
+  if (!spz) return res.json({ ok: false, error: 'Vyplň SPZ vozu (max 12 znaků)' });
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název / model vozu' });
+  if (!isAmount(cenaNum, 50_000_000)) return res.json({ ok: false, error: 'Neplatná cena v SAD' });
+  if (ucelRaw && !ucel) return res.json({ ok: false, error: 'Účel je příliš dlouhý (max 400 znaků)' });
+
+  const imagePath = saveGarageImage(image, null);
+
+  const cars = loadGarage();
+  const car = {
+    id: `car_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    spz: spz.toUpperCase(),
+    nazev,
+    cena: cenaNum,
+    kupil,
+    ucel: ucel || '',
+    image: imagePath,
+    pridal: req.session.icName,
+    createdAt: Date.now(),
+    createdAtText: sheets.timestamp ? sheets.timestamp() : new Date().toLocaleString('cs-CZ'),
+  };
+  cars.push(car);
+  saveGarage(cars);
+  broadcastSSE('garageUpdate', { action: 'add', car: { spz: car.spz, nazev: car.nazev } });
+  res.json({ ok: true, car });
+});
+
+app.put('/api/garage/:id', requireAuth, (req, res) => {
+  const cars = loadGarage();
+  const car = cars.find(c => c.id === req.params.id);
+  if (!car) return res.json({ ok: false, error: 'Vůz nenalezen' });
+
+  let { spz, nazev, cena, kupil, ucel, image } = req.body;
+  spz = sanitizeText(spz, 12);
+  nazev = sanitizeText(nazev, 80);
+  ucel = ucel != null ? sanitizeText(ucel, 400) : '';
+  kupil = sanitizeText(kupil, 80);
+  const cenaNum = parseFloat(cena);
+
+  if (!spz) return res.json({ ok: false, error: 'Vyplň SPZ vozu (max 12 znaků)' });
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název / model vozu' });
+  if (!isAmount(cenaNum, 50_000_000)) return res.json({ ok: false, error: 'Neplatná cena v SAD' });
+
+  car.spz = spz.toUpperCase();
+  car.nazev = nazev;
+  car.cena = cenaNum;
+  car.kupil = kupil || car.kupil;
+  car.ucel = ucel || '';
+  if (image) car.image = saveGarageImage(image, car.image);
+  car.updatedAt = Date.now();
+
+  saveGarage(cars);
+  broadcastSSE('garageUpdate', { action: 'edit', car: { spz: car.spz, nazev: car.nazev } });
+  res.json({ ok: true, car });
+});
+
+app.delete('/api/garage/:id', requireAuth, (req, res) => {
+  let cars = loadGarage();
+  const car = cars.find(c => c.id === req.params.id);
+  if (!car) return res.json({ ok: false, error: 'Vůz nenalezen' });
+  if (car.image && car.image.startsWith('/garage-uploads/')) {
+    fs.unlink(path.join(GARAGE_UPLOADS_DIR, path.basename(car.image)), () => {});
+  }
+  cars = cars.filter(c => c.id !== req.params.id);
+  saveGarage(cars);
+  broadcastSSE('garageUpdate', { action: 'remove', id: req.params.id });
   res.json({ ok: true });
 });
 
@@ -1304,6 +1424,7 @@ app.get('/audit', requireAuth, (req, res) => res.send(renderAudit(req)));
 app.get('/statistiky', requireAuth, (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
+app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 
 
 // ── LEDGER EMPTY STATE — shared "unwritten page" illustration ──────────────────
@@ -1406,6 +1527,8 @@ function baseStyles() {
         --leather2:#FBF8F0;
         --leather3:#F1EBDC;
         --leather4:#E9E1CE;
+        --vellum:#241F17;
+        --vellum-bright:#15110C;
         --text:#241F17;
         --text-dim:#5C5340;
         --text-muted:#8C8264;
@@ -1447,6 +1570,8 @@ function baseStyles() {
         --text-dim:#85A0B3;
         --text-muted:#4D6376;
         --text-label:#5E7A8C;
+        --vellum:#E4EEF5;
+        --vellum-bright:#F5FAFD;
         --border:rgba(111,168,201,0.16);
         --border-hover:rgba(111,168,201,0.30);
         --border-seal:rgba(194,59,59,0.30);
@@ -2257,10 +2382,12 @@ function baseStyles() {
         font-size:0.64rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:600;
         text-decoration:none;transition:all 0.2s;
         font-family:var(--font-mono);
-        border-radius:2px;
+        border-radius:2px;cursor:pointer;
       }
       .quick-btn:hover{background:var(--seal-glow);border-color:var(--border-seal);color:var(--text);transform:translateY(-2px)}
       .quick-btn svg{width:13px;height:13px;opacity:0.7}
+      .quick-btn.primary{background:var(--blood);border-color:var(--blood);color:#FFF7EE;box-shadow:0 0 16px var(--blood-glow)}
+      .quick-btn.primary:hover{background:var(--blood);opacity:0.9;box-shadow:0 0 26px var(--blood-glow);color:#FFF7EE}
 
       /* ── MINI STOCK BARS ── */
       .mini-stock-row{display:flex;align-items:center;gap:0.8rem;padding:0.5rem 0;border-bottom:1px solid var(--border)}
@@ -2608,6 +2735,8 @@ function renderNav(req, active) {
       </button>
       <ul class="nav-menu" id="navMenu">
         <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Rejstřík</span></a></li>
+
+        <li><a href="/garaz" class="${active==='garaz'?'active':''}">Garáž<span class="nav-desc">Vozový park</span></a></li>
 
         <li class="nav-dropdown ${skladPages.includes(active)?'open':''}">
           <a href="/sklad" class="nav-drop-trigger ${skladPages.includes(active)?'active':''}">
@@ -4105,6 +4234,321 @@ function renderHierarchy(req) {
   </main>
   </body></html>`;
 }
+// ── RENDER GARÁŽ ──────────────────────────────────────────────────────────────
+function renderGaraz(req) {
+  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Garáž</title>
+  ${baseStyles()}
+  <style>
+    .garage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.6rem}
+    .car-card{
+      background:var(--bg-card);border:1px solid var(--border);border-radius:6px;
+      overflow:hidden;transition:border-color 0.2s,transform 0.2s;box-shadow:var(--shadow-card);
+      position:relative;display:flex;flex-direction:column;
+    }
+    .car-card:hover{border-color:var(--border-hover);transform:translateY(-3px)}
+    .car-photo{
+      width:100%;aspect-ratio:16/10;background:var(--bg-mid);
+      position:relative;overflow:hidden;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .car-photo img{width:100%;height:100%;object-fit:cover;display:block}
+    .car-photo-empty{
+      display:flex;flex-direction:column;align-items:center;gap:0.5rem;
+      color:var(--text-muted);font-family:var(--font-mono);font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase;
+    }
+    .car-photo-empty svg{width:32px;height:32px;opacity:0.4}
+    .car-plate{
+      position:absolute;left:0.9rem;bottom:0.9rem;
+      background:var(--vellum-bright);color:#15110C;
+      font-family:var(--font-mono);font-weight:700;font-size:0.92rem;letter-spacing:0.08em;
+      padding:0.35rem 0.8rem;border-radius:3px;
+      border:2px solid #15110C;
+      box-shadow:0 4px 14px rgba(0,0,0,0.5);
+    }
+    .car-body{padding:1.3rem 1.4rem 1.5rem;display:flex;flex-direction:column;gap:0.7rem;flex:1}
+    .car-name{font-family:var(--font-display);font-weight:600;font-size:1.15rem;color:var(--vellum-bright);line-height:1.2}
+    .car-price{font-family:var(--font-mono);font-size:0.95rem;color:var(--brass);font-weight:600}
+    .car-price .car-price-tag{font-size:0.6rem;color:var(--text-muted);letter-spacing:0.08em;text-transform:uppercase;margin-left:0.4rem}
+    .car-meta-row{display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-dim);padding:0.25rem 0;border-top:1px solid var(--border)}
+    .car-meta-row span:first-child{color:var(--text-muted);font-family:var(--font-mono);font-size:0.66rem;letter-spacing:0.06em;text-transform:uppercase}
+    .car-purpose{font-size:0.84rem;color:var(--text-dim);line-height:1.6;margin-top:0.2rem;flex:1}
+    .car-actions{display:flex;gap:0.5rem;margin-top:0.6rem}
+    .car-action-btn{
+      flex:1;padding:0.5rem;background:transparent;border:1px solid var(--border-hover);
+      color:var(--text-dim);font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;
+      cursor:pointer;border-radius:3px;transition:all 0.15s;
+    }
+    .car-action-btn:hover{border-color:var(--brass);color:var(--brass-bright)}
+    .car-action-btn.danger:hover{border-color:var(--blood);color:var(--blood);box-shadow:0 0 12px var(--blood-glow)}
+
+    /* ── Upload zone — drop / paste / click ── */
+    .upload-zone{
+      border:1.5px dashed var(--border-hover);border-radius:6px;
+      padding:1.6rem;text-align:center;cursor:pointer;
+      transition:border-color 0.2s,background 0.2s;position:relative;
+      background:var(--input-bg);min-height:140px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.6rem;
+      overflow:hidden;
+    }
+    .upload-zone:hover,.upload-zone.drag-over{border-color:var(--brass);background:var(--gold-dim)}
+    .upload-zone svg{width:28px;height:28px;color:var(--text-muted);flex-shrink:0}
+    .upload-zone-text{font-family:var(--font-mono);font-size:0.68rem;letter-spacing:0.04em;color:var(--text-muted);line-height:1.6}
+    .upload-zone-text strong{color:var(--brass)}
+    .upload-preview{width:100%;height:100%;position:absolute;inset:0;object-fit:cover}
+    .upload-clear{
+      position:absolute;top:0.5rem;right:0.5rem;z-index:2;
+      width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.65);
+      color:#fff;border:1px solid rgba(255,255,255,0.3);cursor:pointer;
+      display:none;align-items:center;justify-content:center;font-size:0.9rem;line-height:1;
+    }
+    .upload-zone.has-image .upload-clear{display:flex}
+    .upload-zone.has-image .upload-zone-text,.upload-zone.has-image svg{display:none}
+
+    @media(max-width:640px){.garage-grid{grid-template-columns:1fr}}
+  </style>
+  </head><body>
+  ${renderNav(req, 'garaz')}
+  <main>
+    <div class="page-header">
+      <div>
+        <div class="page-label">Albion — Majetek organizace</div>
+        <h1 class="page-title">Garáž</h1>
+        <p class="page-sub">Vozový park, jeho SPZ, hodnota a určení</p>
+      </div>
+      <button class="quick-btn primary" onclick="openCarModal()" style="flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Přidat vůz</span>
+      </button>
+    </div>
+    <p class="folio-footnote"><strong>Vozový park.</strong> Každý záznam nese SPZ, model, cenu pořízenou v obchodě PDM (San Andreas Dollar), kdo vůz koupil a k čemu organizaci slouží. Záznamy vidí všichni členové a lze je upravovat nebo mazat.</p>
+
+    <div id="garage-loading" class="ledger-loading">Načítám vozový park…</div>
+    <div id="garage-grid" class="garage-grid"></div>
+  </main>
+
+  <!-- ── CAR MODAL ── -->
+  <div class="modal-overlay" id="carModal">
+    <div class="modal-box" id="carModalBox" style="max-width:480px">
+      <div class="modal-title" id="carModalTitle">Přidat vůz</div>
+      <div class="modal-subtitle">Vyplň údaje o vozu. Fotku vlož přes Ctrl+V (screenshot) nebo ji nahraj ze souboru.</div>
+
+      <div class="form-group" style="margin-bottom:1rem">
+        <label>Fotka vozu</label>
+        <div class="upload-zone" id="uploadZone" tabindex="0">
+          <button type="button" class="upload-clear" id="uploadClear" onclick="clearCarImage(event)">✕</button>
+          <img class="upload-preview" id="uploadPreview" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          <div class="upload-zone-text"><strong>Klikni</strong> pro výběr souboru<br>nebo <strong>Ctrl+V</strong> pro vložení screenshotu</div>
+        </div>
+        <input type="file" id="carImageFile" accept="image/*" style="display:none">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group"><label>SPZ</label><input type="text" id="car-spz" placeholder="ABC 123" maxlength="12"></div>
+        <div class="form-group"><label>Cena (SAD)</label><input type="number" id="car-cena" min="0" placeholder="250000"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0.85rem"><label>Model / název vozu</label><input type="text" id="car-nazev" placeholder="Obey Tailgater, Pegassi Zentorno…"></div>
+      <div class="form-group" style="margin-bottom:0.85rem"><label>Kdo vůz koupil</label><input type="text" id="car-kupil" placeholder="IC jméno"></div>
+      <div class="form-group" style="margin-bottom:0.5rem"><label>K čemu slouží</label><textarea id="car-ucel" placeholder="Krátký popis využití vozu…" rows="3"></textarea></div>
+
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="closeCarModal()">Zrušit</button>
+        <button class="modal-btn-confirm" id="carModalConfirmBtn" onclick="submitCar()">Uložit vůz</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let CARS = [];
+    let editingCarId = null;
+    let pendingImageData = null; // base64 data URL, null = no change, '' = cleared
+
+    function esc(s) { return (s==null?'':String(s)).replace(/</g,'&lt;'); }
+    function money(n) { return '$' + Math.round(n||0).toLocaleString('cs-CZ'); }
+
+    function carCardHtml(car) {
+      const photo = car.image
+        ? '<img src="' + esc(car.image) + '" alt="' + esc(car.nazev) + '" loading="lazy">'
+        : '<div class="car-photo-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Bez fotky</div>';
+      return '<div class="car-card">' +
+        '<div class="car-photo">' + photo + '<div class="car-plate">' + esc(car.spz) + '</div></div>' +
+        '<div class="car-body">' +
+          '<div class="car-name">' + esc(car.nazev) + '</div>' +
+          '<div class="car-price">' + money(car.cena) + '<span class="car-price-tag">PDM · SAD</span></div>' +
+          '<div class="car-meta-row"><span>Koupil</span><span>' + esc(car.kupil) + '</span></div>' +
+          (car.ucel ? '<div class="car-purpose">' + esc(car.ucel) + '</div>' : '<div class="car-purpose" style="color:var(--text-muted);font-style:italic">Účel nezadán</div>') +
+          '<div class="car-actions">' +
+            '<button class="car-action-btn" onclick="editCar(\'' + car.id + '\')">Upravit</button>' +
+            '<button class="car-action-btn danger" onclick="deleteCar(\'' + car.id + '\')">Smazat</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderGarage() {
+      const grid = document.getElementById('garage-grid');
+      if (!CARS.length) { grid.innerHTML = ledgerEmptyHTML('Garáž je prázdná — zatím žádný vůz nebyl zapsán'); return; }
+      grid.innerHTML = CARS.map(carCardHtml).join('');
+    }
+
+    async function loadGarage() {
+      try {
+        const res = await fetch('/api/garage', { cache: 'no-store' });
+        const data = await res.json();
+        document.getElementById('garage-loading').style.display = 'none';
+        CARS = data.cars || [];
+        renderGarage();
+      } catch (e) {
+        document.getElementById('garage-loading').textContent = 'Chyba načtení: ' + e.message;
+      }
+    }
+
+    // ── Modal open/close ──
+    function resetCarForm() {
+      document.getElementById('car-spz').value = '';
+      document.getElementById('car-cena').value = '';
+      document.getElementById('car-nazev').value = '';
+      document.getElementById('car-kupil').value = '';
+      document.getElementById('car-ucel').value = '';
+      pendingImageData = null;
+      setUploadPreview(null);
+      editingCarId = null;
+    }
+    function openCarModal() {
+      resetCarForm();
+      document.getElementById('carModalTitle').textContent = 'Přidat vůz';
+      document.getElementById('carModalConfirmBtn').textContent = 'Uložit vůz';
+      document.getElementById('carModal').classList.add('open');
+    }
+    function closeCarModal() {
+      document.getElementById('carModal').classList.remove('open');
+    }
+    function editCar(id) {
+      const car = CARS.find(c => c.id === id);
+      if (!car) return;
+      resetCarForm();
+      editingCarId = id;
+      document.getElementById('car-spz').value = car.spz || '';
+      document.getElementById('car-cena').value = car.cena || '';
+      document.getElementById('car-nazev').value = car.nazev || '';
+      document.getElementById('car-kupil').value = car.kupil || '';
+      document.getElementById('car-ucel').value = car.ucel || '';
+      if (car.image) setUploadPreview(car.image);
+      document.getElementById('carModalTitle').textContent = 'Upravit vůz';
+      document.getElementById('carModalConfirmBtn').textContent = 'Uložit změny';
+      document.getElementById('carModal').classList.add('open');
+    }
+    async function deleteCar(id) {
+      const car = CARS.find(c => c.id === id);
+      if (!car) return;
+      if (!confirm('Smazat vůz ' + car.spz + ' (' + car.nazev + ') z garáže?')) return;
+      const res = await fetch('/api/garage/' + id, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) { showToast('Vůz odstraněn z garáže'); loadGarage(); }
+      else showToast(data.error || 'Chyba mazání', true);
+    }
+
+    // ── Image handling: file picker, drag&drop, and Ctrl+V paste ──
+    function setUploadPreview(src) {
+      const zone = document.getElementById('uploadZone');
+      const img = document.getElementById('uploadPreview');
+      if (src) {
+        img.src = src; img.style.display = 'block';
+        zone.classList.add('has-image');
+      } else {
+        img.src = ''; img.style.display = 'none';
+        zone.classList.remove('has-image');
+      }
+    }
+    function clearCarImage(e) {
+      e.stopPropagation();
+      pendingImageData = '';
+      setUploadPreview(null);
+    }
+    function fileToDataUrl(file, cb) {
+      if (!file || !file.type || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => cb(reader.result);
+      reader.readAsDataURL(file);
+    }
+    const uploadZone = document.getElementById('uploadZone');
+    const carImageFile = document.getElementById('carImageFile');
+    uploadZone.addEventListener('click', () => carImageFile.click());
+    carImageFile.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      fileToDataUrl(file, (dataUrl) => { pendingImageData = dataUrl; setUploadPreview(dataUrl); });
+    });
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault(); uploadZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files && e.dataTransfer.files[0];
+      fileToDataUrl(file, (dataUrl) => { pendingImageData = dataUrl; setUploadPreview(dataUrl); });
+    });
+    uploadZone.addEventListener('paste', (e) => handlePaste(e));
+    document.addEventListener('paste', (e) => {
+      if (document.getElementById('carModal').classList.contains('open')) handlePaste(e);
+    });
+    function handlePaste(e) {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          fileToDataUrl(file, (dataUrl) => { pendingImageData = dataUrl; setUploadPreview(dataUrl); });
+          e.preventDefault();
+          break;
+        }
+      }
+    }
+
+    async function submitCar() {
+      const spz = document.getElementById('car-spz').value.trim();
+      const cena = document.getElementById('car-cena').value;
+      const nazev = document.getElementById('car-nazev').value.trim();
+      const kupil = document.getElementById('car-kupil').value.trim();
+      const ucel = document.getElementById('car-ucel').value.trim();
+      if (!spz) return showToast('Vyplň SPZ vozu', true);
+      if (!nazev) return showToast('Vyplň model / název vozu', true);
+      if (!cena || parseFloat(cena) <= 0) return showToast('Vyplň platnou cenu v SAD', true);
+
+      const btn = document.getElementById('carModalConfirmBtn');
+      btn.disabled = true;
+      btn.textContent = 'Ukládám…';
+
+      const payload = { spz, cena, nazev, kupil, ucel };
+      if (pendingImageData) payload.image = pendingImageData;
+
+      try {
+        const url = editingCarId ? '/api/garage/' + editingCarId : '/api/garage';
+        const method = editingCarId ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(editingCarId ? 'Vůz upraven' : 'Vůz zapsán do garáže');
+          closeCarModal();
+          loadGarage();
+        } else {
+          showToast(data.error || 'Chyba ukládání', true);
+        }
+      } catch (e) {
+        showToast('Chyba sítě: ' + e.message, true);
+      }
+      btn.disabled = false;
+      btn.textContent = editingCarId ? 'Uložit změny' : 'Uložit vůz';
+    }
+
+    document.getElementById('carModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCarModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.getElementById('carModal').classList.contains('open')) closeCarModal(); });
+
+    loadGarage();
+    const evtGarage = new EventSource('/api/events');
+    evtGarage.addEventListener('garageUpdate', () => setTimeout(loadGarage, 400));
+  </script>
+  </body></html>`;
+}
+
 
 // ── RENDER WEED SÁZENÍ ────────────────────────────────────────────────────────
 function renderWeedSazeni(req) {
