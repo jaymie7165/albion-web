@@ -4397,8 +4397,8 @@ function renderGaraz(req) {
           '<div class="car-meta-row"><span>Koupil</span><span>' + esc(car.kupil) + '</span></div>' +
           (car.ucel ? '<div class="car-purpose">' + esc(car.ucel) + '</div>' : '<div class="car-purpose" style="color:var(--text-muted);font-style:italic">Účel nezadán</div>') +
           '<div class="car-actions">' +
-            '<button class="car-action-btn" onclick="editCar(\'' + car.id + '\')">Upravit</button>' +
-            '<button class="car-action-btn danger" onclick="deleteCar(\'' + car.id + '\')">Smazat</button>' +
+            '<button class="car-action-btn" onclick="editCar(&quot;' + car.id + '&quot;)">Upravit</button>' +
+            '<button class="car-action-btn danger" onclick="deleteCar(&quot;' + car.id + '&quot;)">Smazat</button>' +
           '</div>' +
         '</div>' +
       '</div>';
