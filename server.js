@@ -4479,6 +4479,14 @@ function renderGaraz(req) {
       reader.onload = () => cb(reader.result);
       reader.readAsDataURL(file);
     }
+    // Exponujeme funkce do globálního scope — onclick atributy v HTML je potřebují na window.*
+    window.openCarModal = openCarModal;
+    window.closeCarModal = closeCarModal;
+    window.editCar = editCar;
+    window.deleteCar = deleteCar;
+    window.submitCar = submitCar;
+    window.clearCarImage = clearCarImage;
+
     const uploadZone = document.getElementById('uploadZone');
     const carImageFile = document.getElementById('carImageFile');
     uploadZone.addEventListener('click', (e) => {
@@ -4557,14 +4565,6 @@ function renderGaraz(req) {
 
     document.getElementById('carModal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCarModal(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.getElementById('carModal').classList.contains('open')) closeCarModal(); });
-
-    // Exponujeme funkce do globálního scope — onclick atributy v HTML je potřebují na window.*
-    window.openCarModal = openCarModal;
-    window.closeCarModal = closeCarModal;
-    window.editCar = editCar;
-    window.deleteCar = deleteCar;
-    window.submitCar = submitCar;
-    window.clearCarImage = clearCarImage;
 
     loadGarage();
     // Nasloucháme garageUpdate přes sdílený evtSource z renderNav (window.evtSource),
