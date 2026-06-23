@@ -42,9 +42,29 @@ app.use(session({
   cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 },
 }));
 
+// ── TRVALÉ ÚLOŽIŠTĚ ──────────────────────────────────────────────────────────
+// Na Railway je k službě připojený Volume (persistentní disk) — Railway sám
+// zpřístupní jeho cestu v proměnné RAILWAY_VOLUME_MOUNT_PATH. Pokud Volume
+// není připojený (např. při lokálním vývoji), spadneme zpátky na složku
+// ./data v kořeni projektu, ať appka funguje i bez Railway.
+// DŮLEŽITÉ: po nastavení Volume na Railway nastav jeho Mount Path na "/app/data",
+// aby seděl s touto fallback cestou i v lokálním běhu.
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) { try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { console.error('[DATA_DIR]', e.message); } }
+console.log(`[STORAGE] Trvalá data se ukládají do: ${DATA_DIR}${process.env.RAILWAY_VOLUME_MOUNT_PATH ? ' (Railway Volume)' : ' (lokální složka — NEPŘETRVÁ na Railway bez Volume!)'}`);
+
+// Fotky vozů servírujeme vlastní route, aby mohly ležet na Volume mimo public/
+// a přitom byly dostupné na stejné URL jako dřív (/garage-uploads/soubor.jpg).
+app.get('/garage-uploads/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename); // ochrana proti path traversal
+  res.sendFile(path.join(DATA_DIR, 'garage-uploads', safeName), (err) => {
+    if (err) res.status(404).end();
+  });
+});
+
 
 // ── ÚLOŽIŠTĚ ODPOČTŮ PĚSTOVÁNÍ (sdílené pro všechny uživatele) ─────────────────
-const WEED_TIMERS_FILE = path.join(__dirname, 'weed-timers.json');
+const WEED_TIMERS_FILE = path.join(DATA_DIR, 'weed-timers.json');
 
 function loadWeedTimers() {
   try {
@@ -57,8 +77,8 @@ function saveWeedTimers(timers) {
 }
 
 // ── GARÁŽ — vozový park organizace (sdílené pro všechny uživatele) ────────────
-const GARAGE_FILE = path.join(__dirname, 'garage.json');
-const GARAGE_UPLOADS_DIR = path.join(__dirname, 'public', 'garage-uploads');
+const GARAGE_FILE = path.join(DATA_DIR, 'garage.json');
+const GARAGE_UPLOADS_DIR = path.join(DATA_DIR, 'garage-uploads');
 if (!fs.existsSync(GARAGE_UPLOADS_DIR)) { try { fs.mkdirSync(GARAGE_UPLOADS_DIR, { recursive: true }); } catch (e) { console.error('[GARAGE]', e.message); } }
 
 function loadGarage() {
