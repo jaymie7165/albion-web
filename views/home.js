@@ -1,4 +1,4 @@
-// home.js — extracted view module
+// home.js — extracted view module (redesign: stříbro/platina akcent, heraldický štít v hero)
 
 const { baseStyles, ledgerEmpty } = require('./styles');
 const { renderNav } = require('./nav');
@@ -115,26 +115,21 @@ function renderHome(req, data) {
       position:relative;z-index:1;
     }
     .opening-seal{
-      width:118px;height:118px;border-radius:50%;
-      border:2px solid var(--brass);
-      display:flex;align-items:center;justify-content:center;flex-direction:column;
-      box-shadow:0 0 0 7px var(--ink),0 0 50px var(--blood-glow),0 0 14px var(--seal-glow);
-      position:relative;
-      background:radial-gradient(circle at 35% 30%, rgba(232,35,28,0.08), transparent 65%);
+      width:120px;height:148px;
+      display:flex;align-items:center;justify-content:center;
+      filter:drop-shadow(0 0 26px var(--blood-glow));
       animation:sealAmbientBreathe 4s ease-in-out infinite;
     }
+    .opening-seal svg{width:100%;height:100%;display:block}
     @keyframes sealAmbientBreathe{
-      0%,100%{box-shadow:0 0 0 7px var(--ink),0 0 50px var(--blood-glow),0 0 14px var(--seal-glow)}
-      50%{box-shadow:0 0 0 7px var(--ink),0 0 64px var(--blood-glow),0 0 20px var(--seal-glow)}
+      0%,100%{filter:drop-shadow(0 0 20px var(--blood-glow))}
+      50%{filter:drop-shadow(0 0 34px var(--blood-glow))}
     }
-    .opening-seal::before{content:'';position:absolute;inset:9px;border-radius:50%;border:1px solid var(--border-brass)}
-    .opening-seal .os-letter{font-family:var(--font-display);font-weight:800;font-size:2.3rem;color:var(--brass-bright);line-height:1;text-shadow:0 0 18px rgba(201,162,39,0.4)}
-    .opening-seal .os-sub{font-family:var(--font-mono);font-size:0.5rem;letter-spacing:0.22em;color:var(--brass);opacity:0.85;margin-top:0.2rem}
     .opening-seal.live-pulse{animation:heroSealPulseBlood 1.2s ease-out 1}
     @keyframes heroSealPulseBlood{
-      0%{box-shadow:0 0 0 7px var(--ink),0 0 50px var(--blood-glow),0 0 14px var(--seal-glow)}
-      35%{box-shadow:0 0 0 7px var(--ink),0 0 90px var(--blood-glow),0 0 40px var(--blood);border-color:var(--blood)}
-      100%{box-shadow:0 0 0 7px var(--ink),0 0 50px var(--blood-glow),0 0 14px var(--seal-glow)}
+      0%{filter:drop-shadow(0 0 20px var(--blood-glow))}
+      35%{filter:drop-shadow(0 0 60px var(--blood))}
+      100%{filter:drop-shadow(0 0 20px var(--blood-glow))}
     }
     .opening-clock{font-family:var(--font-mono);font-size:0.95rem;color:var(--text-dim);letter-spacing:0.04em}
     .opening-date{font-family:var(--font-mono);font-size:0.64rem;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase}
@@ -200,8 +195,7 @@ function renderHome(req, data) {
       .opening-folio{margin:-1.5rem -1rem 0;padding:2rem 1.2rem 1.6rem}
     }
     @media(max-width:480px){
-      .opening-seal{width:78px;height:78px}
-      .opening-seal .os-letter{font-size:1.5rem}
+      .opening-seal{width:78px;height:96px}
       .ledger-line{gap:0.5rem 1.1rem}
     }
   </style>
@@ -224,7 +218,22 @@ function renderHome(req, data) {
         </div>
       </div>
       <div class="opening-right">
-        <div class="opening-seal" id="heroSeal"><span class="os-letter">A</span><span class="os-sub">LOS SANTOS</span></div>
+        <div class="opening-seal" id="heroSeal">
+          <svg viewBox="0 0 220 280" xmlns="http://www.w3.org/2000/svg">
+            <line x1="40" y1="60" x2="138" y2="118" stroke="var(--brass)" stroke-width="3"/>
+            <polygon points="34,46 50,56 40,68 28,58" fill="var(--brass-bright)"/>
+            <line x1="180" y1="60" x2="82" y2="118" stroke="var(--brass)" stroke-width="3"/>
+            <polygon points="186,46 198,58 186,68 174,56" fill="var(--brass-bright)"/>
+            <path d="M78 52 L84 30 L98 46 L110 22 L122 46 L136 30 L142 52 Z" fill="none" stroke="var(--brass)" stroke-width="3"/>
+            <rect x="80" y="50" width="60" height="10" rx="1" fill="none" stroke="var(--brass)" stroke-width="3"/>
+            <path d="M110 56 L172 78 L172 150 Q172 210 110 248 Q48 210 48 150 L48 78 Z" fill="#160B0C" stroke="var(--brass)" stroke-width="3.5"/>
+            <path d="M110 70 L160 88 L160 148 Q160 198 110 230 Q60 198 60 148 L60 88 Z" fill="var(--seal-deep)" stroke="var(--brass-bright)" stroke-width="2"/>
+            <g stroke="var(--brass-bright)" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round" transform="translate(110,158)">
+              <path d="M-6,-46 C2,-52 12,-50 16,-42 C20,-34 18,-26 12,-22 C18,-18 22,-10 20,0 C18,10 10,16 0,18 C-12,20 -22,14 -26,4 L-30,16 L-38,12 L-32,-2 C-36,-6 -38,-12 -36,-18 C-32,-28 -22,-32 -14,-30 C-16,-36 -12,-44 -6,-46 Z"/>
+              <path d="M18,-2 C26,2 30,10 26,18 C22,24 14,24 10,18"/>
+            </g>
+          </svg>
+        </div>
         <div>
           <div class="opening-clock" id="live-clock">--:--:--</div>
           <div class="opening-date" id="live-date"></div>
@@ -339,4 +348,3 @@ function renderHome(req, data) {
 }
 
 module.exports = { renderHome };
-
