@@ -1,5 +1,5 @@
 // styles.js — sdílené CSS (baseStyles) a drobné HTML helpery (ledgerEmpty)
-// Používá se na všech stránkách kromě renderAuth (ten má vlastní izolovaný <style> blok).
+// Redesign: stříbro/platina jako hlavní akcent (místo zlata/mosazi), karmínová zůstává.
 
 function ledgerEmpty(text, compact) {
   return `<div class="ledger-empty${compact ? ' compact' : ''}">
@@ -39,24 +39,24 @@ function baseStyles() {
         --seal-deep:#5C0F0F;
         --blood:#E8231C;
         --blood-glow:rgba(232,35,28,0.35);
-        --brass:#C9A227;
-        --brass-bright:#E0BC4A;
-        --brass-dim:rgba(201,162,39,0.14);
-        --brass-line:rgba(201,162,39,0.30);
-        --vellum:#EAE3D3;
-        --vellum-bright:#F5F0E4;
-        --parchment-dim:#9C9484;
-        --text:#E8E2D5;
-        --text-dim:#9C9484;
-        --text-muted:#6B6358;
-        --text-label:#5A5346;
-        --border:rgba(201,162,39,0.10);
-        --border-hover:rgba(201,162,39,0.24);
+        --brass:#A9B4B8;
+        --brass-bright:#E4ECEE;
+        --brass-dim:rgba(169,180,184,0.16);
+        --brass-line:rgba(169,180,184,0.34);
+        --vellum:#E9EDEE;
+        --vellum-bright:#F7FAFB;
+        --parchment-dim:#9CA3A6;
+        --text:#E2E7E9;
+        --text-dim:#9CA3A6;
+        --text-muted:#6A7174;
+        --text-label:#5A6164;
+        --border:rgba(169,180,184,0.11);
+        --border-hover:rgba(169,180,184,0.28);
         --border-seal:rgba(139,26,26,0.32);
-        --border-brass:rgba(201,162,39,0.28);
-        --gold-dim:rgba(201,162,39,0.10);
-        --true-gold:#C9A227;
-        --true-gold-dim:rgba(201,162,39,0.14);
+        --border-brass:rgba(169,180,184,0.30);
+        --gold-dim:rgba(169,180,184,0.11);
+        --true-gold:#A9B4B8;
+        --true-gold-dim:rgba(169,180,184,0.16);
         --input-bg:#0C0A08;
         --shadow:0 16px 50px rgba(0,0,0,0.75);
         --shadow-card:0 2px 20px rgba(0,0,0,0.5);
@@ -71,7 +71,7 @@ function baseStyles() {
         --money:#3A7D2D;
         --silver:var(--text-dim);
         --silver-bright:var(--text);
-        --silver-dim:rgba(201,162,39,0.05);
+        --silver-dim:rgba(169,180,184,0.06);
         --bg:var(--ink);
         --bg-soft:var(--ink-soft);
         --bg-mid:var(--leather);
@@ -90,10 +90,10 @@ function baseStyles() {
         --seal-deep:#7A1812;
         --blood:#D11F18;
         --blood-glow:rgba(209,31,24,0.22);
-        --brass:#8A6A14;
-        --brass-bright:#A9821C;
-        --brass-dim:rgba(138,106,20,0.10);
-        --brass-line:rgba(138,106,20,0.30);
+        --brass:#52606A;
+        --brass-bright:#37434C;
+        --brass-dim:rgba(82,96,106,0.10);
+        --brass-line:rgba(82,96,106,0.30);
         --ink:#F3EEE3;
         --ink-soft:#ECE5D6;
         --leather:#E6DDC9;
@@ -109,15 +109,15 @@ function baseStyles() {
         --border:rgba(36,31,23,0.10);
         --border-hover:rgba(36,31,23,0.22);
         --border-seal:rgba(161,39,31,0.30);
-        --border-brass:rgba(138,106,20,0.32);
-        --gold-dim:rgba(138,106,20,0.08);
-        --true-gold:#8A6A14;
-        --true-gold-dim:rgba(138,106,20,0.10);
+        --border-brass:rgba(82,96,106,0.32);
+        --gold-dim:rgba(82,96,106,0.08);
+        --true-gold:#52606A;
+        --true-gold-dim:rgba(82,96,106,0.10);
         --input-bg:#FFFFFF;
         --shadow:0 8px 30px rgba(40,30,10,0.10);
         --shadow-card:0 2px 12px rgba(40,30,10,0.07);
         --crimson:var(--seal);--crimson-light:var(--seal-bright);--crimson-glow:var(--seal-glow);--crimson-bright:var(--seal-bright);
-        --silver:var(--text-dim);--silver-bright:var(--text);--silver-dim:rgba(138,106,20,0.05);
+        --silver:var(--text-dim);--silver-bright:var(--text);--silver-dim:rgba(82,96,106,0.05);
         --bg:var(--ink);--bg-soft:var(--ink-soft);--bg-mid:var(--leather);--bg-card:var(--leather2);--bg-card2:var(--leather3);--bg-card3:var(--leather4);
         --gold:var(--brass);--border-silver:var(--border);--border-gold:var(--border-seal);
       }
@@ -181,7 +181,7 @@ function baseStyles() {
         content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         background-image:
           radial-gradient(ellipse 90% 70% at 50% -10%, rgba(139,26,26,0.07), transparent 60%),
-          radial-gradient(ellipse 70% 60% at 100% 110%, rgba(201,162,39,0.04), transparent 60%);
+          radial-gradient(ellipse 70% 60% at 100% 110%, rgba(169,180,184,0.05), transparent 60%);
       }
       body::after{
         content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
@@ -191,7 +191,7 @@ function baseStyles() {
       body.light::before{
         background-image:
           radial-gradient(ellipse 90% 70% at 50% -10%, rgba(161,39,31,0.05), transparent 60%),
-          radial-gradient(ellipse 70% 60% at 100% 110%, rgba(138,106,20,0.05), transparent 60%);
+          radial-gradient(ellipse 70% 60% at 100% 110%, rgba(82,96,106,0.05), transparent 60%);
       }
       body.light::after{box-shadow:inset 0 0 22vw rgba(60,45,20,0.10);opacity:1}
 
@@ -272,7 +272,7 @@ function baseStyles() {
         width:34px;height:34px;
         object-fit:contain;
         transition:transform 0.25s;
-        filter:drop-shadow(0 0 6px rgba(201,162,39,0.25));
+        filter:drop-shadow(0 0 6px rgba(169,180,184,0.35));
       }
       .nav-logo:hover .nav-logo-img{transform:scale(1.06) rotate(-3deg)}
       .nav-logo-text .b-red{color:var(--seal)}
@@ -339,7 +339,7 @@ function baseStyles() {
         flex-shrink:0;outline:none;padding:0;
       }
       .theme-dot-btn:hover{transform:scale(1.25)}
-      .theme-dot-btn.active{border-color:var(--vellum);box-shadow:0 0 0 1px var(--bg),0 0 6px rgba(201,162,39,0.3)}
+      .theme-dot-btn.active{border-color:var(--vellum);box-shadow:0 0 0 1px var(--bg),0 0 6px rgba(169,180,184,0.4)}
       .nav-shortcut-hint{
         font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.05em;
         color:var(--text-muted);border:1px solid var(--border);
@@ -419,7 +419,6 @@ function baseStyles() {
       @media(min-width:881px){
         .nav-overlay,body.nav-locked .nav-overlay{display:none}
       }
-
       /* ── LAYOUT ── */
       main{max-width:1480px;margin:0 auto;padding:2.6rem 2rem 5rem;position:relative;z-index:1}
 
@@ -625,7 +624,6 @@ function baseStyles() {
       .toast.error{border-left-color:var(--seal-bright)}
 
       /* ── TABULKY — ledger rows ── */
-      /* ── TABULKY — true ledger with column rules, not zebra-striped UI tables ── */
       .table-wrap{overflow-x:auto}
       table{width:100%;border-collapse:collapse;font-size:0.86rem;border-top:2px solid var(--brass);border-bottom:2px solid var(--brass)}
       th{
@@ -720,7 +718,6 @@ function baseStyles() {
       }
       .stat-section-label:first-of-type{border-top:none;margin-top:0}
       .stat-item-group{margin-left:0.5rem}
-
       /* ── LORE / HIERARCHY — open-book spread with a spine shadow ── */
       .lore-grid{
         display:grid;grid-template-columns:1fr 320px;gap:0;align-items:start;
@@ -916,7 +913,6 @@ function baseStyles() {
         100%{transform:translateY(0) scale(1)}
       }
       .modal-box.thud{animation:modalThud 0.62s cubic-bezier(0.32,0.04,0.5,1) 1}
-
       /* ── ACTIVITY FEED ── */
       .activity-item{
         display:flex;align-items:flex-start;gap:0.9rem;
@@ -950,7 +946,7 @@ function baseStyles() {
       .quick-actions{display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.5rem}
       .quick-btn{
         display:inline-flex;align-items:center;gap:0.5rem;
-        padding:0.6rem 1.2rem;background:rgba(201,162,39,0.03);
+        padding:0.6rem 1.2rem;background:rgba(169,180,184,0.04);
         border:1px solid var(--border);color:var(--text-dim);
         font-size:0.64rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:600;
         text-decoration:none;transition:all 0.2s;
@@ -1088,13 +1084,11 @@ function baseStyles() {
       .ledger-empty.compact{padding:1.1rem 0.5rem;gap:0.6rem}
       .ledger-empty.compact svg{width:42px;height:32px}
       .ledger-empty.compact .ledger-empty-text{font-size:0.76rem}
-
       /* ══════════════════════════════════════════════════════════════════
          FOLIO SYSTEM — the page-as-document primitives.
          Not dashboard widgets: a register you read, not a grid you scan.
          ══════════════════════════════════════════════════════════════════ */
 
-      /* ── Oversized figures — the number does the talking ── */
       .folio-mega{
         font-family:var(--font-display);
         font-weight:600;
@@ -1111,7 +1105,6 @@ function baseStyles() {
       }
       .folio-mega.seal-tint{color:var(--seal-bright)}
 
-      /* ── Marginalia — small annotations that live in the margin, not in a box ── */
       .marginalia{
         font-family:var(--font-mono);
         font-size:0.68rem;
@@ -1126,14 +1119,12 @@ function baseStyles() {
       .marginalia .m-line:last-child{border-bottom:none}
       .marginalia .m-line .m-val{color:var(--vellum);font-weight:500}
 
-      /* ── Folio rule — a full-bleed line like a newspaper column break ── */
       .folio-rule{
         height:1px;background:linear-gradient(90deg,var(--seal) 0%,var(--border) 40%,var(--border) 60%,var(--brass) 100%);
         opacity:0.4;margin:2.5rem 0;
       }
       .folio-rule.tight{margin:1.4rem 0;opacity:0.25}
 
-      /* ── Folio label — small caps running head, like a chapter marker ── */
       .folio-label{
         font-family:var(--font-mono);
         font-size:0.64rem;letter-spacing:0.3em;text-transform:uppercase;
@@ -1142,7 +1133,6 @@ function baseStyles() {
       }
       .folio-label::after{content:'';flex:1;height:1px;background:var(--border);margin-top:1px}
 
-      /* ── Asymmetric two-column folio — text dominant, figures in margin ── */
       .folio-spread{
         display:grid;
         grid-template-columns:1fr 280px;
@@ -1151,7 +1141,6 @@ function baseStyles() {
       }
       .folio-spread.reverse{grid-template-columns:280px 1fr}
 
-      /* ── Drop-stat — a number that overlaps its own label, no box around it ── */
       .drop-stat{position:relative;padding-top:0.3rem}
       .drop-stat-label{
         font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.18em;
@@ -1165,7 +1154,6 @@ function baseStyles() {
       }
       .drop-stat-sub{font-family:var(--font-mono);font-size:0.66rem;color:var(--text-muted);margin-top:0.4rem}
 
-      /* ── Seal-anchor — the wax seal as a structural element bridging two blocks ── */
       .seal-anchor{
         width:56px;height:56px;border-radius:50%;flex-shrink:0;
         border:1.5px solid var(--brass);
@@ -1177,7 +1165,6 @@ function baseStyles() {
       }
       .seal-anchor::before{content:'';position:absolute;inset:5px;border-radius:50%;border:1px solid var(--border-brass)}
 
-      /* ── Manifest row — a ledger line with running dots, like a table of contents ── */
       .manifest-row{
         display:flex;align-items:baseline;gap:0.6rem;
         padding:0.85rem 0;border-bottom:1px solid var(--border);
@@ -1189,7 +1176,6 @@ function baseStyles() {
       .manifest-row .mr-val{font-family:var(--font-mono);color:var(--text-dim);flex-shrink:0;font-size:0.85rem}
       .manifest-row:hover .mr-name{color:var(--seal-bright)}
 
-      /* ── Manifest column — the heading above a manifest-row group ── */
       .manifest-col{padding-top:0.2rem}
       .manifest-col-head{
         display:flex;align-items:baseline;justify-content:space-between;
@@ -1199,11 +1185,9 @@ function baseStyles() {
       .manifest-col-count{font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted)}
       .manifest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 2.6rem}
 
-      /* ── Folio panel — replaces .card for document-style sections (no box, just rule) ── */
       .folio-panel{position:relative;padding-top:0.5rem}
       .folio-panel + .folio-panel{margin-top:2.2rem}
 
-      /* ── Ledger bar — a hand-ruled bar chart row, not a UI progress bar ── */
       .ledger-bar-row{
         display:grid;grid-template-columns:1fr 2.6fr auto;gap:1rem;
         align-items:baseline;padding:0.55rem 0;border-bottom:1px solid var(--border);
@@ -1215,7 +1199,6 @@ function baseStyles() {
       .ledger-bar-fill::after{content:'';position:absolute;right:-1px;top:0;bottom:0;width:1px;background:var(--brass-bright)}
       .ledger-bar-val{font-family:var(--font-mono);font-size:0.82rem;color:var(--vellum);text-align:right;white-space:nowrap}
 
-      /* ── Report figure row — replaces the 4-box "Today/Week/Month/Total" card strip ── */
       .report-figures{
         display:grid;grid-template-columns:repeat(4,1fr);gap:0;
         border-top:1px solid var(--border-brass);border-bottom:1px solid var(--border-brass);
@@ -1227,7 +1210,6 @@ function baseStyles() {
       .report-figure-net{font-family:var(--font-display);font-weight:700;font-size:1.5rem;line-height:1;margin-bottom:0.55rem}
       .report-figure-line{display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-dim);padding:0.12rem 0;font-family:var(--font-mono)}
 
-      /* ── Recommendation entry — replaces the boxed .bb-tip ── */
       .recommendation{
         display:flex;gap:1rem;align-items:flex-start;
         padding:0.9rem 0;border-bottom:1px solid var(--border);
@@ -1242,7 +1224,6 @@ function baseStyles() {
       .recommendation-cat{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:0.3rem}
       .recommendation-text{font-size:0.86rem;color:var(--vellum);line-height:1.7}
 
-      /* ── Report section — replaces tab-button bar with a folio running-head selector ── */
       .report-nav{display:flex;flex-wrap:wrap;gap:0 2rem;margin-bottom:0.4rem;border-bottom:1px solid var(--border)}
       .report-nav-item{
         font-family:var(--font-mono);font-size:0.66rem;letter-spacing:0.1em;text-transform:uppercase;
@@ -1287,9 +1268,14 @@ function baseStyles() {
         font-family:var(--font-mono);
       }
 
+      /* ── CREST SIGNATURE — shared heraldic mark used on hero/login ── */
+      .crest-mark svg{display:block}
+      .crest-mark .cm-shield{fill:var(--seal-deep);stroke:var(--brass);stroke-width:1.4}
+      .crest-mark .cm-lion{fill:none;stroke:var(--brass-bright);stroke-width:1.3;stroke-linejoin:round;stroke-linecap:round}
+      .crest-mark .cm-crown{fill:none;stroke:var(--brass);stroke-width:1.2}
+
     </style>
   `;
 }
 
 module.exports = { baseStyles, ledgerEmpty };
-
