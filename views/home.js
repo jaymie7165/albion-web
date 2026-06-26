@@ -276,7 +276,7 @@ function renderHome(req, data) {
 
       <!-- Erb -->
       <div class="home-crest" id="homeCrest">
-        <img src="/logo.png" alt="Albion" style="width:100%;height:100%;object-fit:contain;display:block">
+        <img src="/logo.png" alt="Albion" style="width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:lighten;filter:drop-shadow(0 0 28px rgba(110,20,35,0.7))">
       </div>
 
       <div class="home-eyebrow">Los Santos · Interní rejstřík</div>
