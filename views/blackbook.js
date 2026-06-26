@@ -159,7 +159,7 @@ function renderBlackbook(req) {
       h+='<div class="folio-label">Členové dle aktivity</div><div style="height:1rem"></div>';
       h+=tbl([{t:'Člen'},{t:'Poslední aktivita'},{t:'Zdroj'},{t:'Web login'},{t:'Stav',r:true},{t:'Pohyby',r:true},{t:'Vklady/Výběry',r:true},{t:'Vklad SAD',r:true}],
         a.members.map(m=>[
-          esc(m.member)+(m.discord?'<span style="color:var(--ivory-faint);font-size:0.7rem;font-family:var(--font-mono)"> '+esc(m.discord)+'</span>':''),
+          esc(m.member),
           m.lastCas?esc(m.lastCas):'<span style="color:var(--ivory-faint)">nikdy</span>',
           m.lastZdroj?'<span style="color:var(--ivory-faint);font-size:0.7rem">'+esc(m.lastZdroj)+'</span>':'—',
           m.lastWebLoginCas?'<span style="color:var(--ivory-dim);font-size:0.72rem">'+esc(m.lastWebLoginCas)+'</span>':'<span style="color:var(--ivory-faint)">—</span>',
