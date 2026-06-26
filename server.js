@@ -11,8 +11,6 @@ const db      = require('./db');
 const sheets  = require('./sheets');
 
 const discord = require('./discord');
-const { notifyGarageAdd } = require('./commands/garaz');
-const clientStore          = require('./discord-client');
 const { requireAuth } = require('./middleware/auth');
 
 const { CONFIG, WEED_PLANT } = require('./constants');
@@ -32,6 +30,7 @@ const { renderAuth } = require('./views/auth');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
+app.set('trust proxy', 1); // Railway běží appku za reverse proxy — potřebujeme správně detekovat https pro veřejné URL (např. fotky vozů pro Discord embed)
 
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
@@ -607,10 +606,11 @@ app.post('/api/garage', requireAuth, (req, res) => {
   cars.push(car);
   saveGarage(cars);
   broadcastSSE('garageUpdate', { action: 'add', car: { spz: car.spz, nazev: car.nazev } });
-  try {
-    const discordClient = clientStore.getClient();
-    if (discordClient) notifyGarageAdd(discordClient, car);
-  } catch (e) { console.error('[GARAZ DISCORD]', e.message); }
+
+  const imageUrl = car.image ? `${req.protocol}://${req.get('host')}${car.image}` : null;
+  discord.notifyGarage(car, req.session.icName, req.session.discordUsername, imageUrl)
+    .catch(e => console.error('[DISCORD GARAGE]', e.message));
+
   res.json({ ok: true, car });
 });
 
