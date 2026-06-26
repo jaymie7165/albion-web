@@ -53,4 +53,20 @@ db.setLastLogin = (id, iso) => {
   return false;
 };
 
+
+// Uloží pole discord aliasů (jména co bot zapisuje do sheetu) jako JSON string
+db.setAliases = (id, aliasesArray) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.discord_aliases = JSON.stringify(aliasesArray); save(users); return true; }
+  return false;
+};
+
+// Aktualizuje IC jméno uživatele
+db.updateIcName = (id, ic_name) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.ic_name = ic_name; save(users); return true; }
+  return false;
+};
 module.exports = db;
