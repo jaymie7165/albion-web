@@ -1,7 +1,7 @@
 // audit.js — Albion v3
 
-const { baseStyles } = require('./styles');
-const { renderNav } = require('./nav');
+const { baseStyles } = require('../styles');
+const { renderNav } = require('../nav');
 
 function renderAudit(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
