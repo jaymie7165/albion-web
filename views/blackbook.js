@@ -1,7 +1,7 @@
 // blackbook.js — Albion v3 · Heraldický blackbook
 
-const { baseStyles } = require('./styles');
-const { renderNav } = require('./nav');
+const { baseStyles } = require('../styles');
+const { renderNav } = require('../nav');
 
 function renderBlackbook(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
