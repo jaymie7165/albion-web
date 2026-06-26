@@ -1,7 +1,7 @@
 // home.js — Albion v3 · Heraldická hlavní stránka
 
-const { baseStyles, ledgerEmpty } = require('./styles');
-const { renderNav } = require('./nav');
+const { baseStyles, ledgerEmpty } = require('../styles');
+const { renderNav } = require('../nav');
 
 function renderHome(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky } = data;
