@@ -66,6 +66,29 @@ async function notifyChemky(typ, chemikalie, mnozstvi, uzivatel) {
   await sendEmbed(channelId, { title: typ === 'VKLAD' ? '⚗️ VLOŽENO DO SKLADU (web)' : '⚗️ VYBRÁNO ZE SKLADU (web)', color, fields, timestamp: new Date().toISOString() });
 }
 
+async function notifyGarage(car, uzivatel, discordUsername, imageUrl) {
+  const channelId = process.env.CHANNEL_GARAZ || '1518526763641212968';
+  const fields = [
+    { name: '🔑 SPZ', value: car.spz || '—', inline: true },
+    { name: '🚙 Model', value: car.nazev || '—', inline: true },
+    { name: '💰 Cena', value: car.cena != null ? `$${Number(car.cena).toLocaleString('cs-CZ')} SAD` : '—', inline: true },
+    { name: '🧾 Koupil', value: car.kupil || '—', inline: true },
+    { name: '📋 Přidal', value: car.pridal || uzivatel || '—', inline: true },
+  ];
+  if (car.ucel) fields.push({ name: '📝 Účel / poznámka', value: car.ucel, inline: false });
+  fields.push({ name: '👤 Zadal', value: discordUsername ? `${uzivatel}\n(@${discordUsername})` : uzivatel, inline: true });
+
+  const embed = {
+    title: '🚗 NOVÝ VŮZ PŘIDÁN DO GARÁŽE (web)',
+    color: 0xC9A84C,
+    fields,
+    timestamp: new Date().toISOString(),
+  };
+  if (imageUrl) embed.image = { url: imageUrl };
+
+  await sendEmbed(channelId, embed);
+}
+
 async function notifyUcet(typ, castka, valuta, poznamka, uzivatel) {
   const channelId = process.env.CHANNEL_UCETNICTVI;
   const color = typ === 'PŘÍJEM' ? 0x00FF88 : 0xFF4444;
@@ -166,4 +189,4 @@ async function isUserOnServer(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyUcet, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer };
