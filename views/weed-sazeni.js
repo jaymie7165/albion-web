@@ -1,8 +1,8 @@
 // weed-sazeni.js — Albion v3 · Heraldický weed sázení
 
-const { baseStyles } = require('./styles');
-const { renderNav } = require('./nav');
-const { WEED_PLANT } = require('./constants');
+const { baseStyles } = require('../styles');
+const { renderNav } = require('../nav');
+const { WEED_PLANT } = require('../constants');
 
 function renderWeedSazeni(req) {
   const icName = req.session.icName;
