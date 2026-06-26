@@ -11,6 +11,8 @@ const db      = require('./db');
 const sheets  = require('./sheets');
 
 const discord = require('./discord');
+const { notifyGarageAdd } = require('./commands/garaz');
+const clientStore          = require('./discord-client');
 const { requireAuth } = require('./middleware/auth');
 
 const { CONFIG, WEED_PLANT } = require('./constants');
@@ -605,6 +607,10 @@ app.post('/api/garage', requireAuth, (req, res) => {
   cars.push(car);
   saveGarage(cars);
   broadcastSSE('garageUpdate', { action: 'add', car: { spz: car.spz, nazev: car.nazev } });
+  try {
+    const discordClient = clientStore.getClient();
+    if (discordClient) notifyGarageAdd(discordClient, car);
+  } catch (e) { console.error('[GARAZ DISCORD]', e.message); }
   res.json({ ok: true, car });
 });
 
