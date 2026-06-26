@@ -83,6 +83,7 @@ function renderNav(req, active) {
         </div>
         <span class="nav-shortcut-hint" title="g+h Přehled · g+s Sklad · g+b Blackbook · g+a Audit · g+n Nástěnka · / Hledat">g·_</span>
         <span class="nav-user">člen &nbsp;<strong>${ic}</strong></span>
+        <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
       </div>
     </nav>
