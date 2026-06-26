@@ -100,6 +100,51 @@ function baseStyles() {
         --money:#3A7D2D;
       }
 
+      /* ── SVĚTLÝ REŽIM — Pergamen ── */
+      body.light{
+        --noir:#F3EEE3;
+        --panel:#EDE5D4;
+        --panel2:#E5DBС8;
+        --panel2:#E5DBC8;
+        --panel3:#DDD3BD;
+        --panel4:#D4C9B0;
+        --oxblood:#6E1423;
+        --oxblood-bright:#8B1A2D;
+        --oxblood-glow:rgba(110,20,35,0.18);
+        --oxblood-faint:rgba(110,20,35,0.08);
+        --brass:#8B6325;
+        --brass-bright:#6B4A18;
+        --brass-dim:rgba(139,99,37,0.25);
+        --brass-faint:rgba(139,99,37,0.10);
+        --ivory:#1A1410;
+        --ivory-dim:#3D3020;
+        --ivory-faint:#5C4A30;
+        --border:rgba(139,99,37,0.20);
+        --border-hover:rgba(139,99,37,0.40);
+        --border-brass:rgba(139,99,37,0.35);
+        --border-oxblood:rgba(110,20,35,0.30);
+        --input-bg:rgba(255,252,245,0.90);
+        --shadow:0 8px 32px rgba(0,0,0,0.15);
+        --shadow-card:0 2px 12px rgba(0,0,0,0.10);
+        background:var(--noir);
+        color:var(--ivory);
+      }
+      body.light::before{
+        background:
+          radial-gradient(ellipse 70% 50% at 50% 0%, rgba(139,99,37,0.08), transparent 60%),
+          radial-gradient(ellipse 60% 60% at 100% 100%, rgba(110,20,35,0.06), transparent 60%);
+      }
+      body.light::after{box-shadow:inset 0 0 18vw rgba(0,0,0,0.06)}
+      body.light nav{background:rgba(237,229,212,0.97)}
+      body.light select,body.light input[type=text],body.light input[type=number],body.light textarea{
+        background:var(--input-bg);color:var(--ivory);
+      }
+      body.light .card{background:var(--panel2)}
+      body.light .modal-box{background:var(--panel2)}
+      body.light .nav-dropdown-menu{background:rgba(237,229,212,0.98)}
+      body.light ::-webkit-scrollbar-track{background:var(--panel)}
+      body.light ::-webkit-scrollbar-thumb{background:var(--oxblood)}
+
       html{scroll-behavior:smooth}
       body{
         background:var(--noir);
