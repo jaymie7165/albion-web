@@ -92,9 +92,10 @@ function renderAuth(page, error, data) {
         display:flex;flex-direction:column;align-items:center;
         gap:0;
       }
-      .herald-crest svg{
-        width:min(240px,30vw);height:auto;
-        filter:drop-shadow(0 0 30px var(--oxblood-glow));
+      .herald-crest img{
+        width:min(220px,28vw);height:auto;
+        mix-blend-mode:lighten;
+        filter:drop-shadow(0 0 30px rgba(110,20,35,0.7));
         animation:crestAmbient 4s ease-in-out infinite;
       }
       @keyframes crestAmbient{
@@ -227,11 +228,11 @@ function renderAuth(page, error, data) {
         text-align:center;
       }
       .boot-crest{
-        width:80px;height:80px;
+        width:110px;height:110px;
         display:flex;align-items:center;justify-content:center;
         position:relative;
       }
-      .boot-crest img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 16px rgba(110,20,35,0.5));animation:crestAmbient 2s ease-in-out infinite}
+      .boot-crest img{width:100%;height:100%;object-fit:contain;mix-blend-mode:lighten;filter:drop-shadow(0 0 24px rgba(110,20,35,0.7));animation:crestAmbient 2s ease-in-out infinite}
       .boot-lines{
         width:min(560px,90vw);
         font-family:var(--font-mono);font-size:0.76rem;line-height:2.1;
