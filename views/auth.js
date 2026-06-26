@@ -1,355 +1,452 @@
-// auth.js — extracted view module
+// auth.js — Albion v3 · Heraldická autentizace
 
 function renderAuth(page, error, data) {
   const errors = {
     no_code: 'Discord autorizace selhala.',
-    not_on_server: 'Nejsi členem aplikace serveru Albion.',
-    already_registered: 'Tento Discord účet je již registrován.',
-    not_registered: 'Nemáš účet. Zaregistruj se nejdřív.',
+    not_on_server: 'Nejsi členem serveru Albion.',
+    already_registered: 'Tento Discord účet je již v rejstříku.',
+    not_registered: 'Nemáš záznam v rejstříku. Zaregistruj se.',
     auth_failed: 'Přihlášení selhalo. Zkus to znovu.',
-    not_found: 'Účet nenalezen.',
+    not_found: 'Záznam nenalezen.',
     wrong_password: 'Špatné heslo.',
     missing: 'Vyplň všechna pole.',
     password_mismatch: 'Hesla se neshodují.',
     password_short: 'Heslo musí mít alespoň 6 znaků.',
     exists: 'Účet již existuje.',
   };
-  const errMsg = error && errors[error] ? `<div class="auth-alert">${errors[error]}</div>` : '';
-  const successReg = page === 'login' ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Registrace proběhla úspěšně. Přihlaš se.';document.querySelector('.auth-form-col').prepend(a);}<\/script>` : '';
+  const errMsg = error && errors[error]
+    ? `<div class="auth-alert">${errors[error]}</div>`
+    : '';
+  const successReg = page === 'login'
+    ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Registrace proběhla úspěšně. Přihlaš se.';document.querySelector('.auth-body').prepend(a);}<\/script>`
+    : '';
 
   const style = `
     <link rel="icon" type="image/png" href="/logo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,500;1,9..144,600&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,600;0,6..96,700;0,6..96,800;0,6..96,900;1,6..96,600;1,6..96,700&family=Cinzel:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700&display=swap" rel="stylesheet">
     <style>
       *{margin:0;padding:0;box-sizing:border-box}
       :root{
-        --seal:#8B1A1A;--seal-bright:#B23B3B;--seal-glow:rgba(139,26,26,0.20);
-        --blood:#E8231C;--blood-glow:rgba(232,35,28,0.35);
-        --brass:#C9A227;--brass-bright:#E0BC4A;
-        --border-seal:rgba(139,26,26,0.30);
-        --font-display:'Fraunces',serif;
-        --font-mono:'JetBrains Mono',monospace;
+        --noir:#0B0F0D;
+        --panel:#10150F;
+        --panel2:#141A14;
+        --oxblood:#6E1423;
+        --oxblood-bright:#A33049;
+        --oxblood-glow:rgba(110,20,35,0.28);
+        --brass:#B68A4E;
+        --brass-bright:#E0BD7F;
+        --brass-dim:rgba(182,138,78,0.22);
+        --brass-faint:rgba(182,138,78,0.10);
+        --ivory:#EDE6D4;
+        --ivory-dim:#B7AE99;
+        --ivory-faint:#7E7868;
+        --border:rgba(182,138,78,0.18);
+        --border-brass:rgba(182,138,78,0.32);
+        --border-oxblood:rgba(110,20,35,0.40);
+        --font-display:'Bodoni Moda',serif;
+        --font-label:'Cinzel',serif;
+        --font-mono:'Space Mono',monospace;
       }
       html,body{height:100%}
       body{
-        background-color:#070605;
-        color:#E8E2D5;
-        font-family:'Inter',sans-serif;font-weight:300;
+        background:var(--noir);
+        color:var(--ivory);
+        font-family:'Jost',sans-serif;font-weight:300;
         min-height:100vh;
         position:relative;overflow-x:hidden;
-        animation:authBodyFlicker 0.7s linear;
+        animation:authIn 0.5s ease-out;
       }
-      @keyframes authBodyFlicker{0%{opacity:0}6%{opacity:1}10%{opacity:0.4}15%{opacity:1}100%{opacity:1}}
+      @keyframes authIn{from{opacity:0}to{opacity:1}}
 
-      /* leather-and-candlelight ambient, asymmetric — light source from the left where the seal sits */
+      /* Heraldický ambient */
       body::before{
-        content:'';position:fixed;inset:0;z-index:0;
+        content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         background:
-          radial-gradient(ellipse 50% 70% at 12% 45%, rgba(201,162,39,0.13) 0%, transparent 60%),
-          radial-gradient(ellipse 60% 50% at 100% 0%, rgba(139,26,26,0.10) 0%, transparent 55%),
-          radial-gradient(ellipse 70% 60% at 50% 110%, rgba(5,4,3,0.8) 0%, transparent 65%);
-        pointer-events:none;
+          radial-gradient(ellipse 70% 50% at 50% 0%, rgba(182,138,78,0.08), transparent 60%),
+          radial-gradient(ellipse 60% 60% at 100% 100%, rgba(110,20,35,0.10), transparent 60%);
       }
-      .bg-grid{
-        position:fixed;inset:0;z-index:0;
-        background-image:
-          linear-gradient(rgba(201,162,39,0.014) 1px,transparent 1px),
-          linear-gradient(90deg,rgba(201,162,39,0.009) 1px,transparent 1px);
-        background-size:100px 100px;
-        pointer-events:none;
-        animation:gridDrift 70s linear infinite;
+      body::after{
+        content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+        box-shadow:inset 0 0 20vw rgba(0,0,0,0.70);
       }
-      @keyframes gridDrift{from{background-position:0 0}to{background-position:100px 100px}}
 
-      /* ── FRONTISPIECE LAYOUT — asymmetric title page, not a centered card ── */
-      .frontispiece{
+      /* ── LAYOUT — symetrický dvoudílný ── */
+      .auth-page{
         position:relative;z-index:1;
         min-height:100vh;
         display:grid;
         grid-template-columns:1fr 1px 460px;
         align-items:center;
       }
-      .auth-seal-col{
+
+      /* ── LEVÁ ČÁST — heraldický erb + motto ── */
+      .auth-herald{
         display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
         padding:3rem 5vw;text-align:right;
-        gap:2.2rem;
+        gap:2.8rem;
       }
-      .auth-seal-monolith{
-        width:min(220px,28vw);height:min(220px,28vw);border-radius:50%;
-        border:2px solid var(--brass);position:relative;
-        display:flex;align-items:center;justify-content:center;flex-direction:column;
-        box-shadow:0 0 0 10px #070605, 0 0 90px var(--blood-glow), 0 0 30px var(--seal-glow);
-        animation:sealBreathe 3.2s ease-in-out infinite;
-        background:radial-gradient(circle at 32% 28%, rgba(232,35,28,0.10), transparent 65%);
+      .herald-crest{
+        position:relative;
+        display:flex;flex-direction:column;align-items:center;
+        gap:0;
       }
-      .auth-seal-monolith::before{content:'';position:absolute;inset:14px;border-radius:50%;border:1px solid rgba(201,162,39,0.4)}
-      .auth-seal-monolith::after{content:'';position:absolute;inset:26px;border-radius:50%;border:1px dotted rgba(201,162,39,0.25)}
-      .auth-seal-letter{font-family:var(--font-display);font-weight:800;font-size:min(5rem,11vw);color:var(--brass-bright);line-height:1;text-shadow:0 0 30px rgba(201,162,39,0.5)}
-      .auth-seal-sub{font-family:var(--font-mono);font-size:0.56rem;letter-spacing:0.32em;color:var(--brass);opacity:0.85;margin-top:0.3rem}
-      @keyframes sealBreathe{
-        0%,100%{box-shadow:0 0 0 10px #070605,0 0 70px var(--blood-glow),0 0 20px var(--seal-glow)}
-        50%{box-shadow:0 0 0 10px #070605,0 0 130px var(--blood-glow),0 0 50px var(--blood)}
+      .herald-crest svg{
+        width:min(240px,30vw);height:auto;
+        filter:drop-shadow(0 0 30px var(--oxblood-glow));
+        animation:crestAmbient 4s ease-in-out infinite;
       }
-      .auth-tagline{
+      @keyframes crestAmbient{
+        0%,100%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}
+        50%{filter:drop-shadow(0 0 40px var(--oxblood-glow))}
+      }
+      .herald-crest.slam svg{animation:crestSlam 0.5s ease-out 1}
+      @keyframes crestSlam{
+        0%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}
+        30%{filter:drop-shadow(0 0 80px rgba(163,48,73,0.9))}
+        100%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}
+      }
+      .herald-motto{
         font-family:var(--font-display);font-style:italic;font-weight:500;
-        font-size:1.15rem;color:#9C9484;max-width:340px;line-height:1.55;
+        font-size:1.1rem;color:var(--ivory-dim);max-width:340px;line-height:1.65;
+        text-align:right;
       }
-      .auth-tagline strong{color:var(--blood);font-style:normal;font-weight:700;text-shadow:0 0 20px var(--blood-glow)}
-      .frontispiece-rule{
-        width:1px;height:62vh;background:linear-gradient(180deg,transparent,var(--blood) 20%,var(--brass) 50%,var(--blood) 80%,transparent);
+      .herald-motto strong{color:var(--oxblood-bright);font-style:normal;font-weight:700}
+
+      /* Vertikální dělicí čára */
+      .auth-divider-line{
+        width:1px;height:65vh;
+        background:linear-gradient(180deg,transparent,var(--oxblood) 20%,var(--brass) 50%,var(--oxblood) 80%,transparent);
         opacity:0.6;justify-self:center;
       }
 
-      .auth-form-col{padding:3rem 5vw;width:100%;max-width:460px}
+      /* ── PRAVÁ ČÁST — formulář ── */
+      .auth-body{
+        padding:3rem 5vw;width:100%;max-width:460px;
+      }
       .auth-eyebrow{
-        font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.3em;text-transform:uppercase;
-        color:var(--blood);margin-bottom:0.9rem;font-weight:700;text-shadow:0 0 16px var(--blood-glow);
+        font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.32em;text-transform:uppercase;
+        color:var(--brass);margin-bottom:1rem;font-weight:600;
       }
       .auth-h1{
-        font-family:var(--font-display);font-weight:700;font-size:clamp(1.8rem,4vw,2.3rem);
-        color:#F5F0E4;letter-spacing:0.005em;line-height:1.1;margin-bottom:0.6rem;
+        font-family:var(--font-display);font-weight:700;font-style:italic;
+        font-size:clamp(1.9rem,4vw,2.6rem);color:var(--ivory);line-height:1.05;margin-bottom:0.6rem;
+        letter-spacing:0.01em;
       }
-      .auth-h1 .b-red{color:var(--blood);text-shadow:0 0 24px var(--blood-glow)}
-      .auth-subcopy{font-size:0.86rem;color:#9C9484;line-height:1.7;margin-bottom:2rem;max-width:380px}
+      .auth-h1 .b-brass{color:var(--brass-bright)}
+      .auth-subcopy{font-size:0.86rem;color:var(--ivory-faint);line-height:1.8;margin-bottom:2.2rem;max-width:360px}
 
+      /* Upozornění */
+      .auth-alert{
+        padding:0.85rem 1rem;
+        background:rgba(110,20,35,0.10);
+        border:1px solid var(--border-oxblood);
+        border-left:2px solid var(--oxblood);
+        font-size:0.78rem;margin-bottom:1.5rem;color:var(--oxblood-bright);
+        font-family:var(--font-mono);
+      }
+      .auth-success{background:rgba(58,125,45,0.08);border-color:rgba(58,125,45,0.28);border-left-color:#6FBF52;color:#7DC568}
+
+      /* Hlavní akční tlačítko */
       .auth-btn{
-        display:block;width:100%;padding:1rem;
-        background:var(--blood);
-        color:#FFF7EE;border:1px solid var(--blood);
-        font-family:var(--font-mono);font-size:0.68rem;
-        letter-spacing:0.22em;text-transform:uppercase;font-weight:700;
+        display:block;width:100%;padding:1rem 1.5rem;
+        background:transparent;
+        color:var(--ivory);border:1px solid var(--oxblood);
+        font-family:var(--font-label);font-size:0.62rem;
+        letter-spacing:0.24em;text-transform:uppercase;font-weight:600;
         cursor:pointer;text-decoration:none;text-align:center;
         margin-top:0.8rem;
-        transition:opacity 0.2s,box-shadow 0.2s;border-radius:3px;
+        transition:background 0.2s,box-shadow 0.2s,border-color 0.2s;
         position:relative;overflow:hidden;
-        box-shadow:0 0 30px var(--blood-glow);
       }
-      .auth-btn:hover{opacity:0.9;box-shadow:0 0 44px var(--blood-glow)}
-      .auth-btn:active{opacity:1}
+      .auth-btn:hover{background:var(--oxblood);box-shadow:0 0 28px var(--oxblood-glow)}
       .auth-btn.secondary{
-        background:transparent;border:1px solid rgba(201,162,39,0.18);
-        color:#9C9484;box-shadow:none;
+        background:transparent;border:1px solid var(--border-brass);
+        color:var(--ivory-faint);box-shadow:none;
       }
-      .auth-btn.secondary:hover{color:#E8E2D5;border-color:rgba(201,162,39,0.32);background:rgba(201,162,39,0.04);opacity:1;box-shadow:none}
+      .auth-btn.secondary:hover{color:var(--ivory);border-color:var(--brass);background:var(--brass-faint);box-shadow:none}
+
+      /* Sweep animace na tlačítku */
+      .auth-btn::after{
+        content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);
+        animation:btnSweep 3.5s ease-in-out 1.5s infinite;
+      }
+      @keyframes btnSweep{0%,55%{left:-100%}100%{left:200%}}
+
+      /* Inputy */
       .auth-input{
         display:block;width:100%;
         padding:0.85rem 1rem;
-        background:rgba(0,0,0,0.35);
-        border:1px solid rgba(201,162,39,0.16);
-        color:#E8E2D5;font-family:'Inter',sans-serif;font-size:0.84rem;
-        margin-bottom:0.8rem;outline:none;border-radius:3px;
-        transition:border-color 0.2s;
+        background:rgba(11,15,13,0.85);
+        border:1px solid var(--border-brass);
+        color:var(--ivory);font-family:'Jost',sans-serif;font-size:0.86rem;font-weight:300;
+        margin-bottom:0.8rem;outline:none;
+        transition:border-color 0.2s,box-shadow 0.2s;
       }
-      .auth-input:focus{border-color:rgba(201,162,39,0.5)!important;box-shadow:0 0 0 2px rgba(201,162,39,0.08),0 0 12px rgba(201,162,39,0.12)!important}
-      .auth-label{display:block;font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:#9C9484;margin-bottom:0.4rem;font-family:var(--font-mono);font-weight:600}
-      .auth-alert{
-        padding:0.8rem 1rem;
-        background:var(--seal-glow);
-        border:1px solid var(--border-seal);
-        border-left:2px solid var(--seal);
-        font-size:0.78rem;margin-bottom:1.5rem;color:#D89B9B;
-      }
-      .auth-success{background:rgba(111,191,82,0.08);border-color:rgba(111,191,82,0.25);border-left-color:#6FBF52;color:#9BD686}
-      .auth-divider{
-        text-align:left;font-size:0.6rem;letter-spacing:0.26em;
-        text-transform:uppercase;color:#5A5346;margin:1.4rem 0;
-        position:relative;font-family:var(--font-mono);
-        display:flex;align-items:center;gap:1rem;
-      }
-      .auth-divider::after{content:'';flex:1;height:1px;background:rgba(201,162,39,0.12)}
-      .auth-sep{height:1px;background:rgba(201,162,39,0.08);margin:1.2rem 0}
+      .auth-input:focus{border-color:var(--brass);box-shadow:0 0 0 2px var(--brass-faint)}
+      .auth-label{font-family:var(--font-label);display:block;font-size:0.56rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem;font-weight:500}
 
-      .auth-status-bar{
-        display:inline-flex;align-items:center;gap:0.6rem;margin-bottom:1.8rem;padding:0.5rem 0.85rem;
-        background:rgba(201,162,39,0.07);border:1px solid rgba(201,162,39,0.22);
-        font-family:var(--font-mono);font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass-bright);
+      /* Oddělovač */
+      .auth-sep-line{
+        display:flex;align-items:center;gap:1rem;margin:1.4rem 0;
+        font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--ivory-faint);
       }
-      .auth-status-dot{width:6px;height:6px;border-radius:50%;background:var(--seal);box-shadow:0 0 8px var(--seal);animation:authDotPulse 1.8s ease-in-out infinite;flex-shrink:0}
-      @keyframes authDotPulse{0%,100%{box-shadow:0 0 4px var(--seal)}50%{box-shadow:0 0 12px var(--seal),0 0 20px rgba(139,26,26,0.35)}}
-      .auth-btn::before{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.10),transparent);animation:btnSweep 3.2s ease-in-out 2s infinite}
-      @keyframes btnSweep{0%,60%{left:-100%}100%{left:220%}}
+      .auth-sep-line::before,.auth-sep-line::after{content:'';flex:1;height:1px;background:var(--border)}
 
-      @keyframes authReveal{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:translateY(0)}}
-      .auth-h1{animation:authReveal 0.6s ease-out 1}
-      .auth-reveal{transition:opacity 0.7s ease}
-      body.booting .auth-reveal{opacity:0}
-
-      @media(max-width:900px){
-        .frontispiece{grid-template-columns:1fr;display:flex;flex-direction:column;padding:3rem 0 2.5rem}
-        .auth-seal-col{align-items:center;text-align:center;padding:1.5rem 6vw 0.5rem}
-        .frontispiece-rule{display:none}
-        .auth-form-col{margin:0 auto;padding:2rem 6vw}
-        .auth-tagline{max-width:100%}
+      /* Status pečeť */
+      .auth-seal-status{
+        display:inline-flex;align-items:center;gap:0.6rem;margin-bottom:2rem;
+        padding:0.45rem 0.9rem;
+        background:var(--brass-faint);border:1px solid var(--border-brass);
+        font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass);
       }
+      .auth-seal-dot{width:5px;height:5px;background:var(--oxblood);flex-shrink:0;animation:sealDotPulse 2s ease-in-out infinite}
+      @keyframes sealDotPulse{0%,100%{opacity:0.5}50%{opacity:1;box-shadow:0 0 6px var(--oxblood-glow)}}
 
-      /* ── SEAL RITUAL — opening of the register, not a hacker boot ── */
-      body.booting{overflow:hidden}
+      /* Discord uživatel */
+      .auth-discord-chip{
+        display:inline-flex;align-items:center;gap:0.7rem;
+        padding:0.6rem 0.9rem;
+        background:var(--brass-faint);border:1px solid var(--border-brass);
+        font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.1em;
+        color:var(--ivory);margin-bottom:1.5rem;
+      }
+      .auth-discord-chip span{color:var(--brass);font-size:0.56em;letter-spacing:0.16em;text-transform:uppercase}
+
+      /* ── BOOT SCREEN — otevření pečetěného rejstříku ── */
       .boot-screen{
-        position:fixed;inset:0;z-index:999;background:#050403;
+        position:fixed;inset:0;z-index:999;background:var(--noir);
         display:flex;align-items:center;justify-content:center;
-        transition:opacity 0.6s ease, visibility 0.6s ease;
+        transition:opacity 0.6s ease,visibility 0.6s;
       }
       .boot-screen.boot-hidden{opacity:0;visibility:hidden;pointer-events:none}
-      .boot-screen::before{
-        content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
-        background:radial-gradient(ellipse 55% 50% at 50% 42%, rgba(201,162,39,0.12), transparent 70%);
+      .boot-stage{
+        display:flex;flex-direction:column;align-items:center;gap:2rem;
+        text-align:center;
       }
-      .boot-screen::after{
-        content:'';position:absolute;inset:0;pointer-events:none;z-index:1;
-        background:radial-gradient(ellipse 75% 65% at 50% 50%, transparent 35%, rgba(0,0,0,0.88) 100%);
-      }
-      .boot-stage{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:1.8rem}
-      .boot-seal-wax{
-        width:84px;height:84px;border-radius:50%;
-        border:2px solid var(--brass);
+      .boot-crest{
+        width:80px;height:80px;
         display:flex;align-items:center;justify-content:center;
         position:relative;
-        box-shadow:0 0 0 1px #050403 inset, 0 0 24px var(--seal-glow);
-        animation:sealBreatheSm 2.4s ease-in-out infinite;
       }
-      .boot-seal-wax::before{content:'';position:absolute;inset:6px;border-radius:50%;border:1px solid rgba(201,162,39,0.4)}
-      .boot-seal-wax span{font-family:var(--font-display);font-weight:700;font-size:1.7rem;color:var(--brass);letter-spacing:0.02em}
-      @keyframes sealBreatheSm{0%,100%{box-shadow:0 0 0 1px #050403 inset,0 0 16px var(--seal-glow)}50%{box-shadow:0 0 0 1px #050403 inset,0 0 34px var(--seal-glow)}}
-      .boot-term{
-        width:88%;max-width:560px;color:#C9A227;
-        font-family:var(--font-mono);
-        font-size:0.78rem;line-height:2.05;letter-spacing:0.03em;
-        text-shadow:0 0 8px rgba(201,162,39,0.3);
-        text-align:center;
-        min-height:7.5em;
+      .boot-crest svg{width:100%;height:100%;filter:drop-shadow(0 0 16px var(--oxblood-glow));animation:crestAmbient 2s ease-in-out infinite}
+      .boot-lines{
+        width:min(560px,90vw);
+        font-family:var(--font-mono);font-size:0.76rem;line-height:2.1;
+        letter-spacing:0.03em;color:var(--brass);
+        text-shadow:0 0 8px rgba(182,138,78,0.3);
+        text-align:center;min-height:7em;
       }
-      .boot-term .boot-line{white-space:pre-wrap;word-break:break-word;animation:bootLineIn 0.2s ease}
+      .boot-line{animation:bootLineIn 0.18s ease}
       @keyframes bootLineIn{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
-      .boot-line.dim{color:#7A6418;text-shadow:none}
-      .boot-line.warn{color:#C9A227;text-shadow:0 0 8px rgba(201,162,39,0.4)}
-      .boot-line.white{color:#E8E2D5;text-shadow:none;font-family:var(--font-display);font-style:italic;letter-spacing:0.01em}
-      .boot-cursor{display:inline-block;width:7px;height:1em;background:var(--seal-bright);vertical-align:-2px;animation:bootCursor 0.7s steps(1) infinite}
-      @keyframes bootCursor{0%,49%{opacity:1}50%,100%{opacity:0}}
-      .boot-skip{
-        position:absolute;bottom:24px;right:28px;z-index:2;
-        color:#5A5346;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;
-        font-family:var(--font-mono);
+      .boot-line.dim{color:var(--ivory-faint);text-shadow:none}
+      .boot-line.accent{color:var(--oxblood-bright);text-shadow:0 0 10px var(--oxblood-glow)}
+      .boot-line.ivory{color:var(--ivory);text-shadow:none;font-family:var(--font-display);font-style:italic;letter-spacing:0.01em}
+      .boot-cursor{display:inline-block;width:6px;height:1em;background:var(--brass);vertical-align:-2px;animation:blink 0.7s steps(1) infinite}
+      @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+      .boot-progress{width:min(280px,80%);height:1px;background:rgba(182,138,78,0.15);position:relative;overflow:hidden}
+      .boot-progress-fill{height:100%;background:linear-gradient(90deg,var(--oxblood),var(--brass));transition:width 0.2s linear;width:0}
+      .boot-skip{position:absolute;bottom:24px;right:28px;font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ivory-faint);opacity:0.6}
+
+      /* Responsivita */
+      @media(max-width:900px){
+        .auth-page{grid-template-columns:1fr;display:flex;flex-direction:column;padding:3rem 0 2.5rem}
+        .auth-herald{align-items:center;text-align:center;padding:1.5rem 6vw 0.5rem}
+        .auth-divider-line{display:none}
+        .auth-body{margin:0 auto;padding:2rem 6vw}
+        .herald-motto{text-align:center}
       }
-      .boot-progress{width:88%;max-width:280px;height:2px;background:rgba(139,26,26,0.18);position:relative;overflow:hidden;border-radius:1px}
-      .boot-progress-fill{height:100%;background:linear-gradient(90deg,var(--seal),var(--brass));box-shadow:0 0 10px var(--seal-glow);transition:width 0.18s linear;width:0%}
     </style>
   `;
 
-  const sealColHtml = `
-    <div class="auth-seal-col">
-      <div class="auth-seal-monolith">
-        <span class="auth-seal-letter">A</span>
-        <span class="auth-seal-sub">LOS SANTOS</span>
-      </div>
-      <p class="auth-tagline">Albion nepotřebuje být <strong>hlasitý</strong>. Stačí, že je <strong>zapečetěný</strong>.</p>
-    </div>
-    <div class="frontispiece-rule"></div>
-  `;
+  // Heraldický SVG erb — shodný s logem webu
+  const crestSvg = `<svg viewBox="0 0 160 210" xmlns="http://www.w3.org/2000/svg">
+    <!-- Radiant rays -->
+    <g stroke="rgba(182,138,78,0.25)" stroke-width="0.8" stroke-dasharray="80" stroke-dashoffset="80">
+      <line x1="80" y1="10" x2="80" y2="110" style="animation:drawRayAuth 1s ease-out 0.3s forwards"/>
+      <line x1="80" y1="10" x2="120" y2="85" style="animation:drawRayAuth 1s ease-out 0.4s forwards"/>
+      <line x1="80" y1="10" x2="40" y2="85" style="animation:drawRayAuth 1s ease-out 0.4s forwards"/>
+      <line x1="80" y1="10" x2="140" y2="50" style="animation:drawRayAuth 1s ease-out 0.5s forwards"/>
+      <line x1="80" y1="10" x2="20" y2="50" style="animation:drawRayAuth 1s ease-out 0.5s forwards"/>
+    </g>
+    <style>
+      @keyframes drawRayAuth{to{stroke-dashoffset:0}}
+    </style>
+    <!-- Koruna -->
+    <path d="M54 30 L62 20 L68 30 L80 16 L92 30 L98 20 L106 30 L106 38 L54 38 Z" fill="none" stroke="var(--brass)" stroke-width="1.2" stroke-linejoin="round"/>
+    <!-- Štít -->
+    <path d="M80 50 L136 72 L136 138 Q136 188 80 208 Q24 188 24 138 L24 72 Z" fill="rgba(110,20,35,0.6)" stroke="var(--brass)" stroke-width="2"/>
+    <path d="M80 62 L122 80 L122 136 Q122 176 80 194 Q38 176 38 136 L38 80 Z" fill="rgba(110,20,35,0.4)" stroke="rgba(182,138,78,0.6)" stroke-width="1.2"/>
+    <!-- Lev — heraldický -->
+    <g stroke="var(--brass-bright)" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round" transform="translate(80,136)">
+      <path d="M-6,-42 C2,-48 14,-46 16,-38 C18,-30 16,-22 10,-18 C18,-14 20,-6 18,4 C16,12 8,18 0,18 C-12,20 -22,12 -24,2 L-28,14 L-36,10 L-30,0 C-34,-4 -36,-10 -34,-18 C-30,-28 -20,-32 -12,-28 C-14,-34 -10,-42 -6,-42 Z"/>
+      <path d="M16,0 C22,4 26,12 24,20 C20,26 12,26 8,20"/>
+    </g>
+    <!-- Fleur-de-lis ozdoby -->
+    <g stroke="var(--brass)" stroke-width="1" fill="none">
+      <path d="M24 72 C18 66 14 58 18 52 C22 46 30 46 34 52"/>
+      <path d="M136 72 C142 66 146 58 142 52 C138 46 130 46 126 52"/>
+    </g>
+    <!-- Stuha s nápisem -->
+    <path d="M36 200 Q80 192 124 200" fill="none" stroke="var(--brass)" stroke-width="1"/>
+    <text x="80" y="198" font-family="Cinzel,serif" font-size="8" fill="var(--brass)" text-anchor="middle" letter-spacing="3">ALBION</text>
+  </svg>`;
 
   const bootScreen = `
     <div class="boot-screen" id="bootScreen">
       <div class="boot-stage">
-        <div class="boot-seal-wax"><span>A</span></div>
-        <div class="boot-term" id="bootTerm">
-          <span class="boot-cursor"></span>
-        </div>
+        <div class="boot-crest">${crestSvg}</div>
+        <div class="boot-lines" id="bootTerm"><span class="boot-cursor"></span></div>
         <div class="boot-progress"><div class="boot-progress-fill" id="bootBar"></div></div>
       </div>
-      <div class="boot-skip">[ klikni / stiskni klávesu — přeskočit ]</div>
+      <div class="boot-skip">[ klikni nebo stiskni klávesu ]</div>
     </div>
     <script>
       (function(){
-        var boot = document.getElementById('bootScreen');
-        var term = document.getElementById('bootTerm');
-        var bar  = document.getElementById('bootBar');
-        if (!boot || !term) return;
-        var lines = [
-          { text: 'Otevírání rejstříku rodiny…', cls: 'dim', delay: 90 },
-          { text: 'Kodex mlčenlivosti — potvrzen', cls: 'dim', delay: 70 },
-          { text: 'Ověřování přísahy…', cls: 'warn', delay: 80 },
-          { text: 'Pečeť rodiny přiložena.', cls: 'warn', delay: 70 },
-          { text: 'Brána se otevírá.', cls: 'white', delay: 90 },
-          { text: 'Vítej, bratře.', cls: 'white', delay: 90 },
+        var boot=document.getElementById('bootScreen');
+        var term=document.getElementById('bootTerm');
+        var bar=document.getElementById('bootBar');
+        if(!boot||!term)return;
+        var lines=[
+          {text:'Otevírání rejstříku organizace…',cls:'dim',delay:100},
+          {text:'Ověřování pečetě…',cls:'dim',delay:80},
+          {text:'Prověřuji přísahu loajality.',cls:'accent',delay:90},
+          {text:'Pečeť přiložena.',cls:'accent',delay:80},
+          {text:'Brána se otevírá.',cls:'ivory',delay:100},
+          {text:'Vítej, bratře.',cls:'ivory',delay:120},
         ];
-        var cursor = term.querySelector('.boot-cursor');
-        var li = 0;
-        function nextLine(){
-          if (li >= lines.length) { return finish(); }
-          var ln = lines[li];
-          term.innerHTML = '';
-          var div = document.createElement('div');
-          div.className = 'boot-line ' + (ln.cls||'dim');
+        var li=0;
+        function next(){
+          if(li>=lines.length)return finish();
+          var ln=lines[li];
+          term.innerHTML='';
+          var div=document.createElement('div');
+          div.className='boot-line '+(ln.cls||'dim');
           term.appendChild(div);
-          if (bar) bar.style.width = Math.round((li/lines.length)*100) + '%';
-          var i = 0, text = ln.text;
-          var typer = setInterval(function(){
-            div.textContent = text.slice(0,++i);
-            if (i >= text.length) { clearInterval(typer); li++; setTimeout(nextLine, ln.delay||120); }
-          }, 18);
+          if(bar)bar.style.width=Math.round((li/lines.length)*100)+'%';
+          var i=0,text=ln.text;
+          var t=setInterval(function(){
+            div.textContent=text.slice(0,++i);
+            if(i>=text.length){clearInterval(t);li++;setTimeout(next,ln.delay||100);}
+          },16);
         }
         function finish(){
-          if (bar) bar.style.width = '100%';
+          if(bar)bar.style.width='100%';
           setTimeout(function(){
             boot.classList.add('boot-hidden');
-            document.body.classList.remove('booting');
-            setTimeout(function(){ boot.remove(); }, 600);
-          }, 500);
+            setTimeout(function(){boot.remove()},600);
+          },480);
         }
-        function skip(){ finish(); }
-        boot.addEventListener('click', skip);
-        document.addEventListener('keydown', skip, { once: true });
-        nextLine();
+        function skip(){finish();}
+        boot.addEventListener('click',skip);
+        document.addEventListener('keydown',skip,{once:true});
+        next();
       })();
     </script>
   `;
 
-  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body class="booting">${bootScreen}<div class="bg-grid"></div><div class="frontispiece auth-reveal">${sealColHtml}<div class="auth-form-col">
-    <div class="auth-eyebrow">Rejstřík Albionu</div>
-    <h1 class="auth-h1">Vstup pro <span class="b-red">členy</span></h1>
-    <p class="auth-subcopy">Přihlášení vyžaduje příslušnost k organizaci na Discordu a heslo do interního rejstříku.</p>
-    <div class="auth-status-bar"><div class="auth-status-dot"></div><span>Kanál zapečetěn</span></div>
-    ${errMsg}
-    <a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a>
-    <div class="auth-divider">nebo</div>
-    <a href="/register" class="auth-btn secondary">Registrovat se</a>
-  </div></div>${successReg}</body></html>`;
+  const heraldsCol = `
+    <div class="auth-herald">
+      <div class="herald-crest" id="heraldryCrest">${crestSvg}</div>
+      <p class="herald-motto">Albion nepotřebuje být <strong>hlasitý</strong>.<br>Stačí, že je <strong>nepřehlédnutelný</strong>.</p>
+    </div>
+    <div class="auth-divider-line"></div>
+  `;
 
-  if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body class="booting">${bootScreen}<div class="bg-grid"></div><div class="frontispiece auth-reveal">${sealColHtml}<div class="auth-form-col">
-    <div class="auth-eyebrow">Rejstřík Albionu</div>
-    <h1 class="auth-h1">Žádost o <span class="b-red">členství</span></h1>
-    <p class="auth-subcopy">Pro registraci musíš být členem Discord serveru Albion. Po ověření tě rejstřík vyzve k zápisu jména a heslu.</p>
-    ${errMsg}
-    <a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a>
-    <div class="auth-sep"></div>
-    <a href="/login" class="auth-btn secondary">Zpět na přihlášení</a>
-  </div></div></body></html>`;
+  if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Albion — Přihlášení</title>${style}
+  </head><body>
+    ${bootScreen}
+    <div class="auth-page">
+      ${heraldsCol}
+      <div class="auth-body">
+        <div class="auth-eyebrow">Rejstřík organizace</div>
+        <h1 class="auth-h1">Vstup pro <span class="b-brass">členy</span></h1>
+        <p class="auth-subcopy">Přihlášení vyžaduje příslušnost na Discordu a heslo do interního rejstříku.</p>
+        <div class="auth-seal-status"><div class="auth-seal-dot"></div><span>Kanál zapečetěn</span></div>
+        ${errMsg}
+        <a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a>
+        <div class="auth-sep-line">nebo</div>
+        <a href="/register" class="auth-btn secondary">Registrovat se</a>
+      </div>
+    </div>
+    ${successReg}
+  </body></html>`;
 
-  if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Registrace</title>${style}</head><body><div class="bg-grid"></div><div class="frontispiece">${sealColHtml}<div class="auth-form-col">
-    <div class="auth-eyebrow">Rejstřík Albionu</div>
-    <h1 class="auth-h1">Zápis do <span class="b-red">rejstříku</span></h1>
-    <p class="auth-subcopy">Discord: <strong style="color:#E8E2D5">${data?.username||''}</strong></p>
-    ${errMsg}
-    <form method="POST" action="/register/complete">
-      <label class="auth-label">IC jméno (ve hře)</label><input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required>
-      <label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required>
-      <label class="auth-label">Heslo znovu</label><input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required>
-      <button type="submit" class="auth-btn">Dokončit registraci</button>
-    </form>
-  </div></div></body></html>`;
+  if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Albion — Registrace</title>${style}
+  </head><body>
+    <div class="auth-page">
+      ${heraldsCol}
+      <div class="auth-body">
+        <div class="auth-eyebrow">Rejstřík organizace</div>
+        <h1 class="auth-h1">Žádost o <span class="b-brass">členství</span></h1>
+        <p class="auth-subcopy">Pro registraci musíš být členem Discord serveru Albion. Po ověření tě rejstřík vyzve k zapsání jména a hesla.</p>
+        ${errMsg}
+        <a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a>
+        <div class="auth-sep-line">nebo</div>
+        <a href="/login" class="auth-btn secondary">Zpět na přihlášení</a>
+      </div>
+    </div>
+  </body></html>`;
 
-  if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>Albion — Přihlášení</title>${style}</head><body><div class="bg-grid"></div><div class="frontispiece">${sealColHtml}<div class="auth-form-col">
-    <div class="auth-eyebrow">Rejstřík Albionu</div>
-    <h1 class="auth-h1">Potvrzení <span class="b-red">totožnosti</span></h1>
-    <p class="auth-subcopy">Discord: <strong style="color:#E8E2D5">${data?.username||''}</strong></p>
-    ${errMsg}
-    <form method="POST" action="/login/password">
-      <label class="auth-label">Heslo</label><input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus>
-      <button type="submit" class="auth-btn">Přihlásit se</button>
-    </form>
-  </div></div></body></html>`;
+  if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Albion — Zápis do rejstříku</title>${style}
+  </head><body>
+    <div class="auth-page">
+      ${heraldsCol}
+      <div class="auth-body">
+        <div class="auth-eyebrow">Rejstřík organizace</div>
+        <h1 class="auth-h1">Zápis do <span class="b-brass">rejstříku</span></h1>
+        <div class="auth-discord-chip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px;color:var(--brass)"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.100 18.08.12 18.103.14 18.115a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+          <span>Discord</span>
+          <strong>${data?.username||''}</strong>
+        </div>
+        ${errMsg}
+        <form method="POST" action="/register/complete">
+          <label class="auth-label">IC jméno (ve hře)</label>
+          <input class="auth-input" type="text" name="ic_name" placeholder="Christopher Sinclair" required>
+          <label class="auth-label">Heslo</label>
+          <input class="auth-input" type="password" name="password" placeholder="Alespoň 6 znaků" required>
+          <label class="auth-label">Heslo znovu</label>
+          <input class="auth-input" type="password" name="password2" placeholder="Zopakuj heslo" required>
+          <button type="submit" class="auth-btn" style="margin-top:1.2rem">Zapsat se do rejstříku</button>
+        </form>
+      </div>
+    </div>
+  </body></html>`;
+
+  if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Albion — Potvrzení totožnosti</title>${style}
+  </head><body>
+    <div class="auth-page">
+      ${heraldsCol}
+      <div class="auth-body">
+        <div class="auth-eyebrow">Rejstřík organizace</div>
+        <h1 class="auth-h1">Potvrzení <span class="b-brass">totožnosti</span></h1>
+        <div class="auth-discord-chip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px;color:var(--brass)"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.100 18.08.12 18.103.14 18.115a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+          <span>Discord</span>
+          <strong>${data?.username||''}</strong>
+        </div>
+        ${errMsg}
+        <form method="POST" action="/login/password">
+          <label class="auth-label">Heslo</label>
+          <input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus>
+          <button type="submit" class="auth-btn" style="margin-top:1.2rem">Vstoupit do rejstříku</button>
+        </form>
+      </div>
+    </div>
+  </body></html>`;
 
   return '<h1>404</h1>';
 }
 
 module.exports = { renderAuth };
-
