@@ -7,14 +7,10 @@ function renderHome(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky } = data;
   const icName = req.session.icName;
 
-  const WEED_P   = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
-  const DROGY_P  = {"Kapky":200,"Kokain":500,"Extáze":350,"Metamfetamin":450,"Benzo":300,"Joyka":250,"Heroin":600,"Speed":280,"LSD":400};
-  const ZBRANE_P = {"Pump Shotgun":8000,"Pistol MK2":12000,"Pistol":5000,"Combat Pistol":7000,"Double Action Revolver":15000,"Navy Revolver":14000,"Vintage Pistol":6000,"Gusenberg":18000,"Dlouhé":25000,"9mm":100,"9mm Mk2":150,".75cal":300,".50cal":250,"12-gauge":200};
+  const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
 
   let totalValue = 0;
   Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
-  Object.entries(drogy).forEach(([k,q]) => { if(q>0 && DROGY_P[k]) totalValue += q * DROGY_P[k]; });
-  Object.entries(zbrane).forEach(([k,q]) => { if(q>0 && ZBRANE_P[k]) totalValue += q * ZBRANE_P[k]; });
 
   const totalWeed   = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalDrogy  = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
@@ -300,9 +296,9 @@ function renderHome(req, data) {
         <div class="plaque-sub">hotovost organizace</div>
       </div>
       <div class="plaque">
-        <div class="plaque-label">Hodnota skladu</div>
+        <div class="plaque-label">Hodnota weedu</div>
         <div class="plaque-value">$${totalValue.toLocaleString('cs-CZ')}</div>
-        <div class="plaque-sub">weed · drogy · zbraně</div>
+        <div class="plaque-sub">dle prodejní ceny</div>
       </div>
       <div class="plaque">
         <div class="plaque-label">Pesos</div>
@@ -336,7 +332,7 @@ function renderHome(req, data) {
         </div>
         <p class="home-balance-note">
           Vedle USD vede frakce i účet v <strong>₱${ucet.pesos.toLocaleString('cs-CZ')} pesos</strong>.
-          Odhadovaná tržní hodnota celého skladu (weed, drogy, zbraně) činí <strong>$${totalValue.toLocaleString('cs-CZ')}</strong>.
+          Odhadovaná tržní hodnota weedu ve skladu činí <strong>$${totalValue.toLocaleString('cs-CZ')}</strong>.
         </p>
       </div>
       <div class="marginalia">
