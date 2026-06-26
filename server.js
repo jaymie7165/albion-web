@@ -574,6 +574,18 @@ app.get('/api/garage', requireAuth, (req, res) => {
   res.json({ ok: true, cars });
 });
 
+// ── API — GARÁŽ pro Discord bota (chráněno tajným klíčem, ne Discord session) ──
+// Bot běží jako samostatná služba bez přístupu ke stejnému Volume jako web,
+// takže si data o garáži stahuje přes tento endpoint místo čtení souboru z disku.
+app.get('/api/bot/garage', (req, res) => {
+  const key = req.headers['x-bot-key'];
+  if (!key || key !== process.env.BOT_API_KEY) {
+    return res.status(401).json({ ok: false, error: 'Neautorizováno' });
+  }
+  const cars = loadGarage().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  res.json({ ok: true, cars });
+});
+
 app.post('/api/garage', requireAuth, (req, res) => {
   let { spz, nazev, cena, kupil, ucel, image } = req.body;
   const ucelRaw = ucel;
