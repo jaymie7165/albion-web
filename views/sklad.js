@@ -1,7 +1,7 @@
 // sklad.js — Albion v3 · Heraldický sklad
 
-const { baseStyles, ledgerEmpty } = require('./styles');
-const { renderNav } = require('./nav');
+const { baseStyles, ledgerEmpty } = require('../styles');
+const { renderNav } = require('../nav');
 
 function renderDashboard(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet } = data;
