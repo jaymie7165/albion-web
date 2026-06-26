@@ -231,7 +231,7 @@ function renderAuth(page, error, data) {
         display:flex;align-items:center;justify-content:center;
         position:relative;
       }
-      .boot-crest svg{width:100%;height:100%;filter:drop-shadow(0 0 16px var(--oxblood-glow));animation:crestAmbient 2s ease-in-out infinite}
+      .boot-crest img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 16px rgba(110,20,35,0.5));animation:crestAmbient 2s ease-in-out infinite}
       .boot-lines{
         width:min(560px,90vw);
         font-family:var(--font-mono);font-size:0.76rem;line-height:2.1;
@@ -262,37 +262,7 @@ function renderAuth(page, error, data) {
   `;
 
   // Heraldický SVG erb — shodný s logem webu
-  const crestSvg = `<svg viewBox="0 0 160 210" xmlns="http://www.w3.org/2000/svg">
-    <!-- Radiant rays -->
-    <g stroke="rgba(182,138,78,0.25)" stroke-width="0.8" stroke-dasharray="80" stroke-dashoffset="80">
-      <line x1="80" y1="10" x2="80" y2="110" style="animation:drawRayAuth 1s ease-out 0.3s forwards"/>
-      <line x1="80" y1="10" x2="120" y2="85" style="animation:drawRayAuth 1s ease-out 0.4s forwards"/>
-      <line x1="80" y1="10" x2="40" y2="85" style="animation:drawRayAuth 1s ease-out 0.4s forwards"/>
-      <line x1="80" y1="10" x2="140" y2="50" style="animation:drawRayAuth 1s ease-out 0.5s forwards"/>
-      <line x1="80" y1="10" x2="20" y2="50" style="animation:drawRayAuth 1s ease-out 0.5s forwards"/>
-    </g>
-    <style>
-      @keyframes drawRayAuth{to{stroke-dashoffset:0}}
-    </style>
-    <!-- Koruna -->
-    <path d="M54 30 L62 20 L68 30 L80 16 L92 30 L98 20 L106 30 L106 38 L54 38 Z" fill="none" stroke="var(--brass)" stroke-width="1.2" stroke-linejoin="round"/>
-    <!-- Štít -->
-    <path d="M80 50 L136 72 L136 138 Q136 188 80 208 Q24 188 24 138 L24 72 Z" fill="rgba(110,20,35,0.6)" stroke="var(--brass)" stroke-width="2"/>
-    <path d="M80 62 L122 80 L122 136 Q122 176 80 194 Q38 176 38 136 L38 80 Z" fill="rgba(110,20,35,0.4)" stroke="rgba(182,138,78,0.6)" stroke-width="1.2"/>
-    <!-- Lev — heraldický -->
-    <g stroke="var(--brass-bright)" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round" transform="translate(80,136)">
-      <path d="M-6,-42 C2,-48 14,-46 16,-38 C18,-30 16,-22 10,-18 C18,-14 20,-6 18,4 C16,12 8,18 0,18 C-12,20 -22,12 -24,2 L-28,14 L-36,10 L-30,0 C-34,-4 -36,-10 -34,-18 C-30,-28 -20,-32 -12,-28 C-14,-34 -10,-42 -6,-42 Z"/>
-      <path d="M16,0 C22,4 26,12 24,20 C20,26 12,26 8,20"/>
-    </g>
-    <!-- Fleur-de-lis ozdoby -->
-    <g stroke="var(--brass)" stroke-width="1" fill="none">
-      <path d="M24 72 C18 66 14 58 18 52 C22 46 30 46 34 52"/>
-      <path d="M136 72 C142 66 146 58 142 52 C138 46 130 46 126 52"/>
-    </g>
-    <!-- Stuha s nápisem -->
-    <path d="M36 200 Q80 192 124 200" fill="none" stroke="var(--brass)" stroke-width="1"/>
-    <text x="80" y="198" font-family="Cinzel,serif" font-size="8" fill="var(--brass)" text-anchor="middle" letter-spacing="3">ALBION</text>
-  </svg>`;
+  const crestSvg = `<img src="/logo.png" alt="Albion" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 20px rgba(110,20,35,0.5))">`;
 
   const bootScreen = `
     <div class="boot-screen" id="bootScreen">
