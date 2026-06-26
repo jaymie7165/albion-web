@@ -276,19 +276,7 @@ function renderHome(req, data) {
 
       <!-- Erb -->
       <div class="home-crest" id="homeCrest">
-        <svg viewBox="0 0 160 200" xmlns="http://www.w3.org/2000/svg">
-          <path d="M56 32 L64 20 L70 32 L80 16 L90 32 L96 20 L104 32 L104 40 L56 40 Z" fill="none" stroke="var(--brass)" stroke-width="1.4" stroke-linejoin="round"/>
-          <path d="M80 50 L134 72 L134 136 Q134 186 80 206 Q26 186 26 136 L26 72 Z" fill="rgba(110,20,35,0.55)" stroke="var(--brass)" stroke-width="2"/>
-          <path d="M80 62 L120 80 L120 134 Q120 174 80 192 Q40 174 40 134 L40 80 Z" fill="rgba(110,20,35,0.35)" stroke="rgba(182,138,78,0.5)" stroke-width="1"/>
-          <g stroke="var(--brass-bright)" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round" transform="translate(80,134)">
-            <path d="M-6,-42 C2,-48 14,-46 16,-38 C18,-30 16,-22 10,-18 C18,-14 20,-6 18,4 C16,12 8,18 0,18 C-12,20 -22,12 -24,2 L-28,14 L-36,10 L-30,0 C-34,-4 -36,-10 -34,-18 C-30,-28 -20,-32 -12,-28 C-14,-34 -10,-42 -6,-42 Z"/>
-            <path d="M16,0 C22,4 26,12 24,20 C20,26 12,26 8,20"/>
-          </g>
-          <g stroke="var(--brass)" stroke-width="0.9" fill="none" opacity="0.7">
-            <path d="M26 72 C20 66 16 58 20 52 C24 46 32 46 36 52"/>
-            <path d="M134 72 C140 66 144 58 140 52 C136 46 128 46 124 52"/>
-          </g>
-        </svg>
+        <img src="/logo.png" alt="Albion" style="width:100%;height:100%;object-fit:contain;display:block">
       </div>
 
       <div class="home-eyebrow">Los Santos · Interní rejstřík</div>
