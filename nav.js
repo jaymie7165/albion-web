@@ -76,10 +76,9 @@ function renderNav(req, active) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge" id="notifBadge">0</span>
         </button>
-        <div class="theme-switcher" title="Přepnout vrstvu archivu">
-          <button class="theme-dot-btn" id="td-dark"    style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"    title="Heraldický noir"></button>
-          <button class="theme-dot-btn" id="td-light"   style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')"   title="Pergamen"></button>
-          <button class="theme-dot-btn" id="td-crystal" style="background:#070B10;border:1.5px solid #6FA8C9;box-shadow:0 0 6px rgba(111,168,201,0.5)" onclick="setTheme('crystal')" title="Šifrovaný kanál"></button>
+        <div class="theme-switcher" title="Přepnout téma">
+          <button class="theme-dot-btn" id="td-dark"  style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"  title="Heraldický noir"></button>
+          <button class="theme-dot-btn" id="td-light" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
         </div>
         <span class="nav-shortcut-hint" title="g+h Přehled · g+s Sklad · g+b Blackbook · g+a Audit · g+n Nástěnka · / Hledat">g·_</span>
         <span class="nav-user">člen &nbsp;<strong>${ic}</strong></span>
@@ -138,7 +137,7 @@ function renderNav(req, active) {
       navMenu.querySelectorAll('a[href]:not([href="#"])').forEach(a => a.addEventListener('click', closeMobileNav));
 
       // ── TÉMATA ──
-      const THEMES = ['dark','light','crystal'];
+      const THEMES = ['dark','light'];
       let currentTheme = localStorage.getItem('albion_theme') || 'dark';
       function applyTheme(t) {
         THEMES.forEach(c => document.body.classList.remove(c));
