@@ -1,7 +1,7 @@
 // profit-centrum.js — Albion v3 · Heraldický profit centrum
 
-const { baseStyles } = require('./styles');
-const { renderNav } = require('./nav');
+const { baseStyles } = require('../styles');
+const { renderNav } = require('../nav');
 
 function renderProfitCentrum(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
