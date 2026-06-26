@@ -245,6 +245,133 @@ app.post('/login/password', async (req, res) => {
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
 
+// ── PROFIL — správa aliasů a IC jména ────────────────────────────────────────
+app.get('/profil', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  const aliases = user && user.discord_aliases ? JSON.parse(user.discord_aliases) : [];
+  res.send(renderProfil(req, user, aliases));
+});
+
+app.post('/api/me/aliases', requireAuth, (req, res) => {
+  let { aliases } = req.body;
+  if (!Array.isArray(aliases)) return res.json({ ok: false, error: 'Neplatný formát' });
+  aliases = aliases.map(a => (a||'').toString().trim()).filter(Boolean).slice(0, 10);
+  db.setAliases(req.session.userId, aliases);
+  res.json({ ok: true, aliases });
+});
+
+app.post('/api/me/ic-name', requireAuth, async (req, res) => {
+  const { ic_name } = req.body;
+  const safe = (ic_name || '').toString().trim();
+  if (!safe || safe.length < 3 || safe.length > 80) return res.json({ ok: false, error: 'IC jméno musí mít 3–80 znaků' });
+  db.updateIcName(req.session.userId, safe);
+  req.session.icName = safe;
+  res.json({ ok: true });
+});
+
+function renderProfil(req, user, aliases) {
+  const { baseStyles } = require('./styles');
+  const { renderNav } = require('./nav');
+  const aliasesJson = JSON.stringify(aliases);
+  return `<!DOCTYPE html><html lang="cs"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Albion — Profil</title>
+  ${baseStyles()}
+  </head><body>
+  ${renderNav(req, '')}
+  <main>
+    <div class="page-header">
+      <div>
+        <div class="page-label">Organizace Albion</div>
+        <h1 class="page-title">Profil</h1>
+        <p class="page-sub">Nastavení IC jména a Discord aliasů pro správné přiřazení záznamů</p>
+      </div>
+    </div>
+    <p class="folio-footnote"><strong>Discord aliasy.</strong> Pokud Discord bot zapisuje do tabulky jiné jméno než tvoje IC jméno (např. <code style="background:var(--panel3);padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85em">j_jakuub</code>), přidej ho sem. Systém pak všechny záznamy pod tímto jménem přiřadí k tvému profilu.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">IC jméno</span><span class="card-badge">Zobrazované jméno</span></div>
+        <div class="form-group" style="margin-bottom:0.8rem">
+          <label>Jméno postavy (IC)</label>
+          <input type="text" id="ic-name-input" value="${(user.ic_name||'').replace(/"/g,'&quot;')}" maxlength="80">
+        </div>
+        <button class="btn-submit" onclick="saveIcName()">Uložit IC jméno</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span class="card-title">Discord aliasy</span><span class="card-badge">Jména z bota / sheetu</span></div>
+        <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1rem;line-height:1.7">Přidej všechna jména která bot nebo ostatní používají při zápisu do Google Sheets — discord username, přezdívky, atd.</p>
+        <div id="aliases-list" style="margin-bottom:1rem"></div>
+        <div style="display:flex;gap:0.5rem">
+          <input type="text" id="alias-input" placeholder="j_jakuub, přezdívka…" style="flex:1" onkeydown="if(event.key==='Enter')addAlias()">
+          <button class="btn-submit" style="width:auto;padding:0.75rem 1.2rem;margin-top:0" onclick="addAlias()">Přidat</button>
+        </div>
+        <button class="btn-submit" style="margin-top:0.8rem" onclick="saveAliases()">Uložit aliasy</button>
+      </div>
+
+    </div>
+
+    <div style="margin-top:2rem;padding:1rem 1.4rem;background:var(--panel2);border:1px solid var(--border);font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)">
+      <strong style="color:var(--brass)">Tvůj profil:</strong>
+      &nbsp;IC: <strong style="color:var(--ivory)">${user.ic_name||'—'}</strong>
+      &nbsp;·&nbsp; Discord: <strong style="color:var(--ivory)">${user.discord_username||'—'}</strong>
+      &nbsp;·&nbsp; ID: <strong style="color:var(--ivory)">${user.discord_id||'—'}</strong>
+    </div>
+  </main>
+
+  <script>
+    let aliases = ${aliasesJson};
+
+    function renderAliases() {
+      const list = document.getElementById('aliases-list');
+      if (!aliases.length) {
+        list.innerHTML = '<div style="color:var(--ivory-faint);font-size:0.82rem;font-family:var(--font-mono)">Žádné aliasy</div>';
+        return;
+      }
+      list.innerHTML = aliases.map((a, i) =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-family:var(--font-mono);font-size:0.84rem;color:var(--ivory)">' + a + '</span>' +
+        '<button onclick="removeAlias(' + i + ')" style="background:none;border:none;color:var(--oxblood-bright);cursor:pointer;font-size:0.8rem;font-family:var(--font-label);letter-spacing:0.08em">✕ odebrat</button>' +
+        '</div>'
+      ).join('');
+    }
+
+    function addAlias() {
+      const input = document.getElementById('alias-input');
+      const val = input.value.trim();
+      if (!val) return;
+      if (!aliases.includes(val)) aliases.push(val);
+      input.value = '';
+      renderAliases();
+    }
+
+    function removeAlias(i) {
+      aliases.splice(i, 1);
+      renderAliases();
+    }
+
+    async function saveAliases() {
+      const res = await fetch('/api/me/aliases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ aliases }) });
+      const d = await res.json();
+      if (d.ok) showToast('Aliasy uloženy');
+      else showToast(d.error, true);
+    }
+
+    async function saveIcName() {
+      const ic_name = document.getElementById('ic-name-input').value.trim();
+      const res = await fetch('/api/me/ic-name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ic_name }) });
+      const d = await res.json();
+      if (d.ok) showToast('IC jméno uloženo — stránka se obnoví');
+      else showToast(d.error, true);
+    }
+
+    renderAliases();
+  </script>
+  </body></html>`;
+}
+
 // ── DISCORD MEMBERSHIP CHECK ──────────────────────────────────────────────────
 // Každý request na chráněné routy ověří, že uživatel je stále na Discord serveru.
 // Kontrola probíhá max. jednou za 5 minut (cache v session), aby se nevolalo API
@@ -577,19 +704,22 @@ app.get('/api/stats', requireAuth, async (req, res) => {
         if (u.discord_username) nameMapStats[u.discord_username.toLowerCase()] = u.ic_name;
         if (u.discord_display_name) nameMapStats[u.discord_display_name.toLowerCase()] = u.ic_name;
         if (u.global_name) nameMapStats[u.global_name.toLowerCase()] = u.ic_name;
+        if (u.discord_aliases) {
+          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMapStats[a.toLowerCase()] = u.ic_name; }); } catch {}
+        }
       }
     });
     const icToDiscord = {};
     allUsers.forEach(u => { if (u.ic_name && u.discord_username) icToDiscord[u.ic_name] = u.discord_username; });
 
     const normalizeUser = (name) => {
-      if (!name) return name;
+      if (!name) return null;
       const lower = name.trim().toLowerCase();
       if (nameMapStats[lower]) return nameMapStats[lower];
       for (const [key, icName] of Object.entries(nameMapStats)) {
         if (key.includes(lower) || lower.includes(key)) return icName;
       }
-      return name.trim();
+      return name.trim(); // neznámý — vrátíme jak je
     };
 
     const stats = {};
@@ -702,16 +832,20 @@ app.get('/api/audit', requireAuth, async (req, res) => {
         if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
         if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
         if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
+        if (u.discord_aliases) {
+          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {}
+        }
       }
     });
     const normAudit = (name) => {
-      if (!name || name === '—') return name || '—';
+      if (!name || name === '—' || name === '-') return '—';
       const trimmed = name.trim();
       const lower = trimmed.toLowerCase();
       if (nameMap[lower]) return nameMap[lower];
       for (const [key, icName] of Object.entries(nameMap)) {
         if (key.includes(lower) || lower.includes(key)) return icName;
       }
+      // Neznámý uživatel — vrátíme co je v sheetu, ale mohlo by být discord username od bota
       return trimmed;
     };
 
@@ -888,6 +1022,9 @@ app.get('/api/blackbook', requireAuth, async (req, res) => {
         if (u.discord_username) { nameMap[u.discord_username.toLowerCase()] = u.ic_name; icToDiscord[u.ic_name] = u.discord_username; }
         if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
         if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
+        if (u.discord_aliases) {
+          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {}
+        }
       }
     });
     const norm = (name) => {
@@ -895,7 +1032,7 @@ app.get('/api/blackbook', requireAuth, async (req, res) => {
       const lower = name.toString().trim().toLowerCase();
       if (nameMap[lower]) return nameMap[lower];
       for (const [key, ic] of Object.entries(nameMap)) { if (key.includes(lower) || lower.includes(key)) return ic; }
-      return name.toString().trim();
+      return name.toString().trim(); // neznámý — vrátíme jak je
     };
 
     const parseCas = (cas) => {
@@ -1226,6 +1363,9 @@ app.get('/api/profit-centrum', requireAuth, async (req, res) => {
         if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
         if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
         if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
+        if (u.discord_aliases) {
+          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {}
+        }
       }
     });
     const norm = (name) => {
@@ -1233,7 +1373,7 @@ app.get('/api/profit-centrum', requireAuth, async (req, res) => {
       const lower = name.toString().trim().toLowerCase();
       if (nameMap[lower]) return nameMap[lower];
       for (const [key, ic] of Object.entries(nameMap)) { if (key.includes(lower) || lower.includes(key)) return ic; }
-      return name.toString().trim();
+      return name.toString().trim(); // neznámý — vrátíme jak je
     };
 
     const parseCas = (cas) => {
