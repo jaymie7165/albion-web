@@ -36,12 +36,8 @@ function renderDashboard(req, data) {
 
   const totalValue = (() => {
     const W={"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
-    const D={"Kapky":200,"Kokain":500,"Extáze":350,"Metamfetamin":450,"Benzo":300,"Joyka":250,"Heroin":600,"Speed":280,"LSD":400};
-    const Z={"Pump Shotgun":8000,"Pistol MK2":12000,"Pistol":5000,"Combat Pistol":7000,"Double Action Revolver":15000,"Navy Revolver":14000,"Vintage Pistol":6000,"Gusenberg":18000,"Dlouhé":25000,"9mm":100,"9mm Mk2":150,".75cal":300,".50cal":250,"12-gauge":200};
     let t=0;
     Object.entries(weed).forEach(([k,q])=>{if(q>0&&W[k])t+=q*W[k];});
-    Object.entries(drogy).forEach(([k,q])=>{if(q>0&&D[k])t+=q*D[k];});
-    Object.entries(zbrane).forEach(([k,q])=>{if(q>0&&Z[k])t+=q*Z[k];});
     return t;
   })();
 
@@ -147,7 +143,7 @@ function renderDashboard(req, data) {
         <div class="tally-cell-val" style="color:#6FA8C9">${Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0)} ks</div>
       </div>
       <div class="tally-cell">
-        <div class="tally-cell-label">Hodnota skladu</div>
+        <div class="tally-cell-label">Hodnota weedu</div>
         <div class="tally-cell-val" style="color:var(--brass)">$${totalValue.toLocaleString('cs-CZ')}</div>
       </div>
     </div>
