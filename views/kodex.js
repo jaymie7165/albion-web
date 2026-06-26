@@ -1,4 +1,4 @@
-// kodex.js — extracted view module
+// kodex.js — Albion v3
 
 const { baseStyles } = require('./styles');
 const { renderNav } = require('./nav');
@@ -17,7 +17,9 @@ function renderKodex(req) {
     { num: 'X',    title: 'Albion nade vše', text: 'Osobní zájmy nesmí ohrozit stabilitu organizace. Dlouhodobý úspěch Albionu je důležitější než krátkodobý prospěch jednotlivce.' },
   ];
 
-  return `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Albion — Kodex</title>
+  return `<!DOCTYPE html><html lang="cs"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Albion — Kodex</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'kodex')}
@@ -29,21 +31,25 @@ function renderKodex(req) {
         <p class="page-sub">Principy a zásady, které definují každého člena Albionu</p>
       </div>
     </div>
-    <p class="folio-footnote"><strong>Závazný řád organizace.</strong> Kodex Albionu je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Neznalost pravidel není omluvou. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení z organizace.</p>
+    <p class="folio-footnote"><strong>Závazný řád organizace.</strong> Kodex Albionu je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení.</p>
+
     <div class="lore-grid">
       <div class="chapters">
-        ${articles.map((a,i) => `
-        <div class="chapter">
-          <div class="chapter-meta">Článek ${a.num}</div>
-          <div class="chapter-title">${a.title}</div>
-          <div class="chapter-text${i===0?' with-dropcap':''}">${a.text}</div>
-        </div>
-        `).join('')}
+        ${articles.map((a, i) => `
+          <div class="chapter">
+            <div class="chapter-meta">Článek ${a.num}</div>
+            <div class="chapter-title">${a.title}</div>
+            <div class="chapter-text${i === 0 ? ' with-dropcap' : ''}">${a.text}</div>
+          </div>`).join('')}
       </div>
       <div class="sidebar">
-        <div class="sidebar-title">Obsah</div>
-        ${articles.map(a => `<div class="toc-item"><span class="toc-num">${a.num}</span><span>${a.title}</span></div>`).join('')}
-        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:var(--font-display);font-style:italic;font-size:0.95rem;color:var(--text-muted);line-height:1.9">
+        <div class="sidebar-title">Obsah kodexu</div>
+        ${articles.map(a => `
+          <div class="toc-item">
+            <span class="toc-num">${a.num}</span>
+            <span>${a.title}</span>
+          </div>`).join('')}
+        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:var(--font-display);font-style:italic;font-size:0.95rem;color:var(--ivory-faint);line-height:1.9">
           Kodex Albionu je závazný pro každého člena bez výjimky.
         </div>
       </div>
@@ -53,4 +59,3 @@ function renderKodex(req) {
 }
 
 module.exports = { renderKodex };
-
