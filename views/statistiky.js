@@ -60,7 +60,6 @@ function renderStatistiky(req) {
           '<div class="stat-card-header">'+
             '<div>'+
               '<div class="stat-card-name">'+icName+'</div>'+
-              (s.discordUsername?'<div class="stat-card-discord">'+s.discordUsername+'</div>':'')+
             '</div>'+
           '</div>'+
           (hasZbrane?'<div class="stat-section-label">Zbraně</div>'+renderItemGroup(s.zbrane):'')+
