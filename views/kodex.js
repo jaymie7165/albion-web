@@ -1,7 +1,7 @@
 // kodex.js — Albion v3
 
-const { baseStyles } = require('./styles');
-const { renderNav } = require('./nav');
+const { baseStyles } = require('../styles');
+const { renderNav } = require('../nav');
 
 function renderKodex(req) {
   const articles = [
