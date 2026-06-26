@@ -1,7 +1,7 @@
 // garaz.js — Albion v3 · Heraldická garáž
 
-const { baseStyles, ledgerEmpty } = require('./styles');
-const { renderNav } = require('./nav');
+const { baseStyles, ledgerEmpty } = require('../styles');
+const { renderNav } = require('../nav');
 
 function renderGaraz(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
