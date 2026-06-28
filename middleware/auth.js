@@ -1,6 +1,10 @@
+// middleware/auth.js — ochrana routes, vyžaduje přihlášeného uživatele
+
 function requireAuth(req, res, next) {
   if (req.session && req.session.userId) return next();
-  res.redirect('/login');
+  const isApi = req.path.startsWith('/api/');
+  if (isApi) return res.status(401).json({ ok: false, error: 'Nepřihlášen' });
+  return res.redirect('/login');
 }
+
 module.exports = { requireAuth };
- 
