@@ -102,6 +102,22 @@ async function notifyUcet(typ, castka, valuta, poznamka, uzivatel) {
   await sendEmbed(channelId, { title: typ === 'PŘÍJEM' ? `💚 PŘÍJEM — ${valuta} (web)` : `🔴 VÝDAJ — ${valuta} (web)`, color, fields, timestamp: new Date().toISOString() });
 }
 
+async function notifySmena(smer, castka, vysledek, uzivatel) {
+  const channelId = process.env.CHANNEL_UCETNICTVI;
+  const zFrom = smer === 'usd_to_pesos' ? 'SAD' : 'Pesos';
+  const zTo   = smer === 'usd_to_pesos' ? 'Pesos' : 'SAD';
+  const symFrom = smer === 'usd_to_pesos' ? '$' : '₱';
+  const symTo   = smer === 'usd_to_pesos' ? '₱' : '$';
+  const fields = [
+    { name: 'Směr', value: `${zFrom} → ${zTo}`, inline: true },
+    { name: 'Směněno', value: `${symFrom}${castka}`, inline: true },
+    { name: 'Obdrženo', value: `${symTo}${vysledek}`, inline: true },
+    { name: 'Kurz', value: '1:1', inline: true },
+    { name: 'Zadal', value: uzivatel, inline: true },
+  ];
+  await sendEmbed(channelId, { title: '💱 SMĚNA MĚN (web)', color: 0x6FA8C9, fields, timestamp: new Date().toISOString() });
+}
+
 async function notifyAudit(akce, uzivatel, discordUsername, detail) {
   const channelId = process.env.CHANNEL_AUDIT;
   if (!channelId) {
@@ -189,4 +205,4 @@ async function isUserOnServer(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer };
