@@ -40,7 +40,15 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'albion_secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 },
+  rolling: true, // každý request prodlouží platnost cookie — aktivní uživatel nevyprší
+  cookie: {
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 dní
+    // secure=true vyžaduje HTTPS — na Railway (a obecně za proxy s trust proxy) to platí vždy,
+    // lokálně (http://localhost) díky tomu zůstane false, takže přihlášení funguje i bez HTTPS.
+    secure: !!process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    httpOnly: true,
+  },
 }));
 
 // ── TRVALÉ ÚLOŽIŠTĚ ──────────────────────────────────────────────────────────
@@ -524,6 +532,35 @@ app.post('/api/chemky', requireAuth, async (req, res) => {
   await discord.notifyAudit('Chemky', uzivatel, discordUser, `${typUp} — ${chemikalieTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'chemky', typ: typUp, chemikalie: chemikalieTrim, qty, uzivatel, cas });
   res.json({ ok: true });
+});
+
+// ── API — SMĚNÁRNA (SAD ↔ Pesos, kurz 1:1, pouze pro účet organizace Albion) ──
+app.post('/api/smena', requireAuth, async (req, res) => {
+  const { smer, castka } = req.body;
+  const smerOk = (smer || '').toString().trim();
+  const amount = parseFloat(castka);
+
+  if (!['usd_to_pesos', 'pesos_to_usd'].includes(smerOk)) return res.json({ ok: false, error: 'Neplatný směr směny' });
+  if (!isAmount(amount)) return res.json({ ok: false, error: 'Neplatná částka (max 1 000 000)' });
+
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+
+  const zValuta = smerOk === 'usd_to_pesos' ? 'USD' : 'PESOS';
+  const naValuta = smerOk === 'usd_to_pesos' ? 'PESOS' : 'USD';
+  const poznamka = `Směna 1:1 — ${zValuta === 'USD' ? 'SAD' : 'Pesos'} → ${naValuta === 'USD' ? 'SAD' : 'Pesos'}`;
+
+  // Dva řádky do Účetnictví: výdaj měny, kterou frakce dává + příjem měny, kterou frakce dostává.
+  // Kurz je 1:1, takže částka zůstává stejná, jen se přesouvá mezi měnami.
+  await sheets.appendRow('Účetnictví', [cas, 'VÝDAJ', amount, zValuta, poznamka, uzivatel]);
+  await sheets.appendRow('Účetnictví', [cas, 'PŘÍJEM', amount, naValuta, poznamka, uzivatel]);
+
+  await discord.notifySmena(smerOk, amount, amount, uzivatel);
+  await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `SMĚNA — ${poznamka} | ${zValuta === 'USD' ? '$' : '₱'}${amount} → ${naValuta === 'USD' ? '$' : '₱'}${amount}`);
+  broadcastSSE('ucetUpdate', { typ: 'SMĚNA', castka: amount, valuta: zValuta, poznamka, uzivatel, cas });
+
+  res.json({ ok: true, zValuta, naValuta, castka: amount });
 });
 
 // ── API — WEED SÁZENÍ (odpočty růstu, sdílené pro všechny) ────────────────────
