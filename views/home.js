@@ -2,10 +2,15 @@
 
 const { baseStyles, ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
+const { canAccess } = require('../roles');
 
 function renderHome(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky } = data;
   const icName = req.session.icName;
+  const accessLevel = req.session.accessLevel || 3;
+  // Member/Associate (level 3) nevidí finance ani obsah skladu na hlavní stránce —
+  // vychází z toho, že nemají přístup ke Skladu, Auditu ani Blackbooku.
+  const isRestricted = accessLevel >= 3;
 
   const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
 
@@ -289,6 +294,14 @@ function renderHome(req, data) {
     <div class="home-fret"></div>
 
     <!-- ── TALLY PLAQUES — čtyři dominantní čísla ── -->
+    ${isRestricted ? `
+    <div class="tally" style="grid-template-columns:1fr">
+      <div class="plaque">
+        <div class="plaque-label">Vítej v Albionu</div>
+        <div class="plaque-value" style="font-size:1.1rem">Finance a sklad jsou viditelné jen od hodnosti Senior Member výš</div>
+        <div class="plaque-sub">obrať se na Council nebo Foundera ohledně přístupu</div>
+      </div>
+    </div>` : `
     <div class="tally">
       <div class="plaque">
         <div class="plaque-label">Zůstatek · SAD</div>
@@ -310,19 +323,26 @@ function renderHome(req, data) {
         <div class="plaque-value">${(totalWeed+totalDrogy+totalZbrane+totalChemky).toLocaleString('cs-CZ')}</div>
         <div class="plaque-sub">ks ve skladu</div>
       </div>
-    </div>
+    </div>`}
 
     <!-- ── RYCHLÉ AKCE ── -->
     <nav class="quick-nav">
-      <a href="/sklad">Správa skladu</a>
-      <a href="/audit">Audit zápisů</a>
-      <a href="/blackbook">Blackbook</a>
-      <a href="/nastenska">Nástěnka</a>
-      <a href="/statistiky">Statistiky</a>
+      ${canAccess(accessLevel,'sklad') ? '<a href="/sklad">Správa skladu</a>' : ''}
+      ${canAccess(accessLevel,'audit') ? '<a href="/audit">Audit zápisů</a>' : ''}
+      ${canAccess(accessLevel,'blackbook') ? '<a href="/blackbook">Blackbook</a>' : ''}
+      ${canAccess(accessLevel,'nastenska') ? '<a href="/nastenska">Nástěnka</a>' : ''}
+      ${canAccess(accessLevel,'statistiky') ? '<a href="/statistiky">Statistiky</a>' : ''}
       <a href="/garaz">Garáž</a>
       <a href="/lore">Historie rodu</a>
     </nav>
 
+    ${isRestricted ? `
+    <div class="folio-rule"></div>
+    <div class="marginalia" style="border-left:none;max-width:260px;margin:0 auto;text-align:center">
+      <div class="home-clock" id="live-clock" style="text-align:center">--:--:--</div>
+      <div class="home-clock-date" id="live-date" style="text-align:center"></div>
+    </div>
+    ` : `
     <!-- ── HLAVNÍ ČÍSLO + MARGINALIA ── -->
     <div class="home-spread">
       <div>
@@ -384,6 +404,7 @@ function renderHome(req, data) {
     <div class="folio-label">Poslední zápisy do rejstříku</div>
     <div style="height:1.8rem"></div>
     <div id="activity-stream">${activityHtml}</div>
+    `}
 
   </main>
   <div class="toast" id="toast"></div>
@@ -420,16 +441,20 @@ function renderHome(req, data) {
         crest.classList.add('live-beat');
       }
     }
+    const RESTRICTED_HOME = ${isRestricted ? 'true' : 'false'};
     evtHome.addEventListener('skladUpdate', (e) => {
+      if (RESTRICTED_HOME) return;
       const d = JSON.parse(e.data);
       const label = d.sekce==='zbrane'?'Zbraně':d.sekce==='weed'?'Weed':'Drogy';
       bumpLive(label + ' · ' + d.typ + ' — ' + (d.polozka||d.odruda||d.droga) + ' (' + d.qty + ' ks)');
     });
     evtHome.addEventListener('ucetUpdate', (e) => {
+      if (RESTRICTED_HOME) return;
       const d = JSON.parse(e.data);
       bumpLive('Finance · ' + d.typ + ' — ' + (d.valuta==='USD'?'SAD ':'₱') + d.castka);
     });
     evtHome.addEventListener('nastenska', (e) => {
+      if (RESTRICTED_HOME) return; // Member/Associate nemá přístup k Nástěnce
       const d = JSON.parse(e.data);
       bumpLive('Oznámení: ' + d.title);
     });
