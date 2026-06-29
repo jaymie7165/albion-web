@@ -1,7 +1,11 @@
 // nav.js — Albion v3 · Heraldická navigace
 
+const { canAccess } = require('./roles');
+
 function renderNav(req, active) {
   const ic = req.session.icName;
+  const accessLevel = req.session.accessLevel || 3;
+  const can = (pageId) => canAccess(accessLevel, pageId);
   const skladPages = ['sklad','weed-sazeni'];
   const blackbookPages = ['blackbook','profit-centrum'];
   const infoPages  = ['nastenska','kodex','lore','hierarchy'];
@@ -20,6 +24,7 @@ function renderNav(req, active) {
         <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Rejstřík</span></a></li>
         <li><a href="/garaz" class="${active==='garaz'?'active':''}">Garáž<span class="nav-desc">Vozový park</span></a></li>
 
+        ${can('sklad') ? `
         <li class="nav-dropdown ${skladPages.includes(active)?'open':''}">
           <a href="/sklad" class="nav-drop-trigger ${skladPages.includes(active)?'active':''}">
             Sklad
@@ -30,8 +35,10 @@ function renderNav(req, active) {
             <a href="/sklad" class="${active==='sklad'?'active':''}">Správa skladu</a>
             <a href="/weed-sazeni" class="${active==='weed-sazeni'?'active':''}">Weed sázení</a>
           </div>
-        </li>
+        </li>` : `
+        <li><a href="/weed-sazeni" class="${active==='weed-sazeni'?'active':''}">Weed sázení<span class="nav-desc">Odpočty růstu</span></a></li>`}
 
+        ${blackbookPages.some(can) ? `
         <li class="nav-dropdown ${blackbookPages.includes(active)?'open':''}">
           <a href="/blackbook" class="nav-drop-trigger ${blackbookPages.includes(active)?'active':''}">
             Blackbook
@@ -39,11 +46,12 @@ function renderNav(req, active) {
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
-            <a href="/blackbook" class="${active==='blackbook'?'active':''}">Blackbook</a>
-            <a href="/profit-centrum" class="${active==='profit-centrum'?'active':''}">Profit centrum</a>
+            ${can('blackbook') ? `<a href="/blackbook" class="${active==='blackbook'?'active':''}">Blackbook</a>` : ''}
+            ${can('profit-centrum') ? `<a href="/profit-centrum" class="${active==='profit-centrum'?'active':''}">Profit centrum</a>` : ''}
           </div>
-        </li>
+        </li>` : ''}
 
+        ${dataPages.some(can) ? `
         <li class="nav-dropdown ${dataPages.includes(active)?'open':''}">
           <a href="/audit" class="nav-drop-trigger ${dataPages.includes(active)?'active':''}">
             Záznamy
@@ -51,10 +59,10 @@ function renderNav(req, active) {
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
-            <a href="/audit" class="${active==='audit'?'active':''}">Audit</a>
-            <a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky</a>
+            ${can('audit') ? `<a href="/audit" class="${active==='audit'?'active':''}">Audit</a>` : ''}
+            ${can('statistiky') ? `<a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky</a>` : ''}
           </div>
-        </li>
+        </li>` : ''}
 
         <li class="nav-dropdown ${infoPages.includes(active)?'open':''}">
           <a href="#" class="nav-drop-trigger ${infoPages.includes(active)?'active':''}">
@@ -63,7 +71,7 @@ function renderNav(req, active) {
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
-            <a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka</a>
+            ${can('nastenska') ? `<a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka</a>` : ''}
             <a href="/kodex" class="${active==='kodex'?'active':''}">Kodex</a>
             <a href="/lore" class="${active==='lore'?'active':''}">Historie</a>
             <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a>
@@ -72,15 +80,16 @@ function renderNav(req, active) {
       </ul>
 
       <div class="nav-right" id="navRight">
+        ${can('nastenska') ? `
         <button class="notif-bell" id="notifBell" title="Oznámení" onclick="window.location='/nastenska'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge" id="notifBadge">0</span>
-        </button>
+        </button>` : ''}
         <div class="theme-switcher" title="Přepnout téma">
           <button class="theme-dot-btn" id="td-dark"  style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"  title="Heraldický noir"></button>
           <button class="theme-dot-btn" id="td-light" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
         </div>
-        <span class="nav-shortcut-hint" title="g+h Přehled · g+s Sklad · g+b Blackbook · g+a Audit · g+n Nástěnka · / Hledat">g·_</span>
+        <span class="nav-shortcut-hint" title="g+h Přehled${can('sklad')?' · g+s Sklad':''}${can('blackbook')?' · g+b Blackbook':''}${can('audit')?' · g+a Audit':''}${can('nastenska')?' · g+n Nástěnka':''} · / Hledat">g·_</span>
         <span class="nav-user">člen &nbsp;<strong>${ic}</strong></span>
         <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
@@ -201,7 +210,7 @@ function renderNav(req, active) {
 
       // ── KLÁVESOVÉ ZKRATKY ──
       (function(){
-        const ROUTES = { h:'/home', s:'/sklad', b:'/blackbook', p:'/profit-centrum', a:'/audit', t:'/statistiky', n:'/nastenska', k:'/kodex', l:'/lore', o:'/hierarchy', w:'/weed-sazeni' };
+        const ROUTES = { h:'/home'${can('sklad')?", s:'/sklad'":''}${can('blackbook')?", b:'/blackbook'":''}${can('profit-centrum')?", p:'/profit-centrum'":''}${can('audit')?", a:'/audit'":''}${can('statistiky')?", t:'/statistiky'":''}${can('nastenska')?", n:'/nastenska'":''}, k:'/kodex', l:'/lore', o:'/hierarchy', w:'/weed-sazeni' };
         let awaitingSecond = false, chordTimer = null;
         function isTyping(el) { if(!el) return false; const tag=el.tagName; return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||el.isContentEditable; }
         document.addEventListener('keydown', (e) => {
