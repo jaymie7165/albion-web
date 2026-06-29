@@ -12,6 +12,7 @@ const sheets  = require('./sheets');
 
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
+const { levelFromRoleIds, requireAccess, canAccess } = require('./roles');
 
 const { CONFIG, WEED_PLANT } = require('./constants');
 const { renderHome } = require('./views/home');
@@ -50,6 +51,12 @@ app.use(session({
     httpOnly: true,
   },
 }));
+
+// DŮLEŽITÉ: requireDiscordMember (definováno níže, function declaration je hoistnutá)
+// se registruje hned tady — aby kontrola kicknutí z Discordu platila pro ÚPLNĚ všechny
+// routy včetně SSE /api/events a /home. Dřív byla registrace až dole v souboru, takže
+// část stránek a živé notifikace kontrolu přeskakovaly.
+app.use(requireDiscordMember);
 
 // ── TRVALÉ ÚLOŽIŠTĚ ──────────────────────────────────────────────────────────
 // Na Railway je k službě připojený Volume (persistentní disk) — Railway sám
@@ -248,6 +255,15 @@ app.post('/login/password', async (req, res) => {
   req.session.discordUsername = user.discord_username;
   req.session.discordId = dUser.id;
   req.session.pendingDiscord = null;
+  // Zjistíme Discord role hned při loginu, ať accessLevel sedí od první stránky
+  try {
+    const roles = await discord.getMemberRoles(dUser.id);
+    req.session.accessLevel = levelFromRoleIds(roles);
+    req.session.discordCheckedAt = Date.now();
+  } catch (e) {
+    console.error('[LOGIN ROLES]', e.message);
+    req.session.accessLevel = 3; // fail-safe — nejnižší úroveň přístupu
+  }
   try { db.setLastLogin(user.id, new Date().toISOString()); } catch (e) { console.error('[LOGIN]', e.message); }
   res.redirect('/home');
 });
@@ -398,13 +414,16 @@ async function requireDiscordMember(req, res, next) {
   if (now - lastCheck < DISCORD_CHECK_INTERVAL_MS) return next();
 
   try {
-    const onServer = await discord.isUserOnServer(req.session.discordId);
-    if (!onServer) {
+    // Jedno API volání zjistí jak přítomnost na serveru, tak aktuální role —
+    // pokud byl uživatel vyhozen, getMemberRoles vrátí null a roli ho odhlásíme.
+    const roles = await discord.getMemberRoles(req.session.discordId);
+    if (roles === null) {
       req.session.destroy(() => {});
       const isApi = req.path.startsWith('/api/');
       if (isApi) return res.json({ ok: false, error: 'Přístup odepřen — nejsi na Discord serveru' });
       return res.redirect('/login?error=not_on_server');
     }
+    req.session.accessLevel = levelFromRoleIds(roles);
     req.session.discordCheckedAt = now;
     return next();
   } catch (err) {
@@ -415,7 +434,8 @@ async function requireDiscordMember(req, res, next) {
   }
 }
 
-app.use(requireDiscordMember);
+// (Registrace requireDiscordMember byla přesunuta hned za session middleware výše,
+// aby platila i pro SSE /api/events a všechny ostatní routy.)
 
 // ── VALIDAČNÍ HELPERY ─────────────────────────────────────────────────────────
 function inEnum(value, allowed) { return allowed.includes((value || '').toString().toUpperCase()); }
@@ -432,7 +452,7 @@ const TYP_UCET  = ['PŘÍJEM', 'VÝDAJ'];
 const VALUTY    = ['USD', 'PESOS'];
 
 // ── API — SKLADY ──────────────────────────────────────────────────────────────
-app.post('/api/zbrane', requireAuth, async (req, res) => {
+app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { typ, polozka, mnozstvi, kategorie, ucel } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -454,7 +474,7 @@ app.post('/api/zbrane', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/weed', requireAuth, async (req, res) => {
+app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { typ, odruda, mnozstvi } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -474,7 +494,7 @@ app.post('/api/weed', requireAuth, async (req, res) => {
   res.json({ ok: true, celkVyroba: ceny.vyroba * qty, celkProdej: ceny.prodej * qty });
 });
 
-app.post('/api/drogy', requireAuth, async (req, res) => {
+app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { typ, droga, mnozstvi } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -493,7 +513,7 @@ app.post('/api/drogy', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/ucet', requireAuth, async (req, res) => {
+app.post('/api/ucet', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { typ, castka, valuta, poznamka } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const amount = parseFloat(castka);
@@ -514,7 +534,7 @@ app.post('/api/ucet', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/chemky', requireAuth, async (req, res) => {
+app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { typ, chemikalie, mnozstvi } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -535,7 +555,7 @@ app.post('/api/chemky', requireAuth, async (req, res) => {
 });
 
 // ── API — SMĚNÁRNA (SAD ↔ Pesos, kurz 1:1, pouze pro účet organizace Albion) ──
-app.post('/api/smena', requireAuth, async (req, res) => {
+app.post('/api/smena', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { smer, castka } = req.body;
   const smerOk = (smer || '').toString().trim();
   const amount = parseFloat(castka);
@@ -713,7 +733,7 @@ app.delete('/api/garage/:id', requireAuth, (req, res) => {
 });
 
 // ── API — NÁSTĚNKA ────────────────────────────────────────────────────────────
-app.get('/api/nastenska', requireAuth, async (req, res) => {
+app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, res) => {
   try {
     const msgs = await discord.getAnnouncementMessages(20);
     const formatted = msgs
@@ -732,7 +752,7 @@ app.get('/api/nastenska', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/nastenska', requireAuth, async (req, res) => {
+app.post('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, res) => {
   const { title, content } = req.body;
   if (!content || content.trim().length < 3) return res.json({ ok: false, error: 'Obsah je příliš krátký' });
   const uzivatel = req.session.icName;
@@ -742,7 +762,7 @@ app.post('/api/nastenska', requireAuth, async (req, res) => {
 });
 
 // ── API — STATISTIKY ──────────────────────────────────────────────────────────
-app.get('/api/stats', requireAuth, async (req, res) => {
+app.get('/api/stats', requireAuth, requireAccess('statistiky'), async (req, res) => {
   try {
     const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
       sheets.getRows('Zbraně').catch(() => []),
@@ -868,7 +888,7 @@ app.get('/api/stats', requireAuth, async (req, res) => {
 });
 
 // ── API — AUDIT ───────────────────────────────────────────────────────────────
-app.get('/api/audit', requireAuth, async (req, res) => {
+app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
   try {
     const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
       sheets.getRows('Zbraně').catch(() => []),
@@ -1057,7 +1077,7 @@ app.get('/api/debug-sheets', requireAuth, async (req, res) => {
 });
 
 // ── API — BLACKBOOK (reporty z dostupných dat: sheets + web/discord účty) ──────
-app.get('/api/blackbook', requireAuth, async (req, res) => {
+app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, res) => {
   try {
     const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
       sheets.getRows('Zbraně').catch(() => []),
@@ -1401,7 +1421,7 @@ app.get('/api/blackbook', requireAuth, async (req, res) => {
 
 // ── API — PROFIT CENTRUM ────────────────────────────────────────────────────
 // Report se počítá výhradně z reálných dat: Účetnictví (peníze) + Drogy/Weed (sklad).
-app.get('/api/profit-centrum', requireAuth, async (req, res) => {
+app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), async (req, res) => {
   try {
     const [weedRows, drogyRows, ucetRows] = await Promise.all([
       sheets.getRows('Weed').catch(() => []),
@@ -1573,7 +1593,7 @@ app.get('/home', requireAuth, async (req, res) => {
 app.get('/dashboard', requireAuth, async (req, res) => res.redirect('/home'));
 
 
-app.get('/sklad', requireAuth, async (req, res) => {
+app.get('/sklad', requireAuth, requireAccess('sklad'), async (req, res) => {
   try {
     const [zbrane, weed, drogy, chemky, ucet, recentUcet] = await Promise.all([
       sheets.getStockSummary('Zbraně').catch(() => ({})),
@@ -1590,12 +1610,12 @@ app.get('/sklad', requireAuth, async (req, res) => {
 });
 
 app.get('/weed-sazeni', requireAuth, (req, res) => res.send(renderWeedSazeni(req)));
-app.get('/blackbook', requireAuth, (req, res) => res.send(renderBlackbook(req)));
-app.get('/profit-centrum', requireAuth, (req, res) => res.send(renderProfitCentrum(req)));
-app.get('/nastenska', requireAuth, (req, res) => res.send(renderNastenska(req)));
+app.get('/blackbook', requireAuth, requireAccess('blackbook'), (req, res) => res.send(renderBlackbook(req)));
+app.get('/profit-centrum', requireAuth, requireAccess('profit-centrum'), (req, res) => res.send(renderProfitCentrum(req)));
+app.get('/nastenska', requireAuth, requireAccess('nastenska'), (req, res) => res.send(renderNastenska(req)));
 app.get('/kodex', requireAuth, (req, res) => res.send(renderKodex(req)));
-app.get('/audit', requireAuth, (req, res) => res.send(renderAudit(req)));
-app.get('/statistiky', requireAuth, (req, res) => res.send(renderStatistiky(req)));
+app.get('/audit', requireAuth, requireAccess('audit'), (req, res) => res.send(renderAudit(req)));
+app.get('/statistiky', requireAuth, requireAccess('statistiky'), (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
