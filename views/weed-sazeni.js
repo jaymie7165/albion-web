@@ -204,7 +204,7 @@ function renderWeedSazeni(req) {
             '</div>'+
             '<div style="text-align:right">'+
               '<div class="cd-remain" data-ends="'+t.endsAt+'" style="font-family:var(--font-display);font-style:italic;font-size:1.2rem;color:var(--brass)">–</div>'+
-              '<button onclick="removeTimer(\''+t.id+'\')" style="margin-top:0.4rem;background:none;border:1px solid var(--border-brass);color:var(--ivory-faint);font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.6rem;cursor:pointer">Smazat</button>'+
+              '<button onclick="removeTimer(\\''+t.id+'\\')" style="margin-top:0.4rem;background:none;border:1px solid var(--border-brass);color:var(--ivory-faint);font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.6rem;cursor:pointer">Smazat</button>'+
             '</div>'+
           '</div>'+
           '<div class="timer-bar-track"><div class="cd-bar" data-start="'+t.startedAt+'" data-ends="'+t.endsAt+'" style="height:100%;width:0%"></div></div>'+
