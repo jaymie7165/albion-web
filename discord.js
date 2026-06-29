@@ -205,4 +205,19 @@ async function isUserOnServer(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer };
+// Vrátí pole role ID (string[]) daného člena na serveru, nebo null pokud není na serveru / nastala chyba.
+// Používá se pro určení úrovně přístupu ve webu (viz roles.js).
+async function getMemberRoles(discordId) {
+  const guildId = process.env.GUILD_ID;
+  try {
+    const res = await axios.get(
+      `https://discord.com/api/v10/guilds/${guildId}/members/${discordId}`,
+      { headers: { Authorization: `Bot ${BOT_TOKEN()}` } }
+    );
+    return res.data?.roles || [];
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
