@@ -33,10 +33,10 @@ function renderGaraz(req) {
     }
     .car-photo-empty svg{width:28px;height:28px;opacity:0.3}
 
-    /* SPZ štítek — heraldický styl */
+    /* SPZ štítek — heraldický styl (vždy světlý štítek + tmavý text, nezávisle na tématu) */
     .car-plate{
       position:absolute;left:0.8rem;bottom:0.8rem;
-      background:var(--ivory);color:#15110C;
+      background:#EDE6D4;color:#15110C;
       font-family:var(--font-label);font-weight:700;font-size:0.88rem;letter-spacing:0.1em;
       padding:0.3rem 0.75rem;
       border:2px solid #15110C;
