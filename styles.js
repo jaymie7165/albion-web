@@ -1082,6 +1082,50 @@ function baseStyles() {
 
       /* Garage */
       .ledger-loading{display:flex;align-items:center;gap:0.7rem;color:var(--ivory-dim);font-family:var(--font-mono);font-size:0.82rem;padding:0.4rem 0}
+
+      /* ══════════════════════════════════════════════
+         SKELETON LOADING
+         ══════════════════════════════════════════════ */
+      .skeleton{background:linear-gradient(90deg,var(--panel3) 25%,var(--panel4) 50%,var(--panel3) 75%);background-size:200% 100%;animation:skeletonShine 1.4s ease-in-out infinite}
+      @keyframes skeletonShine{0%{background-position:200% 0}100%{background-position:-200% 0}}
+      .skeleton-line{height:0.9rem;margin:0.5rem 0;border-radius:2px}
+      .skeleton-row{display:flex;gap:0.8rem;padding:0.7rem 0;border-bottom:1px solid var(--border)}
+      .skeleton-card{height:140px;border:1px solid var(--border-brass)}
+
+      /* ══════════════════════════════════════════════
+         SEZÓNNÍ VZHLED
+         ══════════════════════════════════════════════ */
+      body.season-vanoce::before{background-image:radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.5) 0, transparent 50%),radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.4) 0, transparent 50%),radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,0.3) 0, transparent 50%);background-size:200px 200px;animation:snowFall 12s linear infinite}
+      @keyframes snowFall{from{background-position:0 0}to{background-position:0 200px}}
+      body.season-halloween{--oxblood:#D2691E;--oxblood-bright:#FF8C00}
+      body.season-novy-rok::before{background-image:radial-gradient(3px 3px at 30% 40%, rgba(182,138,78,0.6) 0, transparent 50%);animation:snowFall 8s linear infinite}
+
+      /* ══════════════════════════════════════════════
+         TRADING KARTA
+         ══════════════════════════════════════════════ */
+      .trading-card{max-width:380px;margin:0 auto;background:var(--panel2);border:2px solid var(--brass);position:relative;overflow:hidden;box-shadow:var(--shadow)}
+      .tc-header{background:linear-gradient(135deg,var(--oxblood),var(--seal-deep,#4A0D18));padding:1.6rem;text-align:center}
+      .tc-avatar{width:96px;height:96px;border-radius:50%;border:3px solid var(--brass-bright);object-fit:cover;background:var(--panel3);margin:0 auto 0.8rem;display:block}
+      .tc-name{font-family:var(--font-display);font-style:italic;font-weight:700;font-size:1.3rem;color:var(--ivory)}
+      .tc-discord{font-family:var(--font-mono);font-size:0.7rem;color:var(--ivory-dim)}
+      .tc-body{padding:1.4rem}
+      .tc-stat{display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border);font-size:0.84rem}
+      .tc-badges{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem}
+      .tc-badge{font-family:var(--font-label);font-size:0.54rem;padding:0.25rem 0.6rem;background:var(--brass-faint);border:1px solid var(--border-brass);color:var(--brass-bright)}
+
+      /* ══════════════════════════════════════════════
+         GALERIE
+         ══════════════════════════════════════════════ */
+      .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.2rem}
+      .gal-item{background:var(--panel2);border:1px solid var(--border);overflow:hidden;position:relative}
+      .gal-item img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+      .gal-caption{padding:0.8rem 1rem;font-size:0.82rem;color:var(--ivory-dim)}
+      .gal-meta{font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint);padding:0 1rem 0.8rem}
+      .gal-del{position:absolute;top:0.5rem;right:0.5rem;background:rgba(0,0,0,0.6);color:#fff;border:none;width:26px;height:26px;cursor:pointer}
+
+      /* Onboarding dots */
+      .onb-dot{width:6px;height:6px;border-radius:50%;background:var(--border-brass);display:inline-block}
+      .onb-dot.active{background:var(--oxblood-bright)}
     </style>
   `;
 }
