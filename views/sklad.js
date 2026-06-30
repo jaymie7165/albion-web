@@ -309,7 +309,7 @@ function renderDashboard(req, data) {
         <!-- Zbraně -->
         <div class="sklad-panel" id="panel-zbrane">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Zbraně &amp; Střelivo</span><span class="panel-badge">Sklad</span></div>
+            <div class="panel-head"><span class="panel-title">Zbraně &amp; Střelivo</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('zbrane')" style="margin-left:auto">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -338,7 +338,7 @@ function renderDashboard(req, data) {
         <!-- Weed -->
         <div class="sklad-panel" id="panel-weed">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Weed</span><span class="panel-badge">Sklad</span></div>
+            <div class="panel-head"><span class="panel-title">Weed</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('weed')" style="margin-left:auto">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -364,7 +364,7 @@ function renderDashboard(req, data) {
         <!-- Drogy -->
         <div class="sklad-panel" id="panel-drogy">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Drogy</span><span class="panel-badge">Sklad</span></div>
+            <div class="panel-head"><span class="panel-title">Drogy</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('drogy')" style="margin-left:auto">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -389,7 +389,7 @@ function renderDashboard(req, data) {
         <!-- Chemky -->
         <div class="sklad-panel" id="panel-chemky">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Chemikálie</span><span class="panel-badge">Sklad</span></div>
+            <div class="panel-head"><span class="panel-title">Chemikálie</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('chemky')" style="margin-left:auto">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -425,6 +425,30 @@ function renderDashboard(req, data) {
       <div class="modal-actions">
         <button class="modal-btn-cancel" onclick="closeModal()">Zrušit</button>
         <button class="modal-btn-confirm" id="modalConfirmBtn">Potvrdit</button>
+      </div>
+    </div>
+  </div>
+  <!-- BULK MODAL -->
+  <div class="modal-overlay" id="bulkModal">
+    <div class="modal-box" style="max-width:640px">
+      <div class="modal-title">Hromadný zápis</div>
+      <div class="modal-subtitle">Přidej více položek najednou. Souhrn se zobrazí před potvrzením.</div>
+
+      <div class="typ-toggle">
+        <button class="typ-btn active-vklad" id="bulk-typ-vklad" onclick="setBulkTyp('VKLAD')">Uložit</button>
+        <button class="typ-btn" id="bulk-typ-vyber" onclick="setBulkTyp('VÝBĚR')">Vybrat</button>
+      </div>
+      <input type="hidden" id="bulk-typ" value="VKLAD">
+
+      <div id="bulk-rows" style="display:flex;flex-direction:column;gap:0.6rem;margin:1rem 0"></div>
+      <button class="quick-btn" onclick="addBulkRow()">+ Přidat řádek</button>
+
+      <div class="folio-rule tight"></div>
+      <div id="bulk-summary" style="font-family:var(--font-mono);font-size:0.8rem;color:var(--ivory-dim);margin-bottom:1rem"></div>
+
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="closeBulkModal()">Zrušit</button>
+        <button class="modal-btn-confirm" id="bulkConfirmBtn" onclick="submitBulk()">Potvrdit zápis</button>
       </div>
     </div>
   </div>
@@ -511,6 +535,71 @@ function renderDashboard(req, data) {
       if(badge)badge.textContent=items.length;
     }
     updateZbraneItems();
+
+    // ── HROMADNÝ ZÁPIS (BULK) ──
+    const BULK_ITEMS = {
+      zbrane: [...ZBRANE.map(i=>({label:i,kat:'Zbraň'})), ...NABOJE.map(i=>({label:i,kat:'Střelivo'})), ...AKCE.map(i=>({label:i,kat:'Akce'}))],
+      weed:   Object.keys(WEED_CENY).map(i=>({label:i})),
+      drogy:  ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"].map(i=>({label:i})),
+      chemky: ["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná"].map(i=>({label:i})),
+    };
+    let bulkSekce='zbrane',bulkTyp='VKLAD';
+
+    function openBulkModal(sekce){
+      bulkSekce=sekce;
+      document.getElementById('bulk-rows').innerHTML='';
+      addBulkRow();
+      setBulkTyp('VKLAD');
+      document.getElementById('bulkModal').classList.add('open');
+    }
+    function closeBulkModal(){document.getElementById('bulkModal').classList.remove('open');}
+    function setBulkTyp(typ){
+      bulkTyp=typ;
+      document.getElementById('bulk-typ').value=typ;
+      document.getElementById('bulk-typ-vklad').className='typ-btn'+(typ==='VKLAD'?' active-vklad':'');
+      document.getElementById('bulk-typ-vyber').className='typ-btn'+(typ==='VÝBĚR'?' active-vyber':'');
+      updateBulkSummary();
+    }
+    function addBulkRow(){
+      const items=BULK_ITEMS[bulkSekce];
+      const wrap=document.createElement('div');
+      wrap.style.cssText='display:flex;gap:0.5rem;align-items:center';
+      wrap.innerHTML=
+        '<select class="bulk-item" style="flex:2">'+items.map(i=>'<option value="'+i.label+'" data-kat="'+(i.kat||'')+'">'+i.label+'</option>').join('')+'</select>'+
+        '<input type="number" class="bulk-qty" min="1" value="1" style="flex:1">'+
+        '<button type="button" onclick="this.parentElement.remove();updateBulkSummary()" style="background:none;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);width:32px;height:32px;cursor:pointer">✕</button>';
+      document.getElementById('bulk-rows').appendChild(wrap);
+      wrap.querySelector('.bulk-qty').addEventListener('input',updateBulkSummary);
+      wrap.querySelector('.bulk-item').addEventListener('change',updateBulkSummary);
+      updateBulkSummary();
+    }
+    function updateBulkSummary(){
+      const rows=[...document.querySelectorAll('#bulk-rows > div')];
+      const lines=rows.map(r=>{
+        const sel=r.querySelector('.bulk-item'),qty=r.querySelector('.bulk-qty').value||1;
+        return sel.value+' × '+qty;
+      });
+      document.getElementById('bulk-summary').textContent=
+        bulkTyp+' · '+rows.length+' položek: '+lines.join(', ');
+    }
+    async function submitBulk(){
+      const rows=[...document.querySelectorAll('#bulk-rows > div')];
+      if(!rows.length)return showToast('Přidej alespoň jednu položku',true);
+      const items=rows.map(r=>{
+        const sel=r.querySelector('.bulk-item');
+        return {
+          polozka:sel.value,
+          mnozstvi:r.querySelector('.bulk-qty').value,
+          kategorie:sel.selectedOptions[0].dataset.kat||undefined,
+        };
+      });
+      const btn=document.getElementById('bulkConfirmBtn');
+      btn.disabled=true;btn.textContent='Odesílám…';
+      const r=await post('/api/sklad/bulk',{sekce:bulkSekce,typ:bulkTyp,items});
+      btn.disabled=false;btn.textContent='Potvrdit zápis';
+      if(r.ok){showToast('Hromadný zápis uložen ('+r.count+' položek)');closeBulkModal();setTimeout(()=>location.reload(),1200);}
+      else showToast(r.error,true);
+    }
 
     function setTyp(prefix,typ,btn){
       document.getElementById(prefix+'-typ').value=typ;
