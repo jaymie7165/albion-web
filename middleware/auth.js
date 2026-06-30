@@ -1,5 +1,4 @@
-// middleware/auth.js — ochrana routes, vyžaduje přihlášeného uživatele
-
+// middleware/auth.js — kontrola přihlášení
 function requireAuth(req, res, next) {
   if (req.session && req.session.userId) return next();
   const isApi = req.path.startsWith('/api/');
