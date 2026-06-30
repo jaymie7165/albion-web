@@ -8,7 +8,7 @@ function renderNav(req, active) {
   const can = (pageId) => canAccess(accessLevel, pageId);
   const skladPages = ['sklad','weed-sazeni'];
   const blackbookPages = ['blackbook','profit-centrum'];
-  const infoPages  = ['nastenska','kodex','lore','hierarchy'];
+  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie'];
   const dataPages  = ['audit','statistiky'];
 
   return `
@@ -75,6 +75,8 @@ function renderNav(req, active) {
             <a href="/kodex" class="${active==='kodex'?'active':''}">Kodex</a>
             <a href="/lore" class="${active==='lore'?'active':''}">Historie</a>
             <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a>
+            <a href="/leaderboard" class="${active==='leaderboard'?'active':''}">Aktivita</a>
+            ${!req.session.isAssociate ? `<a href="/galerie" class="${active==='galerie'?'active':''}">Galerie</a>` : ''}
           </div>
         </li>
       </ul>
@@ -85,17 +87,34 @@ function renderNav(req, active) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge" id="notifBadge">0</span>
         </button>` : ''}
+        ${req.session.realAccessLevel === 1 ? `
+        <div class="view-as-switcher" style="position:relative">
+          <button class="nav-shortcut-hint" id="viewAsBtn" style="cursor:pointer;${req.session.viewAsLevel?'border-color:var(--oxblood-bright);color:var(--oxblood-bright)':''}" title="View As — simulace role">
+            ${req.session.viewAsLevel ? 'Náhled: '+({1:'Founder/Council',2:'Senior Member',3:'Member'}[req.session.viewAsLevel]) : 'View As'}
+          </button>
+          <div id="viewAsMenu" class="nav-dropdown-menu" style="position:absolute;top:120%;right:0;left:auto;transform:none;opacity:0;pointer-events:none">
+            <a href="#" onclick="setViewAs(null);return false">Vlastní role (Founder/Council)</a>
+            <a href="#" onclick="setViewAs(2);return false">Náhled: Senior Member</a>
+            <a href="#" onclick="setViewAs(3);return false">Náhled: Member / Associate</a>
+          </div>
+        </div>` : ''}
+        <div class="sound-switcher" style="position:relative;margin-left:0.4rem">
+          <button class="theme-dot-btn" id="soundToggle" style="border-radius:0;width:18px;height:18px;background:none;border:1px solid var(--border-brass);color:var(--brass);font-size:0.65rem;display:flex;align-items:center;justify-content:center" title="Zvuky">♪</button>
+        </div>
         <div class="theme-switcher" title="Přepnout téma">
           <button class="theme-dot-btn" id="td-dark"  style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"  title="Heraldický noir"></button>
           <button class="theme-dot-btn" id="td-light" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
         </div>
         <span class="nav-shortcut-hint" title="g+h Přehled${can('sklad')?' · g+s Sklad':''}${can('blackbook')?' · g+b Blackbook':''}${can('audit')?' · g+a Audit':''}${can('nastenska')?' · g+n Nástěnka':''} · / Hledat">g·_</span>
-        <span class="nav-user">člen &nbsp;<strong>${ic}</strong></span>
+        <span class="nav-user" style="border-left:2px solid ${({1:'var(--oxblood-bright)',2:'var(--brass-bright)',3:'var(--ivory-faint)'})[accessLevel]||'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${ic}</strong></span>
         <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
       </div>
     </nav>
     <div class="nav-overlay" id="navOverlay"></div>
+    ${req.session.viewAsLevel ? `<div style="background:var(--oxblood-faint);border-bottom:1px solid var(--border-oxblood);padding:0.5rem 2rem;text-align:center;font-family:var(--font-mono);font-size:0.72rem;color:var(--oxblood-bright)">
+      Náhled jako role: ${({1:'Founder/Council',2:'Senior Member',3:'Member/Associate'})[req.session.viewAsLevel]} — <a href="#" onclick="setViewAs(null);return false" style="color:var(--oxblood-bright);text-decoration:underline">ukončit náhled</a>
+    </div>` : ''}
 
     <script>
       // ── MOBILE NAV ──
@@ -172,6 +191,7 @@ function renderNav(req, active) {
         badge.textContent = newCount;
         badge.classList.add('visible');
         showToast('Oznámení: ' + d.title + ' — ' + d.uzivatel);
+        if (window.bumpUnread) window.bumpUnread();
       });
       evtSource.addEventListener('skladUpdate', (e) => {
         const d = JSON.parse(e.data);
@@ -207,6 +227,115 @@ function renderNav(req, active) {
           '<line x1="12" y1="38" x2="48" y2="38" stroke="var(--border)" stroke-width="1"/>' +
           '</svg><div class="ledger-empty-text">' + text + '</div></div>';
       };
+
+      window.skeletonRows = function(n, cols) {
+        cols = cols || [1];
+        let html = '';
+        for (let i=0;i<n;i++){
+          html += '<div class="skeleton-row">' + cols.map(w=>'<div class="skeleton skeleton-line" style="flex:'+w+'"></div>').join('') + '</div>';
+        }
+        return html;
+      };
+
+      // ── CHYTRÝ FAVICON ──
+      (function favicon(){
+        let unread = 0;
+        function renderFavicon() {
+          const size = 64;
+          const canvas = document.createElement('canvas');
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
+          img.src = '/logo.png';
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, size, size);
+            if (unread > 0) {
+              ctx.beginPath();
+              ctx.fillStyle = '#A33049';
+              ctx.arc(size-14, 14, 14, 0, 2*Math.PI);
+              ctx.fill();
+              ctx.fillStyle = '#fff';
+              ctx.font = 'bold 18px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(unread > 9 ? '9+' : String(unread), size-14, 15);
+            }
+            let link = document.querySelector("link[rel='icon']");
+            if (!link) { link = document.createElement('link'); link.rel='icon'; document.head.appendChild(link); }
+            link.href = canvas.toDataURL('image/png');
+            document.title = (unread>0?'('+unread+') ':'') + document.title.replace(/^\(\d+\)\s*/,'');
+          };
+        }
+        window.bumpUnread = function(){ unread++; renderFavicon(); };
+        window.clearUnread = function(){ unread=0; renderFavicon(); };
+        renderFavicon();
+      })();
+
+      // ── ZVUKY ──
+      (function sounds(){
+        const ENABLED_KEY='albion_sound_enabled';
+        let enabled = localStorage.getItem(ENABLED_KEY) !== 'false';
+
+        function playTone(freq, dur, vol) {
+          if (!enabled) return;
+          try {
+            const ctx = window._albionAudioCtx || (window._albionAudioCtx = new (window.AudioContext||window.webkitAudioContext)());
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+            const gain = ctx.createGain(); gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(vol||0.15, ctx.currentTime+0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(); osc.stop(ctx.currentTime+dur);
+          } catch(e){}
+        }
+        window.albionSound = {
+          login: () => playTone(440, 0.4, 0.12),
+          success: () => playTone(660, 0.25, 0.1),
+          notification: () => playTone(520, 0.18, 0.08),
+          timerDone: () => { playTone(523,0.3,0.12); setTimeout(()=>playTone(659,0.3,0.12),150); },
+        };
+
+        const btn = document.getElementById('soundToggle');
+        if (btn) {
+          function renderBtn(){ btn.style.opacity = enabled ? '1' : '0.35'; }
+          renderBtn();
+          btn.addEventListener('click', () => {
+            enabled = !enabled;
+            localStorage.setItem(ENABLED_KEY, enabled);
+            renderBtn();
+          });
+        }
+      })();
+
+      // ── VIEW AS ──
+      (function viewAsInit(){
+        const viewAsBtn=document.getElementById('viewAsBtn');
+        if(viewAsBtn){
+          const menu=document.getElementById('viewAsMenu');
+          viewAsBtn.addEventListener('click',()=>{
+            const open=menu.style.opacity==='1';
+            menu.style.opacity=open?'0':'1';
+            menu.style.pointerEvents=open?'none':'all';
+          });
+        }
+        window.setViewAs=async function(level){
+          const res=await fetch('/api/view-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level})});
+          const d=await res.json();
+          if(d.ok)location.reload();
+          else if(window.showToast)showToast(d.error,true);
+        };
+      })();
+
+      // ── SEZÓNNÍ VZHLED ──
+      fetch('/api/season').then(r=>r.json()).then(d=>{
+        if(d.season && d.season!=='none') document.body.classList.add('season-'+d.season);
+      }).catch(()=>{});
+      window.evtSource && window.evtSource.addEventListener('seasonChange', (e)=>{
+        const d=JSON.parse(e.data);
+        ['vanoce','halloween','novy-rok'].forEach(s=>document.body.classList.remove('season-'+s));
+        if(d.season!=='none') document.body.classList.add('season-'+d.season);
+      });
 
       // ── KLÁVESOVÉ ZKRATKY ──
       (function(){
