@@ -156,6 +156,7 @@ function renderHome(req, data) {
       width:min(120px,20vw);height:auto;margin-bottom:1.6rem;
       filter:drop-shadow(0 0 24px var(--oxblood-glow));
       animation:heroFadeUp 0.8s ease-out 0.15s both, crestAmbient 4s ease-in-out 2s infinite;
+      transition:transform 0.15s ease-out;
     }
     @keyframes heroFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     @keyframes crestAmbient{0%,100%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}50%{filter:drop-shadow(0 0 36px var(--oxblood-glow))}}
@@ -251,6 +252,8 @@ function renderHome(req, data) {
   </head><body>
   ${renderNav(req, 'home')}
   <main>
+
+    <div id="weekly-banner" style="display:none;background:var(--brass-faint);border:1px solid var(--border-brass);padding:1rem 1.6rem;margin-bottom:2rem;font-family:var(--font-body);font-size:0.9rem;text-align:center"></div>
 
     <!-- ── HERO — záhlaví stránky ── -->
     <div class="home-hero">
@@ -407,6 +410,19 @@ function renderHome(req, data) {
     `}
 
   </main>
+  <div class="modal-overlay" id="onboardModal">
+    <div class="modal-box" style="max-width:560px;text-align:left">
+      <div class="modal-title">Vítej v Albionu</div>
+      <div class="modal-subtitle" id="onb-step-content" style="line-height:1.8"></div>
+      <div style="display:flex;justify-content:center;gap:0.4rem;margin:1rem 0">
+        <span class="onb-dot" data-i="0"></span><span class="onb-dot" data-i="1"></span><span class="onb-dot" data-i="2"></span><span class="onb-dot" data-i="3"></span>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" onclick="onbPrev()" id="onbBackBtn">Zpět</button>
+        <button class="modal-btn-confirm" onclick="onbNext()" id="onbNextBtn">Další</button>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -458,6 +474,67 @@ function renderHome(req, data) {
       const d = JSON.parse(e.data);
       bumpLive('Oznámení: ' + d.title);
     });
+
+    // ── PARALLAX HERO ──
+    (function parallax(){
+      const hero=document.querySelector('.home-hero');
+      const crest=document.getElementById('homeCrest');
+      if(!hero||!crest)return;
+      hero.addEventListener('mousemove',(e)=>{
+        const r=hero.getBoundingClientRect();
+        const x=(e.clientX-r.left)/r.width-0.5, y=(e.clientY-r.top)/r.height-0.5;
+        crest.style.transform='translate3d('+(x*10)+'px,'+(y*10)+'px,0)';
+      });
+      hero.addEventListener('mouseleave',()=>{crest.style.transform='translate3d(0,0,0)';});
+    })();
+
+    // ── TÝDENNÍ SOUHRN ──
+    ${!isRestricted ? `
+    fetch('/api/weekly-summary').then(r=>r.json()).then(d=>{
+      if(!d.ok)return;
+      const el=document.getElementById('weekly-banner');
+      const netTxt=(d.net>=0?'vydělal':'prodělal')+' $'+Math.abs(Math.round(d.net)).toLocaleString('cs-CZ');
+      el.innerHTML='<strong style="color:var(--brass-bright)">Tento týden Albion</strong> '+netTxt+' a provedl '+d.ops+' finančních operací.';
+      el.style.display='block';
+    }).catch(()=>{});` : ''}
+
+    // ── ONBOARDING ──
+    const ONB_STEPS = [
+      '<strong style="color:var(--brass-bright)">Krátká historie.</strong><br>Albion vznikl krátce po příchodu Christophera Sinclaira do Los Santos — organizace postavená na důvěře, ne na strachu. <a href="/lore" style="color:var(--brass)">Číst celou kroniku →</a>',
+      '<strong style="color:var(--brass-bright)">Kodex.</strong><br>Deset principů, které jsou závazné pro každého člena bez výjimky — loajalita, diskrétnost, profesionalita. <a href="/kodex" style="color:var(--brass)">Přečíst kodex →</a>',
+      '<strong style="color:var(--brass-bright)">Hierarchie.</strong><br>Pět úrovní členství — od Associate po Foundera. Postup závisí na loajalitě, schopnostech a přínosu organizaci. <a href="/hierarchy" style="color:var(--brass)">Zobrazit hierarchii →</a>',
+      '<strong style="color:var(--brass-bright)">První kroky.</strong><br>Sleduj Nástěnku pro oznámení, drž se Kodexu a v případě dotazů kontaktuj svého Senior Membera nebo Council. Albion roste — staň se jeho součástí.',
+    ];
+    let onbStep=0;
+    function onbRender(){
+      document.getElementById('onb-step-content').innerHTML=ONB_STEPS[onbStep];
+      document.querySelectorAll('.onb-dot').forEach((d,i)=>d.classList.toggle('active',i===onbStep));
+      document.getElementById('onbBackBtn').style.visibility=onbStep===0?'hidden':'visible';
+      document.getElementById('onbNextBtn').textContent=onbStep===ONB_STEPS.length-1?'Začít':'Další';
+    }
+    function onbNext(){
+      if(onbStep<ONB_STEPS.length-1){onbStep++;onbRender();}
+      else{document.getElementById('onboardModal').classList.remove('open');fetch('/api/me/onboarding/seen',{method:'POST'});}
+    }
+    function onbPrev(){if(onbStep>0){onbStep--;onbRender();}}
+    fetch('/api/me/onboarding').then(r=>r.json()).then(d=>{
+      if(d.ok && !d.seen){onbRender();document.getElementById('onboardModal').classList.add('open');}
+    }).catch(()=>{});
+
+    // ── GRATULACE PŘI POVÝŠENÍ ──
+    fetch('/api/me/promotions/pending').then(r=>r.json()).then(d=>{
+      if(d.ok && d.pending){
+        const overlay=document.createElement('div');
+        overlay.className='modal-overlay open';
+        overlay.innerHTML='<div class="modal-box" style="text-align:center;max-width:420px">'+
+          '<div class="seal-stamp slam" style="position:static;transform:scale(1.3);opacity:1;margin:0 auto 1rem"><span>A</span></div>'+
+          '<div class="modal-title">Povýšení!</div>'+
+          '<div class="modal-subtitle">Byl jsi povýšen na novou hodnost: <strong style="color:var(--brass-bright)">'+d.toLabel+'</strong></div>'+
+          '<button class="modal-btn-confirm" style="width:100%" onclick="this.closest(\\'.modal-overlay\\').remove();fetch(\\'/api/me/promotions/ack\\',{method:\\'POST\\'})">Děkuji</button>'+
+        '</div>';
+        document.body.appendChild(overlay);
+      }
+    }).catch(()=>{});
   </script>
   </body></html>`;
 }
