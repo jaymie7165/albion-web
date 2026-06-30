@@ -185,6 +185,71 @@ async function saveGarageImage(dataUrl, existingPath) {
   }
 }
 
+// ── TRADING KARTA — IC fotky ──────────────────────────────────────────────────
+const CARD_UPLOADS_DIR = path.join(DATA_DIR, 'card-uploads');
+if (!fs.existsSync(CARD_UPLOADS_DIR)) { try { fs.mkdirSync(CARD_UPLOADS_DIR, { recursive: true }); } catch (e) { console.error('[CARD]', e.message); } }
+
+app.get('/card-uploads/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  res.sendFile(path.join(CARD_UPLOADS_DIR, safeName), (err) => { if (err) res.status(404).end(); });
+});
+
+async function saveCardImage(dataUrl, existingPath) {
+  if (!dataUrl || typeof dataUrl !== 'string') return existingPath || null;
+  const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) return existingPath || null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  let buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 6 * 1024 * 1024) return existingPath || null; // 6MB strop
+  const filename = `card_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`;
+  try {
+    fs.writeFileSync(path.join(CARD_UPLOADS_DIR, filename), buffer);
+    if (existingPath && existingPath.startsWith('/card-uploads/')) {
+      fs.unlink(path.join(CARD_UPLOADS_DIR, path.basename(existingPath)), () => {});
+    }
+    return `/card-uploads/${filename}`;
+  } catch (e) {
+    console.error('[CARD IMG]', e.message);
+    return existingPath || null;
+  }
+}
+
+const RANK_LABEL_MAP = { 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member/Associate' };
+
+// ── API — IC ÚDAJE NA TRADING KARTĚ ──
+app.get('/api/me/card-data', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  res.json({ ok: true, data: {
+    phone: user.card_phone || '',
+    birthdate: user.card_birthdate || '',
+    bank: user.card_bank || '',
+    photo: user.card_photo || null,
+  }});
+});
+
+app.post('/api/me/card-data', requireAuth, async (req, res) => {
+  let { phone, birthdate, bank, photo } = req.body;
+  phone = (phone || '').toString().trim();
+  birthdate = (birthdate || '').toString().trim();
+  bank = (bank || '').toString().trim();
+
+  if (phone && !/^\(\d{3}\)\s\d{3}-\d{3}$/.test(phone)) return res.json({ ok: false, error: 'Telefon musí být ve formátu (458) 627-517' });
+  if (birthdate && !/^\d{4}-\d{2}-\d{2}$/.test(birthdate)) return res.json({ ok: false, error: 'Neplatné datum narození' });
+  if (bank && !/^\d{1,30}$/.test(bank)) return res.json({ ok: false, error: 'Bankovní účet smí obsahovat jen číslice' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  let photoPath = user.card_photo || null;
+  if (photo === '') {
+    if (photoPath && photoPath.startsWith('/card-uploads/')) fs.unlink(path.join(CARD_UPLOADS_DIR, path.basename(photoPath)), () => {});
+    photoPath = null;
+  } else if (photo) {
+    photoPath = await saveCardImage(photo, photoPath);
+  }
+
+  db.setCardData(req.session.userId, { phone, birthdate, bank, photo: photoPath });
+  res.json({ ok: true });
+});
+
 // ── SSE — živé notifikace ─────────────────────────────────────────────────────
 const sseClients = new Set();
 
@@ -318,6 +383,7 @@ app.post('/login/password', async (req, res) => {
     req.session.realAccessLevel = req.session.accessLevel;
     req.session.isAssociate = isAssociateOnly(roles);
     req.session.discordCheckedAt = Date.now();
+    try { db.setAccessLevel(user.id, req.session.accessLevel); } catch (e) {}
   } catch (e) {
     console.error('[LOGIN ROLES]', e.message);
     req.session.accessLevel = 3; // fail-safe — nejnižší úroveň přístupu
@@ -411,6 +477,30 @@ function renderProfil(req, user, aliases) {
         </select>
       </div>` : ''}
 
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-header"><span class="card-title">Trading karta — IC údaje</span><span class="card-badge">Viditelné na kartě</span></div>
+        <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1.2rem;line-height:1.7">Tyto údaje se zobrazí na tvé trading kartě. Fotku vlož přes <strong style="color:var(--brass-bright)">Ctrl+V</strong> (screenshot) nebo klikni a vyber soubor.</p>
+
+        <div style="display:grid;grid-template-columns:140px 1fr;gap:1.5rem;align-items:start">
+          <div class="upload-zone" id="cardPhotoZone" tabindex="0" style="min-height:140px;aspect-ratio:1/1;padding:0.8rem">
+            <button type="button" class="upload-clear" id="cardPhotoClear" onclick="clearCardPhoto(event)">✕</button>
+            <img class="upload-preview" id="cardPhotoPreview" style="display:none;object-fit:cover">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <div class="upload-zone-text">Klikni / <strong>Ctrl+V</strong></div>
+          </div>
+          <input type="file" id="cardPhotoFile" accept="image/*" style="display:none">
+
+          <div>
+            <div class="form-row">
+              <div class="form-group"><label>Telefonní číslo</label><input type="text" id="card-phone" placeholder="(458) 627-517" maxlength="14"></div>
+              <div class="form-group"><label>Datum narození</label><input type="date" id="card-birthdate"></div>
+            </div>
+            <div class="form-group" style="margin-bottom:0.8rem"><label>Bankovní účet</label><input type="text" id="card-bank" placeholder="1234567890" inputmode="numeric"></div>
+            <button class="btn-submit" onclick="saveCardData()">Uložit IC údaje</button>
+          </div>
+        </div>
+      </div>
+
     </div>
 
 
@@ -470,6 +560,51 @@ function renderProfil(req, user, aliases) {
 
     renderAliases();
 
+    let pendingCardPhoto = null;
+
+    function setCardPhotoPreview(src){
+      const zone=document.getElementById('cardPhotoZone');
+      const img=document.getElementById('cardPhotoPreview');
+      if(src){img.src=src;img.style.display='block';zone.classList.add('has-image');}
+      else{img.src='';img.style.display='none';zone.classList.remove('has-image');}
+    }
+    function clearCardPhoto(e){e.stopPropagation();pendingCardPhoto='';setCardPhotoPreview(null);}
+    function fileToDataUrlProfil(file,cb){
+      if(!file||!file.type||!file.type.startsWith('image/'))return;
+      const reader=new FileReader();reader.onload=()=>cb(reader.result);reader.readAsDataURL(file);
+    }
+    const cardPhotoZone=document.getElementById('cardPhotoZone');
+    const cardPhotoFile=document.getElementById('cardPhotoFile');
+    cardPhotoZone.addEventListener('click',()=>cardPhotoFile.click());
+    cardPhotoFile.addEventListener('change',(e)=>{const f=e.target.files&&e.target.files[0];fileToDataUrlProfil(f,(d)=>{pendingCardPhoto=d;setCardPhotoPreview(d);});});
+    cardPhotoZone.addEventListener('paste',(e)=>{
+      const items=e.clipboardData&&e.clipboardData.items;if(!items)return;
+      for(const item of items){if(item.type&&item.type.startsWith('image/')){const f=item.getAsFile();fileToDataUrlProfil(f,(d)=>{pendingCardPhoto=d;setCardPhotoPreview(d);});e.preventDefault();break;}}
+    });
+
+    async function loadCardData(){
+      const res=await fetch('/api/me/card-data');
+      const d=await res.json();
+      if(!d.ok)return;
+      document.getElementById('card-phone').value=d.data.phone||'';
+      document.getElementById('card-birthdate').value=d.data.birthdate||'';
+      document.getElementById('card-bank').value=d.data.bank||'';
+      if(d.data.photo)setCardPhotoPreview(d.data.photo);
+    }
+    loadCardData();
+
+    async function saveCardData(){
+      const phone=document.getElementById('card-phone').value.trim();
+      const birthdate=document.getElementById('card-birthdate').value;
+      const bank=document.getElementById('card-bank').value.trim();
+      const payload={phone,birthdate,bank};
+      if(pendingCardPhoto!==null)payload.photo=pendingCardPhoto;
+      const res=await fetch('/api/me/card-data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const d=await res.json();
+      if(d.ok){showToast('IC údaje uloženy');pendingCardPhoto=null;}
+      else showToast(d.error,true);
+    }
+
     async function loadPromotions(){
       const res=await fetch('/api/me/promotions');
       const d=await res.json();
@@ -525,6 +660,7 @@ async function requireDiscordMember(req, res, next) {
 
     req.session.realAccessLevel = newLevel;
     req.session.isAssociate = isAssociateOnly(roles);
+    try { db.setAccessLevel(req.session.userId, newLevel); } catch (e) {}
     // accessLevel zůstává realAccessLevel, POKUD není aktivní view-as (viz applyViewAs middleware)
     if (!req.session.viewAsLevel) req.session.accessLevel = newLevel;
     req.session.discordCheckedAt = now;
@@ -1424,6 +1560,11 @@ app.get('/api/card/:icName', requireAuth, (req, res) => {
       achievements: user.achievements || [],
       action_count: user.action_count || 0,
       promotions: user.promotions || [],
+      rank: RANK_LABEL_MAP[user.access_level || 3] || 'Member/Associate',
+      ic_photo: user.card_photo || null,
+      phone: user.card_phone || null,
+      birthdate: user.card_birthdate || null,
+      bank: user.card_bank || null,
     },
   });
 });
