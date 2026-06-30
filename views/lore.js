@@ -3,6 +3,18 @@
 const { baseStyles } = require('../styles');
 const { renderNav } = require('../nav');
 
+const QUOTES = [
+  '„Nechtějí být známí tím, jak hlasitě o sobě dávají vědět, ale tím, čeho dokážou dosáhnout."',
+  '„Důvěra se nedává. Důvěra se vydobývá, čin po činu."',
+  '„Albion nestaví na strachu. Staví na slovu, které platí."',
+  '„Kdo nemá ambice, nemá v Albionu místo."',
+];
+
+function pickQuoteOfDay() {
+  const day = Math.floor(Date.now() / 86400000); // mění se jednou denně
+  return QUOTES[day % QUOTES.length];
+}
+
 function renderLore(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -65,7 +77,7 @@ Albion zůstává organizací postavenou na ambicích, loajalitě a společné v
         <div class="toc-item"><span class="toc-num">II</span><span>Působení v Los Santos</span></div>
         <div class="toc-item"><span class="toc-num">III</span><span>Současnost</span></div>
         <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:var(--font-display);font-style:italic;font-size:0.97rem;color:var(--ivory-faint);line-height:1.85">
-          „Nechtějí být známí tím, jak hlasitě o sobě dávají vědět, ale tím, čeho dokážou dosáhnout."
+          ${pickQuoteOfDay()}
         </div>
       </div>
     </div>
