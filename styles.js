@@ -1126,6 +1126,29 @@ function baseStyles() {
       /* Onboarding dots */
       .onb-dot{width:6px;height:6px;border-radius:50%;background:var(--border-brass);display:inline-block}
       .onb-dot.active{background:var(--oxblood-bright)}
+
+      /* ══════════════════════════════════════════════
+         UPLOAD ZONE — fotka (profil / trading karta)
+         ══════════════════════════════════════════════ */
+      .upload-zone{
+        position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+        gap:0.5rem;background:var(--panel3);border:1px dashed var(--border-brass);
+        cursor:pointer;transition:border-color 0.2s,background 0.2s;color:var(--ivory-faint);
+        overflow:hidden;text-align:center;
+      }
+      .upload-zone:hover,.upload-zone:focus{border-color:var(--brass);color:var(--ivory-dim);outline:none}
+      .upload-zone svg{width:26px;height:26px;opacity:0.6}
+      .upload-zone-text{font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.02em;line-height:1.5}
+      .upload-zone-text strong{color:var(--brass-bright);font-weight:400}
+      .upload-preview{position:absolute;inset:0;width:100%;height:100%}
+      .upload-zone.has-image svg,.upload-zone.has-image .upload-zone-text{display:none}
+      .upload-clear{
+        position:absolute;top:0.3rem;right:0.3rem;z-index:2;
+        width:20px;height:20px;background:rgba(0,0,0,0.6);color:var(--ivory);
+        border:1px solid var(--border-brass);cursor:pointer;display:none;
+        align-items:center;justify-content:center;font-size:0.6rem;line-height:1;
+      }
+      .upload-zone.has-image .upload-clear{display:flex}
     </style>
   `;
 }
