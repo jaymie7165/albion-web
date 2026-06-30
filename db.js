@@ -136,4 +136,25 @@ db.findByIcName = (icName) => {
   return users.find(u => u.ic_name === icName) || null;
 };
 
+// ── IC ÚDAJE PRO TRADING KARTU ──
+db.setCardData = (id, data) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (!u) return false;
+  if (data.phone !== undefined) u.card_phone = data.phone || null;
+  if (data.birthdate !== undefined) u.card_birthdate = data.birthdate || null;
+  if (data.bank !== undefined) u.card_bank = data.bank || null;
+  if (data.photo !== undefined) u.card_photo = data.photo || null;
+  save(users);
+  return true;
+};
+
+// ── PRO ZOBRAZENÍ HODNOSTI NA TRADING KARTĚ (persistuje poslední známý level) ──
+db.setAccessLevel = (id, level) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.access_level = level; save(users); return true; }
+  return false;
+};
+
 module.exports = db;
