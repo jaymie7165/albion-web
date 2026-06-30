@@ -92,4 +92,12 @@ function renderForbidden(req) {
   </body></html>`;
 }
 
-module.exports = { ROLE_IDS, LEVELS, levelFromRoleIds, canAccess, requireAccess, PAGE_ACCESS };
+// Vrátí true, pokud uživatel má roli ASSOCIATE (a žádnou vyšší)
+function isAssociateOnly(roleIds) {
+  if (!Array.isArray(roleIds) || !roleIds.length) return true; // bez rolí = bereme jako nejnižší
+  const hasHigher = roleIds.some(rid => ROLE_ID_TO_KEY[rid] && ROLE_ID_TO_KEY[rid] !== 'ASSOCIATE');
+  const hasAssociate = roleIds.some(rid => ROLE_ID_TO_KEY[rid] === 'ASSOCIATE');
+  return hasAssociate && !hasHigher;
+}
+
+module.exports = { ROLE_IDS, LEVELS, levelFromRoleIds, canAccess, requireAccess, PAGE_ACCESS, isAssociateOnly };
