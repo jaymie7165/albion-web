@@ -12,9 +12,10 @@ const sheets  = require('./sheets');
 
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
-const { levelFromRoleIds, requireAccess, canAccess } = require('./roles');
+const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
 
 const { CONFIG, WEED_PLANT } = require('./constants');
+const { makeStore } = require('./content-store');
 const { renderHome } = require('./views/home');
 const { renderDashboard } = require('./views/sklad');
 const { renderNastenska } = require('./views/nastenska');
@@ -28,6 +29,9 @@ const { renderWeedSazeni } = require('./views/weed-sazeni');
 const { renderBlackbook } = require('./views/blackbook');
 const { renderProfitCentrum } = require('./views/profit-centrum');
 const { renderAuth } = require('./views/auth');
+const { renderLeaderboard } = require('./views/leaderboard');
+const { renderCard } = require('./views/card');
+const { renderGallery } = require('./views/gallery');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -57,6 +61,7 @@ app.use(session({
 // routy včetně SSE /api/events a /home. Dřív byla registrace až dole v souboru, takže
 // část stránek a živé notifikace kontrolu přeskakovaly.
 app.use(requireDiscordMember);
+app.use(applyViewAs);
 
 // ── TRVALÉ ÚLOŽIŠTĚ ──────────────────────────────────────────────────────────
 // Na Railway je k službě připojený Volume (persistentní disk) — Railway sám
@@ -68,6 +73,55 @@ app.use(requireDiscordMember);
 const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) { try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { console.error('[DATA_DIR]', e.message); } }
 console.log(`[STORAGE] Trvalá data se ukládají do: ${DATA_DIR}${process.env.RAILWAY_VOLUME_MOUNT_PATH ? ' (Railway Volume)' : ' (lokální složka — NEPŘETRVÁ na Railway bez Volume!)'}`);
+
+// ── EDITOVATELNÝ OBSAH (Kodex/Lore/Hierarchy) — zatím bez defaultů z kódu,
+// store se naplní prázdným polem dokud nebude proveden refaktor views/*-default.js.
+// Endpointy jsou připravené pro budoucí admin UI.
+const kodexStore = makeStore(DATA_DIR, 'content-kodex.json', []);
+const loreStore  = makeStore(DATA_DIR, 'content-lore.json', []);
+const hierStore  = makeStore(DATA_DIR, 'content-hierarchy.json', []);
+
+app.get('/api/content/:key', requireAuth, (req, res) => {
+  const stores = { kodex: kodexStore, lore: loreStore, hierarchy: hierStore };
+  const store = stores[req.params.key];
+  if (!store) return res.status(404).json({ ok: false });
+  res.json({ ok: true, data: store.load() });
+});
+
+app.post('/api/content/:key', requireAuth, requireAccess('audit'), (req, res) => {
+  const stores = { kodex: kodexStore, lore: loreStore, hierarchy: hierStore };
+  const store = stores[req.params.key];
+  if (!store) return res.status(404).json({ ok: false });
+  store.save(req.body.data);
+  res.json({ ok: true });
+});
+
+// ── SEZÓNNÍ VZHLED ──
+const SEASON_FILE = path.join(DATA_DIR, 'season.json');
+function loadSeason() { try { return JSON.parse(fs.readFileSync(SEASON_FILE, 'utf8')).season || 'none'; } catch { return 'none'; } }
+function saveSeason(season) { try { fs.writeFileSync(SEASON_FILE, JSON.stringify({ season })); } catch(e){} }
+
+app.get('/api/season', requireAuth, (req, res) => res.json({ ok: true, season: loadSeason() }));
+app.post('/api/season', requireAuth, requireAccess('audit'), (req, res) => {
+  const allowed = ['none','vanoce','halloween','novy-rok'];
+  const season = (req.body.season || 'none').toString();
+  if (!allowed.includes(season)) return res.json({ ok: false, error: 'Neplatný motiv' });
+  saveSeason(season);
+  broadcastSSE('seasonChange', { season });
+  res.json({ ok: true });
+});
+
+// ── GALERIE ORGANIZACE ──
+const GALLERY_FILE = path.join(DATA_DIR, 'gallery.json');
+const GALLERY_UPLOADS_DIR = path.join(DATA_DIR, 'gallery-uploads');
+if (!fs.existsSync(GALLERY_UPLOADS_DIR)) { try { fs.mkdirSync(GALLERY_UPLOADS_DIR, { recursive: true }); } catch(e){ console.error('[GALLERY]', e.message); } }
+function loadGallery() { try { return JSON.parse(fs.readFileSync(GALLERY_FILE, 'utf8')) || []; } catch { return []; } }
+function saveGallery(items) { try { fs.writeFileSync(GALLERY_FILE, JSON.stringify(items, null, 2)); } catch(e){ console.error('[GALLERY]', e.message); } }
+
+app.get('/gallery-uploads/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  res.sendFile(path.join(GALLERY_UPLOADS_DIR, safeName), (err) => { if (err) res.status(404).end(); });
+});
 
 // Fotky vozů servírujeme vlastní route, aby mohly ležet na Volume mimo public/
 // a přitom byly dostupné na stejné URL jako dřív (/garage-uploads/soubor.jpg).
@@ -107,15 +161,17 @@ function saveGarage(cars) {
   try { fs.writeFileSync(GARAGE_FILE, JSON.stringify(cars, null, 2)); } catch (e) { console.error('[GARAGE]', e.message); }
 }
 // Uloží base64 obrázek (data URL) na disk a vrátí veřejnou cestu, nebo null při chybě/neplatném vstupu.
-function saveGarageImage(dataUrl, existingPath) {
+const { addWatermark } = require('./watermark');
+async function saveGarageImage(dataUrl, existingPath) {
   if (!dataUrl || typeof dataUrl !== 'string') return existingPath || null;
   const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
   if (!match) return existingPath || null;
   const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
-  const buffer = Buffer.from(match[2], 'base64');
+  let buffer = Buffer.from(match[2], 'base64');
   if (buffer.length > 8 * 1024 * 1024) return existingPath || null; // 8MB strop
   const filename = `car_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`;
   try {
+    buffer = await addWatermark(buffer);
     fs.writeFileSync(path.join(GARAGE_UPLOADS_DIR, filename), buffer);
     // Smaž starý obrázek, pokud existuje a je z naší upload složky
     if (existingPath && existingPath.startsWith('/garage-uploads/')) {
@@ -259,12 +315,17 @@ app.post('/login/password', async (req, res) => {
   try {
     const roles = await discord.getMemberRoles(dUser.id);
     req.session.accessLevel = levelFromRoleIds(roles);
+    req.session.realAccessLevel = req.session.accessLevel;
+    req.session.isAssociate = isAssociateOnly(roles);
     req.session.discordCheckedAt = Date.now();
   } catch (e) {
     console.error('[LOGIN ROLES]', e.message);
     req.session.accessLevel = 3; // fail-safe — nejnižší úroveň přístupu
+    req.session.realAccessLevel = 3;
+    req.session.isAssociate = true;
   }
   try { db.setLastLogin(user.id, new Date().toISOString()); } catch (e) { console.error('[LOGIN]', e.message); }
+  try { require('./achievements').checkTenureAchievements(user.id, user.created_at); } catch (e) {}
   res.redirect('/home');
 });
 
@@ -336,7 +397,22 @@ function renderProfil(req, user, aliases) {
         <button class="btn-submit" style="margin-top:0.8rem" onclick="saveAliases()">Uložit aliasy</button>
       </div>
 
+      <div class="card">
+        <div class="card-header"><span class="card-title">Historie povýšení</span><span class="card-badge">Růst v organizaci</span></div>
+        <div id="promotions-list"><div class="ledger-loading">Načítám…</div></div>
+        ${!req.session.isAssociate ? `<a href="/karta" class="btn-submit" style="display:block;text-align:center;text-decoration:none;margin-top:1rem">Moje trading karta</a>` : ''}
+      </div>
+
+      ${req.session.realAccessLevel === 1 ? `
+      <div class="card">
+        <div class="card-header"><span class="card-title">Sezónní vzhled</span><span class="card-badge">Founder/Council</span></div>
+        <select id="season-select" onchange="setSeason(this.value)">
+          <option value="none">Žádný</option><option value="vanoce">Vánoce</option><option value="halloween">Halloween</option><option value="novy-rok">Nový rok</option>
+        </select>
+      </div>` : ''}
+
     </div>
+
 
     <div style="margin-top:2rem;padding:1rem 1.4rem;background:var(--panel2);border:1px solid var(--border);font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)">
       <strong style="color:var(--brass)">Tvůj profil:</strong>
@@ -393,6 +469,22 @@ function renderProfil(req, user, aliases) {
     }
 
     renderAliases();
+
+    async function loadPromotions(){
+      const res=await fetch('/api/me/promotions');
+      const d=await res.json();
+      const wrap=document.getElementById('promotions-list');
+      if(!d.promotions||!d.promotions.length){wrap.innerHTML=ledgerEmptyHTML('Zatím žádné povýšení',true);return;}
+      wrap.innerHTML=d.promotions.slice().reverse().map(p=>
+        '<div class="manifest-row"><span class="mr-name">'+p.fromLabel+' → '+p.toLabel+'</span><span class="mr-dots"></span><span class="mr-val">'+new Date(p.at).toLocaleDateString('cs-CZ')+'</span></div>'
+      ).join('');
+    }
+    loadPromotions();
+
+    ${req.session.realAccessLevel === 1 ? `
+    fetch('/api/season').then(r=>r.json()).then(d=>{const sel=document.getElementById('season-select');if(sel)sel.value=d.season;});
+    async function setSeason(season){await fetch('/api/season',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({season})});showToast('Sezónní motiv změněn');}
+    ` : ''}
   </script>
   </body></html>`;
 }
@@ -423,7 +515,18 @@ async function requireDiscordMember(req, res, next) {
       if (isApi) return res.json({ ok: false, error: 'Přístup odepřen — nejsi na Discord serveru' });
       return res.redirect('/login?error=not_on_server');
     }
-    req.session.accessLevel = levelFromRoleIds(roles);
+    const newLevel = levelFromRoleIds(roles);
+
+    // Detekce povýšení (snížení levelu = vyšší práva) → historie + gratulační banner
+    if (req.session.realAccessLevel !== undefined && newLevel < req.session.realAccessLevel) {
+      const RANK_LABEL = { 1: 'Council', 2: 'Senior Member', 3: 'Member' };
+      try { db.addPromotion(req.session.userId, req.session.realAccessLevel, newLevel, RANK_LABEL[req.session.realAccessLevel]||'—', RANK_LABEL[newLevel]||'—'); } catch(e){}
+    }
+
+    req.session.realAccessLevel = newLevel;
+    req.session.isAssociate = isAssociateOnly(roles);
+    // accessLevel zůstává realAccessLevel, POKUD není aktivní view-as (viz applyViewAs middleware)
+    if (!req.session.viewAsLevel) req.session.accessLevel = newLevel;
     req.session.discordCheckedAt = now;
     return next();
   } catch (err) {
@@ -436,6 +539,35 @@ async function requireDiscordMember(req, res, next) {
 
 // (Registrace requireDiscordMember byla přesunuta hned za session middleware výše,
 // aby platila i pro SSE /api/events a všechny ostatní routy.)
+
+// ── VIEW AS — Founder/Council mohou simulovat nižší roli pro testování ──────
+function applyViewAs(req, res, next) {
+  if (req.session && req.session.userId) {
+    const real = req.session.realAccessLevel ?? req.session.accessLevel ?? 3;
+    if (req.session.viewAsLevel && real === 1) {
+      // Pouze level 1 (Founder/Council) smí mít aktivní view-as
+      req.session.accessLevel = req.session.viewAsLevel;
+    } else {
+      req.session.viewAsLevel = null;
+      req.session.accessLevel = real;
+    }
+  }
+  next();
+}
+
+app.post('/api/view-as', requireAuth, (req, res) => {
+  const real = req.session.realAccessLevel ?? req.session.accessLevel ?? 3;
+  if (real !== 1) return res.status(403).json({ ok: false, error: 'Pouze Founder/Council může používat View As' });
+  const { level } = req.body; // 1,2,3 nebo null pro vypnutí
+  if (level === null || level === undefined) {
+    req.session.viewAsLevel = null;
+  } else {
+    const lvl = parseInt(level);
+    if (![1,2,3].includes(lvl)) return res.json({ ok: false, error: 'Neplatná úroveň' });
+    req.session.viewAsLevel = lvl;
+  }
+  res.json({ ok: true, viewAsLevel: req.session.viewAsLevel });
+});
 
 // ── VALIDAČNÍ HELPERY ─────────────────────────────────────────────────────────
 function inEnum(value, allowed) { return allowed.includes((value || '').toString().toUpperCase()); }
@@ -471,6 +603,7 @@ app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) =>
   await sheets.appendRow('Zbraně', [cas, typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe || '-']);
   await discord.notifyAudit('Zbraně', uzivatel, discordUser, `${typUp} — ${polozkaTrim} (${qty} ks) [${kategorie}]${ucelSafe ? ' | Účel: ' + ucelSafe : ''}`);
   broadcastSSE('skladUpdate', { sekce: 'zbrane', typ: typUp, polozka: polozkaTrim, qty, uzivatel, cas });
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   res.json({ ok: true });
 });
 
@@ -491,6 +624,7 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   await sheets.appendRow('Weed', [cas, typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel]);
   await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
   broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   res.json({ ok: true, celkVyroba: ceny.vyroba * qty, celkProdej: ceny.prodej * qty });
 });
 
@@ -510,6 +644,7 @@ app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => 
   await sheets.appendRow('Drogy', [cas, typUp, drogaTrim, qty, '-', '-', uzivatel]);
   await discord.notifyAudit('Drogy', uzivatel, discordUser, `${typUp} — ${drogaTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'drogy', typ: typUp, droga: drogaTrim, qty, uzivatel, cas });
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   res.json({ ok: true });
 });
 
@@ -551,6 +686,7 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   await discord.notifyChemky(typUp, chemikalieTrim, qty, uzivatel);
   await discord.notifyAudit('Chemky', uzivatel, discordUser, `${typUp} — ${chemikalieTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'chemky', typ: typUp, chemikalie: chemikalieTrim, qty, uzivatel, cas });
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   res.json({ ok: true });
 });
 
@@ -581,6 +717,65 @@ app.post('/api/smena', requireAuth, requireAccess('sklad'), async (req, res) => 
   broadcastSSE('ucetUpdate', { typ: 'SMĚNA', castka: amount, valuta: zValuta, poznamka, uzivatel, cas });
 
   res.json({ ok: true, zValuta, naValuta, castka: amount });
+});
+
+// ── API — BULK SKLAD (více položek najednou) ──────────────────────────────
+const BULK_SEKCE = {
+  zbrane: { sheet: 'Zbraně', allowedList: () => [...CONFIG.zbrane, ...CONFIG.naboje, ...CONFIG.akce] },
+  weed:   { sheet: 'Weed',   allowedList: () => CONFIG.weedOdrudy },
+  drogy:  { sheet: 'Drogy',  allowedList: () => CONFIG.drogyTypy },
+  chemky: { sheet: 'Chemky', allowedList: () => CONFIG.chemkyTypy },
+};
+
+app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res) => {
+  const { sekce, typ, items } = req.body; // items = [{ polozka, mnozstvi, kategorie?, ucel? }, ...]
+  const cfg = BULK_SEKCE[sekce];
+  if (!cfg) return res.json({ ok: false, error: 'Neplatná sekce skladu' });
+
+  const typUp = (typ || '').toString().toUpperCase();
+  if (!inEnum(typUp, TYP_SKLAD)) return res.json({ ok: false, error: 'Neplatný typ pohybu (VKLAD nebo VÝBĚR)' });
+
+  if (!Array.isArray(items) || !items.length) return res.json({ ok: false, error: 'Žádné položky k zápisu' });
+  if (items.length > 30) return res.json({ ok: false, error: 'Max 30 položek najednou' });
+
+  const allowed = cfg.allowedList();
+  const validated = [];
+  for (const it of items) {
+    const polozka = (it.polozka || '').toString().trim();
+    const qty = parseInt(it.mnozstvi);
+    if (!inList(polozka, allowed)) return res.json({ ok: false, error: `Nepovolená položka: ${polozka}` });
+    if (!isQty(qty)) return res.json({ ok: false, error: `Neplatné množství u položky ${polozka}` });
+    let ucelSafe = null;
+    if (sekce === 'zbrane' && it.ucel) {
+      ucelSafe = sanitizeText(it.ucel);
+      if (ucelSafe === null) return res.json({ ok: false, error: `Účel je příliš dlouhý u položky ${polozka}` });
+    }
+    validated.push({ polozka, qty, kategorie: it.kategorie || null, ucel: ucelSafe });
+  }
+
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+
+  for (const v of validated) {
+    if (sekce === 'zbrane') {
+      await sheets.appendRow('Zbraně', [cas, typUp, v.polozka, v.qty, v.kategorie || '?', uzivatel, v.ucel || '-']);
+    } else if (sekce === 'weed') {
+      const ceny = CONFIG.weedCeny[v.polozka] || { vyroba: 100, prodej: 150 };
+      await sheets.appendRow('Weed', [cas, typUp, v.polozka, v.qty, ceny.vyroba, ceny.prodej, uzivatel]);
+    } else if (sekce === 'drogy') {
+      await sheets.appendRow('Drogy', [cas, typUp, v.polozka, v.qty, '-', '-', uzivatel]);
+    } else if (sekce === 'chemky') {
+      await sheets.appendRow('Chemky', [cas, typUp, v.polozka, v.qty, uzivatel]);
+    }
+  }
+
+  const shrnuti = validated.map(v => `${v.polozka} (${v.qty} ks)`).join(', ');
+  await discord.notifyAudit(cfg.sheet, uzivatel, discordUser, `${typUp} (HROMADNĚ ×${validated.length}) — ${shrnuti}`);
+  broadcastSSE('skladUpdate', { sekce, typ: typUp, polozka: `${validated.length} položek`, qty: validated.reduce((a,v)=>a+v.qty,0), uzivatel, cas });
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+
+  res.json({ ok: true, count: validated.length });
 });
 
 // ── API — WEED SÁZENÍ (odpočty růstu, sdílené pro všechny) ────────────────────
@@ -643,7 +838,7 @@ app.get('/api/bot/garage', (req, res) => {
   res.json({ ok: true, cars });
 });
 
-app.post('/api/garage', requireAuth, (req, res) => {
+app.post('/api/garage', requireAuth, async (req, res) => {
   let { spz, nazev, cena, kupil, ucel, image } = req.body;
   const ucelRaw = ucel;
   spz = sanitizeText(spz, 12);
@@ -657,7 +852,7 @@ app.post('/api/garage', requireAuth, (req, res) => {
   if (!isAmount(cenaNum, 50_000_000)) return res.json({ ok: false, error: 'Neplatná cena v SAD' });
   if (ucelRaw && !ucel) return res.json({ ok: false, error: 'Účel je příliš dlouhý (max 400 znaků)' });
 
-  const imagePath = saveGarageImage(image, null);
+  const imagePath = await saveGarageImage(image, null);
 
   const cars = loadGarage();
   const car = {
@@ -683,7 +878,7 @@ app.post('/api/garage', requireAuth, (req, res) => {
   res.json({ ok: true, car });
 });
 
-app.put('/api/garage/:id', requireAuth, (req, res) => {
+app.put('/api/garage/:id', requireAuth, async (req, res) => {
   const cars = loadGarage();
   const car = cars.find(c => c.id === req.params.id);
   if (!car) return res.json({ ok: false, error: 'Vůz nenalezen' });
@@ -704,7 +899,7 @@ app.put('/api/garage/:id', requireAuth, (req, res) => {
   car.cena = cenaNum;
   car.kupil = kupil || car.kupil;
   car.ucel = ucel || '';
-  if (image) car.image = saveGarageImage(image, car.image);
+  if (image) car.image = await saveGarageImage(image, car.image);
   else if (image === '') {
     // Uživatel smazal fotku — odstraníme starý soubor a vynulujeme cestu
     if (car.image && car.image.startsWith('/garage-uploads/')) {
@@ -729,6 +924,40 @@ app.delete('/api/garage/:id', requireAuth, (req, res) => {
   cars = cars.filter(c => c.id !== req.params.id);
   saveGarage(cars);
   broadcastSSE('garageUpdate', { action: 'remove', id: req.params.id });
+  res.json({ ok: true });
+});
+
+// ── API — GALERIE ORGANIZACE ──────────────────────────────────────────────────
+app.get('/api/gallery', requireAuth, (req, res) => {
+  if (req.session.isAssociate) return res.status(403).json({ ok: false, error: 'Galerie je dostupná od hodnosti Member' });
+  res.json({ ok: true, items: loadGallery().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)) });
+});
+
+app.post('/api/gallery', requireAuth, requireAccess('audit'), async (req, res) => {
+  const { image, caption } = req.body;
+  if (!image) return res.json({ ok: false, error: 'Chybí obrázek' });
+  const match = image.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) return res.json({ ok: false, error: 'Neplatný formát obrázku' });
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  let buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 8*1024*1024) return res.json({ ok: false, error: 'Obrázek je příliš velký (max 8MB)' });
+  const filename = `gal_${Date.now()}_${Math.floor(Math.random()*1e6)}.${ext}`;
+  buffer = await addWatermark(buffer);
+  fs.writeFileSync(path.join(GALLERY_UPLOADS_DIR, filename), buffer);
+  const items = loadGallery();
+  const item = { id: filename, image: `/gallery-uploads/${filename}`, caption: (caption||'').toString().slice(0,200), pridal: req.session.icName, createdAt: Date.now() };
+  items.push(item);
+  saveGallery(items);
+  res.json({ ok: true, item });
+});
+
+app.delete('/api/gallery/:id', requireAuth, requireAccess('audit'), (req, res) => {
+  let items = loadGallery();
+  const item = items.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nenalezeno' });
+  fs.unlink(path.join(GALLERY_UPLOADS_DIR, path.basename(item.image)), () => {});
+  items = items.filter(i => i.id !== req.params.id);
+  saveGallery(items);
   res.json({ ok: true });
 });
 
@@ -1059,6 +1288,168 @@ app.get('/api/ic-names', requireAuth, (req, res) => {
   } catch (e) {
     res.json({ ok: false, names: [] });
   }
+});
+
+// ── API — LEADERBOARD AKTIVITY ─────────────────────────────────────────────
+app.get('/api/leaderboard', requireAuth, async (req, res) => {
+  try {
+    const [zbraneRows, weedRows, drogyRows, chemkyRows] = await Promise.all([
+      sheets.getRows('Zbraně').catch(() => []),
+      sheets.getRows('Weed').catch(() => []),
+      sheets.getRows('Drogy').catch(() => []),
+      sheets.getRows('Chemky').catch(() => []),
+    ]);
+    const allUsers = db.prepare('SELECT * FROM users').all();
+    const nameMap = {};
+    allUsers.forEach(u => {
+      if (u.ic_name) {
+        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
+        if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
+        if (u.discord_aliases) { try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {} }
+      }
+    });
+    const norm = (name) => {
+      if (!name) return null;
+      const lower = name.toString().trim().toLowerCase();
+      if (nameMap[lower]) return nameMap[lower];
+      for (const [k, ic] of Object.entries(nameMap)) if (k.includes(lower) || lower.includes(k)) return ic;
+      return name.toString().trim();
+    };
+
+    const parseCas = (cas) => {
+      if (!cas) return 0;
+      const s = cas.toString().trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s).getTime() || 0;
+      const m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4}),?\s*(\d{1,2}):(\d{2}):(\d{2})/);
+      if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
+      return 0;
+    };
+
+    const counts = {};
+    const bump = (member) => {
+      if (!member) return;
+      if (!counts[member]) counts[member] = { acts: 0, lastTs: 0 };
+      counts[member].acts++;
+    };
+    const addRows = (rows, memberCol) => {
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
+        const member = norm(r[memberCol]);
+        bump(member);
+        if (member) counts[member].lastTs = Math.max(counts[member].lastTs, parseCas(r[0]));
+      }
+    };
+    addRows(zbraneRows, 5);
+    addRows(weedRows, 6);
+    addRows(drogyRows, 6);
+    addRows(chemkyRows, 4);
+
+    const list = Object.entries(counts).map(([member, c]) => ({ member, acts: c.acts, lastTs: c.lastTs }));
+    list.sort((a, b) => b.acts - a.acts);
+
+    res.json({ ok: true, leaderboard: list.slice(0, 15), generatedAt: sheets.timestamp() });
+  } catch (e) {
+    console.error('[LEADERBOARD]', e);
+    res.json({ ok: false, leaderboard: [] });
+  }
+});
+
+// ── API — TÝDENNÍ SOUHRN ───────────────────────────────────────────────────
+app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (req, res) => {
+  try {
+    const ucetRows = await sheets.getRows('Účetnictví').catch(() => []);
+    const now = Date.now(), WEEK = 7*86400000;
+    let income=0, expense=0, ops=0;
+    for (let i=1;i<ucetRows.length;i++){
+      const r=ucetRows[i]; if(!r||!r[0])continue;
+      const ts = (()=>{const s=(r[0]||'').toString();const m=s.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4}),?\s*(\d{1,2}):(\d{2}):(\d{2})/);return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0;})();
+      if (now-ts>WEEK || ts===0) continue;
+      ops++;
+      const castka=parseFloat((r[2]||'0').replace(',','.'))||0;
+      if((r[1]||'').toUpperCase()==='PŘÍJEM') income+=castka; else expense+=castka;
+    }
+    res.json({ ok:true, income, expense, net: income-expense, ops });
+  } catch(e){ res.json({ ok:false }); }
+});
+
+// ── API — PROFIL: PROMOTIONS, ACHIEVEMENTY, ONBOARDING ─────────────────────
+app.get('/api/me/promotions', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  res.json({ ok: true, promotions: user?.promotions || [] });
+});
+
+app.get('/api/me/promotions/pending', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  if (!user?.pendingPromotionAck || !user.promotions?.length) return res.json({ ok: true, pending: false });
+  const last = user.promotions[user.promotions.length - 1];
+  res.json({ ok: true, pending: true, toLabel: last.toLabel });
+});
+
+app.post('/api/me/promotions/ack', requireAuth, (req, res) => {
+  db.ackPromotion(req.session.userId);
+  res.json({ ok: true });
+});
+
+app.get('/api/me/achievements', requireAuth, (req, res) => {
+  const { ACHIEVEMENTS } = require('./achievements');
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  const earned = user?.achievements || [];
+  res.json({ ok: true, earned, catalog: ACHIEVEMENTS });
+});
+
+app.get('/api/me/onboarding', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  res.json({ ok: true, seen: !!user?.onboarding_seen });
+});
+
+app.post('/api/me/onboarding/seen', requireAuth, (req, res) => {
+  db.markOnboardingSeen(req.session.userId);
+  res.json({ ok: true });
+});
+
+// ── API — TRADING KARTA ČLENA ──────────────────────────────────────────────
+app.get('/api/card/:icName', requireAuth, (req, res) => {
+  const user = db.findByIcName(req.params.icName);
+  if (!user) return res.json({ ok: false, error: 'Člen nenalezen' });
+  const accessLevel = req.session.realAccessLevel || req.session.accessLevel || 3;
+  // Associate kartu nevidí — ani vlastní, ani cizí
+  if (accessLevel >= 3) return res.json({ ok: false, error: 'Karta je dostupná od hodnosti Member' });
+  res.json({
+    ok: true,
+    card: {
+      ic_name: user.ic_name,
+      discord_username: user.discord_username,
+      avatar_url: user.avatar_url || null,
+      created_at: user.created_at,
+      achievements: user.achievements || [],
+      action_count: user.action_count || 0,
+      promotions: user.promotions || [],
+    },
+  });
+});
+
+app.get('/karta/:icName?', requireAuth, (req, res) => {
+  const target = req.query.icName || req.params.icName || req.session.icName;
+  res.send(renderCard(req, target));
+});
+
+// ── VEŘEJNÁ NÁBOROVÁ STRÁNKA (bez přihlášení) ──────────────────────────────
+app.get('/nabor', (req, res) => {
+  res.send(`<!DOCTYPE html><html lang="cs"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Albion — Připoj se</title>
+  ${require('./styles').baseStyles()}
+  </head><body>
+  <main style="text-align:center;padding-top:5rem">
+    <img src="/logo.png" style="width:140px;margin-bottom:2rem;filter:drop-shadow(0 0 30px rgba(110,20,35,0.6))">
+    <h1 class="page-title" style="font-size:3.5rem">ALBION</h1>
+    <p class="page-sub" style="max-width:560px;margin:1rem auto 3rem">Organizace postavená na ambicích, loajalitě a důvěře. Nehledáme hlasité — hledáme schopné.</p>
+    <div class="folio-footnote" style="text-align:left;max-width:600px;margin:0 auto 2rem">
+      <strong>Poslání.</strong> Budovat dlouhodobý vliv v Los Santos skrze kontakty, důvěru a profesionalitu — ne násilí.
+    </div>
+    <a href="/register" class="auth-btn" style="max-width:320px;margin:0 auto;display:block">Žádost o členství</a>
+  </main>
+  </body></html>`);
 });
 
 // ── API — DEBUG SHEETS (dočasný endpoint pro diagnostiku) ─────────────────────
@@ -1619,6 +2010,11 @@ app.get('/statistiky', requireAuth, requireAccess('statistiky'), (req, res) => r
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
+app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
+app.get('/galerie', requireAuth, (req, res) => {
+  if (req.session.isAssociate) return res.status(403).send('Galerie je dostupná od hodnosti Member. <a href="/home">Zpět</a>');
+  res.send(renderGallery(req));
+});
 
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
