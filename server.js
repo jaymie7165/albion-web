@@ -32,7 +32,6 @@ const { renderAuth } = require('./views/auth');
 const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
-const { renderAlbion } = require('./views/albion');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -1515,6 +1514,16 @@ app.get('/api/me/promotions', requireAuth, (req, res) => {
   res.json({ ok: true, promotions: user?.promotions || [] });
 });
 
+// ── ALBION WORLD — expose stávající session dat pro React frontend (žádná nová logika) ──
+app.get('/api/me/session', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
+  const accessLevel = req.session.accessLevel || 3;
+  const pages = ['home','garaz','sklad','blackbook','profit-centrum','audit','statistiky','nastenska','hierarchy','kodex','lore','profil','galerie','karta','weed-sazeni'];
+  const permissions = pages.filter(p => canAccess(accessLevel, p));
+  res.json({ ok: true, icName: req.session.icName, accessLevel, photo, permissions });
+});
+
 app.get('/api/me/promotions/pending', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   if (!user?.pendingPromotionAck || !user.promotions?.length) return res.json({ ok: true, pending: false });
@@ -2158,13 +2167,17 @@ app.get('/galerie', requireAuth, (req, res) => {
   res.send(renderGallery(req));
 });
 
-// ── ALBION IMMERSIVE LAYER — prezentační vrstva nad stávající aplikací,
-// data i logika se beze změny znovupoužívají z existujících routes/DB. ──
-app.get('/albion', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
-  const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
-  res.send(renderAlbion(req, { photo }));
+// ── ALBION WORLD — samostatná React/R3F frontend aplikace (Vite build),
+// servírovaná Expressem jako statické soubory pod /albion-world/.
+// Backend/data/session zůstávají beze změny — viz /api/me/session výše.
+const ALBION_WORLD_DIST = path.join(__dirname, 'albion-world', 'dist');
+app.use('/albion-world', express.static(ALBION_WORLD_DIST));
+app.get('/albion-world*', requireAuth, (req, res) => {
+  res.sendFile(path.join(ALBION_WORLD_DIST, 'index.html'), (err) => {
+    if (err) res.status(503).send('Albion World není sestaven. Spusť: cd albion-world && npm install && npm run build');
+  });
 });
+app.get('/albion', requireAuth, (req, res) => res.redirect('/albion-world/'));
 
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
