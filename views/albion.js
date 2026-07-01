@@ -167,7 +167,7 @@ function renderAlbion(req, data) {
     .hotspot-card{position:absolute;left:50%;bottom:130%;transform:translateX(-50%) translateY(6px);min-width:190px;
       background:rgba(10,12,10,0.92);border:1px solid rgba(182,138,78,0.4);padding:0.7rem 0.9rem;opacity:0;pointer-events:none;
       transition:opacity .18s,transform .18s;box-shadow:0 12px 30px rgba(0,0,0,0.6)}
-    .hotspot:hover .hotspot-card{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:all}
+    .hotspot:hover .hotspot-card,.hotspot.open .hotspot-card{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:all}
     .hotspot-card .hc-title{font-family:'Cinzel',serif;font-size:0.72rem;letter-spacing:0.08em;color:#E0BD7F;margin-bottom:0.2rem}
     .hotspot-card .hc-sub{font-size:0.62rem;color:#B7AE99;line-height:1.5;margin-bottom:0.4rem}
     .hc-item{display:block;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.06em;color:#EDE6D4;text-decoration:none;
@@ -336,14 +336,24 @@ function renderAlbion(req, data) {
       el.style.left = h.x + '%';
       el.style.top = h.y + '%';
       if (h.kind === 'nav') {
-        const itemsHtml = h.items.map(it => \`<a class="hc-item" href="javascript:void(0)" onclick="event.stopPropagation();navTo('\${it.href}','\${it.label.replace(/'/g,"\\\\'")}',\${h.x},\${h.y})">\${it.label}</a>\`).join('');
+        const itemsHtml = h.items.map(it => \`<a class="hc-item" href="javascript:void(0)" onclick="event.stopPropagation();this.closest('.hotspot').classList.remove('open');navTo('\${it.href}','\${it.label.replace(/'/g,"\\\\'")}',\${h.x},\${h.y})">\${it.label}</a>\`).join('');
         el.innerHTML = \`<div class="hotspot-dot"></div><div class="hotspot-card"><div class="hc-title">\${h.label}</div><div class="hc-sub">\${h.sub}</div>\${itemsHtml}</div>\`;
-        el.addEventListener('click', () => { if (h.items.length === 1) navTo(h.items[0].href, h.items[0].label, h.x, h.y); });
+        el.addEventListener('click', (e) => {
+          if (h.items.length === 1) { navTo(h.items[0].href, h.items[0].label, h.x, h.y); return; }
+          // víc položek -> klik na tečku otevře/zavře kartičku (funguje i na dotyku, ne jen na hover)
+          e.stopPropagation();
+          const wasOpen = el.classList.contains('open');
+          document.querySelectorAll('.hotspot.open').forEach(o => o.classList.remove('open'));
+          if (!wasOpen) el.classList.add('open');
+        });
       } else {
         el.innerHTML = \`<div class="hotspot-dot"></div><div class="hotspot-card"><div class="hc-title">\${h.label}</div><div class="hc-sub hc-lamp-state" id="lampLabel-\${h.id}">Klikni pro změnu intenzity</div></div>\`;
         el.addEventListener('click', () => toggleLamp(h.id));
       }
       wrap.appendChild(el);
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.hotspot.open').forEach(o => o.classList.remove('open'));
     });
 
     // ══════════════════════════ CINEMATIC ZOOM + FOCUS MODE ══════════════════════════
