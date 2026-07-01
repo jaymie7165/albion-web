@@ -1,11 +1,11 @@
 {
   "name": "albion-web",
   "version": "2.0.0",
-  "description": "Albion Frakce — Webový dashboard",
+  "description": "Albion Frakce \u2014 Webov\u00fd dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "cd albion-world && npm install && npm run build"
+    "postinstall": "cd albion-world && npm install --include=dev && npm run build"
   },
   "engines": {
     "node": ">=18.0.0"
