@@ -32,6 +32,7 @@ const { renderAuth } = require('./views/auth');
 const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
+const { renderAlbion } = require('./views/albion');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -2178,7 +2179,11 @@ app.get('/albion-world*', requireAuth, (req, res) => {
   }
   res.sendFile(ALBION_WORLD_INDEX);
 });
-app.get('/albion', requireAuth, (req, res) => res.redirect('/albion-world/'));
+app.get('/albion', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
+  res.send(renderAlbion(req, { photo }));
+});
 
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
