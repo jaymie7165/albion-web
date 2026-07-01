@@ -32,6 +32,7 @@ const { renderAuth } = require('./views/auth');
 const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
+const { renderAlbion } = require('./views/albion');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -2155,6 +2156,14 @@ app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(re
 app.get('/galerie', requireAuth, (req, res) => {
   if (req.session.isAssociate) return res.status(403).send('Galerie je dostupná od hodnosti Member. <a href="/home">Zpět</a>');
   res.send(renderGallery(req));
+});
+
+// ── ALBION IMMERSIVE LAYER — prezentační vrstva nad stávající aplikací,
+// data i logika se beze změny znovupoužívají z existujících routes/DB. ──
+app.get('/albion', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
+  res.send(renderAlbion(req, { photo }));
 });
 
 
