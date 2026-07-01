@@ -1514,7 +1514,6 @@ app.get('/api/me/promotions', requireAuth, (req, res) => {
   res.json({ ok: true, promotions: user?.promotions || [] });
 });
 
-// ── ALBION WORLD — expose stávající session dat pro React frontend (žádná nová logika) ──
 app.get('/api/me/session', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
@@ -2167,15 +2166,17 @@ app.get('/galerie', requireAuth, (req, res) => {
   res.send(renderGallery(req));
 });
 
-// ── ALBION WORLD — samostatná React/R3F frontend aplikace (Vite build),
-// servírovaná Expressem jako statické soubory pod /albion-world/.
-// Backend/data/session zůstávají beze změny — viz /api/me/session výše.
+// ── ALBION WORLD — Vite/React build servírovaný jako statika ──
 const ALBION_WORLD_DIST = path.join(__dirname, 'albion-world', 'dist');
-app.use('/albion-world', express.static(ALBION_WORLD_DIST));
+const ALBION_WORLD_INDEX = path.join(ALBION_WORLD_DIST, 'index.html');
+app.use('/albion-world/assets', express.static(path.join(ALBION_WORLD_DIST, 'assets'), {
+  fallthrough: false, // chybějící asset = 404, ne index.html (jinak vzniká špatný MIME type)
+}));
 app.get('/albion-world*', requireAuth, (req, res) => {
-  res.sendFile(path.join(ALBION_WORLD_DIST, 'index.html'), (err) => {
-    if (err) res.status(503).send('Albion World není sestaven. Spusť: cd albion-world && npm install && npm run build');
-  });
+  if (!fs.existsSync(ALBION_WORLD_INDEX)) {
+    return res.status(503).send('Albion World není sestaven na serveru (chybí albion-world/dist). Zkontroluj build log — postinstall musí proběhnout úspěšně.');
+  }
+  res.sendFile(ALBION_WORLD_INDEX);
 });
 app.get('/albion', requireAuth, (req, res) => res.redirect('/albion-world/'));
 
