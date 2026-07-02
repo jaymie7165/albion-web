@@ -106,11 +106,9 @@ function renderAlbion(req, data) {
     .mood-winter .glow-window{opacity:.45;background:radial-gradient(circle,rgba(170,200,230,.35) 0%,transparent 72%)}
     .weather-mask{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden;
       clip-path:inset(2.0% 17.8% 49.6% 21.3%)}
-    #snowCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 1.2s}
+    #snowCanvas,#rainCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 1.2s}
     .weather-mask.w-snow #snowCanvas{opacity:1}
-    .weather-fog{position:absolute;inset:0;opacity:0;transition:opacity 1.4s;
-      background:radial-gradient(ellipse 90% 70% at 50% 45%,rgba(205,210,220,.22),transparent 72%)}
-    .weather-mask.w-fog .weather-fog{opacity:1}
+    .weather-mask.w-fog #rainCanvas{opacity:1}
     .grain-layer{position:fixed;inset:-40px;z-index:4;pointer-events:none;mix-blend-mode:overlay;
       background:url('/albion/grain.png');background-size:220px 220px;opacity:.35;
       animation:grainShift 0.6s steps(4) infinite}
@@ -203,7 +201,7 @@ function renderAlbion(req, data) {
     </div>
     <div class="weather-mask" id="weatherMask">
       <canvas id="snowCanvas"></canvas>
-      <div class="weather-fog"></div>
+      <canvas id="rainCanvas"></canvas>
     </div>
   </div>
 
@@ -315,8 +313,12 @@ function renderAlbion(req, data) {
     });
 
     const snowCv = document.getElementById('snowCanvas'), snowCtx = snowCv.getContext('2d');
-    let snowFlakes = [], snowRAF = null;
-    function resizeCanvas() { snowCv.width = window.innerWidth; snowCv.height = window.innerHeight; }
+    const rainCv = document.getElementById('rainCanvas'), rainCtx = rainCv.getContext('2d');
+    let snowFlakes = [], snowRAF = null, rainDrops = [], rainRAF = null;
+    function resizeCanvas() {
+      snowCv.width = window.innerWidth; snowCv.height = window.innerHeight;
+      rainCv.width = window.innerWidth; rainCv.height = window.innerHeight;
+    }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
     function manageSnow(on) {
@@ -341,6 +343,28 @@ function renderAlbion(req, data) {
         snowCtx.clearRect(0, 0, snowCv.width, snowCv.height);
       }
     }
+    function manageRain(on) {
+      if (on && !rainRAF) {
+        rainDrops = Array.from({ length: 140 }, () => ({
+          x: Math.random() * rainCv.width, y: Math.random() * rainCv.height,
+          len: 10 + Math.random() * 16, spd: 9 + Math.random() * 7, drift: -1.2 - Math.random(),
+        }));
+        const loop = () => {
+          rainCtx.clearRect(0, 0, rainCv.width, rainCv.height);
+          rainCtx.strokeStyle = 'rgba(200,220,255,0.35)'; rainCtx.lineWidth = 1.1;
+          rainDrops.forEach(d => {
+            rainCtx.beginPath(); rainCtx.moveTo(d.x, d.y); rainCtx.lineTo(d.x + d.drift * 2, d.y + d.len); rainCtx.stroke();
+            d.y += d.spd; d.x += d.drift;
+            if (d.y > rainCv.height) { d.y = -20; d.x = Math.random() * rainCv.width; }
+          });
+          rainRAF = requestAnimationFrame(loop);
+        };
+        loop();
+      } else if (!on && rainRAF) {
+        cancelAnimationFrame(rainRAF); rainRAF = null;
+        rainCtx.clearRect(0, 0, rainCv.width, rainCv.height);
+      }
+    }
 
     let actx = null, master = null, soundOn = false, padOn = false, nodes = {};
     function ensureAudio() {
@@ -348,6 +372,7 @@ function renderAlbion(req, data) {
       actx = new (window.AudioContext || window.webkitAudioContext)();
       master = actx.createGain(); master.gain.value = 0; master.connect(actx.destination);
       nodes.wind = makeWindNoise();
+      nodes.rain = makeFilteredNoise(4, 'bandpass', 3200, 0.6, 0);
       nodes.city = makeFilteredNoise(5, 'lowpass', 170, 0.4, 0.1);
       nodes.pad = makePad();
     }
@@ -398,6 +423,7 @@ function renderAlbion(req, data) {
     function applyEnvAudio(env) {
       if (!actx) return;
       fadeGain(nodes.wind.gain, (env === 'fog' || env === 'winter') ? 0.16 : 0.04);
+      fadeGain(nodes.rain.gain, env === 'fog' ? 0.3 : 0);
     }
     let masterVolume = 0.5;
     function toggleSound() {
@@ -527,6 +553,7 @@ function renderAlbion(req, data) {
       const mask = document.getElementById('weatherMask');
       mask.className = 'weather-mask' + (env === 'fog' ? ' w-fog' : env === 'winter' ? ' w-snow' : '');
       manageSnow(env === 'winter');
+      manageRain(env === 'fog');
       applyEnvAudio(env);
       setBackground(BG_BY_ENV[env] || BG_BY_ENV.night);
     }
