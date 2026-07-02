@@ -100,6 +100,7 @@ function renderAlbion(req, data) {
 
     .albion-stage{
       position:absolute;inset:0;overflow:hidden;
+      background:radial-gradient(ellipse 80% 60% at 50% 40%,#12161c 0%,#05070a 75%);
       transition:filter 1.6s ease;
       will-change:transform,filter;
     }
@@ -197,8 +198,9 @@ function renderAlbion(req, data) {
       box-shadow:0 16px 40px rgba(0,0,0,.6)}
     .a-settings.open{display:flex}
     .a-settings h4{font-family:'Cinzel',serif;font-size:0.68rem;letter-spacing:0.12em;color:#E0BD7F;margin-bottom:0.2rem}
-    .a-settings select,.a-settings input[type=range]{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(182,138,78,.3);
-      color:#EDE6D4;font-family:'Space Mono',monospace;font-size:0.62rem;padding:0.35rem;outline:none}
+    .a-settings select,.a-settings input[type=range]{width:100%;background:#15140F;border:1px solid rgba(182,138,78,.4);
+      color:#EDE6D4;font-family:'Space Mono',monospace;font-size:0.68rem;padding:0.4rem;outline:none}
+    .a-settings select option{background:#15140F;color:#EDE6D4}
     .a-settings .row{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
     .a-settings .row span{font-size:0.58rem;color:#B7AE99;letter-spacing:.06em}
     .a-mini-btns{display:flex;gap:.4rem;flex-wrap:wrap}
