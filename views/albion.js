@@ -99,16 +99,17 @@ function renderAlbion(req, data) {
     .zoom-wrap{position:fixed;inset:-4%;will-change:transform;transform-origin:50% 50%}
 
     .albion-stage{
-      position:absolute;inset:0;
-      background:url('/albion-office.jpg') center center / cover no-repeat;
+      position:absolute;inset:0;overflow:hidden;
       transition:filter 1.6s ease;
       will-change:transform,filter;
     }
-    .mood-dawn{filter:brightness(1.05) saturate(0.85) hue-rotate(-10deg)}
-    .mood-morning{filter:brightness(1.18) saturate(0.92) hue-rotate(-6deg)}
-    .mood-noon{filter:brightness(1.28) saturate(1.08)}
-    .mood-evening{filter:brightness(0.9) saturate(1.15) hue-rotate(6deg)}
-    .mood-night{filter:brightness(0.9) saturate(1.05)}
+    .bg-layer{position:absolute;inset:0;background-size:cover;background-position:center center;background-repeat:no-repeat;opacity:0;transition:opacity 1.3s ease}
+    .bg-layer.active{opacity:1}
+    .mood-dawn{filter:brightness(1.02) saturate(1.0)}
+    .mood-morning{filter:brightness(1.04) saturate(1.0)}
+    .mood-noon{filter:brightness(1.06) saturate(1.02)}
+    .mood-evening{filter:brightness(0.98) saturate(1.03)}
+    .mood-night{filter:brightness(0.94) saturate(1.0)}
 
     /* ══ SVĚTELNÉ ZDROJE — lampy + odlesk okna, mix-blend-mode:screen ══ */
     .light-glow{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;z-index:1}
@@ -225,7 +226,10 @@ function renderAlbion(req, data) {
   </head><body>
 
   <div class="zoom-wrap" id="zoomWrap">
-    <div class="albion-stage mood-night" id="stage"></div>
+    <div class="albion-stage mood-night" id="stage">
+      <div class="bg-layer active" id="bgA" style="background-image:url('/albion-office.jpg')"></div>
+      <div class="bg-layer" id="bgB"></div>
+    </div>
     <div class="light-glow" id="lightGlow">
       <div class="glow-window" style="left:${(WIN.left + (100 - WIN.right)) / 2}%;top:${(WIN.top + (100 - WIN.bottom)) / 2}%;width:46vw;height:46vw"></div>
       <div class="glow-spot" id="glowLampLeft" style="left:13.9%;top:51.7%;width:16vw;height:16vw;background:radial-gradient(circle,rgba(255,196,120,.8) 0%,transparent 68%);opacity:.65"></div>
@@ -430,9 +434,45 @@ function renderAlbion(req, data) {
     }
     window.onModeChange = onModeChange;
 
+    // ══════════════════════════ POZADÍ PODLE POČASÍ / DENNÍ DOBY (reálné fotky, crossfade) ══════════════════════════
+    const BG_BY_TIME = {
+      dawn: '/albion/kancelar-vychod-slunce.jpg',
+      morning: '/albion/kancelar-vychod-slunce.jpg',
+      noon: '/albion/kancelar-den.jpg',
+      evening: '/albion/kancelar-zapad-slunce.jpg',
+      night: '/albion-office.jpg',
+    };
+    const BG_BY_WEATHER = { snow: '/albion/kancelar-zima.jpg', fog: '/albion/kancelar-mlha.jpg' };
+    let bgToggle = false, currentBg = '/albion-office.jpg';
+    const bgPreloaded = {};
+    function preloadImg(url) {
+      if (bgPreloaded[url]) return bgPreloaded[url];
+      bgPreloaded[url] = new Promise(res => {
+        const img = new Image();
+        img.onload = () => res(url); img.onerror = () => res(url);
+        img.src = url;
+      });
+      return bgPreloaded[url];
+    }
+    async function setBackground(url) {
+      if (url === currentBg) return;
+      await preloadImg(url);
+      const a = document.getElementById('bgA'), b = document.getElementById('bgB');
+      const nextEl = bgToggle ? a : b, curEl = bgToggle ? b : a;
+      nextEl.style.backgroundImage = "url('" + url + "')";
+      requestAnimationFrame(() => { nextEl.classList.add('active'); curEl.classList.remove('active'); });
+      bgToggle = !bgToggle; currentBg = url;
+    }
+    function updateBackground() {
+      const url = BG_BY_WEATHER[state.weather] || BG_BY_TIME[state.timeOfDay] || BG_BY_TIME.night;
+      setBackground(url);
+    }
+    Object.values(BG_BY_TIME).concat(Object.values(BG_BY_WEATHER)).forEach(preloadImg);
+
     function setTimeClass(t) {
       state.timeOfDay = t;
       document.getElementById('stage').className = 'albion-stage mood-' + t;
+      updateBackground();
     }
     function setWeather(w) {
       state.weather = w;
@@ -443,6 +483,7 @@ function renderAlbion(req, data) {
       manageStorm(w === 'storm');
       manageRain(w === 'rain' || w === 'storm');
       manageSnow(w === 'snow');
+      updateBackground();
     }
     function applyMood() {
       const w = document.getElementById('weatherSelect').value;
