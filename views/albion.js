@@ -342,6 +342,91 @@ function renderAlbion(req, data) {
       }
     }
 
+    let actx = null, master = null, soundOn = false, padOn = false, nodes = {};
+    function ensureAudio() {
+      if (actx) return;
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      master = actx.createGain(); master.gain.value = 0; master.connect(actx.destination);
+      nodes.wind = makeWindNoise();
+      nodes.city = makeFilteredNoise(5, 'lowpass', 170, 0.4, 0.1);
+      nodes.pad = makePad();
+    }
+    function noiseBuffer(seconds) {
+      const len = Math.floor(actx.sampleRate * seconds);
+      const buf = actx.createBuffer(1, len, actx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      return buf;
+    }
+    function makeFilteredNoise(secs, type, freq, q, startGain) {
+      const src = actx.createBufferSource(); src.buffer = noiseBuffer(secs); src.loop = true;
+      const filt = actx.createBiquadFilter(); filt.type = type; filt.frequency.value = freq; if (q) filt.Q.value = q;
+      const g = actx.createGain(); g.gain.value = startGain || 0;
+      src.connect(filt); filt.connect(g); g.connect(master); src.start();
+      return { gain: g };
+    }
+    function makeWindNoise() {
+      const src = actx.createBufferSource(); src.buffer = noiseBuffer(6); src.loop = true;
+      const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480;
+      const lfo = actx.createOscillator(); lfo.frequency.value = 0.06;
+      const lfoGain = actx.createGain(); lfoGain.gain.value = 200;
+      lfo.connect(lfoGain); lfoGain.connect(lp.frequency); lfo.start();
+      const g = actx.createGain(); g.gain.value = 0.04;
+      src.connect(lp); lp.connect(g); g.connect(master); src.start();
+      return { gain: g };
+    }
+    function makePad() {
+      const g = actx.createGain(); g.gain.value = 0;
+      [130.81, 164.81, 196.0].forEach(f => {
+        const o = actx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const og = actx.createGain(); og.gain.value = 0.3;
+        o.connect(og); og.connect(g); o.start();
+      });
+      const lfo = actx.createOscillator(); lfo.frequency.value = 0.045;
+      const lfoGain = actx.createGain(); lfoGain.gain.value = 0.06;
+      lfo.connect(lfoGain); lfoGain.connect(g.gain); lfo.start();
+      g.connect(master);
+      return { gain: g };
+    }
+    function fadeGain(node, target, dur) {
+      if (!node || !actx) return;
+      const t = actx.currentTime;
+      node.gain.cancelScheduledValues(t);
+      node.gain.setValueAtTime(node.gain.value, t);
+      node.gain.linearRampToValueAtTime(target, t + (dur || 1.1));
+    }
+    function applyEnvAudio(env) {
+      if (!actx) return;
+      fadeGain(nodes.wind.gain, (env === 'fog' || env === 'winter') ? 0.16 : 0.04);
+    }
+    let masterVolume = 0.5;
+    function toggleSound() {
+      ensureAudio();
+      if (actx.state === 'suspended') actx.resume();
+      soundOn = !soundOn;
+      fadeGain(master, soundOn ? masterVolume : 0, 0.6);
+      document.getElementById('soundBtn').textContent = soundOn ? '🔊 Zvuk zapnut' : '🔈 Zapnout zvuk';
+      document.getElementById('soundBtn').classList.toggle('active', soundOn);
+      if (soundOn) applyEnvAudio(state.env);
+    }
+    window.toggleSound = toggleSound;
+    function setVolume(v) {
+      masterVolume = v / 100;
+      if (soundOn) fadeGain(master, masterVolume, 0.3);
+    }
+    window.setVolume = setVolume;
+    function togglePad() {
+      ensureAudio();
+      padOn = !padOn;
+      fadeGain(nodes.pad.gain, padOn ? 0.06 : 0, 1.5);
+      document.getElementById('padBtn').classList.toggle('active', padOn);
+    }
+    window.togglePad = togglePad;
+    function duckAudio(down) {
+      if (!actx || !soundOn) return;
+      fadeGain(master, down ? masterVolume * 0.3 : masterVolume, 0.5);
+    }
+
     function navTo(href, title, x, y) { navZoom(x, y, () => openFocus(href, title)); }
     window.navTo = navTo;
 
@@ -464,92 +549,6 @@ function renderAlbion(req, data) {
     }
     tickClock(); setInterval(tickClock, 30000);
     applyReality();
-
-
-    let actx = null, master = null, soundOn = false, padOn = false, nodes = {};
-    function ensureAudio() {
-      if (actx) return;
-      actx = new (window.AudioContext || window.webkitAudioContext)();
-      master = actx.createGain(); master.gain.value = 0; master.connect(actx.destination);
-      nodes.wind = makeWindNoise();
-      nodes.city = makeFilteredNoise(5, 'lowpass', 170, 0.4, 0.1);
-      nodes.pad = makePad();
-    }
-    function noiseBuffer(seconds) {
-      const len = Math.floor(actx.sampleRate * seconds);
-      const buf = actx.createBuffer(1, len, actx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      return buf;
-    }
-    function makeFilteredNoise(secs, type, freq, q, startGain) {
-      const src = actx.createBufferSource(); src.buffer = noiseBuffer(secs); src.loop = true;
-      const filt = actx.createBiquadFilter(); filt.type = type; filt.frequency.value = freq; if (q) filt.Q.value = q;
-      const g = actx.createGain(); g.gain.value = startGain || 0;
-      src.connect(filt); filt.connect(g); g.connect(master); src.start();
-      return { gain: g };
-    }
-    function makeWindNoise() {
-      const src = actx.createBufferSource(); src.buffer = noiseBuffer(6); src.loop = true;
-      const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480;
-      const lfo = actx.createOscillator(); lfo.frequency.value = 0.06;
-      const lfoGain = actx.createGain(); lfoGain.gain.value = 200;
-      lfo.connect(lfoGain); lfoGain.connect(lp.frequency); lfo.start();
-      const g = actx.createGain(); g.gain.value = 0.04;
-      src.connect(lp); lp.connect(g); g.connect(master); src.start();
-      return { gain: g };
-    }
-    function makePad() {
-      const g = actx.createGain(); g.gain.value = 0;
-      [130.81, 164.81, 196.0].forEach(f => {
-        const o = actx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
-        const og = actx.createGain(); og.gain.value = 0.3;
-        o.connect(og); og.connect(g); o.start();
-      });
-      const lfo = actx.createOscillator(); lfo.frequency.value = 0.045;
-      const lfoGain = actx.createGain(); lfoGain.gain.value = 0.06;
-      lfo.connect(lfoGain); lfoGain.connect(g.gain); lfo.start();
-      g.connect(master);
-      return { gain: g };
-    }
-    function fadeGain(node, target, dur) {
-      if (!node || !actx) return;
-      const t = actx.currentTime;
-      node.gain.cancelScheduledValues(t);
-      node.gain.setValueAtTime(node.gain.value, t);
-      node.gain.linearRampToValueAtTime(target, t + (dur || 1.1));
-    }
-    function applyEnvAudio(env) {
-      if (!actx) return;
-      fadeGain(nodes.wind.gain, (env === 'fog' || env === 'winter') ? 0.16 : 0.04);
-    }
-    let masterVolume = 0.5;
-    function toggleSound() {
-      ensureAudio();
-      if (actx.state === 'suspended') actx.resume();
-      soundOn = !soundOn;
-      fadeGain(master, soundOn ? masterVolume : 0, 0.6);
-      document.getElementById('soundBtn').textContent = soundOn ? '🔊 Zvuk zapnut' : '🔈 Zapnout zvuk';
-      document.getElementById('soundBtn').classList.toggle('active', soundOn);
-      if (soundOn) applyEnvAudio(state.env);
-    }
-    window.toggleSound = toggleSound;
-    function setVolume(v) {
-      masterVolume = v / 100;
-      if (soundOn) fadeGain(master, masterVolume, 0.3);
-    }
-    window.setVolume = setVolume;
-    function togglePad() {
-      ensureAudio();
-      padOn = !padOn;
-      fadeGain(nodes.pad.gain, padOn ? 0.06 : 0, 1.5);
-      document.getElementById('padBtn').classList.toggle('active', padOn);
-    }
-    window.togglePad = togglePad;
-    function duckAudio(down) {
-      if (!actx || !soundOn) return;
-      fadeGain(master, down ? masterVolume * 0.3 : masterVolume, 0.5);
-    }
 
     let px = 0, py = 0, tx = 0, ty = 0;
     document.addEventListener('mousemove', e => {
