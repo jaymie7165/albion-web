@@ -314,6 +314,34 @@ function renderAlbion(req, data) {
       document.querySelectorAll('.hotspot.open').forEach(o => o.classList.remove('open'));
     });
 
+    const snowCv = document.getElementById('snowCanvas'), snowCtx = snowCv.getContext('2d');
+    let snowFlakes = [], snowRAF = null;
+    function resizeCanvas() { snowCv.width = window.innerWidth; snowCv.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    function manageSnow(on) {
+      if (on && !snowRAF) {
+        snowFlakes = Array.from({ length: 90 }, () => ({
+          x: Math.random() * snowCv.width, y: Math.random() * snowCv.height,
+          r: 1 + Math.random() * 2.4, spd: 0.4 + Math.random() * 1.1, sway: Math.random() * Math.PI * 2,
+        }));
+        const loop = () => {
+          snowCtx.clearRect(0, 0, snowCv.width, snowCv.height);
+          snowCtx.fillStyle = 'rgba(255,255,255,0.75)';
+          snowFlakes.forEach(f => {
+            snowCtx.beginPath(); snowCtx.arc(f.x, f.y, f.r, 0, Math.PI * 2); snowCtx.fill();
+            f.y += f.spd; f.sway += 0.01; f.x += Math.sin(f.sway) * 0.4;
+            if (f.y > snowCv.height) { f.y = -10; f.x = Math.random() * snowCv.width; }
+          });
+          snowRAF = requestAnimationFrame(loop);
+        };
+        loop();
+      } else if (!on && snowRAF) {
+        cancelAnimationFrame(snowRAF); snowRAF = null;
+        snowCtx.clearRect(0, 0, snowCv.width, snowCv.height);
+      }
+    }
+
     function navTo(href, title, x, y) { navZoom(x, y, () => openFocus(href, title)); }
     window.navTo = navTo;
 
@@ -377,11 +405,11 @@ function renderAlbion(req, data) {
     window.onModeChange = onModeChange;
 
     const BG_BY_ENV = {
-      day: '/albion/kancelar-den.jpg',
-      fog: '/albion/kancelar-mlha.jpg',
-      sunrise: '/albion/kancelar-vychod-slunce.jpg',
-      sunset: '/albion/kancelar-zapad-slunce.jpg',
-      winter: '/albion/kancelar-zima.jpg',
+      day: '/albion/kancelar-den.png',
+      fog: '/albion/kancelar-mlha.png',
+      sunrise: '/albion/kancelar-vychod-slunce.png',
+      sunset: '/albion/kancelar-zapad-slunce.png',
+      winter: '/albion/kancelar-zima.png',
       night: '/albion-office.jpg',
     };
     let bgToggle = false, currentBg = '/albion-office.jpg';
@@ -437,33 +465,6 @@ function renderAlbion(req, data) {
     tickClock(); setInterval(tickClock, 30000);
     applyReality();
 
-    const snowCv = document.getElementById('snowCanvas'), snowCtx = snowCv.getContext('2d');
-    let snowFlakes = [], snowRAF = null;
-    function resizeCanvas() { snowCv.width = window.innerWidth; snowCv.height = window.innerHeight; }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-    function manageSnow(on) {
-      if (on && !snowRAF) {
-        snowFlakes = Array.from({ length: 90 }, () => ({
-          x: Math.random() * snowCv.width, y: Math.random() * snowCv.height,
-          r: 1 + Math.random() * 2.4, spd: 0.4 + Math.random() * 1.1, sway: Math.random() * Math.PI * 2,
-        }));
-        const loop = () => {
-          snowCtx.clearRect(0, 0, snowCv.width, snowCv.height);
-          snowCtx.fillStyle = 'rgba(255,255,255,0.75)';
-          snowFlakes.forEach(f => {
-            snowCtx.beginPath(); snowCtx.arc(f.x, f.y, f.r, 0, Math.PI * 2); snowCtx.fill();
-            f.y += f.spd; f.sway += 0.01; f.x += Math.sin(f.sway) * 0.4;
-            if (f.y > snowCv.height) { f.y = -10; f.x = Math.random() * snowCv.width; }
-          });
-          snowRAF = requestAnimationFrame(loop);
-        };
-        loop();
-      } else if (!on && snowRAF) {
-        cancelAnimationFrame(snowRAF); snowRAF = null;
-        snowCtx.clearRect(0, 0, snowCv.width, snowCv.height);
-      }
-    }
 
     let actx = null, master = null, soundOn = false, padOn = false, nodes = {};
     function ensureAudio() {
