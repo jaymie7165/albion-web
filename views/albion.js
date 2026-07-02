@@ -11,11 +11,6 @@ function renderAlbion(req, data) {
   const can = (id) => canAccess(accessLevel, id);
   const photo = data.photo || '/logo.png';
 
-  // ── Definice hotspotů — pozice v % dle referenčního obrázku ALBION_OFFICE_3840x2160 ──
-  // Souřadnice odvozeny pixelovou analýzou vyznačených objektů (notebook, telefon, klíče,
-  // portrét, knihovna) + doplňkové navigační body na volných plochách scény.
-  // kind: 'nav'  = klik spustí cinematic zoom a otevře modul ve focus-panelu
-  //       'lamp' = klik přepíná intenzitu osvětlení (ambientní, bez navigace, bez access gatingu)
   const hotspots = [
     {
       id: 'knihovna', x: 5.0, y: 28.0, kind: 'nav', label: 'Hierarchie & Kodex', sub: 'Struktura organizace, pravidla a historie',
@@ -62,25 +57,17 @@ function renderAlbion(req, data) {
       id: 'weed', x: 90.0, y: 68.0, kind: 'nav', label: 'Weed sázení', sub: 'Informace, růst, kalkulačka',
       items: [{ label: 'Weed sázení', href: '/weed-sazeni', need: 'weed-sazeni' }],
     },
-    // ── ambientní hotspoty (lampy) — bez access gatingu, jen ovládají osvětlení ──
     { id: 'lamp-left', x: 13.9, y: 51.7, kind: 'lamp', label: 'Stolní lampa' },
     { id: 'lamp-right', x: 87.2, y: 46.9, kind: 'lamp', label: 'Lampa' },
   ];
 
-  // Stránky bez explicitní PAGE_ACCESS položky jsou v roles.js buď volné (level 3),
-  // nebo bez omezení -> canAccess vrátí true.
   const navHotspots = hotspots
     .filter(h => h.kind === 'nav')
     .map(h => ({ ...h, items: h.items.filter(it => can(it.need)) }))
     .filter(h => h.items.length);
   const lampHotspots = hotspots.filter(h => h.kind === 'lamp');
   const allHotspots = [...navHotspots, ...lampHotspots];
-
   const hotspotsJson = JSON.stringify(allHotspots);
-
-  // Okno (červená zóna z referenčního obrázku) — použito pro clip-path počasí/déšť/sníh/bouřku,
-  // aby efekty nikdy nepřetekly mimo sklo.
-  const WIN = { top: 2.0, right: 17.8, bottom: 49.6, left: 21.3 };
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -94,10 +81,7 @@ function renderAlbion(req, data) {
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{height:100%;overflow:hidden;background:#05070a}
     body{font-family:'Space Mono',monospace;color:#EDE6D4;position:relative}
-
-    /* ══ ZOOM WRAP — jediná vrstva, kterou hýbe GSAP při "najetí kamery" ══ */
     .zoom-wrap{position:fixed;inset:-4%;will-change:transform;transform-origin:50% 50%}
-
     .albion-stage{
       position:absolute;inset:0;overflow:hidden;
       background:radial-gradient(ellipse 80% 60% at 50% 40%,#12161c 0%,#05070a 75%);
@@ -106,46 +90,35 @@ function renderAlbion(req, data) {
     }
     .bg-layer{position:absolute;inset:0;background-size:cover;background-position:center center;background-repeat:no-repeat;opacity:0;transition:opacity 1.3s ease}
     .bg-layer.active{opacity:1}
-    .mood-dawn{filter:brightness(1.02) saturate(1.0)}
-    .mood-morning{filter:brightness(1.04) saturate(1.0)}
-    .mood-noon{filter:brightness(1.06) saturate(1.02)}
-    .mood-evening{filter:brightness(0.98) saturate(1.03)}
-    .mood-night{filter:brightness(0.94) saturate(1.0)}
-
-    /* ══ SVĚTELNÉ ZDROJE — lampy + odlesk okna, mix-blend-mode:screen ══ */
+    .mood-sunrise{filter:brightness(1.02)}
+    .mood-day{filter:brightness(1.06) saturate(1.02)}
+    .mood-sunset{filter:brightness(0.98) saturate(1.03)}
+    .mood-night{filter:brightness(0.94)}
+    .mood-fog{filter:brightness(0.92) saturate(0.85)}
+    .mood-winter{filter:brightness(0.96) saturate(0.92)}
     .light-glow{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;z-index:1}
     .glow-spot{position:absolute;border-radius:50%;filter:blur(46px);transform:translate(-50%,-50%);transition:opacity .5s ease}
     .glow-window{position:absolute;filter:blur(70px);transform:translate(-50%,-50%);border-radius:50%;
-      background:radial-gradient(circle,rgba(140,175,220,.35) 0%,transparent 72%);opacity:.5;pointer-events:none}
-    .mood-dawn .glow-window,.mood-morning .glow-window{opacity:.75;background:radial-gradient(circle,rgba(255,200,150,.4) 0%,transparent 72%)}
-    .mood-noon .glow-window{opacity:.35}
-    .mood-evening .glow-window{opacity:.6;background:radial-gradient(circle,rgba(255,160,110,.4) 0%,transparent 72%)}
-
-    /* ══ POČASÍ — přísně omezeno clip-path na okenní tabuli ══ */
+      background:radial-gradient(circle,rgba(140,175,220,.35) 0%,transparent 72%);opacity:.5;pointer-events:none;transition:opacity .6s ease,background .6s ease}
+    .mood-sunrise .glow-window,.mood-sunset .glow-window{opacity:.7;background:radial-gradient(circle,rgba(255,180,120,.4) 0%,transparent 72%)}
+    .mood-day .glow-window{opacity:.3}
+    .mood-fog .glow-window{opacity:.4;background:radial-gradient(circle,rgba(200,205,215,.35) 0%,transparent 72%)}
+    .mood-winter .glow-window{opacity:.45;background:radial-gradient(circle,rgba(170,200,230,.35) 0%,transparent 72%)}
     .weather-mask{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden;
-      clip-path:inset(${WIN.top}% ${WIN.right}% ${WIN.bottom}% ${WIN.left}%)}
-    #rainCanvas,#snowCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 1.2s}
-    .weather-mask.w-rain #rainCanvas{opacity:1}
-    .weather-mask.w-storm #rainCanvas{opacity:1}
+      clip-path:inset(2.0% 17.8% 49.6% 21.3%)}
+    #snowCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 1.2s}
     .weather-mask.w-snow #snowCanvas{opacity:1}
     .weather-fog{position:absolute;inset:0;opacity:0;transition:opacity 1.4s;
       background:radial-gradient(ellipse 90% 70% at 50% 45%,rgba(205,210,220,.22),transparent 72%)}
     .weather-mask.w-fog .weather-fog{opacity:1}
-    .lightning{position:absolute;inset:0;background:#dfe8ff;opacity:0;transition:opacity .09s linear}
-    .lightning.flash{opacity:.8;transition:opacity .04s linear}
-
-    /* ══ FILM GRAIN ══ */
     .grain-layer{position:fixed;inset:-40px;z-index:4;pointer-events:none;mix-blend-mode:overlay;
       background:url('/albion/grain.png');background-size:220px 220px;opacity:.35;
       animation:grainShift 0.6s steps(4) infinite}
     @keyframes grainShift{0%{transform:translate(0,0)}25%{transform:translate(-6%,4%)}50%{transform:translate(4%,-6%)}75%{transform:translate(-4%,-4%)}100%{transform:translate(0,0)}}
-
     .vignette{position:fixed;inset:0;pointer-events:none;z-index:5;box-shadow:inset 0 0 22vw rgba(0,0,0,0.75)}
     .lightshaft{position:fixed;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity 1.6s;
       background:linear-gradient(200deg,rgba(255,225,180,.10) 0%,transparent 40%)}
-    .mood-dawn ~ .lightshaft,.mood-morning ~ .lightshaft{opacity:1}
-
-    /* ══ TOP NAV ══ */
+    .mood-sunrise ~ .lightshaft,.mood-sunset ~ .lightshaft{opacity:1}
     .a-nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
       padding:0.9rem 2rem;background:linear-gradient(180deg,rgba(5,7,10,0.82),rgba(5,7,10,0.35) 80%,transparent);backdrop-filter:blur(6px)}
     .a-logo{display:flex;align-items:center;gap:0.7rem;font-family:'Cinzel',serif;letter-spacing:0.24em;font-size:1rem;color:#EDE6D4;text-decoration:none;font-weight:600}
@@ -158,8 +131,6 @@ function renderAlbion(req, data) {
     .a-user img{width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid #B68A4E}
     .a-user-text{line-height:1.3}
     .a-user-text small{display:block;color:#7E7868;font-size:0.5rem;letter-spacing:0.16em}
-
-    /* ══ HOTSPOTY ══ */
     .hotspot{position:absolute;z-index:10;transform:translate(-50%,-50%);cursor:pointer}
     .hotspot-dot{width:9px;height:9px;border-radius:50%;background:#E0BD7F;box-shadow:0 0 10px 2px rgba(224,189,127,0.7);
       animation:dotPulse 2.6s ease-in-out infinite;transition:transform .2s}
@@ -177,8 +148,6 @@ function renderAlbion(req, data) {
     .hc-item:first-of-type{border-top:none}
     .hc-item:hover{color:#E0BD7F}
     .hc-lamp-state{font-size:0.58rem;color:#8FD3FF;letter-spacing:.06em}
-
-    /* ══ BOTTOM BAR ══ */
     .a-bottom{position:fixed;bottom:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
       padding:0.9rem 2rem;background:linear-gradient(0deg,rgba(5,7,10,0.85),rgba(5,7,10,0.35) 80%,transparent)}
     .a-stats-row{display:flex;gap:1.6rem}
@@ -191,8 +160,6 @@ function renderAlbion(req, data) {
     .a-btn.active{background:rgba(182,138,78,0.3);border-color:#E0BD7F;color:#E0BD7F}
     .a-leave{border-color:rgba(200,90,70,.5)}
     .a-leave:hover{background:rgba(200,90,70,.18);border-color:#E08F7F}
-
-    /* ══ SETTINGS PANEL ══ */
     .a-settings{position:fixed;bottom:4.6rem;right:2rem;z-index:60;min-width:250px;background:rgba(8,9,8,0.94);
       border:1px solid rgba(182,138,78,0.35);padding:1rem 1.1rem;display:none;flex-direction:column;gap:0.65rem;
       box-shadow:0 16px 40px rgba(0,0,0,.6)}
@@ -205,8 +172,6 @@ function renderAlbion(req, data) {
     .a-settings .row span{font-size:0.58rem;color:#B7AE99;letter-spacing:.06em}
     .a-mini-btns{display:flex;gap:.4rem;flex-wrap:wrap}
     .a-mini-btns button{flex:1;min-width:70px}
-
-    /* ══ FOCUS MODE (otevření modulu) ══ */
     .a-focus-overlay{position:fixed;inset:0;background:rgba(3,4,3,0.7);backdrop-filter:blur(3px);z-index:80;opacity:0;pointer-events:none;transition:opacity .3s}
     .a-focus-overlay.open{opacity:1;pointer-events:all}
     .a-focus-panel{position:fixed;left:6vw;right:6vw;top:4vh;bottom:4vh;z-index:81;background:#0B0F0D;border:1px solid rgba(182,138,78,0.4);
@@ -217,7 +182,6 @@ function renderAlbion(req, data) {
     .a-focus-close{background:none;border:1px solid rgba(182,138,78,.4);color:#EDE6D4;width:28px;height:28px;cursor:pointer;font-size:.8rem}
     .a-focus-close:hover{background:rgba(200,90,70,.2);border-color:#E08F7F}
     .a-focus-panel iframe{flex:1;border:none;width:100%;background:#0B0F0D}
-
     @media(max-width:900px){
       .a-menu{display:none}
       .a-stats-row{display:none}
@@ -233,15 +197,13 @@ function renderAlbion(req, data) {
       <div class="bg-layer" id="bgB"></div>
     </div>
     <div class="light-glow" id="lightGlow">
-      <div class="glow-window" style="left:${(WIN.left + (100 - WIN.right)) / 2}%;top:${(WIN.top + (100 - WIN.bottom)) / 2}%;width:46vw;height:46vw"></div>
+      <div class="glow-window" style="left:51.9%;top:26.2%;width:46vw;height:46vw"></div>
       <div class="glow-spot" id="glowLampLeft" style="left:13.9%;top:51.7%;width:16vw;height:16vw;background:radial-gradient(circle,rgba(255,196,120,.8) 0%,transparent 68%);opacity:.65"></div>
       <div class="glow-spot" id="glowLampRight" style="left:87.2%;top:46.9%;width:12vw;height:12vw;background:radial-gradient(circle,rgba(255,196,120,.8) 0%,transparent 68%);opacity:.65"></div>
     </div>
     <div class="weather-mask" id="weatherMask">
-      <canvas id="rainCanvas"></canvas>
       <canvas id="snowCanvas"></canvas>
       <div class="weather-fog"></div>
-      <div class="lightning" id="lightning"></div>
     </div>
   </div>
 
@@ -274,9 +236,9 @@ function renderAlbion(req, data) {
 
   <div class="a-bottom">
     <div class="a-stats-row">
-      <div class="a-stat"><span class="lbl">Počasí</span><b id="stat-weather">—</b></div>
+      <div class="a-stat"><span class="lbl">Vzhled</span><b id="stat-weather">—</b></div>
       <div class="a-stat"><span class="lbl">Čas</span><b id="stat-time">--:--</b></div>
-      <div class="a-stat"><span class="lbl">Atmosféra</span><b id="stat-mood">Reality</b></div>
+      <div class="a-stat"><span class="lbl">Režim</span><b id="stat-mood">Reality</b></div>
       <div class="a-stat"><span class="lbl">Město</span><b>Živá aktivita</b></div>
     </div>
     <div style="display:flex;gap:0.6rem">
@@ -290,23 +252,15 @@ function renderAlbion(req, data) {
     <h4>Atmosféra</h4>
     <select id="modeSelect" onchange="onModeChange()">
       <option value="reality">Reality Mode (reálný čas)</option>
-      <option value="mood">Mood Mode (manuální)</option>
+      <option value="mood">Manuální</option>
     </select>
     <div id="moodControls" style="display:none">
-      <div class="row" style="margin-bottom:.4rem">
-        <select id="weatherSelect" onchange="applyMood()" style="flex:1">
-          <option value="clear">Jasno</option>
-          <option value="rain">Déšť</option>
-          <option value="fog">Mlha</option>
-          <option value="snow">Sníh</option>
-          <option value="storm">Bouřka</option>
-        </select>
-      </div>
-      <select id="dayTimeSelect" onchange="applyMood()">
-        <option value="dawn">Svítání</option>
-        <option value="morning">Ráno</option>
-        <option value="noon">Poledne</option>
-        <option value="evening">Večer</option>
+      <select id="envSelect" onchange="applyMood()">
+        <option value="day">Den</option>
+        <option value="fog">Mlha</option>
+        <option value="sunrise">Východ slunce</option>
+        <option value="sunset">Západ slunce</option>
+        <option value="winter">Zima</option>
         <option value="night" selected>Noc</option>
       </select>
     </div>
@@ -330,11 +284,10 @@ function renderAlbion(req, data) {
   <script>
   (function(){
     const HOTSPOTS = ${hotspotsJson};
-    const state = { weather: 'clear', mood: 'reality', timeOfDay: 'night' };
+    const state = { env: 'night', mood: 'reality' };
     const lampState = { 'lamp-left': 1, 'lamp-right': 1 };
-    const WEATHER_LABELS = { clear:'Jasno', rain:'Déšť', fog:'Mlha', snow:'Sníh', storm:'Bouřka' };
+    const ENV_LABELS = { day:'Den', fog:'Mlha', sunrise:'Východ slunce', sunset:'Západ slunce', winter:'Zima', night:'Noc' };
 
-    // ══════════════════════════ HOTSPOTY ══════════════════════════
     const wrap = document.getElementById('hotspots');
     HOTSPOTS.forEach(h => {
       const el = document.createElement('div');
@@ -346,7 +299,6 @@ function renderAlbion(req, data) {
         el.innerHTML = \`<div class="hotspot-dot"></div><div class="hotspot-card"><div class="hc-title">\${h.label}</div><div class="hc-sub">\${h.sub}</div>\${itemsHtml}</div>\`;
         el.addEventListener('click', (e) => {
           if (h.items.length === 1) { navTo(h.items[0].href, h.items[0].label, h.x, h.y); return; }
-          // víc položek -> klik na tečku otevře/zavře kartičku (funguje i na dotyku, ne jen na hover)
           e.stopPropagation();
           const wasOpen = el.classList.contains('open');
           document.querySelectorAll('.hotspot.open').forEach(o => o.classList.remove('open'));
@@ -362,20 +314,13 @@ function renderAlbion(req, data) {
       document.querySelectorAll('.hotspot.open').forEach(o => o.classList.remove('open'));
     });
 
-    // ══════════════════════════ CINEMATIC ZOOM + FOCUS MODE ══════════════════════════
-    function navTo(href, title, x, y) {
-      navZoom(x, y, () => openFocus(href, title));
-    }
+    function navTo(href, title, x, y) { navZoom(x, y, () => openFocus(href, title)); }
     window.navTo = navTo;
 
     function navZoom(x, y, cb) {
       const zw = document.getElementById('zoomWrap');
       if (window.gsap) {
-        gsap.to(zw, {
-          scale: 1.32, transformOrigin: x + '% ' + y + '%',
-          duration: 1.05, ease: 'power2.inOut',
-          onComplete: cb,
-        });
+        gsap.to(zw, { scale: 1.32, transformOrigin: x + '% ' + y + '%', duration: 1.05, ease: 'power2.inOut', onComplete: cb });
       } else { cb(); }
     }
     function navZoomReset() {
@@ -404,7 +349,6 @@ function renderAlbion(req, data) {
     function leaveAlbion() { window.location.href = '/home'; }
     window.leaveAlbion = leaveAlbion;
 
-    // ══════════════════════════ LAMPY / OSVĚTLENÍ ══════════════════════════
     function toggleLamp(id) {
       const cur = lampState[id];
       const next = cur >= 1 ? 0 : Math.round((cur + 0.5) * 2) / 2;
@@ -415,14 +359,10 @@ function renderAlbion(req, data) {
       const label = document.getElementById('lampLabel-' + id);
       if (label) label.textContent = next === 0 ? 'Vypnuto' : (next === 0.5 ? 'Tlumené světlo' : 'Plný jas');
       const zw = document.getElementById('zoomWrap');
-      if (window.gsap) gsap.fromTo(zw, { filter: 'brightness(1)' }, { filter: 'brightness(1)', duration: .01 });
-      if (window.gsap) {
-        gsap.fromTo(zw, { scale: gsap.getProperty(zw, 'scale') || 1 }, { scale: '+=0.006', duration: .1, yoyo: true, repeat: 1, ease: 'power1.inOut' });
-      }
+      if (window.gsap) gsap.fromTo(zw, { scale: gsap.getProperty(zw, 'scale') || 1 }, { scale: '+=0.006', duration: .1, yoyo: true, repeat: 1, ease: 'power1.inOut' });
     }
     window.toggleLamp = toggleLamp;
 
-    // ══════════════════════════ SETTINGS / MOOD / DAY-NIGHT ══════════════════════════
     function toggleSettings() { document.getElementById('settingsPanel').classList.toggle('open'); }
     window.toggleSettings = toggleSettings;
 
@@ -430,28 +370,28 @@ function renderAlbion(req, data) {
       const mode = document.getElementById('modeSelect').value;
       state.mood = mode;
       document.getElementById('moodControls').style.display = mode === 'mood' ? 'block' : 'none';
-      document.getElementById('stat-mood').textContent = mode === 'mood' ? 'Mood' : 'Reality';
+      document.getElementById('stat-mood').textContent = mode === 'mood' ? 'Manuální' : 'Reality';
       if (mode === 'reality') applyReality();
       else applyMood();
     }
     window.onModeChange = onModeChange;
 
-    // ══════════════════════════ POZADÍ PODLE POČASÍ / DENNÍ DOBY (reálné fotky, crossfade) ══════════════════════════
-    const BG_BY_TIME = {
-      dawn: '/albion/kancelar-vychod-slunce.jpg',
-      morning: '/albion/kancelar-vychod-slunce.jpg',
-      noon: '/albion/kancelar-den.jpg',
-      evening: '/albion/kancelar-zapad-slunce.jpg',
+    const BG_BY_ENV = {
+      day: '/albion/kancelar-den.jpg',
+      fog: '/albion/kancelar-mlha.jpg',
+      sunrise: '/albion/kancelar-vychod-slunce.jpg',
+      sunset: '/albion/kancelar-zapad-slunce.jpg',
+      winter: '/albion/kancelar-zima.jpg',
       night: '/albion-office.jpg',
     };
-    const BG_BY_WEATHER = { snow: '/albion/kancelar-zima.jpg', fog: '/albion/kancelar-mlha.jpg' };
     let bgToggle = false, currentBg = '/albion-office.jpg';
     const bgPreloaded = {};
     function preloadImg(url) {
       if (bgPreloaded[url]) return bgPreloaded[url];
       bgPreloaded[url] = new Promise(res => {
         const img = new Image();
-        img.onload = () => res(url); img.onerror = () => res(url);
+        img.onload = () => res(url);
+        img.onerror = () => { console.error('[ALBION] Obrázek pozadí se nepodařilo načíst:', url); res(url); };
         img.src = url;
       });
       return bgPreloaded[url];
@@ -465,87 +405,43 @@ function renderAlbion(req, data) {
       requestAnimationFrame(() => { nextEl.classList.add('active'); curEl.classList.remove('active'); });
       bgToggle = !bgToggle; currentBg = url;
     }
-    function updateBackground() {
-      const url = BG_BY_WEATHER[state.weather] || BG_BY_TIME[state.timeOfDay] || BG_BY_TIME.night;
-      setBackground(url);
-    }
-    Object.values(BG_BY_TIME).concat(Object.values(BG_BY_WEATHER)).forEach(preloadImg);
+    Object.values(BG_BY_ENV).forEach(preloadImg);
 
-    function setTimeClass(t) {
-      state.timeOfDay = t;
-      document.getElementById('stage').className = 'albion-stage mood-' + t;
-      updateBackground();
-    }
-    function setWeather(w) {
-      state.weather = w;
+    function setEnv(env) {
+      state.env = env;
+      document.getElementById('stage').className = 'albion-stage mood-' + env;
+      document.getElementById('stat-weather').textContent = ENV_LABELS[env];
       const mask = document.getElementById('weatherMask');
-      mask.className = 'weather-mask' + (w !== 'clear' ? ' w-' + w : '');
-      document.getElementById('stat-weather').textContent = WEATHER_LABELS[w];
-      applyWeatherAudio(w);
-      manageStorm(w === 'storm');
-      manageRain(w === 'rain' || w === 'storm');
-      manageSnow(w === 'snow');
-      updateBackground();
+      mask.className = 'weather-mask' + (env === 'fog' ? ' w-fog' : env === 'winter' ? ' w-snow' : '');
+      manageSnow(env === 'winter');
+      applyEnvAudio(env);
+      setBackground(BG_BY_ENV[env] || BG_BY_ENV.night);
     }
     function applyMood() {
-      const w = document.getElementById('weatherSelect').value;
-      const t = document.getElementById('dayTimeSelect').value;
-      setWeather(w); setTimeClass(t);
+      setEnv(document.getElementById('envSelect').value);
     }
     window.applyMood = applyMood;
 
-    function timeOfDayFromHour(h) {
-      if (h >= 5 && h < 7) return 'dawn';
-      if (h >= 7 && h < 11) return 'morning';
-      if (h >= 11 && h < 17) return 'noon';
-      if (h >= 17 && h < 21) return 'evening';
+    function envFromHour(h) {
+      if (h >= 5 && h < 7) return 'sunrise';
+      if (h >= 7 && h < 17) return 'day';
+      if (h >= 17 && h < 21) return 'sunset';
       return 'night';
     }
-    function applyReality() {
-      const now = new Date();
-      setTimeClass(timeOfDayFromHour(now.getHours()));
-      setWeather('clear');
-    }
+    function applyReality() { setEnv(envFromHour(new Date().getHours())); }
     function tickClock() {
       const now = new Date();
       document.getElementById('stat-time').textContent = now.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
-      if (state.mood === 'reality') setTimeClass(timeOfDayFromHour(now.getHours()));
+      if (state.mood === 'reality') setEnv(envFromHour(now.getHours()));
     }
     tickClock(); setInterval(tickClock, 30000);
     applyReality();
 
-    // ══════════════════════════ POČASÍ — CANVAS ČÁSTICE (jen uvnitř okna) ══════════════════════════
-    const rainCv = document.getElementById('rainCanvas'), rainCtx = rainCv.getContext('2d');
     const snowCv = document.getElementById('snowCanvas'), snowCtx = snowCv.getContext('2d');
-    let rainDrops = [], snowFlakes = [], rainRAF = null, snowRAF = null;
-    function resizeCanvases() {
-      [rainCv, snowCv].forEach(cv => { cv.width = window.innerWidth; cv.height = window.innerHeight; });
-    }
-    window.addEventListener('resize', resizeCanvases);
-    resizeCanvases();
-
-    function manageRain(on) {
-      if (on && !rainRAF) {
-        rainDrops = Array.from({ length: 140 }, () => ({
-          x: Math.random() * rainCv.width, y: Math.random() * rainCv.height,
-          len: 10 + Math.random() * 16, spd: 9 + Math.random() * 7, drift: -1.2 - Math.random(),
-        }));
-        const loop = () => {
-          rainCtx.clearRect(0, 0, rainCv.width, rainCv.height);
-          rainCtx.strokeStyle = 'rgba(200,220,255,0.35)'; rainCtx.lineWidth = 1.1;
-          rainDrops.forEach(d => {
-            rainCtx.beginPath(); rainCtx.moveTo(d.x, d.y); rainCtx.lineTo(d.x + d.drift * 2, d.y + d.len); rainCtx.stroke();
-            d.y += d.spd; d.x += d.drift;
-            if (d.y > rainCv.height) { d.y = -20; d.x = Math.random() * rainCv.width; }
-          });
-          rainRAF = requestAnimationFrame(loop);
-        };
-        loop();
-      } else if (!on && rainRAF) {
-        cancelAnimationFrame(rainRAF); rainRAF = null;
-        rainCtx.clearRect(0, 0, rainCv.width, rainCv.height);
-      }
-    }
+    let snowFlakes = [], snowRAF = null;
+    function resizeCanvas() { snowCv.width = window.innerWidth; snowCv.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
     function manageSnow(on) {
       if (on && !snowRAF) {
         snowFlakes = Array.from({ length: 90 }, () => ({
@@ -569,28 +465,13 @@ function renderAlbion(req, data) {
       }
     }
 
-    let stormTimer = null;
-    function manageStorm(on) {
-      clearInterval(stormTimer); stormTimer = null;
-      if (!on) return;
-      stormTimer = setInterval(() => {
-        if (Math.random() < 0.45) {
-          const lg = document.getElementById('lightning');
-          lg.classList.add('flash'); thunder();
-          setTimeout(() => lg.classList.remove('flash'), 120 + Math.random() * 90);
-        }
-      }, 3200);
-    }
-
-    // ══════════════════════════ PROCEDURÁLNÍ AUDIO (Web Audio API, žádné externí soubory) ══════════════════════════
     let actx = null, master = null, soundOn = false, padOn = false, nodes = {};
     function ensureAudio() {
       if (actx) return;
       actx = new (window.AudioContext || window.webkitAudioContext)();
       master = actx.createGain(); master.gain.value = 0; master.connect(actx.destination);
-      nodes.rain = makeFilteredNoise(4, 'bandpass', 3200, 0.6, 1200);
       nodes.wind = makeWindNoise();
-      nodes.city = makeFilteredNoise(5, 'lowpass', 170, 0.4, null, 0.1);
+      nodes.city = makeFilteredNoise(5, 'lowpass', 170, 0.4, 0.1);
       nodes.pad = makePad();
     }
     function noiseBuffer(seconds) {
@@ -600,13 +481,11 @@ function renderAlbion(req, data) {
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       return buf;
     }
-    function makeFilteredNoise(secs, type, freq, q, hpFreq, startGain) {
+    function makeFilteredNoise(secs, type, freq, q, startGain) {
       const src = actx.createBufferSource(); src.buffer = noiseBuffer(secs); src.loop = true;
       const filt = actx.createBiquadFilter(); filt.type = type; filt.frequency.value = freq; if (q) filt.Q.value = q;
       const g = actx.createGain(); g.gain.value = startGain || 0;
-      let last = filt;
-      if (hpFreq) { const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = hpFreq; filt.connect(hp); last = hp; }
-      src.connect(filt); last.connect(g); g.connect(master); src.start();
+      src.connect(filt); filt.connect(g); g.connect(master); src.start();
       return { gain: g };
     }
     function makeWindNoise() {
@@ -632,18 +511,6 @@ function renderAlbion(req, data) {
       g.connect(master);
       return { gain: g };
     }
-    function thunder() {
-      if (!actx || !soundOn) return;
-      const src = actx.createBufferSource(); src.buffer = noiseBuffer(1.4);
-      const lp = actx.createBiquadFilter(); lp.type = 'lowpass';
-      lp.frequency.setValueAtTime(900, actx.currentTime);
-      lp.frequency.exponentialRampToValueAtTime(70, actx.currentTime + 1.3);
-      const g = actx.createGain();
-      g.gain.setValueAtTime(0.0001, actx.currentTime);
-      g.gain.linearRampToValueAtTime(0.85, actx.currentTime + 0.05);
-      g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 1.4);
-      src.connect(lp); lp.connect(g); g.connect(master); src.start();
-    }
     function fadeGain(node, target, dur) {
       if (!node || !actx) return;
       const t = actx.currentTime;
@@ -651,10 +518,9 @@ function renderAlbion(req, data) {
       node.gain.setValueAtTime(node.gain.value, t);
       node.gain.linearRampToValueAtTime(target, t + (dur || 1.1));
     }
-    function applyWeatherAudio(w) {
+    function applyEnvAudio(env) {
       if (!actx) return;
-      fadeGain(nodes.rain.gain, (w === 'rain' || w === 'storm') ? 0.32 : 0);
-      fadeGain(nodes.wind.gain, (w === 'fog' || w === 'storm' || w === 'snow') ? 0.16 : 0.04);
+      fadeGain(nodes.wind.gain, (env === 'fog' || env === 'winter') ? 0.16 : 0.04);
     }
     let masterVolume = 0.5;
     function toggleSound() {
@@ -664,7 +530,7 @@ function renderAlbion(req, data) {
       fadeGain(master, soundOn ? masterVolume : 0, 0.6);
       document.getElementById('soundBtn').textContent = soundOn ? '🔊 Zvuk zapnut' : '🔈 Zapnout zvuk';
       document.getElementById('soundBtn').classList.toggle('active', soundOn);
-      if (soundOn) applyWeatherAudio(state.weather);
+      if (soundOn) applyEnvAudio(state.env);
     }
     window.toggleSound = toggleSound;
     function setVolume(v) {
@@ -684,7 +550,6 @@ function renderAlbion(req, data) {
       fadeGain(master, down ? masterVolume * 0.3 : masterVolume, 0.5);
     }
 
-    // ══════════════════════════ PARALLAX (subtilní posun scény podle kurzoru) ══════════════════════════
     let px = 0, py = 0, tx = 0, ty = 0;
     document.addEventListener('mousemove', e => {
       px = (e.clientX / window.innerWidth - 0.5) * 2;
