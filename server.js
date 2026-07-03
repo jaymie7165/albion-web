@@ -32,6 +32,7 @@ const { renderAuth } = require('./views/auth');
 const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
+const { renderAlbion } = require('./views/albion');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -772,7 +773,10 @@ async function requireDiscordMember(req, res, next) {
     // Detekce povýšení (snížení levelu = vyšší práva) → historie + gratulační banner
     if (req.session.realAccessLevel !== undefined && newLevel < req.session.realAccessLevel) {
       const RANK_LABEL = { 1: 'Council', 2: 'Senior Member', 3: 'Member' };
-      try { db.addPromotion(req.session.userId, req.session.realAccessLevel, newLevel, RANK_LABEL[req.session.realAccessLevel]||'—', RANK_LABEL[newLevel]||'—'); } catch(e){}
+      const fromLabel = RANK_LABEL[req.session.realAccessLevel] || '—';
+      const toLabel   = RANK_LABEL[newLevel] || '—';
+      try { db.addPromotion(req.session.userId, req.session.realAccessLevel, newLevel, fromLabel, toLabel); } catch(e){}
+      try { await discord.notifyPovyseni(fromLabel, toLabel, req.session.icName || req.session.discordUsername, req.session.discordUsername); } catch(e){ console.error('[POVYSENI]', e.message); }
     }
 
     req.session.realAccessLevel = newLevel;
@@ -854,6 +858,7 @@ app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) =>
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Zbraně', [cas, typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe || '-']);
+  await discord.notifyZbrane(typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe);
   await discord.notifyAudit('Zbraně', uzivatel, discordUser, `${typUp} — ${polozkaTrim} (${qty} ks) [${kategorie}]${ucelSafe ? ' | Účel: ' + ucelSafe : ''}`);
   broadcastSSE('skladUpdate', { sekce: 'zbrane', typ: typUp, polozka: polozkaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -875,6 +880,7 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Weed', [cas, typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel]);
+  await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel);
   await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
   broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -895,6 +901,7 @@ app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => 
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Drogy', [cas, typUp, drogaTrim, qty, '-', '-', uzivatel]);
+  await discord.notifyDrogy(typUp, drogaTrim, qty, undefined, undefined, uzivatel);
   await discord.notifyAudit('Drogy', uzivatel, discordUser, `${typUp} — ${drogaTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'drogy', typ: typUp, droga: drogaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -917,6 +924,7 @@ app.post('/api/ucet', requireAuth, requireAccess('sklad'), async (req, res) => {
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Účetnictví', [cas, typUp, amount, valutaUp, poznamkaSafe, uzivatel]);
+  await discord.notifyUcet(typUp, amount, valutaUp, poznamkaSafe, uzivatel);
   await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `${typUp} — ${valutaUp === 'USD' ? 'SAD ' : '₱'}${amount} | ${poznamkaSafe}`);
   broadcastSSE('ucetUpdate', { typ: typUp, castka: amount, valuta: valutaUp, poznamka: poznamkaSafe, uzivatel, cas });
   res.json({ ok: true });
@@ -1024,6 +1032,7 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
   }
 
   const shrnuti = validated.map(v => `${v.polozka} (${v.qty} ks)`).join(', ');
+  await discord.notifyBulkSklad(sekce, typUp, validated, uzivatel);
   await discord.notifyAudit(cfg.sheet, uzivatel, discordUser, `${typUp} (HROMADNĚ ×${validated.length}) — ${shrnuti}`);
   broadcastSSE('skladUpdate', { sekce, typ: typUp, polozka: `${validated.length} položek`, qty: validated.reduce((a,v)=>a+v.qty,0), uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -2342,19 +2351,15 @@ app.get('/galerie', requireAuth, (req, res) => {
   res.send(renderGallery(req));
 });
 
-// ── ALBION WORLD — Vite/React build servírovaný jako statika ──
-const ALBION_WORLD_DIST = path.join(__dirname, 'albion-world', 'dist');
-const ALBION_WORLD_INDEX = path.join(ALBION_WORLD_DIST, 'index.html');
-app.use('/albion-world/assets', express.static(path.join(ALBION_WORLD_DIST, 'assets'), {
-  fallthrough: false, // chybějící asset = 404, ne index.html (jinak vzniká špatný MIME type)
-}));
-app.get('/albion-world*', requireAuth, (req, res) => {
-  if (!fs.existsSync(ALBION_WORLD_INDEX)) {
-    return res.status(503).send('Albion World není sestaven na serveru (chybí albion-world/dist). Zkontroluj build log — postinstall musí proběhnout úspěšně.');
-  }
-  res.sendFile(ALBION_WORLD_INDEX);
+// ── ALBION WORLD — starý React/Three.js build byl smazaný z repa, /albion teď
+// vede rovnou na novou scénu (renderAlbion níže). Staré odkazy/záložky na
+// /albion-world* přesměrujeme, ať nikomu nenaskočí "není sestaven" chyba.
+app.get('/albion-world*', requireAuth, (req, res) => res.redirect('/albion'));
+app.get('/albion', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
+  res.send(renderAlbion(req, { photo }));
 });
-app.get('/albion', requireAuth, (req, res) => res.redirect('/albion-world/'));
 
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
