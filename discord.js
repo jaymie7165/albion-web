@@ -16,6 +16,95 @@ async function sendEmbed(channelId, embed) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// OSOBNOST EVELYN ASHCROFT — sdílená filozofie s Discord botem
+// (viz utils/helpers.js a utils/registry.js v repu bota). Bot posílá
+// embedy jen na základě webhooků, ale VĚTŠINA reálného provozu (sklad,
+// účetnictví, garáž...) jde přímo odsud, z webu — a Evelyn má znít stejně
+// živě, ať zápis přijde odkudkoliv. Vizuál embedů (barvy/tituly/fields)
+// se neměnil, přibyla jen osobnostní vrstva (description + author).
+// ══════════════════════════════════════════════════════════════════════
+
+const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Albionu' };
+
+function pozdrav() {
+  const hodina = parseInt(
+    new Date().toLocaleString('cs-CZ', { timeZone: 'Europe/Prague', hour: '2-digit', hour12: false })
+  );
+  if (hodina >= 5 && hodina < 10)  return 'Dobré ráno';
+  if (hodina >= 10 && hodina < 18) return 'Dobrý den';
+  if (hodina >= 18 && hodina < 23) return 'Dobrý večer';
+  return 'Dobrou noc';
+}
+
+function nahodna(pole) {
+  return pole[Math.floor(Math.random() * pole.length)];
+}
+
+// Rotující banky frází — jedna kategorie akce = víc možných formulací,
+// aby Evelyn nepůsobila jako robot opakující stále stejnou hlášku.
+const FRAZE = {
+  vklad: [
+    'zaznamenávám nový přírůstek do registru.',
+    'do evidence právě přibývá tento zápis.',
+    's potěšením zapisuji tuto položku do knihy organizace.',
+    'evidence skladu se právě rozrostla o následující záznam.',
+    'následující přírůstek eviduji do skladové knihy.',
+  ],
+  vyber: [
+    'zaznamenávám výdej dle níže uvedených údajů.',
+    'do evidence zapisuji tento odběr ze skladu.',
+    'prosím o pozornost k tomuto výdeji ze skladu.',
+    'následující výdej právě eviduji v knize.',
+    'zapisuji úbytek ze skladu dle uvedených údajů.',
+  ],
+  prijem: [
+    's potěšením zaznamenávám příjem do pokladny.',
+    'pokladna organizace se právě rozrostla o tento příjem.',
+    'zapisuji přírůstek do finanční evidence.',
+    'do účetní knihy přibývá tento příjem.',
+  ],
+  vydaj: [
+    'zaznamenávám výdaj z pokladny dle níže uvedeného.',
+    'do finanční evidence zapisuji tento výdaj.',
+    'prosím o pozornost k tomuto výdaji z pokladny.',
+    'pokladna organizace se právě snížila o tuto částku.',
+  ],
+  smena: [
+    'provedla jsem pro vás směnu měn dle níže uvedeného kurzu.',
+    'zaznamenávám směnu měn do účetní knihy.',
+    'směnárna organizace právě zpracovala tuto transakci.',
+  ],
+  garaz: [
+    'evidenci vozového parku jsem právě aktualizovala.',
+    'do garážového registru přibývá nový záznam.',
+    'zapisuji nový přírůstek do evidence vozidel.',
+  ],
+  povyseni: [
+    's potěšením zaznamenávám povýšení v hodnosti.',
+    'personální oddělení eviduje tuto změnu hodnosti.',
+    'do kádrové knihy zapisuji radostnou zprávu o povýšení.',
+  ],
+  vyznamenani: [
+    's radostí zaznamenávám udělení tohoto vyznamenání.',
+    'do knihy cti organizace přibývá nový zápis.',
+    'personální oddělení s potěšením eviduje tento úspěch.',
+  ],
+  bulk: [
+    'zaznamenávám hromadný zápis do registru.',
+    'do evidence právě přibývá tato hromadná dávka záznamů.',
+    'zpracovala jsem pro vás hromadný zápis do skladu.',
+  ],
+};
+
+// Sestaví úvodní řádek (description) — pozdrav podle denní doby, oslovení
+// jménem a rotující sekretářská poznámka. `klic` volí banku frází.
+function uvod(uzivatel, klic) {
+  const jmeno = uzivatel ? `, **${uzivatel}**` : '';
+  const fraze = nahodna(FRAZE[klic] || FRAZE.vklad);
+  return `${pozdrav()}${jmeno}. ${fraze}`;
+}
+
 async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel) {
   const channelId = process.env.CHANNEL_ZBRANE;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
@@ -26,7 +115,12 @@ async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel) {
     { name: typ === 'VKLAD' ? 'Vložil' : 'Vzal', value: uzivatel, inline: true },
   ];
   if (typ === 'VÝBĚR' && ucel) fields.push({ name: 'Účel', value: ucel, inline: true });
-  await sendEmbed(channelId, { title: typ === 'VKLAD' ? '➕ VLOŽENO DO SKLADU (web)' : '➖ VYBRÁNO ZE SKLADU (web)', color, fields, timestamp: new Date().toISOString() });
+  await sendEmbed(channelId, {
+    title: typ === 'VKLAD' ? '➕ VLOŽENO DO SKLADU (web)' : '➖ VYBRÁNO ZE SKLADU (web)',
+    color, fields, timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+  });
 }
 
 async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel) {
@@ -39,7 +133,12 @@ async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel) {
     { name: '💸 Výroba stála', value: `~$${vyroba * mnozstvi}`, inline: true },
     { name: '💰 Doporučená prodejní', value: `$${prodej * mnozstvi}`, inline: true },
   ];
-  await sendEmbed(channelId, { title: typ === 'VKLAD' ? '🌿 VLOŽENO DO SKLADU (web)' : '🌿 VYBRÁNO ZE SKLADU (web)', color, fields, timestamp: new Date().toISOString() });
+  await sendEmbed(channelId, {
+    title: typ === 'VKLAD' ? '🌿 VLOŽENO DO SKLADU (web)' : '🌿 VYBRÁNO ZE SKLADU (web)',
+    color, fields, timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+  });
 }
 
 async function notifyDrogy(typ, droga, mnozstvi, vyroba, prodej, uzivatel) {
@@ -54,7 +153,12 @@ async function notifyDrogy(typ, droga, mnozstvi, vyroba, prodej, uzivatel) {
   // přidáváme jen pokud reálně dorazila platná čísla, ať nezobrazujeme "$NaN".
   if (typeof vyroba === 'number' && !isNaN(vyroba)) fields.push({ name: '💸 Výroba', value: `~$${vyroba * mnozstvi}`, inline: true });
   if (typeof prodej === 'number' && !isNaN(prodej)) fields.push({ name: '💰 Prodej', value: `$${prodej * mnozstvi}`, inline: true });
-  await sendEmbed(channelId, { title: typ === 'VKLAD' ? '💊 VLOŽENO DO SKLADU (web)' : '💊 VYBRÁNO ZE SKLADU (web)', color, fields, timestamp: new Date().toISOString() });
+  await sendEmbed(channelId, {
+    title: typ === 'VKLAD' ? '💊 VLOŽENO DO SKLADU (web)' : '💊 VYBRÁNO ZE SKLADU (web)',
+    color, fields, timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+  });
 }
 
 async function notifyChemky(typ, chemikalie, mnozstvi, uzivatel) {
@@ -65,7 +169,12 @@ async function notifyChemky(typ, chemikalie, mnozstvi, uzivatel) {
     { name: 'Množství', value: `${mnozstvi} ks`, inline: true },
     { name: typ === 'VKLAD' ? 'Vložil' : 'Vzal', value: uzivatel, inline: true },
   ];
-  await sendEmbed(channelId, { title: typ === 'VKLAD' ? '⚗️ VLOŽENO DO SKLADU (web)' : '⚗️ VYBRÁNO ZE SKLADU (web)', color, fields, timestamp: new Date().toISOString() });
+  await sendEmbed(channelId, {
+    title: typ === 'VKLAD' ? '⚗️ VLOŽENO DO SKLADU (web)' : '⚗️ VYBRÁNO ZE SKLADU (web)',
+    color, fields, timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+  });
 }
 
 async function notifyGarage(car, uzivatel, discordUsername, imageUrl) {
@@ -85,6 +194,8 @@ async function notifyGarage(car, uzivatel, discordUsername, imageUrl) {
     color: 0xC9A84C,
     fields,
     timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, 'garaz'),
   };
   if (imageUrl) embed.image = { url: imageUrl };
 
@@ -101,7 +212,12 @@ async function notifyUcet(typ, castka, valuta, poznamka, uzivatel) {
     { name: 'Zadal', value: uzivatel, inline: true },
     { name: 'Poznámka', value: poznamka },
   ];
-  await sendEmbed(channelId, { title: typ === 'PŘÍJEM' ? `💚 PŘÍJEM — ${valuta} (web)` : `🔴 VÝDAJ — ${valuta} (web)`, color, fields, timestamp: new Date().toISOString() });
+  await sendEmbed(channelId, {
+    title: typ === 'PŘÍJEM' ? `💚 PŘÍJEM — ${valuta} (web)` : `🔴 VÝDAJ — ${valuta} (web)`,
+    color, fields, timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, typ === 'PŘÍJEM' ? 'prijem' : 'vydaj'),
+  });
 }
 
 async function notifySmena(smer, castka, vysledek, uzivatel) {
@@ -117,7 +233,12 @@ async function notifySmena(smer, castka, vysledek, uzivatel) {
     { name: 'Kurz', value: '1:1', inline: true },
     { name: 'Zadal', value: uzivatel, inline: true },
   ];
-  await sendEmbed(channelId, { title: '💱 SMĚNA MĚN (web)', color: 0x6FA8C9, fields, timestamp: new Date().toISOString() });
+  await sendEmbed(channelId, {
+    title: '💱 SMĚNA MĚN (web)',
+    color: 0x6FA8C9, fields, timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, 'smena'),
+  });
 }
 
 async function notifyAudit(akce, uzivatel, discordUsername, detail) {
@@ -191,6 +312,8 @@ async function notifyBulkSklad(sekce, typ, items, uzivatel) {
       { name: 'Položky', value: seznam || '—', inline: false },
     ],
     timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, 'bulk'),
   });
 }
 
@@ -214,6 +337,8 @@ async function notifyPovyseni(fromLabel, toLabel, uzivatel, discordUsername) {
     color: 0xC9A84C,
     fields,
     timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, 'povyseni'),
   });
 }
 
@@ -237,6 +362,8 @@ async function notifyVyznamenani(nazevOdznaku, popis, uzivatel, discordUsername)
     color: 0xC9A84C,
     fields,
     timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, 'vyznamenani'),
   });
 }
 
