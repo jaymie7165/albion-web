@@ -9,7 +9,7 @@ function renderCard(req, icName) {
   <title>Albion — Karta člena</title>
   ${baseStyles()}
   <style>
-    .tc-line{display:flex;justify-content:space-between;padding:0.45rem 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:0.8rem}
+    .tc-line{display:flex;justify-content:space-between;padding:0.55rem 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:0.84rem}
     .tc-line:last-child{border-bottom:none}
     .tc-line span:first-child{color:var(--ivory-faint)}
     .tc-line span:last-child{color:var(--ivory)}
@@ -56,23 +56,30 @@ function renderCard(req, icName) {
 
     async function exportCardImage(mode){
       const c=CARD; if(!c)return;
-      const W=420,H=620;
-      const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+      const W=440,H=660,SCALE=2.5; // SCALE = vykreslujeme ve vyšším rozlišení, ať export není rozpixelovaný
+      const canvas=document.createElement('canvas');canvas.width=W*SCALE;canvas.height=H*SCALE;
       const ctx=canvas.getContext('2d');
+      ctx.scale(SCALE,SCALE); // od teď kreslíme v "logických" souřadnicích 440×660, canvas je ale ostrý ve vysokém rozlišení
+
       ctx.fillStyle='#10150F';ctx.fillRect(0,0,W,H);
       ctx.strokeStyle='#B68A4E';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
 
-      const grad=ctx.createLinearGradient(0,0,W,140);
+      const grad=ctx.createLinearGradient(0,0,W,170);
       grad.addColorStop(0,'#6E1423');grad.addColorStop(1,'#4A0D18');
-      ctx.fillStyle=grad;ctx.fillRect(0,0,W,160);
+      ctx.fillStyle=grad;ctx.fillRect(0,0,W,180);
+
+      // Rohové akcenty (stejný heraldický detail jako zbytek webu)
+      ctx.strokeStyle='#E0BD7F';ctx.lineWidth=1.4;
+      ctx.beginPath();ctx.moveTo(14,28);ctx.lineTo(14,14);ctx.lineTo(28,14);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(W-28,H-14);ctx.lineTo(W-14,H-14);ctx.lineTo(W-14,H-28);ctx.stroke();
 
       function drawPhotoAndText(){
-        ctx.font='700 22px Georgia';ctx.fillStyle='#EDE6D4';ctx.textAlign='center';
-        ctx.fillText(c.ic_name,W/2,205);
-        ctx.font='13px monospace';ctx.fillStyle='#B7AE99';
-        ctx.fillText('@'+(c.discord_username||'—')+' · '+c.rank,W/2,226);
+        ctx.font='700 26px Georgia';ctx.fillStyle='#EDE6D4';ctx.textAlign='center';
+        ctx.fillText(c.ic_name,W/2,232);
+        ctx.font='14px monospace';ctx.fillStyle='#B7AE99';
+        ctx.fillText('@'+(c.discord_username||'—')+' · '+c.rank,W/2,254);
 
-        let y=270;
+        let y=305;
         ctx.textAlign='left';
         const rows=[
           ['Telefon', c.phone||'—'],
@@ -84,11 +91,14 @@ function renderCard(req, icName) {
           ['Povýšení', c.promotions.length+'×'],
         ];
         rows.forEach(([label,val])=>{
-          ctx.font='12px monospace';ctx.fillStyle='#7E7868';ctx.fillText(label,30,y);
-          ctx.font='13px monospace';ctx.fillStyle='#EDE6D4';ctx.textAlign='right';ctx.fillText(val,W-30,y);
+          ctx.font='12.5px monospace';ctx.fillStyle='#7E7868';ctx.fillText(label,32,y);
+          ctx.font='13.5px monospace';ctx.fillStyle='#EDE6D4';ctx.textAlign='right';ctx.fillText(val,W-32,y);
           ctx.textAlign='left';
-          y+=34;
+          y+=37;
         });
+
+        ctx.font='600 9px "Cinzel",Georgia';ctx.fillStyle='#7E7868';ctx.textAlign='center';
+        ctx.fillText('A L B I O N',W/2,H-24);
 
         finish();
       }
@@ -108,11 +118,19 @@ function renderCard(req, icName) {
         }
       }
 
+      // Kruhový avatar bez zdeformování — stejná logika jako CSS object-fit:cover:
+      // najdeme čtvercový výřez ze středu zdrojové fotky (bez ohledu na její poměr stran)
+      // a teprve ten vykreslíme do kruhu, takže fotka nikdy není roztažená.
       const img=new Image();img.crossOrigin='anonymous';
+      const R=58, CX=W/2, CY=130;
       img.onload=()=>{
-        ctx.save();ctx.beginPath();ctx.arc(W/2,110,48,0,Math.PI*2);ctx.clip();
-        ctx.drawImage(img,W/2-48,110-48,96,96);ctx.restore();
-        ctx.strokeStyle='#E0BD7F';ctx.lineWidth=3;ctx.beginPath();ctx.arc(W/2,110,48,0,Math.PI*2);ctx.stroke();
+        const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+        const side=Math.min(iw,ih);
+        const sx=(iw-side)/2, sy=(ih-side)/2;
+        ctx.save();ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.clip();
+        ctx.drawImage(img,sx,sy,side,side,CX-R,CY-R,R*2,R*2);
+        ctx.restore();
+        ctx.strokeStyle='#E0BD7F';ctx.lineWidth=3.5;ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.stroke();
         drawPhotoAndText();
       };
       img.onerror=()=>drawPhotoAndText();
