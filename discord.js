@@ -217,6 +217,29 @@ async function notifyPovyseni(fromLabel, toLabel, uzivatel, discordUsername) {
   });
 }
 
+// Vyznamenání / odznaky (achievements.js) — nová notifikace při udělení
+// odznaku (first_action, hundred_ops, first_month, veteran, logistics...).
+async function notifyVyznamenani(nazevOdznaku, popis, uzivatel, discordUsername) {
+  const channelId = process.env.CHANNEL_VYZNAMENANI;
+  if (!channelId) {
+    console.error('[DISCORD] CHANNEL_VYZNAMENANI není nastaven v .env, odznak se nezapsal do Discordu.');
+    return;
+  }
+  const fields = [
+    { name: '👤 Jméno', value: uzivatel || '—', inline: true },
+    { name: '🏅 Odznak', value: nazevOdznaku, inline: true },
+  ];
+  if (discordUsername) fields.push({ name: '🔗 Discord', value: `@${discordUsername}`, inline: true });
+  if (popis) fields.push({ name: '📝 Popis', value: popis, inline: false });
+
+  await sendEmbed(channelId, {
+    title: '🏅 UDĚLENÍ VYZNAMENÁNÍ (web)',
+    color: 0xC9A84C,
+    fields,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 async function sendAnnouncement(title, content, uzivatel) {
   const channelId = process.env.CHANNEL_OZNAMENI;
   if (!channelId) return;
@@ -272,4 +295,4 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
