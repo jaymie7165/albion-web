@@ -4,8 +4,19 @@ const { baseStyles, ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
 
 function renderDashboard(req, data) {
-  const { zbrane, weed, drogy, chemky, ucet, recentUcet } = data;
+  const { zbrane, weed, drogy, chemky, ucet, recentUcet, cenik, katalog } = data;
   const icName = req.session.icName;
+  const canManage = req.session.accessLevel === 1; // jen Founder/Council smí upravovat ceník a katalog položek
+
+  const esc = (s) => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  const cenikRowHtml = (row, ci, ri, editable) => editable
+    ? `<div class="cenik-row" data-row="${ri}">
+        <input type="text" class="cenik-label-input" value="${esc(row.label)}" placeholder="Název položky">
+        <input type="text" class="cenik-cena-input" value="${esc(row.cena)}" placeholder="Cena">
+        <button type="button" class="cenik-row-del" onclick="this.closest('.cenik-row').remove()" title="Smazat řádek">✕</button>
+      </div>`
+    : `<div class="cenik-row cenik-row-static"><span>${esc(row.label)}</span><span class="cenik-cena">${esc(row.cena)}</span></div>`;
 
   const formatSklad = (obj, ceny) => {
     const entries = Object.entries(obj).filter(([,q]) => q > 0);
@@ -48,6 +59,7 @@ function renderDashboard(req, data) {
     { id: 'weed',   label: 'Weed',       sub: 'Sklad',       icon: '◈' },
     { id: 'drogy',  label: 'Drogy',      sub: 'Sklad',       icon: '◆' },
     { id: 'chemky', label: 'Chemikálie', sub: 'Sklad',       icon: '⬡' },
+    { id: 'cenik',  label: 'Ceník',      sub: 'Referenční ceny', icon: '$' },
   ];
 
   return `<!DOCTYPE html><html lang="cs"><head>
@@ -164,6 +176,18 @@ function renderDashboard(req, data) {
       font-family:var(--font-mono);font-size:0.84rem;
     }
     .smena-preview .arrow{color:var(--brass);opacity:0.7}
+
+    /* ── CENÍK ── */
+    .cenik-row{display:grid;grid-template-columns:1fr 140px 30px;gap:0.6rem;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border)}
+    .cenik-row-static{display:flex;justify-content:space-between;padding:0.5rem 0.2rem}
+    .cenik-row-static .cenik-cena{color:var(--brass-bright);font-family:var(--font-mono)}
+    .cenik-label-input,.cenik-cena-input{
+      background:var(--input-bg);border:1px solid var(--border);color:var(--ivory);
+      font-family:var(--font-mono);font-size:0.8rem;padding:0.4rem 0.6rem;width:100%;
+    }
+    .cenik-label-input:focus,.cenik-cena-input:focus{outline:none;border-color:var(--brass)}
+    .cenik-row-del{background:transparent;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);width:28px;height:28px;cursor:pointer;font-size:0.75rem}
+    .cenik-row-del:hover{background:var(--oxblood-faint,rgba(110,20,35,0.15))}
 
     @media(max-width:980px){
       .sklad-shell{grid-template-columns:1fr}
@@ -309,7 +333,7 @@ function renderDashboard(req, data) {
         <!-- Zbraně -->
         <div class="sklad-panel" id="panel-zbrane">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Zbraně &amp; Střelivo</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('zbrane')" style="margin-left:auto">+ Hromadný zápis</button></div>
+            <div class="panel-head"><span class="panel-title">Zbraně &amp; Střelivo</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('zbrane')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('zbrane')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -338,7 +362,7 @@ function renderDashboard(req, data) {
         <!-- Weed -->
         <div class="sklad-panel" id="panel-weed">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Weed</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('weed')" style="margin-left:auto">+ Hromadný zápis</button></div>
+            <div class="panel-head"><span class="panel-title">Weed</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('weed')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('weed')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -364,7 +388,7 @@ function renderDashboard(req, data) {
         <!-- Drogy -->
         <div class="sklad-panel" id="panel-drogy">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Drogy</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('drogy')" style="margin-left:auto">+ Hromadný zápis</button></div>
+            <div class="panel-head"><span class="panel-title">Drogy</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('drogy')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('drogy')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -389,7 +413,7 @@ function renderDashboard(req, data) {
         <!-- Chemky -->
         <div class="sklad-panel" id="panel-chemky">
           <div class="panel-card">
-            <div class="panel-head"><span class="panel-title">Chemikálie</span><span class="panel-badge">Sklad</span><button class="quick-btn" onclick="openBulkModal('chemky')" style="margin-left:auto">+ Hromadný zápis</button></div>
+            <div class="panel-head"><span class="panel-title">Chemikálie</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('chemky')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('chemky')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
@@ -411,9 +435,60 @@ function renderDashboard(req, data) {
           </div>
         </div>
 
+        <!-- Ceník -->
+        <div class="sklad-panel" id="panel-cenik">
+          <div class="panel-card">
+            <div class="panel-head">
+              <span class="panel-title">Ceník</span>
+              <span class="panel-badge">${canManage ? 'Editovatelné · Founder/Council' : 'Jen ke čtení'}</span>
+              ${canManage ? `<button class="quick-btn" onclick="addCenikRow()" style="margin-left:auto">+ Přidat řádek</button>
+              <button class="quick-btn primary" onclick="saveCenik()">Uložit ceník</button>` : ''}
+            </div>
+            <p style="font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-faint);line-height:1.7;margin-bottom:1.4rem;max-width:640px">
+              Referenční výkupní a prodejní ceny. ${canManage ? 'Uprav hodnoty přímo v tabulce a klikni na <strong style="color:var(--brass-bright)">Uložit ceník</strong>.' : 'Upravovat může jen Founder/Council.'}
+            </p>
+            <div id="cenik-categories">
+              ${(cenik.categories || []).map((cat, ci) => `
+                <div class="cenik-cat" data-cat="${ci}">
+                  <div class="panel-list-label" style="margin-top:${ci ? '1.6rem' : '0'}">${esc(cat.label)}</div>
+                  <div class="cenik-rows" data-cat-rows="${ci}">
+                    ${cat.rows.map((r, ri) => cenikRowHtml(r, ci, ri, canManage)).join('')}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </main>
+
+  <!-- MODAL: Spravovat položky katalogu -->
+  <div class="modal-overlay" id="katalogModal">
+    <div class="modal-box" style="max-width:440px">
+      <div class="modal-title">Spravovat položky</div>
+      <div class="modal-subtitle">Přidej novou položku do skladového katalogu (např. nový typ zbraně od dealera).</div>
+      <div class="form-group" style="margin-bottom:0.85rem">
+        <label>Kategorie</label>
+        <select id="katalog-kategorie">
+          <option value="zbrane">Zbraně</option>
+          <option value="naboje">Střelivo</option>
+          <option value="akce">Akce</option>
+          <option value="weed">Weed (odrůda)</option>
+          <option value="drogy">Drogy</option>
+          <option value="chemky">Chemikálie</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:1rem"><label>Název položky</label><input type="text" id="katalog-polozka" placeholder="Např. Heavy Sniper Mk2" maxlength="60"></div>
+      <div style="display:flex;gap:0.6rem">
+        <button class="btn-submit" onclick="submitKatalog()" style="flex:1">Přidat položku</button>
+        <button class="btn-submit" onclick="closeKatalogModal()" style="flex:0 0 auto;background:transparent;border:1px solid var(--border-brass);color:var(--ivory-dim)">Zavřít</button>
+      </div>
+      <div class="folio-rule tight"></div>
+      <div class="panel-list-label">Vlastní přidané položky</div>
+      <div id="katalog-list" style="max-height:180px;overflow:auto"></div>
+    </div>
+  </div>
 
   <!-- MODAL -->
   <div class="modal-overlay" id="confirmModal">
@@ -525,6 +600,26 @@ function renderDashboard(req, data) {
     const NABOJE=["9mm","9mm Mk2",".75cal",".50cal","12-gauge"];
     const AKCE=["Malá C4","Velká C4","Přístupová karta","Pokročilá zvláštní karta","EMP zařízení","Řezací laser","Cable Cutter","Zvláštní karta"];
     const WEED_CENY={"Žlutý kanabis":{vyroba:100,prodej:150},"Zelený kanabis":{vyroba:100,prodej:150},"Kanabis":{vyroba:100,prodej:150},"Červený kanabis":{vyroba:100,prodej:150},"Modrý kanabis":{vyroba:100,prodej:150}};
+    const DROGY_LIST=["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"];
+    const CHEMKY_LIST=["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná"];
+
+    // ── Sloučení vlastních položek katalogu (přidaných přes "Spravovat položky") ──
+    const KATALOG=${JSON.stringify(katalog || { zbrane: [], naboje: [], akce: [], weed: [], drogy: [], chemky: [] })};
+    (KATALOG.zbrane||[]).forEach(i=>{if(!ZBRANE.includes(i))ZBRANE.push(i);});
+    (KATALOG.naboje||[]).forEach(i=>{if(!NABOJE.includes(i))NABOJE.push(i);});
+    (KATALOG.akce||[]).forEach(i=>{if(!AKCE.includes(i))AKCE.push(i);});
+    (KATALOG.weed||[]).forEach(i=>{if(!WEED_CENY[i])WEED_CENY[i]={vyroba:100,prodej:150};});
+    (KATALOG.drogy||[]).forEach(i=>{if(!DROGY_LIST.includes(i))DROGY_LIST.push(i);});
+    (KATALOG.chemky||[]).forEach(i=>{if(!CHEMKY_LIST.includes(i))CHEMKY_LIST.push(i);});
+    function refreshStaticSelects(){
+      const weedSel=document.getElementById('weed-odruda');
+      if(weedSel){weedSel.innerHTML=Object.keys(WEED_CENY).map(i=>'<option>'+i+'</option>').join('');}
+      const drogySel=document.getElementById('drogy-droga');
+      if(drogySel){drogySel.innerHTML=DROGY_LIST.map(i=>'<option>'+i+'</option>').join('');const b=document.querySelector('#panel-drogy .select-count-badge');if(b)b.textContent=DROGY_LIST.length;}
+      const chemkySel=document.getElementById('chemky-chemikalie');
+      if(chemkySel){chemkySel.innerHTML=CHEMKY_LIST.map(i=>'<option>'+i+'</option>').join('');const b=document.querySelector('#panel-chemky .select-count-badge');if(b)b.textContent=CHEMKY_LIST.length;}
+    }
+    refreshStaticSelects();
 
     function updateZbraneItems(){
       const kat=document.getElementById('zbrane-kat').value;
@@ -540,8 +635,8 @@ function renderDashboard(req, data) {
     const BULK_ITEMS = {
       zbrane: [...ZBRANE.map(i=>({label:i,kat:'Zbraň'})), ...NABOJE.map(i=>({label:i,kat:'Střelivo'})), ...AKCE.map(i=>({label:i,kat:'Akce'}))],
       weed:   Object.keys(WEED_CENY).map(i=>({label:i})),
-      drogy:  ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"].map(i=>({label:i})),
-      chemky: ["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná"].map(i=>({label:i})),
+      drogy:  DROGY_LIST.map(i=>({label:i})),
+      chemky: CHEMKY_LIST.map(i=>({label:i})),
     };
     let bulkSekce='zbrane',bulkTyp='VKLAD';
 
@@ -759,6 +854,79 @@ function renderDashboard(req, data) {
         }
       );
     }
+
+    // ── CENÍK ──
+    const CAN_MANAGE=${canManage};
+    function addCenikRow(){
+      const wrap=document.querySelector('#cenik-categories .cenik-cat:last-child .cenik-rows');
+      if(!wrap)return;
+      const div=document.createElement('div');
+      div.className='cenik-row';
+      div.innerHTML='<input type="text" class="cenik-label-input" placeholder="Název položky">'+
+        '<input type="text" class="cenik-cena-input" placeholder="Cena">'+
+        '<button type="button" class="cenik-row-del" onclick="this.closest(\\'.cenik-row\\').remove()" title="Smazat řádek">✕</button>';
+      wrap.appendChild(div);
+      div.querySelector('.cenik-label-input').focus();
+    }
+    window.addCenikRow=addCenikRow;
+    async function saveCenik(){
+      if(!CAN_MANAGE)return;
+      const categories=[...document.querySelectorAll('#cenik-categories .cenik-cat')].map(catEl=>{
+        const label=catEl.querySelector('.panel-list-label').textContent;
+        const rows=[...catEl.querySelectorAll('.cenik-row')].map(r=>({
+          label:r.querySelector('.cenik-label-input').value.trim(),
+          cena:r.querySelector('.cenik-cena-input').value.trim(),
+        })).filter(r=>r.label);
+        return {label,rows};
+      });
+      const res=await fetch('/api/cenik',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories})});
+      const data=await res.json();
+      if(data.ok)showToast('Ceník uložen');else showToast(data.error||'Chyba',true);
+    }
+    window.saveCenik=saveCenik;
+
+    // ── SPRÁVA KATALOGU POLOŽEK ──
+    function openKatalogModal(kategorie){
+      document.getElementById('katalog-kategorie').value=kategorie;
+      document.getElementById('katalog-polozka').value='';
+      renderKatalogList();
+      document.getElementById('katalogModal').classList.add('open');
+    }
+    window.openKatalogModal=openKatalogModal;
+    function closeKatalogModal(){document.getElementById('katalogModal').classList.remove('open');}
+    window.closeKatalogModal=closeKatalogModal;
+    function renderKatalogList(){
+      const kat=document.getElementById('katalog-kategorie').value;
+      const items=KATALOG[kat]||[];
+      const list=document.getElementById('katalog-list');
+      if(!items.length){list.innerHTML='<div style="color:var(--ivory-faint);font-size:0.8rem;padding:0.5rem 0">Zatím žádné vlastní položky v této kategorii.</div>';return;}
+      list.innerHTML=items.map(i=>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:0.8rem">'+
+          '<span>'+i.replace(/</g,'&lt;')+'</span>'+
+          '<button type="button" onclick="removeKatalogItem(\\''+kat+'\\',\\''+i.replace(/'/g,"\\\\'")+'\\')" style="background:none;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);width:26px;height:26px;cursor:pointer">✕</button>'+
+        '</div>'
+      ).join('');
+    }
+    document.getElementById('katalog-kategorie').addEventListener('change',renderKatalogList);
+    async function submitKatalog(){
+      const kategorie=document.getElementById('katalog-kategorie').value;
+      const polozka=document.getElementById('katalog-polozka').value.trim();
+      if(!polozka)return showToast('Vyplň název položky',true);
+      const res=await fetch('/api/sklad/katalog',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kategorie,polozka})});
+      const data=await res.json();
+      if(data.ok){showToast('Položka přidána — obnovuji stránku…');setTimeout(()=>location.reload(),1000);}
+      else showToast(data.error||'Chyba',true);
+    }
+    window.submitKatalog=submitKatalog;
+    async function removeKatalogItem(kategorie,polozka){
+      if(!confirm('Odebrat položku "'+polozka+'" z katalogu?'))return;
+      const res=await fetch('/api/sklad/katalog',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({kategorie,polozka})});
+      const data=await res.json();
+      if(data.ok){showToast('Položka odebrána — obnovuji stránku…');setTimeout(()=>location.reload(),1000);}
+      else showToast(data.error||'Chyba',true);
+    }
+    window.removeKatalogItem=removeKatalogItem;
+    document.getElementById('katalogModal').addEventListener('click',(e)=>{if(e.target===e.currentTarget)closeKatalogModal();});
   </script>
   </body></html>`;
 }
