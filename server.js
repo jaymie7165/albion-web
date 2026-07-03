@@ -32,7 +32,6 @@ const { renderAuth } = require('./views/auth');
 const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
-const { renderAlbion } = require('./views/albion');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -42,7 +41,30 @@ app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 // Logo is served from public/logo.png via express.static above
+
+// ── TRVALÉ ÚLOŽIŠTĚ ──────────────────────────────────────────────────────────
+// Na Railway je k službě připojený Volume (persistentní disk) — Railway sám
+// zpřístupní jeho cestu v proměnné RAILWAY_VOLUME_MOUNT_PATH. Pokud Volume
+// není připojený (např. při lokálním vývoji), spadneme zpátky na složku
+// ./data v kořeni projektu, ať appka funguje i bez Railway.
+// DŮLEŽITÉ: po nastavení Volume na Railway nastav jeho Mount Path na "/app/data",
+// aby seděl s touto fallback cestou i v lokálním běhu.
+// (Přesunuto sem před session middleware, protože session store teď potřebuje
+// tuhle cestu hned — viz níže.)
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) { try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { console.error('[DATA_DIR]', e.message); } }
+console.log(`[STORAGE] Trvalá data se ukládají do: ${DATA_DIR}${process.env.RAILWAY_VOLUME_MOUNT_PATH ? ' (Railway Volume)' : ' (lokální složka — NEPŘETRVÁ na Railway bez Volume!)'}`);
+
+// Session se dřív ukládala jen do paměti procesu (výchozí MemoryStore) — každý
+// restart/redeploy na Railway tak odhlásil úplně všechny uživatele, i když
+// cookie v prohlížeči měla platnost 30 dní. FileStore ukládá session na disk
+// (do Volume, takže to přežije i redeploy) a při startu si je zase načte.
+const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
+if (!fs.existsSync(SESSIONS_DIR)) { try { fs.mkdirSync(SESSIONS_DIR, { recursive: true }); } catch (e) { console.error('[SESSIONS]', e.message); } }
+const FileStore = require('session-file-store')(session);
+
 app.use(session({
+  store: new FileStore({ path: SESSIONS_DIR, ttl: 30 * 24 * 60 * 60, retries: 1, logFn: () => {} }),
   secret: process.env.SESSION_SECRET || 'albion_secret',
   resave: false,
   saveUninitialized: false,
@@ -63,17 +85,6 @@ app.use(session({
 // část stránek a živé notifikace kontrolu přeskakovaly.
 app.use(requireDiscordMember);
 app.use(applyViewAs);
-
-// ── TRVALÉ ÚLOŽIŠTĚ ──────────────────────────────────────────────────────────
-// Na Railway je k službě připojený Volume (persistentní disk) — Railway sám
-// zpřístupní jeho cestu v proměnné RAILWAY_VOLUME_MOUNT_PATH. Pokud Volume
-// není připojený (např. při lokálním vývoji), spadneme zpátky na složku
-// ./data v kořeni projektu, ať appka funguje i bez Railway.
-// DŮLEŽITÉ: po nastavení Volume na Railway nastav jeho Mount Path na "/app/data",
-// aby seděl s touto fallback cestou i v lokálním běhu.
-const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) { try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) { console.error('[DATA_DIR]', e.message); } }
-console.log(`[STORAGE] Trvalá data se ukládají do: ${DATA_DIR}${process.env.RAILWAY_VOLUME_MOUNT_PATH ? ' (Railway Volume)' : ' (lokální složka — NEPŘETRVÁ na Railway bez Volume!)'}`);
 
 // ── EDITOVATELNÝ OBSAH (Kodex/Lore/Hierarchy) — zatím bez defaultů z kódu,
 // store se naplní prázdným polem dokud nebude proveden refaktor views/*-default.js.
@@ -161,6 +172,111 @@ function loadGarage() {
 function saveGarage(cars) {
   try { fs.writeFileSync(GARAGE_FILE, JSON.stringify(cars, null, 2)); } catch (e) { console.error('[GARAGE]', e.message); }
 }
+
+// ── SKLAD — CENÍK (výkupní/prodejní ceny, editovatelné jen Founder/Council) ──
+const CENIK_FILE = path.join(DATA_DIR, 'cenik.json');
+const CENIK_DEFAULT = {
+  categories: [
+    {
+      id: 'vykupni', label: 'Cayo Perico — výkupní ceny',
+      rows: [
+        { label: 'Rozbitá láhev', cena: '80$' },
+        { label: 'Boxer', cena: '100$' },
+        { label: 'Nůž', cena: '150-200$' },
+        { label: 'Klenoty', cena: '80$' },
+        { label: 'Zlatá mince', cena: '100$' },
+        { label: 'Náhrdelník', cena: '120$' },
+        { label: 'Hodinky', cena: '150$' },
+        { label: 'Zlatý prsten', cena: '200$' },
+        { label: 'Korály', cena: '85$' },
+        { label: 'Kůže', cena: '45$' },
+        { label: 'Maso', cena: '20$' },
+        { label: 'Ryby', cena: '22$' },
+      ],
+    },
+    {
+      id: 'sazeni', label: 'Sázení',
+      rows: [
+        { label: 'Jedna kytka (bez květináče, nůžek a sáčků)', cena: '455$' },
+        { label: 'Pytlík na prodej (firemní účet)', cena: '150$' },
+        { label: 'Hnojivo', cena: '25$' },
+        { label: 'Konev s vodou', cena: '20$' },
+        { label: 'Kvalitní hnojivo', cena: '50$ (x4 — 200$)' },
+        { label: 'Výživná voda', cena: '40$ (x4 — 160$)' },
+        { label: 'Květináč', cena: '30$' },
+        { label: 'Nůžky', cena: '20$' },
+        { label: 'Sáček', cena: '2$' },
+        { label: 'Semínko', cena: '80$' },
+      ],
+    },
+    {
+      id: 'zbrane', label: 'Nelegální zbraně a vesty — Cayo Perico',
+      rows: [
+        { label: 'Taktická vesta', cena: '24 000 ₱' },
+        { label: 'Plátová vesta', cena: '12 000 ₱' },
+        { label: 'Podkošilová vesta', cena: '6 000 ₱' },
+        { label: 'Assault Rifle MK2', cena: '300 000 ₱' },
+        { label: 'Assault Rifle', cena: '290 000 ₱' },
+        { label: 'Special Carbine', cena: '260 000 ₱' },
+        { label: 'Bullpup Rifle', cena: '250 000 ₱' },
+        { label: 'Bullpup Rifle MK2', cena: '230 000 ₱' },
+        { label: 'Compact Rifle', cena: '140 000 ₱' },
+        { label: 'SMG MK2', cena: '110 000 ₱' },
+        { label: 'Assault SMG', cena: '90 000 ₱' },
+        { label: 'Micro SMG', cena: '70 000 ₱' },
+        { label: 'Double Barrel Shotgun', cena: '60 000 ₱' },
+        { label: 'Machine Pistol', cena: '60 000 ₱' },
+        { label: 'Mini SMG', cena: '50 000 ₱' },
+        { label: 'Sawn Off Shotgun', cena: '50 000 ₱' },
+        { label: 'Pistol .50', cena: '20 000 ₱' },
+        { label: 'Heavy Pistol', cena: '10 000 ₱' },
+        { label: 'SNS Pistol', cena: '2 600 ₱' },
+        { label: 'SNS Pistol MK2', cena: '2 800 ₱' },
+        { label: 'Ceramic Pistol', cena: '1 000 ₱' },
+        { label: '9mm', cena: '4 ₱' },
+        { label: '.50cal', cena: '5 ₱' },
+        { label: '5.56mm', cena: '8 ₱' },
+        { label: '7.62mm', cena: '12 ₱' },
+        { label: '12-gauge', cena: '8 ₱' },
+        { label: '.75cal', cena: '20 ₱' },
+      ],
+    },
+  ],
+  updatedAt: null, updatedBy: null,
+};
+function loadCenik() {
+  try {
+    if (!fs.existsSync(CENIK_FILE)) return CENIK_DEFAULT;
+    return JSON.parse(fs.readFileSync(CENIK_FILE, 'utf8')) || CENIK_DEFAULT;
+  } catch { return CENIK_DEFAULT; }
+}
+function saveCenik(data) {
+  try { fs.writeFileSync(CENIK_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('[CENIK]', e.message); }
+}
+
+// ── SKLAD — KATALOG POLOŽEK (vlastní přidané položky do select-boxů, jen Founder/Council) ──
+const KATALOG_FILE = path.join(DATA_DIR, 'katalog.json');
+const KATALOG_KEYS = ['zbrane', 'naboje', 'akce', 'weed', 'drogy', 'chemky'];
+function loadKatalog() {
+  try {
+    if (!fs.existsSync(KATALOG_FILE)) return { zbrane: [], naboje: [], akce: [], weed: [], drogy: [], chemky: [] };
+    const d = JSON.parse(fs.readFileSync(KATALOG_FILE, 'utf8')) || {};
+    KATALOG_KEYS.forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
+    return d;
+  } catch { return { zbrane: [], naboje: [], akce: [], weed: [], drogy: [], chemky: [] }; }
+}
+function saveKatalog(data) {
+  try { fs.writeFileSync(KATALOG_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('[KATALOG]', e.message); }
+}
+// Sloučení vlastních položek katalogu (přidaných přes Sklad → Spravovat položky) do CONFIG,
+// aby je server-side validace (inList/allowedList) rovnou uznávala bez nutnosti restartu appky.
+const KATALOG_TO_CONFIG_KEY = { zbrane: 'zbrane', naboje: 'naboje', akce: 'akce', weed: 'weedOdrudy', drogy: 'drogyTypy', chemky: 'chemkyTypy' };
+(function mergeKatalogIntoConfig() {
+  const kat = loadKatalog();
+  Object.entries(KATALOG_TO_CONFIG_KEY).forEach(([katKey, cfgKey]) => {
+    (kat[katKey] || []).forEach(item => { if (!CONFIG[cfgKey].includes(item)) CONFIG[cfgKey].push(item); });
+  });
+})();
 // Uloží base64 obrázek (data URL) na disk a vrátí veřejnou cestu, nebo null při chybě/neplatném vstupu.
 const { addWatermark } = require('./watermark');
 async function saveGarageImage(dataUrl, existingPath) {
@@ -656,10 +772,7 @@ async function requireDiscordMember(req, res, next) {
     // Detekce povýšení (snížení levelu = vyšší práva) → historie + gratulační banner
     if (req.session.realAccessLevel !== undefined && newLevel < req.session.realAccessLevel) {
       const RANK_LABEL = { 1: 'Council', 2: 'Senior Member', 3: 'Member' };
-      const fromLabel = RANK_LABEL[req.session.realAccessLevel] || '—';
-      const toLabel   = RANK_LABEL[newLevel] || '—';
-      try { db.addPromotion(req.session.userId, req.session.realAccessLevel, newLevel, fromLabel, toLabel); } catch(e){}
-      try { await discord.notifyPovyseni(fromLabel, toLabel, req.session.icName || req.session.discordUsername, req.session.discordUsername); } catch(e){ console.error('[POVYSENI]', e.message); }
+      try { db.addPromotion(req.session.userId, req.session.realAccessLevel, newLevel, RANK_LABEL[req.session.realAccessLevel]||'—', RANK_LABEL[newLevel]||'—'); } catch(e){}
     }
 
     req.session.realAccessLevel = newLevel;
@@ -741,7 +854,6 @@ app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) =>
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Zbraně', [cas, typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe || '-']);
-  await discord.notifyZbrane(typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe);
   await discord.notifyAudit('Zbraně', uzivatel, discordUser, `${typUp} — ${polozkaTrim} (${qty} ks) [${kategorie}]${ucelSafe ? ' | Účel: ' + ucelSafe : ''}`);
   broadcastSSE('skladUpdate', { sekce: 'zbrane', typ: typUp, polozka: polozkaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -763,7 +875,6 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Weed', [cas, typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel]);
-  await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel);
   await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
   broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -784,7 +895,6 @@ app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => 
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Drogy', [cas, typUp, drogaTrim, qty, '-', '-', uzivatel]);
-  await discord.notifyDrogy(typUp, drogaTrim, qty, undefined, undefined, uzivatel);
   await discord.notifyAudit('Drogy', uzivatel, discordUser, `${typUp} — ${drogaTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'drogy', typ: typUp, droga: drogaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -807,7 +917,6 @@ app.post('/api/ucet', requireAuth, requireAccess('sklad'), async (req, res) => {
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Účetnictví', [cas, typUp, amount, valutaUp, poznamkaSafe, uzivatel]);
-  await discord.notifyUcet(typUp, amount, valutaUp, poznamkaSafe, uzivatel);
   await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `${typUp} — ${valutaUp === 'USD' ? 'SAD ' : '₱'}${amount} | ${poznamkaSafe}`);
   broadcastSSE('ucetUpdate', { typ: typUp, castka: amount, valuta: valutaUp, poznamka: poznamkaSafe, uzivatel, cas });
   res.json({ ok: true });
@@ -915,12 +1024,66 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
   }
 
   const shrnuti = validated.map(v => `${v.polozka} (${v.qty} ks)`).join(', ');
-  await discord.notifyBulkSklad(sekce, typUp, validated, uzivatel);
   await discord.notifyAudit(cfg.sheet, uzivatel, discordUser, `${typUp} (HROMADNĚ ×${validated.length}) — ${shrnuti}`);
   broadcastSSE('skladUpdate', { sekce, typ: typUp, polozka: `${validated.length} položek`, qty: validated.reduce((a,v)=>a+v.qty,0), uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
 
   res.json({ ok: true, count: validated.length });
+});
+
+// ── API — CENÍK (referenční ceny, editovatelné jen Founder/Council) ───────────
+app.get('/api/cenik', requireAuth, requireAccess('sklad'), (req, res) => {
+  res.json({ ok: true, cenik: loadCenik() });
+});
+app.put('/api/cenik', requireAuth, requireAccess('sklad'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Ceník smí upravovat jen Founder/Council' });
+  const { categories } = req.body;
+  if (!Array.isArray(categories)) return res.json({ ok: false, error: 'Neplatná data ceníku' });
+  const clean = categories.map(cat => ({
+    id: sanitizeText(cat.id, 40) || 'kategorie',
+    label: sanitizeText(cat.label, 80) || 'Kategorie',
+    rows: (Array.isArray(cat.rows) ? cat.rows : [])
+      .map(r => ({ label: sanitizeText(r.label, 100), cena: sanitizeText(r.cena, 60) }))
+      .filter(r => r.label),
+  }));
+  const data = { categories: clean, updatedAt: new Date().toISOString(), updatedBy: req.session.icName };
+  saveCenik(data);
+  broadcastSSE('cenikUpdate', {});
+  res.json({ ok: true });
+});
+
+// ── API — KATALOG POLOŽEK SKLADU (přidávání nových položek do select-boxů) ────
+app.get('/api/sklad/katalog', requireAuth, requireAccess('sklad'), (req, res) => {
+  res.json({ ok: true, katalog: loadKatalog() });
+});
+app.post('/api/sklad/katalog', requireAuth, requireAccess('sklad'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Přidávat položky smí jen Founder/Council' });
+  let { kategorie, polozka } = req.body;
+  polozka = sanitizeText(polozka, 60);
+  const cfgKey = KATALOG_TO_CONFIG_KEY[kategorie];
+  if (!cfgKey) return res.json({ ok: false, error: 'Neplatná kategorie' });
+  if (!polozka) return res.json({ ok: false, error: 'Vyplň název položky' });
+  if (CONFIG[cfgKey].includes(polozka)) return res.json({ ok: false, error: 'Tato položka už existuje' });
+  const kat = loadKatalog();
+  kat[kategorie].push(polozka);
+  saveKatalog(kat);
+  CONFIG[cfgKey].push(polozka); // rovnou zpřístupníme validaci bez restartu appky
+  broadcastSSE('katalogUpdate', {});
+  res.json({ ok: true, katalog: kat });
+});
+app.delete('/api/sklad/katalog', requireAuth, requireAccess('sklad'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Odebírat položky smí jen Founder/Council' });
+  let { kategorie, polozka } = req.body;
+  polozka = (polozka || '').toString().trim();
+  const cfgKey = KATALOG_TO_CONFIG_KEY[kategorie];
+  if (!cfgKey) return res.json({ ok: false, error: 'Neplatná kategorie' });
+  const kat = loadKatalog();
+  if (!kat[kategorie].includes(polozka)) return res.json({ ok: false, error: 'Položku lze odebrat, jen pokud byla přidána přes katalog' });
+  kat[kategorie] = kat[kategorie].filter(p => p !== polozka);
+  saveKatalog(kat);
+  CONFIG[cfgKey] = CONFIG[cfgKey].filter(p => p !== polozka);
+  broadcastSSE('katalogUpdate', {});
+  res.json({ ok: true, katalog: kat });
 });
 
 // ── API — WEED SÁZENÍ (odpočty růstu, sdílené pro všechny) ────────────────────
@@ -1024,6 +1187,7 @@ app.post('/api/garage', requireAuth, async (req, res) => {
 });
 
 app.put('/api/garage/:id', requireAuth, async (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Úpravu vozidel smí provádět jen Founder/Council' });
   const cars = loadGarage();
   const car = cars.find(c => c.id === req.params.id);
   if (!car) return res.json({ ok: false, error: 'Vůz nenalezen' });
@@ -1060,6 +1224,7 @@ app.put('/api/garage/:id', requireAuth, async (req, res) => {
 });
 
 app.delete('/api/garage/:id', requireAuth, (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazání vozidel smí provádět jen Founder/Council' });
   let cars = loadGarage();
   const car = cars.find(c => c.id === req.params.id);
   if (!car) return res.json({ ok: false, error: 'Vůz nenalezen' });
@@ -2153,9 +2318,11 @@ app.get('/sklad', requireAuth, requireAccess('sklad'), async (req, res) => {
       sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 })),
       sheets.getRecentRows('Účetnictví', 5).catch(() => []),
     ]);
-    res.send(renderDashboard(req, { zbrane, weed, drogy, chemky, ucet, recentUcet }));
+    const cenik = loadCenik();
+    const katalog = loadKatalog();
+    res.send(renderDashboard(req, { zbrane, weed, drogy, chemky, ucet, recentUcet, cenik, katalog }));
   } catch (e) {
-    res.send(renderDashboard(req, { zbrane: {}, weed: {}, drogy: {}, chemky: {}, ucet: { usd: 0, pesos: 0 }, recentUcet: [] }));
+    res.send(renderDashboard(req, { zbrane: {}, weed: {}, drogy: {}, chemky: {}, ucet: { usd: 0, pesos: 0 }, recentUcet: [], cenik: loadCenik(), katalog: loadKatalog() }));
   }
 });
 
@@ -2187,11 +2354,7 @@ app.get('/albion-world*', requireAuth, (req, res) => {
   }
   res.sendFile(ALBION_WORLD_INDEX);
 });
-app.get('/albion', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
-  const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
-  res.send(renderAlbion(req, { photo }));
-});
+app.get('/albion', requireAuth, (req, res) => res.redirect('/albion-world/'));
 
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
