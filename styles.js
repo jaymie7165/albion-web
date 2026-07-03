@@ -1103,15 +1103,17 @@ function baseStyles() {
       /* ══════════════════════════════════════════════
          TRADING KARTA
          ══════════════════════════════════════════════ */
-      .trading-card{max-width:380px;margin:0 auto;background:var(--panel2);border:2px solid var(--brass);position:relative;overflow:hidden;box-shadow:var(--shadow)}
-      .tc-header{background:linear-gradient(135deg,var(--oxblood),var(--seal-deep,#4A0D18));padding:1.6rem;text-align:center}
-      .tc-avatar{width:96px;height:96px;border-radius:50%;border:3px solid var(--brass-bright);object-fit:cover;background:var(--panel3);margin:0 auto 0.8rem;display:block}
-      .tc-name{font-family:var(--font-display);font-style:italic;font-weight:700;font-size:1.3rem;color:var(--ivory)}
-      .tc-discord{font-family:var(--font-mono);font-size:0.7rem;color:var(--ivory-dim)}
-      .tc-body{padding:1.4rem}
-      .tc-stat{display:flex;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--border);font-size:0.84rem}
-      .tc-badges{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.8rem}
-      .tc-badge{font-family:var(--font-label);font-size:0.54rem;padding:0.25rem 0.6rem;background:var(--brass-faint);border:1px solid var(--border-brass);color:var(--brass-bright)}
+      .trading-card{max-width:420px;margin:0 auto;background:var(--panel2);border:2px solid var(--brass);position:relative;overflow:hidden;box-shadow:var(--shadow)}
+      .trading-card::before{content:'';position:absolute;top:0;left:0;width:20px;height:20px;border-top:1px solid var(--brass-bright);border-left:1px solid var(--brass-bright);z-index:2}
+      .trading-card::after{content:'';position:absolute;bottom:0;right:0;width:20px;height:20px;border-bottom:1px solid var(--brass-bright);border-right:1px solid var(--brass-bright);z-index:2}
+      .tc-header{background:linear-gradient(135deg,var(--oxblood),var(--seal-deep,#4A0D18));padding:2.4rem 1.6rem 2rem;text-align:center;position:relative}
+      .tc-avatar{width:132px;height:132px;border-radius:50%;border:4px solid var(--brass-bright);object-fit:cover;background:var(--panel3);margin:0 auto 1rem;display:block;box-shadow:0 8px 28px rgba(0,0,0,0.45)}
+      .tc-name{font-family:var(--font-display);font-style:italic;font-weight:700;font-size:1.55rem;color:var(--ivory)}
+      .tc-discord{font-family:var(--font-mono);font-size:0.74rem;color:var(--ivory-dim);margin-top:0.3rem}
+      .tc-body{padding:1.8rem 1.8rem 2rem}
+      .tc-stat{display:flex;justify-content:space-between;padding:0.55rem 0;border-bottom:1px solid var(--border);font-size:0.86rem}
+      .tc-badges{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.9rem}
+      .tc-badge{font-family:var(--font-label);font-size:0.58rem;padding:0.32rem 0.7rem;background:var(--brass-faint);border:1px solid var(--border-brass);color:var(--brass-bright)}
 
       /* ══════════════════════════════════════════════
          GALERIE
