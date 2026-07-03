@@ -4,6 +4,7 @@ const { baseStyles, ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
 
 function renderGaraz(req) {
+  const canManage = req.session.accessLevel === 1; // jen Founder/Council smí mazat/upravovat vozy
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Albion — Garáž</title>
@@ -149,6 +150,7 @@ function renderGaraz(req) {
     window.clearCarImage=function(e){_garageHandlers.clearImg&&_garageHandlers.clearImg(e);};
 
     document.addEventListener('DOMContentLoaded',function(){
+      const CAN_MANAGE=${canManage};
       let CARS=[],editingCarId=null,pendingImageData=null;
       function esc(s){return(s==null?'':String(s)).replace(/</g,'&lt;');}
       function money(n){return '$'+Math.round(n||0).toLocaleString('cs-CZ');}
@@ -164,10 +166,11 @@ function renderGaraz(req) {
             '<div class="car-price">'+money(car.cena)+'<span class="tag">PDM · SAD</span></div>'+
             '<div class="car-meta"><span>Koupil</span><span>'+esc(car.kupil)+'</span></div>'+
             (car.ucel?'<div class="car-purpose">'+esc(car.ucel)+'</div>':'<div class="car-purpose" style="color:var(--ivory-faint);font-style:italic">Účel nezadán</div>')+
+            (CAN_MANAGE?(
             '<div class="car-actions">'+
               '<button class="car-action-btn" onclick="editCar(&quot;'+car.id+'&quot;)">Upravit</button>'+
               '<button class="car-action-btn danger" onclick="deleteCar(&quot;'+car.id+'&quot;)">Smazat</button>'+
-            '</div>'+
+            '</div>'):'')+
           '</div>'+
         '</div>';
       }
