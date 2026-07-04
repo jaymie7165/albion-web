@@ -22,6 +22,7 @@ function renderLore(req) {
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'lore')}
+  <div class="ink-progress-track"><div class="ink-progress-fill" id="inkProgress"></div></div>
   <main>
     <div class="page-header">
       <div>
@@ -82,6 +83,20 @@ Albion zůstává organizací postavenou na ambicích, loajalitě a společné v
       </div>
     </div>
   </main>
+  <script>
+    (function inkFill(){
+      const bar=document.getElementById('inkProgress');
+      if(!bar)return;
+      function tick(){
+        const h=document.documentElement;
+        const scrolled=h.scrollTop||document.body.scrollTop;
+        const max=(h.scrollHeight||document.body.scrollHeight)-h.clientHeight;
+        bar.style.width=(max>0?Math.min(100,(scrolled/max)*100):0)+'%';
+      }
+      document.addEventListener('scroll',tick,{passive:true});
+      tick();
+    })();
+  </script>
   </body></html>`;
 }
 
