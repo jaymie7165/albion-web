@@ -159,7 +159,8 @@ function renderGaraz(req) {
         const photo=car.image
           ?'<img src="'+esc(car.image)+'" alt="'+esc(car.nazev)+'" loading="lazy">'
           :'<div class="car-photo-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Bez fotky</div>';
-        return '<div class="car-card">'+
+        return '<div class="car-card tilt-card">'+
+          '<div class="tilt-glare"></div>'+
           '<div class="car-photo">'+photo+'<div class="car-plate">'+esc(car.spz)+'</div></div>'+
           '<div class="car-body">'+
             '<div class="car-name">'+esc(car.nazev)+'</div>'+
@@ -180,6 +181,30 @@ function renderGaraz(req) {
         if(!CARS.length){grid.innerHTML=ledgerEmptyHTML('Garáž je prázdná — žádný vůz nebyl dosud zapsán');return;}
         grid.innerHTML=CARS.map(carCardHtml).join('');
       }
+
+      // 3D tilt-hover (#12) — delegovaný listener, funguje i pro nově vykreslené karty
+      (function tiltDelegate(){
+        const MAX=7;
+        const grid=document.getElementById('garage-grid');
+        grid.addEventListener('mousemove',(e)=>{
+          const card=e.target.closest('.tilt-card');
+          if(!card||!grid.contains(card))return;
+          const r=card.getBoundingClientRect();
+          const px=(e.clientX-r.left)/r.width, py=(e.clientY-r.top)/r.height;
+          card.style.setProperty('--ry',((px-0.5)*MAX*2)+'deg');
+          card.style.setProperty('--rx',(-(py-0.5)*MAX*2)+'deg');
+          card.style.setProperty('--tz','4px');
+          card.style.setProperty('--gx',(px*100)+'%');
+          card.style.setProperty('--gy',(py*100)+'%');
+          card.classList.remove('tilt-reset');
+        });
+        grid.addEventListener('mouseout',(e)=>{
+          const card=e.target.closest('.tilt-card');
+          if(!card)return;
+          card.classList.add('tilt-reset');
+          card.style.setProperty('--rx','0deg');card.style.setProperty('--ry','0deg');card.style.setProperty('--tz','0px');
+        });
+      })();
 
       async function loadGarage(){
         try{
@@ -262,7 +287,7 @@ function renderGaraz(req) {
           const method=editingCarId?'PUT':'POST';
           const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
           const data=await res.json();
-          if(data.ok){showToast(editingCarId?'Vůz upraven':'Vůz zapsán');closeCarModal();loadGarage();}
+          if(data.ok){if(window.albionSealThud)window.albionSealThud();showToast(editingCarId?'Vůz upraven':'Vůz zapsán');closeCarModal();loadGarage();}
           else showToast(data.error||'Chyba',true);
         }catch(e){showToast('Chyba sítě: '+e.message,true);}
         btn.disabled=false;btn.textContent=editingCarId?'Uložit změny':'Uložit vůz';
