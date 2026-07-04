@@ -1261,6 +1261,50 @@ function baseStyles() {
       .evelyn-bubble .ev-name{font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.4rem;display:block}
       @media(max-width:880px){.evelyn-bubble{right:1rem;left:1rem;max-width:none}}
 
+      /* ── EVELYN — rozšířený "dopis" / e-mail od sekretářky ── */
+      .evelyn-ping{
+        position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;
+        background:var(--oxblood-bright);box-shadow:0 0 6px var(--oxblood-glow);
+        border:1.5px solid var(--noir);opacity:0;transition:opacity 0.2s;
+        animation:evelynPingPulse 1.6s ease-in-out infinite;
+      }
+      .evelyn-ping.show{opacity:1}
+      @keyframes evelynPingPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+
+      .evelyn-letter{
+        position:fixed;top:calc(var(--nav-h) + 10px);right:1.5rem;z-index:250;
+        width:min(380px,92vw);
+        background:rgba(10,12,10,0.97);border:1px solid var(--border-brass);border-top:2px solid var(--oxblood);
+        box-shadow:var(--shadow),0 0 0 1px rgba(182,138,78,0.06);
+        opacity:0;transform:translateY(-10px) scale(0.98);pointer-events:none;
+        transition:opacity 0.3s,transform 0.3s;
+      }
+      .evelyn-letter.show{opacity:1;transform:translateY(0) scale(1);pointer-events:all}
+      .evelyn-letter-head{
+        display:flex;align-items:center;justify-content:space-between;gap:0.6rem;
+        padding:0.75rem 0.95rem;border-bottom:1px solid var(--border-brass);background:var(--brass-faint);
+      }
+      .evelyn-letter-from{display:flex;align-items:center;gap:0.6rem;font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright)}
+      .evelyn-letter-from img{width:22px;height:22px;border-radius:50%;border:1px solid var(--brass);object-fit:cover;flex-shrink:0}
+      .evelyn-letter-close{background:none;border:none;color:var(--ivory-faint);cursor:pointer;font-size:0.85rem;line-height:1;padding:0.2rem;flex-shrink:0}
+      .evelyn-letter-close:hover{color:var(--oxblood-bright)}
+      .evelyn-letter-body{padding:1rem 1.1rem 1.1rem;max-height:62vh;overflow-y:auto}
+      .evelyn-letter-stamp{font-family:var(--font-mono);font-size:0.58rem;color:var(--ivory-faint);letter-spacing:0.05em;margin-bottom:0.6rem}
+      .evelyn-letter-subject{font-family:var(--font-display);font-style:italic;font-weight:600;font-size:0.98rem;color:var(--ivory);margin-bottom:0.6rem;line-height:1.4}
+      .evelyn-letter-line{font-family:var(--font-body);font-size:0.84rem;color:var(--ivory-dim);line-height:1.7;margin-bottom:0.5rem;font-weight:300}
+      .evelyn-letter-tips{margin:0.7rem 0;padding:0.7rem 0.85rem;background:var(--oxblood-faint);border-left:2px solid var(--oxblood)}
+      .evelyn-letter-tip{font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory);line-height:1.65;padding:0.15rem 0}
+      .evelyn-letter-tip::before{content:'⚠ ';color:var(--oxblood-bright)}
+      .evelyn-letter-actions{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.9rem}
+      .evelyn-letter-actions a{
+        font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.08em;text-transform:uppercase;
+        color:var(--ivory-dim);border:1px solid var(--border-brass);padding:0.42rem 0.8rem;text-decoration:none;
+        transition:all 0.15s;
+      }
+      .evelyn-letter-actions a:hover{border-color:var(--brass);color:var(--brass-bright);background:var(--brass-faint)}
+      .evelyn-letter-sig{margin-top:0.9rem;padding-top:0.7rem;border-top:1px solid var(--border);font-family:var(--font-display);font-style:italic;font-size:0.8rem;color:var(--ivory-faint)}
+      @media(max-width:880px){.evelyn-letter{right:1rem;left:1rem;width:auto}}
+
       /* ══════════════════════════════════════════════
          AMBIENTNÍ SOUNDTRACK — ikonka v navu
          ══════════════════════════════════════════════ */
