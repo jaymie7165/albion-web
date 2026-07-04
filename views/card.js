@@ -29,7 +29,8 @@ function renderCard(req, icName) {
       CARD=d.card;
       const c=CARD;
       const photo=c.ic_photo||c.avatar_url||'/logo.png';
-      wrap.innerHTML='<div class="trading-card" id="tradingCardEl">'+
+      wrap.innerHTML='<div class="trading-card tilt-card" id="tradingCardEl" style="position:relative">'+
+        '<div class="tilt-glare"></div>'+
         '<div class="tc-header">'+
           '<img class="tc-avatar" src="'+photo+'" crossorigin="anonymous">'+
           '<div class="tc-name">'+c.ic_name+'</div>'+
@@ -52,6 +53,27 @@ function renderCard(req, icName) {
         '<button class="btn-submit" style="margin-top:0" onclick="exportCardImage(\\'download\\')">Stáhnout jako obrázek</button>'+
         '<button class="btn-submit" style="margin-top:0" onclick="exportCardImage(\\'copy\\')">Zkopírovat obrázek</button>'+
       '</div>';
+      enableTilt(document.getElementById('tradingCardEl'));
+    }
+
+    // 3D tilt-hover (#12) — jemný náklon karty podle pozice kurzoru
+    function enableTilt(el){
+      if(!el)return;
+      const MAX=9;
+      el.addEventListener('mousemove',(e)=>{
+        const r=el.getBoundingClientRect();
+        const px=(e.clientX-r.left)/r.width, py=(e.clientY-r.top)/r.height;
+        el.style.setProperty('--ry',((px-0.5)*MAX*2)+'deg');
+        el.style.setProperty('--rx',(-(py-0.5)*MAX*2)+'deg');
+        el.style.setProperty('--tz','6px');
+        el.style.setProperty('--gx',(px*100)+'%');
+        el.style.setProperty('--gy',(py*100)+'%');
+        el.classList.remove('tilt-reset');
+      });
+      el.addEventListener('mouseleave',()=>{
+        el.classList.add('tilt-reset');
+        el.style.setProperty('--rx','0deg');el.style.setProperty('--ry','0deg');el.style.setProperty('--tz','0px');
+      });
     }
 
     async function exportCardImage(mode){
@@ -103,6 +125,7 @@ function renderCard(req, icName) {
         finish();
       }
       function finish(){
+        if(window.albionSealThud)window.albionSealThud();
         if(mode==='download'){
           const a=document.createElement('a');a.download=c.ic_name+'_karta.png';a.href=canvas.toDataURL('image/png');a.click();
         } else {
