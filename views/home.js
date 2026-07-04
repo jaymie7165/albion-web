@@ -53,7 +53,7 @@ function renderHome(req, data) {
 
   const activityHtml = allRecent.length ? allRecent.map((ev,i) => {
     const isIn = /VKLAD|PŘÍJEM/.test((ev.typ||'').toUpperCase());
-    const sekceIcons = { 'Zbraně':'⚔', 'Weed':'◈', 'Drogy':'◆', 'Chemky':'⬡', 'Finance':'◉' };
+    const sekceIcons = { 'Zbraně':'🔫', 'Weed':'🌿', 'Drogy':'💊', 'Chemky':'⚗️', 'Finance':'💰' };
     return `<div class="stream-entry">
       <span class="stream-num">${String(i+1).padStart(2,'0')}</span>
       <span class="stream-icon">${sekceIcons[ev.sekce]||'·'}</span>
@@ -522,17 +522,32 @@ function renderHome(req, data) {
     }).catch(()=>{});
 
     // ── GRATULACE PŘI POVÝŠENÍ ──
+    // ── PŘÍSAHA (#6) — povýšení se stvrzuje krátkou ceremonií, ne jen kliknutím ──
+    const OATH_TEXT = 'PŘÍSAHÁM';
     fetch('/api/me/promotions/pending').then(r=>r.json()).then(d=>{
       if(d.ok && d.pending){
         const overlay=document.createElement('div');
         overlay.className='modal-overlay open';
-        overlay.innerHTML='<div class="modal-box" style="text-align:center;max-width:420px">'+
+        overlay.innerHTML='<div class="modal-box" style="text-align:center;max-width:460px">'+
           '<div class="seal-stamp slam" style="position:static;transform:scale(1.3);opacity:1;margin:0 auto 1rem"><span>A</span></div>'+
           '<div class="modal-title">Povýšení!</div>'+
-          '<div class="modal-subtitle">Byl jsi povýšen na novou hodnost: <strong style="color:var(--brass-bright)">'+d.toLabel+'</strong></div>'+
-          '<button class="modal-btn-confirm" style="width:100%" onclick="this.closest(\\'.modal-overlay\\').remove();fetch(\\'/api/me/promotions/ack\\',{method:\\'POST\\'})">Děkuji</button>'+
+          '<div class="modal-subtitle">Byl jsi povýšen na novou hodnost: <strong style="color:var(--brass-bright)">'+d.toLabel+'</strong><br><br>'+
+            'Než tvá pečeť vejde v platnost, stvrď přísahu věrnosti Albionu. Napiš do pole níže slovo <strong style="color:var(--brass-bright)">'+OATH_TEXT+'</strong> a přilož svou pečeť.</div>'+
+          '<input type="text" id="oathInput" placeholder="'+OATH_TEXT+'" style="text-align:center;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:1rem">'+
+          '<button class="modal-btn-confirm" style="width:100%" id="oathBtn" disabled>Složit přísahu</button>'+
         '</div>';
         document.body.appendChild(overlay);
+        const input=overlay.querySelector('#oathInput');
+        const btn=overlay.querySelector('#oathBtn');
+        input.addEventListener('input',()=>{ btn.disabled = input.value.trim().toUpperCase() !== OATH_TEXT; });
+        input.addEventListener('keydown',(e)=>{ if(e.key==='Enter' && !btn.disabled) btn.click(); });
+        btn.addEventListener('click',()=>{
+          if(window.albionSealThud)window.albionSealThud();
+          overlay.remove();
+          fetch('/api/me/promotions/ack',{method:'POST'});
+          setTimeout(()=>showToast('Přísaha složena. Vítej ve své nové hodnosti.'),300);
+        });
+        setTimeout(()=>input.focus(),200);
       }
     }).catch(()=>{});
   </script>
