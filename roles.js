@@ -43,6 +43,7 @@ const PAGE_ACCESS = {
   blackbook:       1, // Blackbook
   'profit-centrum':1, // Profit centrum
   nastenska:       2, // Nástěnka
+  spis:            1, // Osobní spisy členů — jen Founder/Council
   // Volně přístupné všem přihlášeným (level 3 = bez omezení):
   garaz:           3,
   'weed-sazeni':   3,
