@@ -1174,6 +1174,138 @@ function baseStyles() {
         align-items:center;justify-content:center;font-size:0.6rem;line-height:1;
       }
       .upload-zone.has-image .upload-clear{display:flex}
+
+      /* ══════════════════════════════════════════════
+         SKUTEČNÁ NÁLADA — jemný posun atmosféry dle reálné
+         denní doby, funguje v tmavém i světlém režimu (viz nav.js)
+         ══════════════════════════════════════════════ */
+      body.mood-sunrise::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(224,150,90,0.14), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(110,20,35,0.10), transparent 60%)}
+      body.mood-day::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(182,138,78,0.06), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(110,20,35,0.06), transparent 60%)}
+      body.mood-sunset::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(163,48,49,0.16), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(182,138,78,0.10), transparent 60%)}
+      body.mood-night::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(182,138,78,0.05), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(20,10,20,0.30), transparent 60%)}
+      body.mood-night{--oxblood-glow:rgba(110,20,35,0.22)}
+      body.mood-sunset{--oxblood-glow:rgba(163,72,40,0.30)}
+      body.light.mood-night{filter:brightness(0.94) saturate(0.94)}
+      body.light.mood-sunset{filter:brightness(1.02) saturate(1.06)}
+      body.light.mood-sunrise{filter:brightness(1.03)}
+
+      /* ══════════════════════════════════════════════
+         VELLUM TEXTURE — jemný pergamenový podklad karet
+         ══════════════════════════════════════════════ */
+      .card,.stat-card,.car-card,.trading-card,.panel-card,.sidebar,.ucet-card{
+        background-image:
+          repeating-linear-gradient(0deg, rgba(182,138,78,0.025) 0px, transparent 1px, transparent 3px),
+          repeating-linear-gradient(90deg, rgba(0,0,0,0.05) 0px, transparent 1px, transparent 3px),
+          radial-gradient(ellipse 140% 100% at 10% 0%, rgba(182,138,78,0.05), transparent 55%),
+          radial-gradient(ellipse 120% 90% at 90% 100%, rgba(0,0,0,0.18), transparent 60%);
+        background-blend-mode:overlay,overlay,normal,normal;
+      }
+      body.light .card,body.light .stat-card,body.light .car-card,body.light .trading-card,body.light .panel-card,body.light .sidebar,body.light .ucet-card{
+        background-image:
+          repeating-linear-gradient(0deg, rgba(110,70,20,0.04) 0px, transparent 1px, transparent 3px),
+          repeating-linear-gradient(90deg, rgba(90,60,20,0.05) 0px, transparent 1px, transparent 3px),
+          radial-gradient(ellipse 140% 100% at 10% 0%, rgba(139,99,37,0.10), transparent 55%),
+          radial-gradient(ellipse 120% 90% at 90% 100%, rgba(90,60,20,0.10), transparent 60%);
+      }
+
+      /* ══════════════════════════════════════════════
+         HODNOST — zlaté zvýraznění řádků Founder/Council
+         přidej třídu "rank-elite" na <tr>/.stream-entry/.stat-card
+         ══════════════════════════════════════════════ */
+      tr.rank-elite td{background:linear-gradient(90deg, rgba(182,138,78,0.10), transparent 40%);border-left:2px solid var(--brass-bright)}
+      tr.rank-elite td:first-child{padding-left:calc(1rem - 2px)}
+      .stat-card.rank-elite{border-color:var(--brass-bright);box-shadow:0 0 0 1px var(--border-brass),var(--shadow-card)}
+      .stat-card.rank-elite .stat-card-tab{background:var(--brass);color:var(--noir)}
+      .stream-entry.rank-elite{border-left:2px solid var(--brass-bright);padding-left:0.6rem;background:rgba(182,138,78,0.05)}
+      .rank-elite-tag{font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.08em;color:var(--brass-bright);border:1px solid var(--border-brass);padding:0.04rem 0.35rem;margin-left:0.4rem;text-transform:uppercase;vertical-align:1px}
+
+      /* ══════════════════════════════════════════════
+         3D TILT HOVER — trading karta / vůz
+         JS nastavuje --rx/--ry/--tz přes inline style
+         ══════════════════════════════════════════════ */
+      .tilt-card{transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateZ(var(--tz,0px));transition:transform 0.15s ease-out;will-change:transform}
+      .tilt-card.tilt-reset{transition:transform 0.4s cubic-bezier(0.22,1,0.36,1)}
+      .tilt-glare{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at var(--gx,50%) var(--gy,50%), rgba(255,255,255,0.14), transparent 55%);transition:opacity 0.2s;z-index:5}
+      .tilt-card:hover .tilt-glare{opacity:1}
+
+      /* ══════════════════════════════════════════════
+         PAGE TRANSITION — jemný fade mezi routami
+         ══════════════════════════════════════════════ */
+      @keyframes pageOutFade{to{opacity:0;filter:blur(2px)}}
+      body.page-leaving{animation:pageOutFade 0.22s ease-in forwards}
+      ::view-transition-old(root){animation:pageOutFade 0.22s ease-in forwards}
+      ::view-transition-new(root){animation:pageFadeIn 0.28s ease-out}
+
+      /* ══════════════════════════════════════════════
+         INK-FILL SCROLL PROGRESS (Kodex/Lore)
+         ══════════════════════════════════════════════ */
+      .ink-progress-track{position:fixed;top:var(--nav-h);left:0;right:0;height:3px;background:var(--border);z-index:150}
+      .ink-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--oxblood),var(--brass));box-shadow:0 0 8px var(--oxblood-glow);transition:width 0.08s linear}
+      .ink-progress-fill::after{content:'';position:absolute;right:-3px;top:-2px;width:7px;height:7px;border-radius:50%;background:var(--brass-bright);box-shadow:0 0 6px var(--brass-bright)}
+
+      /* ══════════════════════════════════════════════
+         EVELYN ASHCROFT — sekretářský widget v navu
+         (bez pevné fotky — placeholder monogram, dokud není
+         nahrána skutečná /evelyn.png, viz nav.js)
+         ══════════════════════════════════════════════ */
+      .evelyn-widget{position:relative;display:flex;align-items:center;gap:0.5rem;cursor:pointer}
+      .evelyn-portrait{width:30px;height:30px;border-radius:50%;border:1px solid var(--brass);object-fit:cover;background:var(--panel3);flex-shrink:0}
+      .evelyn-portrait-placeholder{display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-style:italic;font-size:0.9rem;color:var(--brass-bright);background:var(--oxblood-faint)}
+      .evelyn-bubble{
+        position:fixed;top:calc(var(--nav-h) + 10px);right:1.5rem;max-width:290px;z-index:250;
+        background:rgba(10,12,10,0.96);border:1px solid var(--border-brass);border-top:2px solid var(--oxblood);
+        padding:0.9rem 1.1rem;font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim);line-height:1.7;
+        box-shadow:var(--shadow);opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity 0.25s,transform 0.25s;
+      }
+      .evelyn-bubble.show{opacity:1;transform:translateY(0);pointer-events:all}
+      .evelyn-bubble .ev-name{font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.4rem;display:block}
+      @media(max-width:880px){.evelyn-bubble{right:1rem;left:1rem;max-width:none}}
+
+      /* ══════════════════════════════════════════════
+         AMBIENTNÍ SOUNDTRACK — ikonka v navu
+         ══════════════════════════════════════════════ */
+      .ambient-btn{width:18px;height:18px;border:1px solid var(--border-brass);background:none;color:var(--brass);font-size:0.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+      .ambient-btn.active{color:var(--brass-bright);border-color:var(--brass-bright);box-shadow:0 0 6px var(--oxblood-glow)}
+
+      /* ══════════════════════════════════════════════
+         CONTINENTAL LEDGER — dluhy stylem "Continental"
+         ══════════════════════════════════════════════ */
+      .cont-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+      @media(max-width:980px){.cont-grid{grid-template-columns:1fr}}
+      .cont-col-title{font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;font-weight:600;margin-bottom:1rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border-brass);display:flex;align-items:center;gap:0.5rem}
+      .cont-col-title.owed-to-us{color:var(--brass-bright)}
+      .cont-col-title.owed-by-us{color:var(--oxblood-bright)}
+      .cont-entry{
+        position:relative;background:var(--panel2);border:1px solid var(--border);
+        padding:1.1rem 1.3rem;margin-bottom:0.9rem;overflow:hidden;transition:border-color 0.2s;
+      }
+      .cont-entry:hover{border-color:var(--border-brass)}
+      .cont-entry.settled{opacity:0.62}
+      .cont-entry-row{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:0.35rem}
+      .cont-entry-who{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:1.02rem;color:var(--ivory)}
+      .cont-entry-amount{font-family:var(--font-mono);font-size:0.92rem;white-space:nowrap}
+      .cont-entry-reason{font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim);line-height:1.6;margin-bottom:0.5rem}
+      .cont-entry-meta{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint);letter-spacing:0.03em}
+      .cont-entry-actions{margin-top:0.7rem;display:flex;gap:0.5rem}
+      .cont-seal{
+        position:absolute;top:50%;right:1.1rem;transform:translateY(-50%) rotate(-11deg);
+        width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        font-family:var(--font-label);font-weight:700;font-size:0.56rem;letter-spacing:0.05em;text-align:center;
+        text-transform:uppercase;color:rgba(255,255,255,0.85);
+        box-shadow:0 8px 20px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(0,0,0,0.25), inset 0 2px 5px rgba(255,255,255,0.12);
+        opacity:0;pointer-events:none;transform-origin:center;
+      }
+      .cont-entry.settled .cont-seal{opacity:1;animation:contSealStamp 0.5s cubic-bezier(0.3,0.05,0.5,1) 1}
+      .cont-seal.seal-brass{background:radial-gradient(circle at 35% 30%, var(--brass-bright), var(--brass) 55%, #6B4A18 100%)}
+      .cont-seal.seal-oxblood{background:radial-gradient(circle at 35% 30%, var(--oxblood-bright), var(--oxblood) 55%, #4A0D18 100%)}
+      @keyframes contSealStamp{0%{opacity:0;transform:translateY(-50%) rotate(-11deg) scale(2.4)}60%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(0.92)}100%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(1)}}
+      .cont-btn-settle{
+        padding:0.4rem 0.9rem;background:transparent;border:1px solid var(--border-brass);
+        color:var(--ivory-dim);font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.1em;
+        text-transform:uppercase;cursor:pointer;transition:all 0.15s;
+      }
+      .cont-btn-settle:hover{border-color:var(--brass);color:var(--brass-bright)}
+      .cont-btn-del{padding:0.4rem 0.7rem;background:transparent;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);font-family:var(--font-label);font-size:0.54rem;cursor:pointer}
     </style>
   `;
 }
