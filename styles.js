@@ -546,18 +546,41 @@ function baseStyles() {
          ══════════════════════════════════════════════ */
       .toast{
         position:fixed;bottom:1.5rem;right:1.5rem;
-        background:var(--panel3);
+        display:flex;align-items:flex-start;gap:0.85rem;
+        background:linear-gradient(160deg,var(--panel3),var(--panel2));
         border:1px solid var(--border-brass);
-        border-left:2px solid #6FBF52;
-        padding:0.9rem 1.4rem;font-size:0.8rem;
-        transform:translateY(20px);opacity:0;
-        transition:transform 0.25s ease,opacity 0.25s ease;
-        z-index:999;max-width:340px;
-        box-shadow:var(--shadow);
-        font-family:var(--font-body);
+        border-left:3px solid #6FBF52;
+        padding:0.9rem 1.3rem;
+        transform:translateY(24px) scale(0.97);opacity:0;
+        transition:transform 0.3s cubic-bezier(.22,1,.36,1),opacity 0.3s ease;
+        z-index:999;max-width:360px;
+        box-shadow:var(--shadow),0 0 0 1px rgba(182,138,78,0.06);
+        pointer-events:none;
       }
-      .toast.show{transform:translateY(0);opacity:1}
+      .toast.show{transform:translateY(0) scale(1);opacity:1;pointer-events:auto}
       .toast.error{border-left-color:var(--oxblood-bright)}
+      .toast-icon{
+        flex:none;width:26px;height:26px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        font-size:0.75rem;font-family:var(--font-label);
+        background:rgba(111,191,82,0.14);color:#8FE070;
+        border:1px solid rgba(111,191,82,0.35);
+        margin-top:0.05rem;
+      }
+      .toast.error .toast-icon{
+        background:var(--oxblood-faint);color:var(--oxblood-bright);
+        border-color:var(--border-oxblood);
+      }
+      .toast-body{display:flex;flex-direction:column;gap:0.15rem;min-width:0}
+      .toast-title{
+        font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.09em;
+        text-transform:uppercase;color:var(--brass-bright);
+      }
+      .toast.error .toast-title{color:var(--oxblood-bright)}
+      .toast-msg{
+        font-family:var(--font-body);font-size:0.82rem;color:var(--text);
+        line-height:1.35;word-break:break-word;
+      }
 
       /* ══════════════════════════════════════════════
          TABULKY
