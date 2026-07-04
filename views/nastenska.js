@@ -69,6 +69,7 @@ function renderNastenska(req) {
       const res=await fetch('/api/nastenska',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content})});
       const data=await res.json();
       if(data.ok){
+        if(window.albionSealThud)window.albionSealThud();
         showToast('Oznámení odesláno');
         document.getElementById('ann-title').value='';
         document.getElementById('ann-content').value='';
