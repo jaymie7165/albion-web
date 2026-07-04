@@ -44,10 +44,12 @@ function renderStatistiky(req) {
       const data=await res.json();
       const container=document.getElementById('stats-container');
       const stats=data.stats||{};
+      const elite=data.elite||[];
       const users=Object.keys(stats);
       if(!users.length){container.innerHTML=ledgerEmptyHTML('Žádná data');return;}
       container.innerHTML=users.map((icName,idx)=>{
         const s=stats[icName];
+        const isElite=elite.includes(icName);
         const hasZbrane=Object.keys({...s.zbrane.vklad,...s.zbrane.vyber}).length>0;
         const hasNaboje=Object.keys({...s.naboje.vklad,...s.naboje.vyber}).length>0;
         const hasAkce=Object.keys({...s.akce.vklad,...s.akce.vyber}).length>0;
@@ -55,11 +57,11 @@ function renderStatistiky(req) {
         const hasDrogy=Object.keys({...s.drogy.vklad,...s.drogy.vyber}).length>0;
         const hasChemky=s.chemky&&Object.keys({...s.chemky.vklad,...s.chemky.vyber}).length>0;
         const hasUcet=s.ucet.prijem_usd||s.ucet.vydaj_usd||s.ucet.prijem_pesos||s.ucet.vydaj_pesos;
-        return '<div class="stat-card">'+
+        return '<div class="stat-card'+(isElite?' rank-elite':'')+'">'+
           '<div class="stat-card-tab">SPIS č. '+String(idx+1).padStart(3,'0')+'</div>'+
           '<div class="stat-card-header">'+
             '<div>'+
-              '<div class="stat-card-name">'+icName+'</div>'+
+              '<div class="stat-card-name">'+icName+(isElite?'<span class="rank-elite-tag">Founder/Council</span>':'')+'</div>'+
             '</div>'+
           '</div>'+
           (hasZbrane?'<div class="stat-section-label">Zbraně</div>'+renderItemGroup(s.zbrane):'')+
