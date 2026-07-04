@@ -134,13 +134,13 @@ function renderProfitCentrum(req) {
     function renderLeaderboards(){
       const lb=PD.leaderboards[pcPeriod];
       const d0=lb.dealers[0];
-      document.getElementById('pc-dealer-top').innerHTML=podium('§',d0?d0.member:null,d0?money(d0.trzby):'—',d0?(d0.qty+' ks · Nejlepší dealer'):'Nejlepší dealer');
+      document.getElementById('pc-dealer-top').innerHTML=podium('💰',d0?d0.member:null,d0?money(d0.trzby):'—',d0?(d0.qty+' ks · Nejlepší dealer'):'Nejlepší dealer');
       document.getElementById('pc-dealer-list').innerHTML=rankList(lb.dealers,'member','trzby','Žádné prodeje');
       const dr0=lb.drugs[0];
-      document.getElementById('pc-drug-top').innerHTML=podium('◆',dr0?dr0.droga:null,dr0?money(dr0.trzby):'—',dr0?(dr0.qty+' ks · Nejvýdělečnější droga'):'Nejvýdělečnější droga');
+      document.getElementById('pc-drug-top').innerHTML=podium('💊',dr0?dr0.droga:null,dr0?money(dr0.trzby):'—',dr0?(dr0.qty+' ks · Nejvýdělečnější droga'):'Nejvýdělečnější droga');
       document.getElementById('pc-drug-list').innerHTML=rankList(lb.drugs,'droga','trzby','Žádné prodeje');
       const m0=lb.members[0];
-      document.getElementById('pc-member-top').innerHTML=podium('I',m0?m0.member:null,m0?money(m0.net):'—','Čistý přínos do účtu (SAD)');
+      document.getElementById('pc-member-top').innerHTML=podium('👤',m0?m0.member:null,m0?money(m0.net):'—','Čistý přínos do účtu (SAD)');
       document.getElementById('pc-member-list').innerHTML=rankList(lb.members,'member','net','Žádná data');
     }
 
