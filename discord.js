@@ -97,15 +97,96 @@ const FRAZE = {
   ],
 };
 
+// Formálnější varianty pro nejvyšší hodnosti (accessLevel 1 = Founder/Council,
+// viz roles.js). Používají se jen ČÁSTEČNĚ (ne pokaždé), ať to nepůsobí
+// vykonstruovaně — ale jednou za čas Evelyn dá jasně najevo, že si je
+// vědoma, s kým mluví.
+const FRAZE_VYSOKA_HODNOST = {
+  vklad: [
+    'dovolte, abych tomuto zápisu věnovala patřičnou pečlivost.',
+    'ihned zaznamenávám do registru, jak si vaše postavení žádá.',
+    's náležitou vážností zapisuji tento přírůstek do knihy.',
+  ],
+  vyber: [
+    'tomuto výdeji věnuji zvýšenou pozornost, jak se na vaši hodnost sluší.',
+    'zaznamenávám s náležitou pečlivostí, Vaše slovo je pro mě směrodatné.',
+  ],
+};
+
 // Sestaví úvodní řádek (description) — pozdrav podle denní doby, oslovení
 // jménem a rotující sekretářská poznámka. `klic` volí banku frází.
-function uvod(uzivatel, klic) {
+// `accessLevel` (nepovinné, 1/2/3 dle roles.js) — u úrovně 1 (Founder/Council)
+// se část času použije formálnější fráze místo běžné rotace.
+function uvod(uzivatel, klic, accessLevel) {
   const jmeno = uzivatel ? `, **${uzivatel}**` : '';
-  const fraze = nahodna(FRAZE[klic] || FRAZE.vklad);
+  let banka = FRAZE[klic] || FRAZE.vklad;
+  if (accessLevel === 1 && FRAZE_VYSOKA_HODNOST[klic] && Math.random() < 0.4) {
+    banka = FRAZE_VYSOKA_HODNOST[klic];
+  }
+  const fraze = nahodna(banka);
   return `${pozdrav()}${jmeno}. ${fraze}`;
 }
 
-async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel) {
+// ══════════════════════════════════════════════════════════════════════
+// NÍZKÉ ZÁSOBY — hlídání prahů + upozornění do příslušné roomky
+// ══════════════════════════════════════════════════════════════════════
+//
+// Prahy jsou výchozí odhad — klidně uprav podle reálné spotřeby organizace.
+// Číslo = pod kolika kusy JEDNÉ položky se má poslat upozornění.
+const PRAH_NIZKE_ZASOBY = {
+  zbrane: 5,
+  weed:   20,
+  drogy:  10,
+  chemky: 10,
+};
+
+const KANAL_PODLE_SEKCE = {
+  zbrane: () => process.env.CHANNEL_ZBRANE,
+  weed:   () => process.env.CHANNEL_WEED,
+  drogy:  () => process.env.CHANNEL_DROGY,
+  chemky: () => process.env.CHANNEL_CHEMKY,
+};
+
+const IKONA_PODLE_SEKCE = { zbrane: '🔫', weed: '🌿', drogy: '💊', chemky: '⚗️' };
+const NAZEV_SEKCE = { zbrane: 'arzenálu', weed: 'botanického registru', drogy: 'farmaceutického registru', chemky: 'laboratorního registru' };
+
+const FRAZE_NIZKE_ZASOBY = [
+  'ráda bych upozornila, že zásoby klesly pod bezpečnou hranici.',
+  's jistými obavami hlásím pokles zásob pod doporučenou úroveň.',
+  'dovoluji si upozornit na klesající stav zásob u této položky.',
+  'prosím o pozornost — tahle položka se blíží vyprodání.',
+];
+
+// Vyhodnotí, jestli akce (VKLAD/VÝBĚR o `mnozstvi` ks) právě STÁHLA položku
+// POD práh — a pokud ano, pošle upozornění. Neopakuje se při každém dalším
+// výběru, dokud se zásoba znovu nedostane nad práh a zase pod něj neklesne
+// (kontrolujeme, že PŘEDCHOZÍ stav byl ještě nad prahem).
+async function checkNizkaZasoba(sekce, polozka, typ, mnozstvi, aktualniStav) {
+  const prah = PRAH_NIZKE_ZASOBY[sekce];
+  if (!prah || aktualniStav == null) return;
+
+  const predchoziStav = typ === 'VÝBĚR' ? aktualniStav + mnozstvi : aktualniStav - mnozstvi;
+  const preslaPresHranici = predchoziStav >= prah && aktualniStav < prah;
+  if (!preslaPresHranici) return;
+
+  const channelId = KANAL_PODLE_SEKCE[sekce]?.();
+  if (!channelId) return;
+
+  await sendEmbed(channelId, {
+    title: `⚠️ NÍZKÉ ZÁSOBY — ${polozka}`,
+    color: 0xE8A33D,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}. ${nahodna(FRAZE_NIZKE_ZASOBY)}`,
+    fields: [
+      { name: 'Položka', value: polozka, inline: true },
+      { name: 'Aktuální stav', value: `${aktualniStav} ks`, inline: true },
+      { name: 'Doporučený minimální stav', value: `${prah} ks`, inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
+async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel, accessLevel) {
   const channelId = process.env.CHANNEL_ZBRANE;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
   const fields = [
@@ -119,11 +200,11 @@ async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel) {
     title: typ === 'VKLAD' ? '➕ VLOŽENO DO SKLADU (web)' : '➖ VYBRÁNO ZE SKLADU (web)',
     color, fields, timestamp: new Date().toISOString(),
     author: EVELYN_AUTHOR,
-    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber', accessLevel),
   });
 }
 
-async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel) {
+async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel, accessLevel) {
   const channelId = process.env.CHANNEL_WEED;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
   const fields = [
@@ -137,11 +218,11 @@ async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel) {
     title: typ === 'VKLAD' ? '🌿 VLOŽENO DO SKLADU (web)' : '🌿 VYBRÁNO ZE SKLADU (web)',
     color, fields, timestamp: new Date().toISOString(),
     author: EVELYN_AUTHOR,
-    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber', accessLevel),
   });
 }
 
-async function notifyDrogy(typ, droga, mnozstvi, vyroba, prodej, uzivatel) {
+async function notifyDrogy(typ, droga, mnozstvi, vyroba, prodej, uzivatel, accessLevel) {
   const channelId = process.env.CHANNEL_DROGY;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
   const fields = [
@@ -157,11 +238,11 @@ async function notifyDrogy(typ, droga, mnozstvi, vyroba, prodej, uzivatel) {
     title: typ === 'VKLAD' ? '💊 VLOŽENO DO SKLADU (web)' : '💊 VYBRÁNO ZE SKLADU (web)',
     color, fields, timestamp: new Date().toISOString(),
     author: EVELYN_AUTHOR,
-    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber', accessLevel),
   });
 }
 
-async function notifyChemky(typ, chemikalie, mnozstvi, uzivatel) {
+async function notifyChemky(typ, chemikalie, mnozstvi, uzivatel, accessLevel) {
   const channelId = process.env.CHANNEL_CHEMKY;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
   const fields = [
@@ -173,7 +254,7 @@ async function notifyChemky(typ, chemikalie, mnozstvi, uzivatel) {
     title: typ === 'VKLAD' ? '⚗️ VLOŽENO DO SKLADU (web)' : '⚗️ VYBRÁNO ZE SKLADU (web)',
     color, fields, timestamp: new Date().toISOString(),
     author: EVELYN_AUTHOR,
-    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber'),
+    description: uvod(uzivatel, typ === 'VKLAD' ? 'vklad' : 'vyber', accessLevel),
   });
 }
 
@@ -422,4 +503,4 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyAudit, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyAudit, checkNizkaZasoba, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
