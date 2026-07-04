@@ -66,12 +66,12 @@ function renderAudit(req) {
   </main>
 
   <script>
-    let allEvents=[],ucetSouhrn={},activeFilter='vse',searchTerm='';
+    let allEvents=[],ucetSouhrn={},activeFilter='vse',searchTerm='',eliteMembers=[];
 
     async function loadAudit(){
       const res=await fetch('/api/audit',{cache:'no-store'});
       const data=await res.json();
-      allEvents=data.events||[];ucetSouhrn=data.ucetSouhrn||{};
+      allEvents=data.events||[];ucetSouhrn=data.ucetSouhrn||{};eliteMembers=data.elite||[];
       applyAuditFilters();renderUcetSouhrn();
     }
 
@@ -101,23 +101,24 @@ function renderAudit(req) {
       const tbody=document.getElementById('audit-body');
       if(!events.length){tbody.innerHTML='<tr><td colspan="6" style="padding:1.5rem">'+ledgerEmptyHTML('Žádné záznamy',true)+'</td></tr>';return;}
       const SEKCE={
-        'Zbraně':{letter:'Z',color:'var(--brass)'},
-        'Weed':{letter:'W',color:'#7A9A4A'},
-        'Drogy':{letter:'D',color:'var(--oxblood-bright)'},
-        'Chemky':{letter:'C',color:'#6FA8C9'},
-        'Účetnictví':{letter:'Ú',color:'var(--brass-bright)'},
+        'Zbraně':{letter:'🔫',color:'var(--brass)'},
+        'Weed':{letter:'🌿',color:'#7A9A4A'},
+        'Drogy':{letter:'💊',color:'var(--oxblood-bright)'},
+        'Chemky':{letter:'⚗️',color:'#6FA8C9'},
+        'Účetnictví':{letter:'💰',color:'var(--brass-bright)'},
       };
       tbody.innerHTML=events.map(e=>{
         const typCls=e.typ==='VKLAD'||e.typ==='PŘÍJEM'?'vklad':'vyber';
         const src=e.source==='web'?'<span class="src-web">WEB</span>':'<span class="src-bot">BOT</span>';
         const mono=SEKCE[e.sekce]||{letter:'?',color:'var(--ivory-faint)'};
         const badge='<span class="sekce-badge" style="border-color:'+mono.color+';color:'+mono.color+'">'+mono.letter+'</span>';
-        return '<tr>'+
+        const isElite=eliteMembers.includes(e.uzivatel);
+        return '<tr'+(isElite?' class="rank-elite"':'')+'>'+
           '<td style="white-space:nowrap;color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.78rem">'+e.cas+'</td>'+
           '<td>'+src+'</td>'+
           '<td style="display:flex;align-items:center">'+badge+e.sekce+'</td>'+
           '<td><span class="badge '+typCls+'">'+e.typ+'</span></td>'+
-          '<td style="color:var(--ivory);font-family:var(--font-display);font-style:italic">'+e.uzivatel+'</td>'+
+          '<td style="color:var(--ivory);font-family:var(--font-display);font-style:italic">'+e.uzivatel+(isElite?'<span class="rank-elite-tag">★</span>':'')+'</td>'+
           '<td style="color:var(--ivory-dim)">'+e.detail+'</td>'+
         '</tr>';
       }).join('');
