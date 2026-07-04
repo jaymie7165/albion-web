@@ -8,7 +8,7 @@ function renderNav(req, active) {
   const can = (pageId) => canAccess(accessLevel, pageId);
   const skladPages = ['sklad','weed-sazeni'];
   const blackbookPages = ['blackbook','profit-centrum'];
-  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie'];
+  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie','spis'];
   const dataPages  = ['audit','statistiky'];
 
   return `
@@ -75,6 +75,7 @@ function renderNav(req, active) {
           </a>
           <div class="nav-dropdown-menu">
             ${can('nastenska') ? `<a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka</a>` : ''}
+            ${can('spis') ? `<a href="/spis" class="${active==='spis'?'active':''}">Osobní spisy</a>` : ''}
             <a href="/kodex" class="${active==='kodex'?'active':''}">Kodex</a>
             <a href="/lore" class="${active==='lore'?'active':''}">Historie</a>
             <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a>
@@ -85,6 +86,12 @@ function renderNav(req, active) {
       </ul>
 
       <div class="nav-right" id="navRight">
+        <div class="evelyn-widget" id="evelynWidget" title="Evelyn Ashcroft — Sekretariát Albionu">
+          <img src="/evelyn.png" class="evelyn-portrait" alt="Evelyn Ashcroft" id="evelynImg" onerror="this.style.display='none';document.getElementById('evelynFallback').style.display='flex';">
+          <div class="evelyn-portrait evelyn-portrait-placeholder" id="evelynFallback" style="display:none">E</div>
+        </div>
+        <div class="evelyn-bubble" id="evelynBubble"><span class="ev-name">Evelyn Ashcroft</span><span id="evelynText">…</span></div>
+        <button class="ambient-btn" id="ambientBtn" title="Ambientní zvuk kanceláře">♫</button>
         ${can('nastenska') ? `
         <button class="notif-bell" id="notifBell" title="Oznámení" onclick="window.location='/nastenska'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -107,6 +114,7 @@ function renderNav(req, active) {
         <div class="theme-switcher" title="Přepnout téma">
           <button class="theme-dot-btn" id="td-dark"  style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"  title="Heraldický noir"></button>
           <button class="theme-dot-btn" id="td-light" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
+          <button class="theme-dot-btn" id="td-auto" style="background:conic-gradient(from 180deg,#F3EEE3,#0B0F0D,#F3EEE3);border:1.5px solid #B68A4E" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
         </div>
         <span class="nav-shortcut-hint" title="g+h Přehled${can('sklad')?' · g+s Sklad':''}${can('blackbook')?' · g+b Blackbook':''}${can('audit')?' · g+a Audit':''}${can('nastenska')?' · g+n Nástěnka':''} · / Hledat">g·_</span>
         <span class="nav-user" style="border-left:2px solid ${({1:'var(--oxblood-bright)',2:'var(--brass-bright)',3:'var(--ivory-faint)'})[accessLevel]||'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${ic}</strong></span>
@@ -167,20 +175,36 @@ function renderNav(req, active) {
       document.addEventListener('click', (e) => { if (!e.target.closest('.nav-dropdown')) document.querySelectorAll('.nav-dropdown').forEach(dd => dd.classList.remove('open')); });
       navMenu.querySelectorAll('a[href]:not([href="#"])').forEach(a => a.addEventListener('click', closeMobileNav));
 
-      // ── TÉMATA ──
+      // ── NÁLADA — reálná denní doba, nezávislá na zvoleném tématu ──
+      const MOODS = ['mood-sunrise','mood-day','mood-sunset','mood-night'];
+      function moodFromHour(h){ if(h>=5&&h<7)return'mood-sunrise'; if(h>=7&&h<17)return'mood-day'; if(h>=17&&h<21)return'mood-sunset'; return'mood-night'; }
+      function applyMoodTick(){
+        const m = moodFromHour(new Date().getHours());
+        MOODS.forEach(c=>document.body.classList.remove(c));
+        document.body.classList.add(m);
+        if (currentTheme === 'auto') {
+          // Auto téma: v noci/soumraku tmavý noir, přes den pergamen
+          const wantLight = (m === 'mood-day');
+          document.body.classList.toggle('light', wantLight);
+        }
+      }
+
+      // ── TÉMATA ── ('dark' | 'light' | 'auto' = dle reálné denní doby)
       const THEMES = ['dark','light'];
       let currentTheme = localStorage.getItem('albion_theme') || 'dark';
       function applyTheme(t) {
         THEMES.forEach(c => document.body.classList.remove(c));
-        if (t !== 'dark') document.body.classList.add(t);
+        if (t === 'light') document.body.classList.add('light');
         currentTheme = t;
         localStorage.setItem('albion_theme', t);
-        THEMES.forEach(th => {
+        ['dark','light','auto'].forEach(th => {
           const btn = document.getElementById('td-' + th);
           if (btn) btn.classList.toggle('active', th === t);
         });
+        applyMoodTick();
       }
       applyTheme(currentTheme);
+      setInterval(applyMoodTick, 60000);
       function setTheme(t) { applyTheme(t); }
 
       // ── SSE NOTIFIKACE ──
@@ -308,6 +332,20 @@ function renderNav(req, active) {
           timerDone: () => { playTone(523,0.3,0.12); setTimeout(()=>playTone(659,0.3,0.12),150); },
         };
 
+        // Pečeťovací "thud" — sdíleno napříč Sklad/Garáž/Galerie/Nástěnka/Karta/Spisy,
+        // aby každé potvrzení důležité akce znělo stejně heraldicky.
+        window.albionSealThud = function(){
+          if(!enabled)return;
+          try{
+            const ctx=window._albionAudioCtx||(window._albionAudioCtx=new (window.AudioContext||window.webkitAudioContext)());
+            if(ctx.state==='suspended')ctx.resume();
+            const now=ctx.currentTime;
+            const osc=ctx.createOscillator();osc.type='sine';osc.frequency.setValueAtTime(180,now);osc.frequency.exponentialRampToValueAtTime(48,now+0.16);
+            const gain=ctx.createGain();gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(0.5,now+0.012);gain.gain.exponentialRampToValueAtTime(0.0001,now+0.32);
+            osc.connect(gain);const master=ctx.createGain();master.gain.value=0.9;gain.connect(master);master.connect(ctx.destination);osc.start(now);osc.stop(now+0.34);
+          }catch(e){}
+        };
+
         const btn = document.getElementById('soundToggle');
         if (btn) {
           function renderBtn(){ btn.style.opacity = enabled ? '1' : '0.35'; }
@@ -348,6 +386,85 @@ function renderNav(req, active) {
         ['vanoce','halloween','novy-rok'].forEach(s=>document.body.classList.remove('season-'+s));
         if(d.season!=='none') document.body.classList.add('season-'+d.season);
       });
+
+      // ── EVELYN ASHCROFT — hlášení dle denní doby / "počasí" (sezóny) ──
+      (function evelyn(){
+        const bubble=document.getElementById('evelynBubble');
+        const widget=document.getElementById('evelynWidget');
+        const textEl=document.getElementById('evelynText');
+        if(!bubble||!widget)return;
+        const hodina=new Date().getHours();
+        const denniDoba = hodina>=5&&hodina<10?'rano':hodina>=10&&hodina<18?'den':hodina>=18&&hodina<23?'vecer':'noc';
+        const LINES={
+          rano:['Dobré ráno. Kancelář je otevřená, kávu už mám uvařenou.','Ráno v Albionu — klidno, zatím žádné požáry k hašení.'],
+          den:['Dobrý den. Rejstřík je aktuální, ptejte se na cokoliv.','Odpoledne plyne poklidně — sklad i účty sedí.'],
+          vecer:['Dobrý večer. Většina bratrů už dorazila domů, ale rejstřík nikdy nespí.','Večer bývá rušno — kdyby něco, jsem tu.'],
+          noc:['Je pozdě. I tak jsem na svém místě, kdyby bylo potřeba.','Noční směna sekretariátu — vše zapsáno, vše na svém místě.'],
+        };
+        fetch('/api/season').then(r=>r.json()).then(d=>{
+          const season=d.season;
+          let extra='';
+          if(season==='vanoce')extra=' A přes svátky je v kanceláři výjimečně klidno.';
+          else if(season==='halloween')extra=' Dnešní noc je... neklidnější než obvykle.';
+          else if(season==='novy-rok')extra=' Nový rok, nové účty — začínáme na nule.';
+          const arr=LINES[denniDoba];
+          textEl.textContent=arr[Math.floor(Math.random()*arr.length)]+extra;
+        }).catch(()=>{ textEl.textContent=LINES[denniDoba][0]; });
+        let shown=false;
+        function toggleBubble(){shown=!shown;bubble.classList.toggle('show',shown);}
+        widget.addEventListener('click',toggleBubble);
+        document.addEventListener('click',(e)=>{if(shown&&!e.target.closest('.evelyn-widget')&&!e.target.closest('.evelyn-bubble'))toggleBubble();});
+        // Automatické krátké přivítání při prvním vstupu do sekce v této relaci
+        try{
+          if(!sessionStorage.getItem('albion_evelyn_greeted')){
+            sessionStorage.setItem('albion_evelyn_greeted','1');
+            setTimeout(()=>{bubble.classList.add('show');shown=true;setTimeout(()=>{if(shown)toggleBubble();},6000);},900);
+          }
+        }catch(e){}
+      })();
+
+      // ── AMBIENTNÍ SOUNDTRACK KANCELÁŘE — opt-in, hraje napříč celým webem ──
+      (function ambient(){
+        const KEY='albion_ambient_on';
+        const btn=document.getElementById('ambientBtn');
+        if(!btn)return;
+        const AUDIO_BY_ENV={day:'/albion/audio/den.mp3',fog:'/albion/audio/mlha.mp3',sunrise:'/albion/audio/vychod-slunce.mp3',sunset:'/albion/audio/zapad-slunce.mp3',winter:'/albion/audio/snih.mp3',night:'/albion/audio/noc.mp3'};
+        function envFromHour(h){if(h>=5&&h<7)return'sunrise';if(h>=7&&h<17)return'day';if(h>=17&&h<21)return'sunset';return'night';}
+        let on=localStorage.getItem(KEY)==='1';
+        function render(){btn.classList.toggle('active',on);btn.textContent=on?'♪':'♫';}
+        render();
+        let audioEl=null;
+        function ensureAudio(){
+          if(audioEl)return audioEl;
+          audioEl=new Audio();audioEl.loop=true;audioEl.volume=0.22;
+          audioEl.src=AUDIO_BY_ENV[envFromHour(new Date().getHours())];
+          return audioEl;
+        }
+        if(on){ const a=ensureAudio(); a.play().catch(()=>{ /* autoplay může být blokováno do prvního kliku */ }); }
+        btn.addEventListener('click',()=>{
+          on=!on;localStorage.setItem(KEY,on?'1':'0');render();
+          const a=ensureAudio();
+          if(on)a.play().catch(()=>{});else a.pause();
+        });
+        // Pokud autoplay selhal, spustí se při prvním kliknutí kamkoliv na stránku
+        document.addEventListener('click',function once(){ if(on&&audioEl&&audioEl.paused)audioEl.play().catch(()=>{}); },{once:true});
+      })();
+
+      // ── PAGE TRANSITION — jemný fade při odchodu na jinou stránku webu ──
+      (function pageTransition(){
+        document.addEventListener('click',(e)=>{
+          const a=e.target.closest('a[href]');
+          if(!a)return;
+          const href=a.getAttribute('href');
+          if(!href||href.startsWith('#')||href.startsWith('javascript:')||a.target==='_blank'||e.metaKey||e.ctrlKey||e.shiftKey)return;
+          if(a.hasAttribute('download'))return;
+          let url; try{url=new URL(href,location.href);}catch(err){return;}
+          if(url.origin!==location.origin)return;
+          e.preventDefault();
+          document.body.classList.add('page-leaving');
+          setTimeout(()=>{location.href=url.href;},180);
+        });
+      })();
 
       // ── KLÁVESOVÉ ZKRATKY ──
       (function(){
