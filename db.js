@@ -2,7 +2,28 @@
 const fs   = require('fs');
 const path = require('path');
 
-const DB_FILE = path.join(__dirname, 'users.json');
+// DŮLEŽITÉ: dřív bylo DB_FILE v __dirname (kód appky) — to Railway při
+// KAŽDÉM redeployi přepíše čerstvým buildem z gitu, takže se veškerá data
+// (uživatelé, achievementy, povýšení, přístupové úrovně) nenávratně
+// resetovala. Stejně jako server.js (ceník, katalog, milestones) teď
+// ukládáme do trvalého Railway Volume.
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const DB_FILE = path.join(DATA_DIR, 'users.json');
+const OLD_DB_FILE = path.join(__dirname, 'users.json'); // staré, nepersistentní umístění
+
+// Jednorázová migrace: pokud na novém (trvalém) místě ještě nic není, ale
+// na starém místě existující data ano, zkopírujeme je — jinak bychom o ně
+// přišli přesně při tomhle redeployi, který má problém opravit.
+if (!fs.existsSync(DB_FILE) && fs.existsSync(OLD_DB_FILE)) {
+  try {
+    fs.copyFileSync(OLD_DB_FILE, DB_FILE);
+    console.log('[DB] Migrace users.json do trvalého úložiště (Railway Volume) proběhla úspěšně.');
+  } catch (err) {
+    console.error('[DB] Migrace users.json selhala:', err.message);
+  }
+}
 
 function load() {
   if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, '[]');
