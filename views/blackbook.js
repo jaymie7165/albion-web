@@ -4,6 +4,7 @@ const { baseStyles } = require('../styles');
 const { renderNav } = require('../nav');
 
 function renderBlackbook(req) {
+  const canManageCont = req.session.accessLevel === 1;
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Albion — Blackbook</title>
@@ -28,6 +29,7 @@ function renderBlackbook(req) {
       <button class="report-nav-item" data-sec="zbrane" onclick="bbTab('zbrane')">IV. Zbraně</button>
       <button class="report-nav-item" data-sec="drogy" onclick="bbTab('drogy')">V. Drogy</button>
       <button class="report-nav-item" data-sec="bezpecnost" onclick="bbTab('bezpecnost')">VI. Bezpečnost</button>
+      <button class="report-nav-item" data-sec="continental" onclick="bbTab('continental')">VII. Continental</button>
     </div>
 
     <div id="bb-loading" class="ledger-loading" style="margin-top:1.5rem">Generuji reporty…</div>
@@ -37,7 +39,9 @@ function renderBlackbook(req) {
     <div id="bb-zbrane"    class="report-section"></div>
     <div id="bb-drogy"     class="report-section"></div>
     <div id="bb-bezpecnost" class="report-section"></div>
+    <div id="bb-continental" class="report-section"></div>
   </main>
+  <div class="toast" id="toast"></div>
 
   <script>
     let D=null;
@@ -240,6 +244,100 @@ function renderBlackbook(req) {
       );
       document.getElementById('bb-bezpecnost').innerHTML=h;
     }
+
+    // ══════════ VII. CONTINENTAL LEDGER (#16) ══════════
+    const CAN_MANAGE_CONT = ${canManageCont};
+    let contEntries = [], contLoaded = false;
+
+    function contEntryHtml(e){
+      const isUs = e.smer === 'dluzime'; // true = my dlužíme (oxblood pečeť), false = dluží nám (mosazná pečeť)
+      const sym = e.valuta === 'USD' ? '$' : '₱';
+      return '<div class="cont-entry'+(e.settled?' settled':'')+'">'+
+        '<div class="cont-entry-row"><span class="cont-entry-who">'+esc(e.osoba)+'</span>'+
+        '<span class="cont-entry-amount" style="color:'+(isUs?'var(--oxblood-bright)':'#6FBF52')+'">'+sym+Math.round(e.hodnota).toLocaleString('cs-CZ')+'</span></div>'+
+        '<div class="cont-entry-reason">'+esc(e.duvod)+'</div>'+
+        '<div class="cont-entry-meta"><span>'+esc(e.createdAtText||'')+' · zapsal '+esc(e.createdBy||'—')+'</span>'+(e.splatnost?('<span>splatnost: '+esc(e.splatnost)+'</span>'):'')+'</div>'+
+        (!e.settled ? '<div class="cont-entry-actions">'+
+          '<button class="cont-btn-settle" onclick="settleCont(\\''+e.id+'\\')">'+(isUs?'Splatili jsme':'Splaceno')+'</button>'+
+          (CAN_MANAGE_CONT?'<button class="cont-btn-del" onclick="delCont(\\''+e.id+'\\')">✕</button>':'')+
+        '</div>' : '<div class="cont-entry-meta" style="margin-top:0.4rem;color:var(--brass)">Uzavřeno '+(e.settledAt?new Date(e.settledAt).toLocaleDateString('cs-CZ'):'')+' · '+esc(e.settledBy||'')+'</div>')+
+        '<div class="cont-seal '+(isUs?'seal-oxblood':'seal-brass')+'">'+(isUs?'VYROVNÁNO':'UZAVŘENA<br>SLUŽBA')+'</div>'+
+      '</div>';
+    }
+
+    function renderContinental(){
+      const owedToUs = contEntries.filter(e => e.smer === 'dluzi_nam');
+      const owedByUs  = contEntries.filter(e => e.smer === 'dluzime');
+      let h = '<div class="folio-footnote"><strong>Continental rejstřík.</strong> Sem se zapisují dluhy stylem starého řádu — komu, co, kolik a od kdy. Jakmile je vyrovnáno, záznam dostane pečeť a zůstává v knize jako uzavřená služba.</div>';
+      h += '<div class="card" style="margin-bottom:1.6rem">'+
+        '<div class="card-header"><span class="card-title">Nový zápis do knihy</span></div>'+
+        '<div class="typ-toggle"><button class="typ-btn active-vklad" id="cont-smer-nam" onclick="setContSmer(\\'dluzi_nam\\')">Dluží nám</button>'+
+        '<button class="typ-btn" id="cont-smer-my" onclick="setContSmer(\\'dluzime\\')">Dlužíme my</button></div>'+
+        '<input type="hidden" id="cont-smer" value="dluzi_nam">'+
+        '<div class="form-row"><div class="form-group"><label>Osoba / frakce</label><input type="text" id="cont-osoba" placeholder="IC jméno nebo frakce"></div>'+
+        '<div class="form-group"><label>Splatnost (volitelné)</label><input type="text" id="cont-splatnost" placeholder="např. do 15.7."></div></div>'+
+        '<div class="form-group" style="margin-bottom:0.85rem"><label>Za co / důvod</label><input type="text" id="cont-duvod" placeholder="Krytí při razii, půjčka na zbraně…"></div>'+
+        '<div class="form-row"><div class="form-group"><label>Hodnota</label><input type="number" id="cont-hodnota" min="1" placeholder="5000"></div>'+
+        '<div class="form-group"><label>Valuta</label><select id="cont-valuta"><option value="USD">SAD</option><option value="PESOS">Pesos</option></select></div></div>'+
+        '<button class="btn-submit" onclick="submitCont()">Zapsat do knihy</button></div>';
+      h += '<div class="cont-grid">'+
+        '<div><div class="cont-col-title owed-to-us">Dluží nám</div>'+(owedToUs.length?owedToUs.map(contEntryHtml).join(''):ledgerEmptyHTML('Nikdo nám nic nedluží',true))+'</div>'+
+        '<div><div class="cont-col-title owed-by-us">Dlužíme my</div>'+(owedByUs.length?owedByUs.map(contEntryHtml).join(''):ledgerEmptyHTML('Frakce nikomu nedluží',true))+'</div>'+
+      '</div>';
+      document.getElementById('bb-continental').innerHTML = h;
+    }
+
+    function setContSmer(s){
+      document.getElementById('cont-smer').value = s;
+      document.getElementById('cont-smer-nam').className = 'typ-btn' + (s==='dluzi_nam' ? ' active-vklad' : '');
+      document.getElementById('cont-smer-my').className = 'typ-btn' + (s==='dluzime' ? ' active-vyber' : '');
+    }
+    window.setContSmer = setContSmer;
+
+    async function loadContinental(){
+      try{
+        const res = await fetch('/api/continental', { cache: 'no-store' });
+        const d = await res.json();
+        contEntries = d.entries || [];
+        contLoaded = true;
+        renderContinental();
+      }catch(e){}
+    }
+    async function submitCont(){
+      const smer = document.getElementById('cont-smer').value;
+      const osoba = document.getElementById('cont-osoba').value.trim();
+      const duvod = document.getElementById('cont-duvod').value.trim();
+      const hodnota = document.getElementById('cont-hodnota').value;
+      const valuta = document.getElementById('cont-valuta').value;
+      const splatnost = document.getElementById('cont-splatnost').value.trim();
+      if(!osoba || !duvod || !hodnota) return showToast('Vyplň osobu, důvod a hodnotu', true);
+      const res = await fetch('/api/continental', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ smer, osoba, duvod, hodnota, valuta, splatnost }) });
+      const d = await res.json();
+      if(d.ok){ if(window.albionSealThud) window.albionSealThud(); showToast('Zapsáno do Continental knihy'); loadContinental(); }
+      else showToast(d.error, true);
+    }
+    window.submitCont = submitCont;
+    async function settleCont(id){
+      if(!confirm('Označit tento dluh jako vyrovnaný? Přiloží se pečeť.')) return;
+      const res = await fetch('/api/continental/'+id+'/splatit', { method:'POST' });
+      const d = await res.json();
+      if(d.ok){ if(window.albionSealThud) window.albionSealThud(); showToast('Vyrovnáno — pečeť přiložena'); loadContinental(); }
+      else showToast(d.error, true);
+    }
+    window.settleCont = settleCont;
+    async function delCont(id){
+      if(!confirm('Trvale smazat tento záznam z knihy?')) return;
+      const res = await fetch('/api/continental/'+id, { method:'DELETE' });
+      const d = await res.json();
+      if(d.ok){ showToast('Záznam smazán'); loadContinental(); } else showToast(d.error, true);
+    }
+    window.delCont = delCont;
+
+    const _origBbTab = bbTab;
+    bbTab = function(sec){
+      _origBbTab(sec);
+      if(sec === 'continental' && !contLoaded) loadContinental();
+    };
 
     async function loadBlackbook(){
       try{
