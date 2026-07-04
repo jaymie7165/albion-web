@@ -49,7 +49,7 @@ function renderGallery(req) {
       reader.onload=async()=>{
         const res=await fetch('/api/gallery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:reader.result,caption:document.getElementById('gal-caption').value})});
         const d=await res.json();
-        if(d.ok){showToast('Fotka přidána');loadGallery();}else showToast(d.error,true);
+        if(d.ok){if(window.albionSealThud)window.albionSealThud();showToast('Fotka přidána');loadGallery();}else showToast(d.error,true);
       };
       reader.readAsDataURL(f);
     }
