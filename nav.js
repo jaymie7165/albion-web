@@ -89,8 +89,20 @@ function renderNav(req, active) {
         <div class="evelyn-widget" id="evelynWidget" title="Evelyn Ashcroft — Sekretariát Albionu">
           <img src="/evelyn.png" class="evelyn-portrait" alt="Evelyn Ashcroft" id="evelynImg" onerror="this.style.display='none';document.getElementById('evelynFallback').style.display='flex';">
           <div class="evelyn-portrait evelyn-portrait-placeholder" id="evelynFallback" style="display:none">E</div>
+          <span class="evelyn-ping" id="evelynPing"></span>
         </div>
-        <div class="evelyn-bubble" id="evelynBubble"><span class="ev-name">Evelyn Ashcroft</span><span id="evelynText">…</span></div>
+        <div class="evelyn-letter" id="evelynLetter">
+          <div class="evelyn-letter-head">
+            <div class="evelyn-letter-from">
+              <img src="/evelyn.png" alt="" onerror="this.style.display='none'">
+              <span>Evelyn Ashcroft · Sekretariát</span>
+            </div>
+            <button class="evelyn-letter-close" id="evelynCloseBtn" title="Zavřít">✕</button>
+          </div>
+          <div class="evelyn-letter-body" id="evelynLetterBody">
+            <div class="ledger-loading">Evelyn píše zprávu…</div>
+          </div>
+        </div>
         <button class="ambient-btn" id="ambientBtn" title="Ambientní zvuk kanceláře">♫</button>
         ${can('nastenska') ? `
         <button class="notif-bell" id="notifBell" title="Oznámení" onclick="window.location='/nastenska'">
@@ -176,16 +188,21 @@ function renderNav(req, active) {
       navMenu.querySelectorAll('a[href]:not([href="#"])').forEach(a => a.addEventListener('click', closeMobileNav));
 
       // ── NÁLADA — reálná denní doba, nezávislá na zvoleném tématu ──
+      // Auto téma reaguje na VŠECHNY čtyři fáze dne — svítání a soumrak dostávají
+      // tmavý noir s teplým podbarvením (mood-sunrise/mood-sunset), pergamen
+      // (light) patří jen skutečnému dni. Díky tomu je při přepnutí na "Auto"
+      // vždy vidět, že se něco změnilo, i mimo úzké polední okno.
       const MOODS = ['mood-sunrise','mood-day','mood-sunset','mood-night'];
+      const MOOD_LABEL = { 'mood-sunrise':'svítání', 'mood-day':'den', 'mood-sunset':'soumrak', 'mood-night':'noc' };
       function moodFromHour(h){ if(h>=5&&h<7)return'mood-sunrise'; if(h>=7&&h<17)return'mood-day'; if(h>=17&&h<21)return'mood-sunset'; return'mood-night'; }
       function applyMoodTick(){
         const m = moodFromHour(new Date().getHours());
         MOODS.forEach(c=>document.body.classList.remove(c));
         document.body.classList.add(m);
         if (currentTheme === 'auto') {
-          // Auto téma: v noci/soumraku tmavý noir, přes den pergamen
-          const wantLight = (m === 'mood-day');
-          document.body.classList.toggle('light', wantLight);
+          // Jen "den" je pergamen — svítání, soumrak i noc zůstávají v noiru
+          // (ale s vlastním teplým/chladným podbarvením dle mood- třídy výše)
+          document.body.classList.toggle('light', m === 'mood-day');
         }
       }
 
@@ -193,15 +210,19 @@ function renderNav(req, active) {
       const THEMES = ['dark','light'];
       let currentTheme = localStorage.getItem('albion_theme') || 'dark';
       function applyTheme(t) {
-        THEMES.forEach(c => document.body.classList.remove(c));
-        if (t === 'light') document.body.classList.add('light');
         currentTheme = t;
         localStorage.setItem('albion_theme', t);
+        THEMES.forEach(c => document.body.classList.remove(c));
+        if (t === 'light') document.body.classList.add('light');
         ['dark','light','auto'].forEach(th => {
           const btn = document.getElementById('td-' + th);
           if (btn) btn.classList.toggle('active', th === t);
         });
-        applyMoodTick();
+        applyMoodTick(); // pro 'auto' tady doreší light/dark dle aktuální fáze dne
+        if (t === 'auto' && window.showToast) {
+          const m = moodFromHour(new Date().getHours());
+          showToast('Auto režim aktivní — právě je ' + MOOD_LABEL[m]);
+        }
       }
       applyTheme(currentTheme);
       setInterval(applyMoodTick, 60000);
@@ -358,6 +379,48 @@ function renderNav(req, active) {
         }
       })();
 
+      // ── AMBIENTNÍ ZVUK KANCELÁŘE — napříč celým webem (ne jen /albion) ──
+      // Tlačítko ♫ v navu dřív nebylo na nic napojené. Sdílí localStorage klíč
+      // s /albion, takže stav (zapnuto/vypnuto) je konzistentní na celém webu,
+      // i když se přehrávání při přechodu na jinou stránku vždy znovu nastartuje
+      // (klasický multi-page web, ne SPA).
+      (function globalAmbient(){
+        const KEY = 'albion_ambient_on';
+        const btn = document.getElementById('ambientBtn');
+        if (!btn) return;
+        const AUDIO_BY_ENV = {
+          day: '/albion/audio/den.mp3', fog: '/albion/audio/mlha.mp3',
+          sunrise: '/albion/audio/vychod-slunce.mp3', sunset: '/albion/audio/zapad-slunce.mp3',
+          winter: '/albion/audio/snih.mp3', night: '/albion/audio/noc.mp3',
+        };
+        function envFromHour(h){ if(h>=5&&h<7)return'sunrise'; if(h>=7&&h<17)return'day'; if(h>=17&&h<21)return'sunset'; return'night'; }
+        let on = localStorage.getItem(KEY) === '1';
+        function render(){ btn.classList.toggle('active', on); btn.textContent = on ? '♪' : '♫'; }
+        render();
+        let audioEl = null;
+        function ensureAudio(){
+          if (audioEl) return audioEl;
+          audioEl = new Audio();
+          audioEl.loop = true;
+          audioEl.volume = 0.22;
+          audioEl.src = AUDIO_BY_ENV[envFromHour(new Date().getHours())];
+          return audioEl;
+        }
+        if (on) { const a = ensureAudio(); a.play().catch(() => { /* autoplay blokován do prvního kliku */ }); }
+        btn.addEventListener('click', () => {
+          on = !on;
+          localStorage.setItem(KEY, on ? '1' : '0');
+          render();
+          const a = ensureAudio();
+          if (on) a.play().catch(() => {});
+          else a.pause();
+        });
+        // Pokud autoplay selhal, spustí se při prvním kliknutí kamkoliv na stránku
+        document.addEventListener('click', function once(){
+          if (on && audioEl && audioEl.paused) audioEl.play().catch(() => {});
+        }, { once: true });
+      })();
+
       // ── VIEW AS ──
       (function viewAsInit(){
         const viewAsBtn=document.getElementById('viewAsBtn');
@@ -387,40 +450,81 @@ function renderNav(req, active) {
         if(d.season!=='none') document.body.classList.add('season-'+d.season);
       });
 
-      // ── EVELYN ASHCROFT — hlášení dle denní doby / "počasí" (sezóny) ──
+      // ── EVELYN ASHCROFT — sekretářka Albionu: kontextová "e-mailová" zpráva ──
+      // Místo jedné náhodné hlášky teď Evelyn posílá skutečný krátký brífink
+      // podle toho, na jaké stránce jste (nízké zásoby na Skladu, dorostlé
+      // odpočty na Weed sázení, stav pokladny na Blackbooku…) — data táhne
+      // z /api/evelyn/brief. Panel se navíc sám automaticky vysune po chvíli
+      // na každé stránce, je větší a vydrží otevřený déle.
       (function evelyn(){
-        const bubble=document.getElementById('evelynBubble');
+        const letter=document.getElementById('evelynLetter');
         const widget=document.getElementById('evelynWidget');
-        const textEl=document.getElementById('evelynText');
-        if(!bubble||!widget)return;
-        const hodina=new Date().getHours();
-        const denniDoba = hodina>=5&&hodina<10?'rano':hodina>=10&&hodina<18?'den':hodina>=18&&hodina<23?'vecer':'noc';
-        const LINES={
-          rano:['Dobré ráno. Kancelář je otevřená, kávu už mám uvařenou.','Ráno v Albionu — klidno, zatím žádné požáry k hašení.'],
-          den:['Dobrý den. Rejstřík je aktuální, ptejte se na cokoliv.','Odpoledne plyne poklidně — sklad i účty sedí.'],
-          vecer:['Dobrý večer. Většina bratrů už dorazila domů, ale rejstřík nikdy nespí.','Večer bývá rušno — kdyby něco, jsem tu.'],
-          noc:['Je pozdě. I tak jsem na svém místě, kdyby bylo potřeba.','Noční směna sekretariátu — vše zapsáno, vše na svém místě.'],
-        };
-        fetch('/api/season').then(r=>r.json()).then(d=>{
-          const season=d.season;
-          let extra='';
-          if(season==='vanoce')extra=' A přes svátky je v kanceláři výjimečně klidno.';
-          else if(season==='halloween')extra=' Dnešní noc je... neklidnější než obvykle.';
-          else if(season==='novy-rok')extra=' Nový rok, nové účty — začínáme na nule.';
-          const arr=LINES[denniDoba];
-          textEl.textContent=arr[Math.floor(Math.random()*arr.length)]+extra;
-        }).catch(()=>{ textEl.textContent=LINES[denniDoba][0]; });
-        let shown=false;
-        function toggleBubble(){shown=!shown;bubble.classList.toggle('show',shown);}
-        widget.addEventListener('click',toggleBubble);
-        document.addEventListener('click',(e)=>{if(shown&&!e.target.closest('.evelyn-widget')&&!e.target.closest('.evelyn-bubble'))toggleBubble();});
-        // Automatické krátké přivítání při prvním vstupu do sekce v této relaci
-        try{
-          if(!sessionStorage.getItem('albion_evelyn_greeted')){
-            sessionStorage.setItem('albion_evelyn_greeted','1');
-            setTimeout(()=>{bubble.classList.add('show');shown=true;setTimeout(()=>{if(shown)toggleBubble();},6000);},900);
+        const body=document.getElementById('evelynLetterBody');
+        const closeBtn=document.getElementById('evelynCloseBtn');
+        const ping=document.getElementById('evelynPing');
+        if(!letter||!widget||!body)return;
+
+        const PAGE_ID = '${active}' || 'home';
+        let shown=false, autoCloseTimer=null, briefCache=null;
+
+        function esc(s){return (s==null?'':String(s)).replace(/</g,'&lt;');}
+
+        function renderBrief(d){
+          const stamp=new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
+          let html='<div class="evelyn-letter-stamp">Doručeno '+stamp+'</div>';
+          html+='<div class="evelyn-letter-subject">'+esc(d.subject)+'</div>';
+          (d.lines||[]).forEach(l=>{ html+='<div class="evelyn-letter-line">'+esc(l)+'</div>'; });
+          if(d.tips&&d.tips.length){
+            html+='<div class="evelyn-letter-tips">'+d.tips.map(t=>'<div class="evelyn-letter-tip">'+esc(t)+'</div>').join('')+'</div>';
           }
-        }catch(e){}
+          if(d.actions&&d.actions.length){
+            html+='<div class="evelyn-letter-actions">'+d.actions.map(a=>'<a href="'+a.href+'">'+esc(a.label)+'</a>').join('')+'</div>';
+          }
+          html+='<div class="evelyn-letter-sig">— E. Ashcroft</div>';
+          body.innerHTML=html;
+        }
+
+        function fetchBrief(){
+          return fetch('/api/evelyn/brief?page='+encodeURIComponent(PAGE_ID))
+            .then(r=>r.json())
+            .then(d=>{
+              if(!d.ok) throw new Error('no data');
+              briefCache=d;
+              renderBrief(d);
+              if(d.tips&&d.tips.length) ping.classList.add('show');
+              return d;
+            })
+            .catch(()=>{
+              body.innerHTML='<div class="evelyn-letter-line">Omlouvám se, momentálně nemám zprávu připravenou.</div>';
+            });
+        }
+
+        function openLetter(autoHideMs){
+          letter.classList.add('show');
+          shown=true;
+          ping.classList.remove('show');
+          clearTimeout(autoCloseTimer);
+          if(autoHideMs) autoCloseTimer=setTimeout(closeLetter,autoHideMs);
+        }
+        function closeLetter(){
+          letter.classList.remove('show');
+          shown=false;
+          clearTimeout(autoCloseTimer);
+        }
+        function toggleLetter(){
+          if(shown){closeLetter();return;}
+          openLetter(0);
+          if(!briefCache) fetchBrief();
+        }
+
+        widget.addEventListener('click',toggleLetter);
+        closeBtn.addEventListener('click',(e)=>{e.stopPropagation();closeLetter();});
+        document.addEventListener('click',(e)=>{
+          if(shown&&!e.target.closest('.evelyn-widget')&&!e.target.closest('.evelyn-letter'))closeLetter();
+        });
+
+        // Automatické vysunutí — na každé stránce, o něco větší panel a delší výdrž
+        setTimeout(()=>{ fetchBrief().then(()=>{ openLetter(11000); }); },1000);
       })();
 
       // ── AMBIENTNÍ SOUNDTRACK KANCELÁŘE — opt-in, hraje napříč celým webem ──
