@@ -212,11 +212,20 @@ function renderNav(req, active) {
 
       function showToast(msg, isError) {
         let t = document.getElementById('toast');
-        if (!t) { t = document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
-        t.textContent = msg;
-        t.className = 'toast show' + (isError ? ' error' : '');
+        if (!t) { t = document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
+        t.className = 'toast' + (isError ? ' error' : '');
+        t.innerHTML =
+          '<div class="toast-icon">' + (isError ? '✕' : '✓') + '</div>' +
+          '<div class="toast-body">' +
+            '<div class="toast-title">' + (isError ? 'Chyba' : 'Zaznamenáno') + '</div>' +
+            '<div class="toast-msg"></div>' +
+          '</div>';
+        t.querySelector('.toast-msg').textContent = msg; // textContent kvůli bezpečnosti (žádné HTML injection)
+        // Vynutit reflow, ať se transformace znovu přehraje i při rychlém opakovaném volání
+        void t.offsetWidth;
+        t.classList.add('show');
         clearTimeout(t._timer);
-        t._timer = setTimeout(() => t.className = 'toast', 3500);
+        t._timer = setTimeout(() => t.classList.remove('show'), 3500);
       }
       window.showToast = showToast;
 
