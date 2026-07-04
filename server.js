@@ -278,6 +278,79 @@ const KATALOG_TO_CONFIG_KEY = { zbrane: 'zbrane', naboje: 'naboje', akce: 'akce'
     (kat[katKey] || []).forEach(item => { if (!CONFIG[cfgKey].includes(item)) CONFIG[cfgKey].push(item); });
   });
 })();
+
+// ── ORGANIZAČNÍ MILNÍKY — celoorganizační momenty (ne osobní achievementy) ──
+// Ukládá se do stejného trvalého úložiště jako ceník/katalog (přežije redeploy).
+// Jakmile celkový stav kategorie/pokladny poprvé překročí danou hranici,
+// pošle se JEDNORÁZOVÁ oslava do #vyznamenani — každá hranice max. jednou.
+const MILESTONES_FILE = path.join(DATA_DIR, 'milestones.json');
+const STOCK_MILESTONE_HRANICE = [100, 500, 1000, 2500, 5000];
+const PENIZE_MILESTONE_HRANICE = { usd: [1000, 5000, 10000, 25000, 50000], pesos: [50000, 100000, 250000, 500000] };
+
+function loadMilestones() {
+  try {
+    if (!fs.existsSync(MILESTONES_FILE)) return { dosazene: [] };
+    const d = JSON.parse(fs.readFileSync(MILESTONES_FILE, 'utf8'));
+    return { dosazene: Array.isArray(d.dosazene) ? d.dosazene : [] };
+  } catch { return { dosazene: [] }; }
+}
+function saveMilestones(data) {
+  try { fs.writeFileSync(MILESTONES_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('[MILESTONES]', e.message); }
+}
+
+const SEKCE_LABEL = { zbrane: 'Arzenál', weed: 'Botanický registr', drogy: 'Farmaceutický registr', chemky: 'Laboratorní registr' };
+
+// Zavolat PO zápisu do skladu (sekce: zbrane/weed/drogy/chemky). Sečte
+// aktuální celkový stav dané kategorie a zkontroluje, jestli poprvé
+// překročil některou z hranic.
+async function checkStockMilestone(sekce, sheetName) {
+  try {
+    const stav = await sheets.getStockSummary(sheetName);
+    const celkem = Object.values(stav).reduce((s, v) => s + (v > 0 ? v : 0), 0);
+    const ms = loadMilestones();
+    for (const hranice of STOCK_MILESTONE_HRANICE) {
+      const klic = `stock:${sekce}:${hranice}`;
+      if (celkem >= hranice && !ms.dosazene.includes(klic)) {
+        ms.dosazene.push(klic);
+        saveMilestones(ms);
+        await discord.notifyVyznamenani(
+          `Milník — ${SEKCE_LABEL[sekce] || sekce}`,
+          `${SEKCE_LABEL[sekce] || sekce} poprvé přesáhl **${hranice.toLocaleString('cs-CZ')} ks** celkem.`,
+          'Organizace Albion', null,
+        );
+        return; // jedna hranice na zápis stačí, další se chytí příště
+      }
+    }
+  } catch (e) { console.error('[MILESTONES] stock:', e.message); }
+}
+
+// Zavolat PO zápisu do účetnictví/směny. Kontroluje hranice pokladny.
+async function checkPenizeMilestone() {
+  try {
+    const { usd, pesos } = await sheets.getAccountingSummary();
+    const ms = loadMilestones();
+    let zmena = false;
+    for (const [mena, hranice_pole] of Object.entries(PENIZE_MILESTONE_HRANICE)) {
+      const aktualni = mena === 'usd' ? usd : pesos;
+      for (const hranice of hranice_pole) {
+        const klic = `penize:${mena}:${hranice}`;
+        if (aktualni >= hranice && !ms.dosazene.includes(klic)) {
+          ms.dosazene.push(klic);
+          zmena = true;
+          const symbol = mena === 'usd' ? '$' : '₱';
+          await discord.notifyVyznamenani(
+            `Milník — Pokladna (${mena.toUpperCase()})`,
+            `Pokladna organizace poprvé přesáhla **${symbol}${hranice.toLocaleString('cs-CZ')}**.`,
+            'Organizace Albion', null,
+          );
+          break; // jedna hranice na měnu na zápis stačí
+        }
+      }
+    }
+    if (zmena) saveMilestones(ms);
+  } catch (e) { console.error('[MILESTONES] penize:', e.message); }
+}
+
 // Uloží base64 obrázek (data URL) na disk a vrátí veřejnou cestu, nebo null při chybě/neplatném vstupu.
 const { addWatermark } = require('./watermark');
 async function saveGarageImage(dataUrl, existingPath) {
@@ -858,7 +931,9 @@ app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) =>
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Zbraně', [cas, typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe || '-']);
-  await discord.notifyZbrane(typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe);
+  await discord.notifyZbrane(typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe, req.session.accessLevel);
+  sheets.getStockSummary('Zbraně').then(stav => discord.checkNizkaZasoba('zbrane', polozkaTrim, typUp, qty, stav[polozkaTrim])).catch(() => {});
+  checkStockMilestone('zbrane', 'Zbraně').catch(() => {});
   await discord.notifyAudit('Zbraně', uzivatel, discordUser, `${typUp} — ${polozkaTrim} (${qty} ks) [${kategorie}]${ucelSafe ? ' | Účel: ' + ucelSafe : ''}`);
   broadcastSSE('skladUpdate', { sekce: 'zbrane', typ: typUp, polozka: polozkaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -880,7 +955,9 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Weed', [cas, typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel]);
-  await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel);
+  await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel, req.session.accessLevel);
+  sheets.getStockSummary('Weed').then(stav => discord.checkNizkaZasoba('weed', odruda_trim, typUp, qty, stav[odruda_trim])).catch(() => {});
+  checkStockMilestone('weed', 'Weed').catch(() => {});
   await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
   broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -901,7 +978,9 @@ app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => 
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Drogy', [cas, typUp, drogaTrim, qty, '-', '-', uzivatel]);
-  await discord.notifyDrogy(typUp, drogaTrim, qty, undefined, undefined, uzivatel);
+  await discord.notifyDrogy(typUp, drogaTrim, qty, undefined, undefined, uzivatel, req.session.accessLevel);
+  sheets.getStockSummary('Drogy').then(stav => discord.checkNizkaZasoba('drogy', drogaTrim, typUp, qty, stav[drogaTrim])).catch(() => {});
+  checkStockMilestone('drogy', 'Drogy').catch(() => {});
   await discord.notifyAudit('Drogy', uzivatel, discordUser, `${typUp} — ${drogaTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'drogy', typ: typUp, droga: drogaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -925,6 +1004,7 @@ app.post('/api/ucet', requireAuth, requireAccess('sklad'), async (req, res) => {
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Účetnictví', [cas, typUp, amount, valutaUp, poznamkaSafe, uzivatel]);
   await discord.notifyUcet(typUp, amount, valutaUp, poznamkaSafe, uzivatel);
+  checkPenizeMilestone().catch(() => {});
   await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `${typUp} — ${valutaUp === 'USD' ? 'SAD ' : '₱'}${amount} | ${poznamkaSafe}`);
   broadcastSSE('ucetUpdate', { typ: typUp, castka: amount, valuta: valutaUp, poznamka: poznamkaSafe, uzivatel, cas });
   res.json({ ok: true });
@@ -944,7 +1024,9 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Chemky', [cas, typUp, chemikalieTrim, qty, uzivatel]);
-  await discord.notifyChemky(typUp, chemikalieTrim, qty, uzivatel);
+  await discord.notifyChemky(typUp, chemikalieTrim, qty, uzivatel, req.session.accessLevel);
+  sheets.getStockSummary('Chemky').then(stav => discord.checkNizkaZasoba('chemky', chemikalieTrim, typUp, qty, stav[chemikalieTrim])).catch(() => {});
+  checkStockMilestone('chemky', 'Chemky').catch(() => {});
   await discord.notifyAudit('Chemky', uzivatel, discordUser, `${typUp} — ${chemikalieTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'chemky', typ: typUp, chemikalie: chemikalieTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
@@ -974,6 +1056,7 @@ app.post('/api/smena', requireAuth, requireAccess('sklad'), async (req, res) => 
   await sheets.appendRow('Účetnictví', [cas, 'PŘÍJEM', amount, naValuta, poznamka, uzivatel]);
 
   await discord.notifySmena(smerOk, amount, amount, uzivatel);
+  checkPenizeMilestone().catch(() => {});
   await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `SMĚNA — ${poznamka} | ${zValuta === 'USD' ? '$' : '₱'}${amount} → ${naValuta === 'USD' ? '$' : '₱'}${amount}`);
   broadcastSSE('ucetUpdate', { typ: 'SMĚNA', castka: amount, valuta: zValuta, poznamka, uzivatel, cas });
 
