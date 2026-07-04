@@ -33,6 +33,7 @@ const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
+const { renderSpisy } = require('./views/spis');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -173,6 +174,109 @@ function loadGarage() {
 function saveGarage(cars) {
   try { fs.writeFileSync(GARAGE_FILE, JSON.stringify(cars, null, 2)); } catch (e) { console.error('[GARAGE]', e.message); }
 }
+
+// ── OSOBNÍ SPISY ČLENŮ — tajné poznámky, jen Founder/Council ────────────────
+const DOSSIERS_FILE = path.join(DATA_DIR, 'dossiers.json');
+function loadDossiers() { try { return JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')) || {}; } catch { return {}; } }
+function saveDossiers(d) { try { fs.writeFileSync(DOSSIERS_FILE, JSON.stringify(d, null, 2)); } catch (e) { console.error('[DOSSIERS]', e.message); } }
+
+app.get('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
+  const all = loadDossiers();
+  const entry = all[req.params.icName] || { notes: '', updatedAt: null, updatedBy: null };
+  res.json({ ok: true, dossier: entry });
+});
+app.post('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
+  const notes = sanitizeText(req.body.notes, 5000) || '';
+  const all = loadDossiers();
+  all[req.params.icName] = { notes, updatedAt: new Date().toISOString(), updatedBy: req.session.icName };
+  saveDossiers(all);
+  res.json({ ok: true });
+});
+
+// ── VZTAHY MEZI ČLENY — mentor/rodina/spojenec/rival, vidí všichni ──────────
+const RELATIONSHIPS_FILE = path.join(DATA_DIR, 'relationships.json');
+function loadRelationships() { try { return JSON.parse(fs.readFileSync(RELATIONSHIPS_FILE, 'utf8')) || []; } catch { return []; } }
+function saveRelationships(r) { try { fs.writeFileSync(RELATIONSHIPS_FILE, JSON.stringify(r, null, 2)); } catch (e) { console.error('[VZTAHY]', e.message); } }
+const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival'];
+
+app.get('/api/vztahy', requireAuth, (req, res) => res.json({ ok: true, vztahy: loadRelationships() }));
+app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
+  const a = sanitizeText(req.body.a, 80), b = sanitizeText(req.body.b, 80);
+  const typ = (req.body.typ || '').toString();
+  const note = req.body.note ? sanitizeText(req.body.note, 200) : '';
+  if (!a || !b) return res.json({ ok: false, error: 'Vyplň obě jména' });
+  if (!VZTAH_TYPY.includes(typ)) return res.json({ ok: false, error: 'Neplatný typ vztahu' });
+  const list = loadRelationships();
+  list.push({ id: `vz_${Date.now()}_${Math.floor(Math.random()*1e6)}`, a, b, typ, note: note || '', createdBy: req.session.icName, createdAt: Date.now() });
+  saveRelationships(list);
+  res.json({ ok: true });
+});
+app.delete('/api/vztahy/:id', requireAuth, requireAccess('spis'), (req, res) => {
+  let list = loadRelationships();
+  const before = list.length;
+  list = list.filter(v => v.id !== req.params.id);
+  if (list.length === before) return res.json({ ok: false, error: 'Vztah nenalezen' });
+  saveRelationships(list);
+  res.json({ ok: true });
+});
+
+// ── CONTINENTAL LEDGER — dluhy stylem "Continental": komu/co/kolik/kdy,
+// s voskovou pečetí při vyrovnání. Dva směry: co dluží nám, co dlužíme my. ──
+const CONTINENTAL_FILE = path.join(DATA_DIR, 'continental.json');
+function loadContinental() { try { return JSON.parse(fs.readFileSync(CONTINENTAL_FILE, 'utf8')) || []; } catch { return []; } }
+function saveContinental(d) { try { fs.writeFileSync(CONTINENTAL_FILE, JSON.stringify(d, null, 2)); } catch (e) { console.error('[CONTINENTAL]', e.message); } }
+
+app.get('/api/continental', requireAuth, requireAccess('blackbook'), (req, res) => {
+  res.json({ ok: true, entries: loadContinental().sort((a,b) => (b.createdAt||0)-(a.createdAt||0)) });
+});
+app.post('/api/continental', requireAuth, requireAccess('blackbook'), (req, res) => {
+  const smer = (req.body.smer || '').toString();
+  const osoba = sanitizeText(req.body.osoba, 80);
+  const duvod = sanitizeText(req.body.duvod, 300);
+  const hodnota = parseFloat(req.body.hodnota);
+  const valuta = (req.body.valuta || 'USD').toString().toUpperCase();
+  const splatnost = req.body.splatnost ? sanitizeText(req.body.splatnost, 40) : null;
+
+  if (!['dluzi_nam', 'dluzime'].includes(smer)) return res.json({ ok: false, error: 'Neplatný směr dluhu' });
+  if (!osoba) return res.json({ ok: false, error: 'Vyplň jméno osoby/frakce' });
+  if (!duvod) return res.json({ ok: false, error: 'Vyplň za co je dluh' });
+  if (!isAmount(hodnota, 50_000_000)) return res.json({ ok: false, error: 'Neplatná hodnota dluhu' });
+  if (!inEnum(valuta, VALUTY)) return res.json({ ok: false, error: 'Neplatná valuta' });
+
+  const list = loadContinental();
+  const entry = {
+    id: `cont_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
+    smer, osoba, duvod, hodnota, valuta, splatnost,
+    settled: false, settledAt: null, settledBy: null,
+    createdBy: req.session.icName, createdAt: Date.now(),
+    createdAtText: sheets.timestamp ? sheets.timestamp() : new Date().toLocaleString('cs-CZ'),
+  };
+  list.push(entry);
+  saveContinental(list);
+  broadcastSSE('continentalUpdate', { action: 'add' });
+  res.json({ ok: true, entry });
+});
+app.post('/api/continental/:id/splatit', requireAuth, requireAccess('blackbook'), (req, res) => {
+  const list = loadContinental();
+  const entry = list.find(e => e.id === req.params.id);
+  if (!entry) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  entry.settled = true;
+  entry.settledAt = Date.now();
+  entry.settledBy = req.session.icName;
+  saveContinental(list);
+  broadcastSSE('continentalUpdate', { action: 'settle' });
+  res.json({ ok: true });
+});
+app.delete('/api/continental/:id', requireAuth, requireAccess('blackbook'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat záznamy smí jen Founder/Council' });
+  let list = loadContinental();
+  const before = list.length;
+  list = list.filter(e => e.id !== req.params.id);
+  if (list.length === before) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  saveContinental(list);
+  broadcastSSE('continentalUpdate', { action: 'remove' });
+  res.json({ ok: true });
+});
 
 // ── SKLAD — CENÍK (výkupní/prodejní ceny, editovatelné jen Founder/Council) ──
 const CENIK_FILE = path.join(DATA_DIR, 'cenik.json');
@@ -1511,7 +1615,8 @@ app.get('/api/stats', requireAuth, requireAccess('statistiky'), async (req, res)
       else                  { if (valuta === 'USD') s.vydaj_usd += castka; else s.vydaj_pesos += castka; }
     }
 
-    res.json({ ok: true, stats });
+    const elite = allUsers.filter(u => (u.access_level || 3) === 1).map(u => u.ic_name);
+    res.json({ ok: true, stats, elite });
   } catch (e) {
     console.error('[STATS]', e);
     res.json({ ok: false, stats: {} });
@@ -1675,7 +1780,8 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
 
     events.sort((a, b) => parseCas(b.cas) - parseCas(a.cas));
 
-    res.json({ ok: true, events: events.slice(0, 200), ucetSouhrn });
+    const elite = allUsersAudit.filter(u => (u.access_level || 3) === 1).map(u => u.ic_name);
+    res.json({ ok: true, events: events.slice(0, 200), ucetSouhrn, elite });
   } catch (e) {
     console.error('[AUDIT]', e);
     res.json({ ok: false, events: [], ucetSouhrn: {} });
@@ -2429,6 +2535,10 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
+app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
+  const members = db.prepare('SELECT ic_name FROM users WHERE ic_name IS NOT NULL ORDER BY ic_name ASC').all().map(u => u.ic_name);
+  res.send(renderSpisy(req, members));
+});
 app.get('/galerie', requireAuth, (req, res) => {
   if (req.session.isAssociate) return res.status(403).send('Galerie je dostupná od hodnosti Member. <a href="/home">Zpět</a>');
   res.send(renderGallery(req));
