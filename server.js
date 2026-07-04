@@ -1880,6 +1880,113 @@ app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (
   } catch(e){ res.json({ ok:false }); }
 });
 
+// ── API — EVELYN ASHCROFT: KONTEXTOVÝ BRÍFINK DLE STRÁNKY ──────────────────
+// Sekretářka Albionu — místo jedné náhodné hlášky teď sestaví krátkou
+// "e-mailovou" zprávu podle toho, na jaké stránce se člen právě nachází
+// a co dané datové zdroje reálně obsahují (nízké zásoby, dorostlé odpočty
+// weedu, stav pokladny, nevyrovnané dluhy v Continental knize…).
+app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
+  const page = (req.query.page || 'home').toString();
+  const accessLevel = req.session.accessLevel || 3;
+  const hodina = new Date().getHours();
+  const pozdrav = hodina>=5&&hodina<10?'Dobré ráno':hodina>=10&&hodina<18?'Dobrý den':hodina>=18&&hodina<23?'Dobrý večer':'Dobrou noc';
+
+  const lines = [];
+  const tips = [];
+  const actions = [];
+
+  try {
+    if ((page === 'sklad' || page === 'home') && canAccess(accessLevel, 'sklad')) {
+      const PRAHY = { 'Zbraně': 5, 'Weed': 20, 'Drogy': 10, 'Chemky': 10 };
+      for (const [sheet, prah] of Object.entries(PRAHY)) {
+        try {
+          const stav = await sheets.getStockSummary(sheet);
+          Object.entries(stav).forEach(([item, q]) => {
+            if (q > 0 && q < prah) tips.push(`${item} (${sheet}) — už jen ${q} ks, pod hranicí ${prah}.`);
+          });
+        } catch (e) {}
+      }
+      lines.push(tips.length ? 'Při kontrole skladu jsem narazila na pár položek, které se blíží vyprodání.' : 'Sklad jsem prošla — žádná položka aktuálně nehrozí vyprodáním.');
+      actions.push({ label: 'Otevřít sklad', href: '/sklad' });
+    }
+
+    if (page === 'weed-sazeni' || page === 'home') {
+      try {
+        const timers = loadWeedTimers();
+        const now = Date.now();
+        const hotove = timers.filter(t => t.endsAt <= now).length;
+        const bezici = timers.length - hotove;
+        if (hotove > 0) {
+          tips.push(`${hotove} odpočet(y) sázení už dorostly a čekají na sklizeň.`);
+          actions.push({ label: 'Weed sázení', href: '/weed-sazeni' });
+        } else if (bezici > 0) {
+          lines.push(`Právě běží ${bezici} odpočet(y) sázení.`);
+        }
+      } catch (e) {}
+    }
+
+    if ((page === 'blackbook' || page === 'profit-centrum' || page === 'home') && canAccess(accessLevel, 'blackbook')) {
+      try {
+        const acc = await sheets.getAccountingSummary();
+        lines.push(`Pokladna organizace aktuálně stojí na $${Math.round(acc.usd).toLocaleString('cs-CZ')} a ₱${Math.round(acc.pesos).toLocaleString('cs-CZ')}.`);
+        actions.push({ label: 'Profit centrum', href: '/profit-centrum' });
+      } catch (e) {}
+      try {
+        const cont = loadContinental().filter(c => !c.settled);
+        if (cont.length) {
+          tips.push(`V Continental knize je ${cont.length} nevyrovnaných záznamů.`);
+          actions.push({ label: 'Blackbook', href: '/blackbook' });
+        }
+      } catch (e) {}
+    }
+
+    if (page === 'garaz' || page === 'home') {
+      try {
+        const cars = loadGarage();
+        if (cars.length) lines.push(`Vozový park čítá aktuálně ${cars.length} vozidel.`);
+        actions.push({ label: 'Garáž', href: '/garaz' });
+      } catch (e) {}
+    }
+
+    if (page === 'nastenska') {
+      lines.push('Nástěnka se synchronizuje s Discordem každých 30 sekund — nic vám neuteče.');
+      actions.push({ label: 'Nástěnka', href: '/nastenska' });
+    }
+
+    if (['kodex', 'lore', 'hierarchy'].includes(page)) {
+      lines.push('Pokud si nejste jistí postupem, kodex a hierarchie jsou tu přesně pro tyto chvíle.');
+      actions.push({ label: 'Otevřít stránku', href: '/' + page });
+    }
+
+    if (page === 'audit' || page === 'statistiky') {
+      lines.push('Kompletní historii najdete zde — klidně použijte vyhledávání pro rychlejší orientaci.');
+      actions.push({ label: page === 'audit' ? 'Otevřít audit' : 'Otevřít statistiky', href: '/' + page });
+    }
+
+    try {
+      const season = loadSeason();
+      if (season === 'vanoce') lines.push('Přes svátky je to tu v kanceláři výjimečně klidné.');
+      else if (season === 'halloween') lines.push('Dnešní noc na Discordu je... neklidnější než obvykle.');
+      else if (season === 'novy-rok') lines.push('Nový rok, nové účty — začínáme na nule.');
+    } catch (e) {}
+  } catch (e) {
+    console.error('[EVELYN BRIEF]', e.message);
+  }
+
+  if (!lines.length && !tips.length) {
+    lines.push('Vše je v pořádku, žádné naléhavé záležitosti k řešení.');
+  }
+  actions.push({ label: 'Profil', href: '/profil' });
+
+  res.json({
+    ok: true,
+    subject: `${pozdrav}, ${req.session.icName || 'člene'}.`,
+    lines,
+    tips: tips.slice(0, 5),
+    actions: actions.slice(0, 4),
+  });
+});
+
 // ── API — PROFIL: PROMOTIONS, ACHIEVEMENTY, ONBOARDING ─────────────────────
 app.get('/api/me/promotions', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
