@@ -143,6 +143,16 @@ db.incrementActionCount = (id) => {
   return u.action_count;
 };
 
+// ── ČÍTAČ VKLADŮ (samostatně od celkových akcí — pro odznak "Logistika") ──
+db.incrementDepositCount = (id) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (!u) return 0;
+  u.deposit_count = (u.deposit_count || 0) + 1;
+  save(users);
+  return u.deposit_count;
+};
+
 // ── ONBOARDING ──
 db.markOnboardingSeen = (id) => {
   const users = load();
