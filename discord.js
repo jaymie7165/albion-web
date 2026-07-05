@@ -5,6 +5,7 @@ const BOT_TOKEN = () => process.env.DISCORD_TOKEN;
 
 async function sendEmbed(channelId, embed) {
   if (!channelId || !BOT_TOKEN()) return;
+  if (ALBION_SEAL_URL && !embed.thumbnail) embed.thumbnail = { url: ALBION_SEAL_URL };
   try {
     await axios.post(
       `https://discord.com/api/v10/channels/${channelId}/messages`,
@@ -26,6 +27,48 @@ async function sendEmbed(channelId, embed) {
 // ══════════════════════════════════════════════════════════════════════
 
 const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Albionu' };
+
+// ── Pečeť Albionu (thumbnail) — stejný princip jako v botovi (helpers.js) ──
+// Dokud nemáte hostovaný obrázek erbu, zůstává vypnuté. Nastavte na
+// Railway ALBION_SEAL_URL a projeví se to automaticky ve všech embedech.
+const ALBION_SEAL_URL = process.env.ALBION_SEAL_URL || null;
+
+// ── Nálada dne — STEJNÝ algoritmus jako bot (utils/helpers.js::denniNalada) ──
+// Obě strany (bot i web) počítají náladu ze stejného seedu (dnešní datum),
+// takže i když jde o dva nezávislé procesy, jejich "nálada" je ten samý den
+// konzistentní — to je nejvíc, co lze udělat bez sdíleného balíčku (viz
+// diskuse o konsolidaci hlasu bota a webu).
+const NALADY_DNE = ['klidná', 'čilá', 'mírně zamyšlená', 'soustředěná', 'dobře naladěná', 'pracovitá'];
+function denniNalada() {
+  const dnes = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+  let seed = 0;
+  for (let i = 0; i < dnes.length; i++) seed = (seed * 31 + dnes.charCodeAt(i)) >>> 0;
+  return NALADY_DNE[seed % NALADY_DNE.length];
+}
+
+// ── Sezónní období — stejná logika jako bot ────────────────────────────
+function sezonniObdobi() {
+  const dnes = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
+  const [, mesicStr, denStr] = dnes.split('-');
+  const mesic = parseInt(mesicStr), den = parseInt(denStr);
+  if ((mesic === 12 && den >= 15) || (mesic === 1 && den <= 6)) return 'vanoce';
+  if ((mesic === 10 && den >= 24) || (mesic === 11 && den === 1)) return 'halloween';
+  return null;
+}
+
+const SEZONNI_FRAZE = {
+  vanoce: [
+    'i uprostřed vánočního shonu vedu evidenci s obvyklou pečlivostí.',
+    'byť za okny svítí vánoční výzdoba, registry se vedou dál jako každý den.',
+  ],
+  halloween: [
+    'i v tento strašidelný večer zůstává evidence organizace v bezpečných rukou.',
+    'navzdory halloweenské atmosféře v Los Santos jsem u svého stolu jako obvykle.',
+  ],
+};
+
+// Motiv, který se má opakovat napříč kanály — malá "podpisová" kontinuita.
+const MOTTO = 'Vedu záznamy, abyste vy mohli vést organizaci.';
 
 function pozdrav() {
   const hodina = parseInt(
@@ -119,6 +162,14 @@ const FRAZE_VYSOKA_HODNOST = {
 // se část času použije formálnější fráze místo běžné rotace.
 function uvod(uzivatel, klic, accessLevel) {
   const jmeno = uzivatel ? `, **${uzivatel}**` : '';
+
+  // Sezónní období má občas (ne pokaždé, ať to nezačne nudit) přednost
+  // před běžnou rotací frází.
+  const sezona = sezonniObdobi();
+  if (sezona && SEZONNI_FRAZE[sezona] && Math.random() < 0.3) {
+    return `${pozdrav()}${jmeno}. ${nahodna(SEZONNI_FRAZE[sezona])}`;
+  }
+
   let banka = FRAZE[klic] || FRAZE.vklad;
   if (accessLevel === 1 && FRAZE_VYSOKA_HODNOST[klic] && Math.random() < 0.4) {
     banka = FRAZE_VYSOKA_HODNOST[klic];
@@ -157,13 +208,59 @@ const FRAZE_NIZKE_ZASOBY = [
   'prosím o pozornost — tahle položka se blíží vyprodání.',
 ];
 
+// Bezpečnostní pojistka proti spamu — i kdyby detekce "přechodu přes
+// hranici" z nějakého důvodu vyhodnotila víc upozornění za sebou (např.
+// při rychlém testování mnoha akcí najednou), tenhle cooldown zaručí
+// max. jedno upozornění na stejnou položku za 30 minut.
+const POSLEDNI_UPOZORNENI = new Map(); // klíč: "sekce:polozka" → timestamp (ms)
+const COOLDOWN_MS = 30 * 60 * 1000;
+
 // Vyhodnotí, jestli akce (VKLAD/VÝBĚR o `mnozstvi` ks) právě STÁHLA položku
 // POD práh — a pokud ano, pošle upozornění. Neopakuje se při každém dalším
 // výběru, dokud se zásoba znovu nedostane nad práh a zase pod něj neklesne
 // (kontrolujeme, že PŘEDCHOZÍ stav byl ještě nad prahem).
-async function checkNizkaZasoba(sekce, polozka, typ, mnozstvi, aktualniStav) {
-  const prah = PRAH_NIZKE_ZASOBY[sekce];
+// `vlastniPrah` — nepovinné, umožňuje serveru dodat prah nakonfigurovaný
+// přes web (viz /api/thresholds) místo pevně daného výchozího čísla.
+// ── Prediktivní odhad — "za kolik dní dojde" ────────────────────────────
+// V paměti (ne persistentní — restart appky historii vynuluje, což je pro
+// tenhle "orientační odhad" účel v pořádku) sledujeme poslední stavy
+// každé položky za posledních 7 dní a z poklesu odhadneme tempo spotřeby.
+const HISTORIE_ZASOB = new Map(); // "sekce:polozka" → [{ t, v }, ...]
+const HISTORIE_OKNO_MS = 7 * 24 * 60 * 60 * 1000;
+
+function zaznamenejHistorii(sekce, polozka, aktualniStav) {
+  const klic = `${sekce}:${polozka}`;
+  const ted = Date.now();
+  const zaznamy = (HISTORIE_ZASOB.get(klic) || []).filter(z => ted - z.t <= HISTORIE_OKNO_MS);
+  zaznamy.push({ t: ted, v: aktualniStav });
+  HISTORIE_ZASOB.set(klic, zaznamy);
+}
+
+function odhadniDnyDoVyprodani(sekce, polozka, aktualniStav) {
+  const klic = `${sekce}:${polozka}`;
+  const zaznamy = HISTORIE_ZASOB.get(klic) || [];
+  if (zaznamy.length < 2) return null;
+
+  const nejstarsi = zaznamy[0];
+  const dnyUplynulo = (Date.now() - nejstarsi.t) / 86400000;
+  if (dnyUplynulo < 0.5) return null; // příliš málo dat na rozumný odhad
+
+  const pokles = nejstarsi.v - aktualniStav;
+  if (pokles <= 0) return null; // zásoby rostou/stagnují — nic k predikci
+
+  const tempoZaDen = pokles / dnyUplynulo;
+  return Math.max(1, Math.round(aktualniStav / tempoZaDen));
+}
+
+async function checkNizkaZasoba(sekce, polozka, typ, mnozstvi, aktualniStav, vlastniPrah) {
+  if (aktualniStav != null) zaznamenejHistorii(sekce, polozka, aktualniStav);
+
+  const prah = (typeof vlastniPrah === 'number' && !isNaN(vlastniPrah)) ? vlastniPrah : PRAH_NIZKE_ZASOBY[sekce];
   if (!prah || aktualniStav == null) return;
+
+  const klic = `${sekce}:${polozka}`;
+  const ted = Date.now();
+  if (POSLEDNI_UPOZORNENI.has(klic) && ted - POSLEDNI_UPOZORNENI.get(klic) < COOLDOWN_MS) return;
 
   const predchoziStav = typ === 'VÝBĚR' ? aktualniStav + mnozstvi : aktualniStav - mnozstvi;
   const preslaPresHranici = predchoziStav >= prah && aktualniStav < prah;
@@ -172,11 +269,16 @@ async function checkNizkaZasoba(sekce, polozka, typ, mnozstvi, aktualniStav) {
   const channelId = KANAL_PODLE_SEKCE[sekce]?.();
   if (!channelId) return;
 
+  POSLEDNI_UPOZORNENI.set(klic, ted);
+
+  const odhad = odhadniDnyDoVyprodani(sekce, polozka, aktualniStav);
+  const predikceText = odhad ? `\n\n📉 Při současném tempu spotřeby odhaduji vyprodání za přibližně **${odhad} ${odhad === 1 ? 'den' : odhad < 5 ? 'dny' : 'dní'}**.` : '';
+
   await sendEmbed(channelId, {
     title: `⚠️ NÍZKÉ ZÁSOBY — ${polozka}`,
     color: 0xE8A33D,
     author: EVELYN_AUTHOR,
-    description: `${pozdrav()}. ${nahodna(FRAZE_NIZKE_ZASOBY)}`,
+    description: `${pozdrav()}. ${nahodna(FRAZE_NIZKE_ZASOBY)}${predikceText}`,
     fields: [
       { name: 'Položka', value: polozka, inline: true },
       { name: 'Aktuální stav', value: `${aktualniStav} ks`, inline: true },
@@ -448,6 +550,65 @@ async function notifyVyznamenani(nazevOdznaku, popis, uzivatel, discordUsername)
   });
 }
 
+// Personální oddělení — nástup nového člena do organizace. (Odchod/suspendace
+// zatím nemají na webu žádnou akci, ze které by šly spustit — jakmile
+// taková funkce vznikne, stačí sem přidat obdobné volání.)
+async function notifyPersonalni(typ, jmeno, detail) {
+  const channelId = process.env.CHANNEL_PERSONALNI;
+  if (!channelId) {
+    console.error('[DISCORD] CHANNEL_PERSONALNI není nastaven v .env, personální záznam se nezapsal.');
+    return;
+  }
+  const NAZVY = {
+    nastup: { title: '🟡 NÁSTUP DO ORGANIZACE', icon: '➕' },
+  };
+  const info = NAZVY[typ] || { title: '🟡 PERSONÁLNÍ ZÁZNAM', icon: '📁' };
+
+  await sendEmbed(channelId, {
+    title: info.title,
+    color: 0xC9A84C,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}. Personální oddělení zaznamenává následující změnu.`,
+    fields: [
+      { name: '👤 Jméno', value: `**${jmeno}**`, inline: true },
+      { name: `${info.icon} Detail`, value: detail || '—', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// ── Onboarding DM ────────────────────────────────────────────────────────
+// Krátká uvítací sekvence do soukromé zprávy novému členovi po registraci.
+// Použití: await sendOnboardingDM(discordId, icName)
+async function sendOnboardingDM(discordId, icName) {
+  if (!discordId || !BOT_TOKEN()) return;
+  try {
+    const dmChannel = await axios.post(
+      'https://discord.com/api/v10/users/@me/channels',
+      { recipient_id: discordId },
+      { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
+    );
+    const channelId = dmChannel.data.id;
+
+    const zpravy = [
+      `Vítejte v Albionu${icName ? `, ${icName}` : ''}! Jsem Evelyn Ashcroft a starám se o administrativní chod organizace — ceník, sklad, garáž a spoustu dalšího najdete na webovém rozhraní.`,
+      `Pár tipů na začátek: aktuální ceník najdete v sekci **Ceník** na webu (i jako \`/cenik\` zde na Discordu). Zápisy do skladu (zbraně, weed, drogy, chemikálie) se dělají výhradně přes web — Discord slouží jako živá kronika toho, co se v organizaci děje.`,
+      `Pokud si nebudete s něčím jistí, obraťte se na Senior Membera nebo výše — a přeji vám v organizaci mnoho úspěchů.`,
+    ];
+
+    for (const text of zpravy) {
+      await axios.post(
+        `https://discord.com/api/v10/channels/${channelId}/messages`,
+        { content: text },
+        { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
+      );
+      await new Promise(r => setTimeout(r, 1200)); // krátká pauza mezi zprávami, ať to nepůsobí jako spam
+    }
+  } catch (err) {
+    console.error('[DISCORD] Onboarding DM selhalo (uživatel může mít vypnuté DM):', err.response?.data || err.message);
+  }
+}
+
 async function sendAnnouncement(title, content, uzivatel) {
   const channelId = process.env.CHANNEL_OZNAMENI;
   if (!channelId) return;
@@ -503,4 +664,4 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyAudit, checkNizkaZasoba, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
