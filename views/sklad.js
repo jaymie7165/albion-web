@@ -487,6 +487,14 @@ function renderDashboard(req, data) {
       <div class="folio-rule tight"></div>
       <div class="panel-list-label">Vlastní přidané položky</div>
       <div id="katalog-list" style="max-height:180px;overflow:auto"></div>
+      <div class="folio-rule tight" id="prah-oddelovac" style="display:none"></div>
+      <div id="prah-sekce" style="display:none">
+        <div class="panel-list-label">Práh nízkých zásob (upozornění na Discordu)</div>
+        <div style="display:flex;gap:0.6rem;align-items:flex-end">
+          <div class="form-group" style="margin-bottom:0;flex:1"><label>Počet kusů</label><input type="number" id="prah-hodnota" min="0" placeholder="např. 10"></div>
+          <button class="btn-submit" onclick="ulozPrah()" style="flex:0 0 auto">Uložit</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -885,16 +893,43 @@ function renderDashboard(req, data) {
     }
     window.saveCenik=saveCenik;
 
+    // Sekce se skladovým prahem — jen pro kategorie, které nízké zásoby hlídají
+    const PRAH_SEKCE = { zbrane:'zbrane', weed:'weed', drogy:'drogy', chemky:'chemky' };
+
     // ── SPRÁVA KATALOGU POLOŽEK ──
-    function openKatalogModal(kategorie){
+    async function openKatalogModal(kategorie){
       document.getElementById('katalog-kategorie').value=kategorie;
       document.getElementById('katalog-polozka').value='';
       renderKatalogList();
+      await nactiPrahProKategorii();
       document.getElementById('katalogModal').classList.add('open');
     }
     window.openKatalogModal=openKatalogModal;
     function closeKatalogModal(){document.getElementById('katalogModal').classList.remove('open');}
     window.closeKatalogModal=closeKatalogModal;
+    async function nactiPrahProKategorii(){
+      const kat=document.getElementById('katalog-kategorie').value;
+      const sekce=PRAH_SEKCE[kat];
+      const oddel=document.getElementById('prah-oddelovac'), sekcePrah=document.getElementById('prah-sekce');
+      if(!sekce){oddel.style.display='none';sekcePrah.style.display='none';return;}
+      oddel.style.display='';sekcePrah.style.display='';
+      try{
+        const res=await fetch('/api/thresholds');
+        const data=await res.json();
+        document.getElementById('prah-hodnota').value=(data.prahy&&data.prahy[sekce]!=null)?data.prahy[sekce]:'';
+      }catch{}
+    }
+    async function ulozPrah(){
+      const kat=document.getElementById('katalog-kategorie').value;
+      const sekce=PRAH_SEKCE[kat];
+      const prah=document.getElementById('prah-hodnota').value;
+      if(!sekce)return;
+      const res=await fetch('/api/thresholds',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sekce,prah})});
+      const data=await res.json();
+      if(data.ok)showToast('Práh nízkých zásob uložen');
+      else showToast(data.error||'Chyba',true);
+    }
+    window.ulozPrah=ulozPrah;
     function renderKatalogList(){
       const kat=document.getElementById('katalog-kategorie').value;
       const items=KATALOG[kat]||[];
@@ -907,7 +942,7 @@ function renderDashboard(req, data) {
         '</div>'
       ).join('');
     }
-    document.getElementById('katalog-kategorie').addEventListener('change',renderKatalogList);
+    document.getElementById('katalog-kategorie').addEventListener('change',()=>{renderKatalogList();nactiPrahProKategorii();});
     async function submitKatalog(){
       const kategorie=document.getElementById('katalog-kategorie').value;
       const polozka=document.getElementById('katalog-polozka').value.trim();
