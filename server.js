@@ -33,7 +33,6 @@ const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
-const { renderSpisy } = require('./views/spis');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -174,109 +173,6 @@ function loadGarage() {
 function saveGarage(cars) {
   try { fs.writeFileSync(GARAGE_FILE, JSON.stringify(cars, null, 2)); } catch (e) { console.error('[GARAGE]', e.message); }
 }
-
-// ── OSOBNÍ SPISY ČLENŮ — tajné poznámky, jen Founder/Council ────────────────
-const DOSSIERS_FILE = path.join(DATA_DIR, 'dossiers.json');
-function loadDossiers() { try { return JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')) || {}; } catch { return {}; } }
-function saveDossiers(d) { try { fs.writeFileSync(DOSSIERS_FILE, JSON.stringify(d, null, 2)); } catch (e) { console.error('[DOSSIERS]', e.message); } }
-
-app.get('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
-  const all = loadDossiers();
-  const entry = all[req.params.icName] || { notes: '', updatedAt: null, updatedBy: null };
-  res.json({ ok: true, dossier: entry });
-});
-app.post('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
-  const notes = sanitizeText(req.body.notes, 5000) || '';
-  const all = loadDossiers();
-  all[req.params.icName] = { notes, updatedAt: new Date().toISOString(), updatedBy: req.session.icName };
-  saveDossiers(all);
-  res.json({ ok: true });
-});
-
-// ── VZTAHY MEZI ČLENY — mentor/rodina/spojenec/rival, vidí všichni ──────────
-const RELATIONSHIPS_FILE = path.join(DATA_DIR, 'relationships.json');
-function loadRelationships() { try { return JSON.parse(fs.readFileSync(RELATIONSHIPS_FILE, 'utf8')) || []; } catch { return []; } }
-function saveRelationships(r) { try { fs.writeFileSync(RELATIONSHIPS_FILE, JSON.stringify(r, null, 2)); } catch (e) { console.error('[VZTAHY]', e.message); } }
-const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival'];
-
-app.get('/api/vztahy', requireAuth, (req, res) => res.json({ ok: true, vztahy: loadRelationships() }));
-app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
-  const a = sanitizeText(req.body.a, 80), b = sanitizeText(req.body.b, 80);
-  const typ = (req.body.typ || '').toString();
-  const note = req.body.note ? sanitizeText(req.body.note, 200) : '';
-  if (!a || !b) return res.json({ ok: false, error: 'Vyplň obě jména' });
-  if (!VZTAH_TYPY.includes(typ)) return res.json({ ok: false, error: 'Neplatný typ vztahu' });
-  const list = loadRelationships();
-  list.push({ id: `vz_${Date.now()}_${Math.floor(Math.random()*1e6)}`, a, b, typ, note: note || '', createdBy: req.session.icName, createdAt: Date.now() });
-  saveRelationships(list);
-  res.json({ ok: true });
-});
-app.delete('/api/vztahy/:id', requireAuth, requireAccess('spis'), (req, res) => {
-  let list = loadRelationships();
-  const before = list.length;
-  list = list.filter(v => v.id !== req.params.id);
-  if (list.length === before) return res.json({ ok: false, error: 'Vztah nenalezen' });
-  saveRelationships(list);
-  res.json({ ok: true });
-});
-
-// ── CONTINENTAL LEDGER — dluhy stylem "Continental": komu/co/kolik/kdy,
-// s voskovou pečetí při vyrovnání. Dva směry: co dluží nám, co dlužíme my. ──
-const CONTINENTAL_FILE = path.join(DATA_DIR, 'continental.json');
-function loadContinental() { try { return JSON.parse(fs.readFileSync(CONTINENTAL_FILE, 'utf8')) || []; } catch { return []; } }
-function saveContinental(d) { try { fs.writeFileSync(CONTINENTAL_FILE, JSON.stringify(d, null, 2)); } catch (e) { console.error('[CONTINENTAL]', e.message); } }
-
-app.get('/api/continental', requireAuth, requireAccess('blackbook'), (req, res) => {
-  res.json({ ok: true, entries: loadContinental().sort((a,b) => (b.createdAt||0)-(a.createdAt||0)) });
-});
-app.post('/api/continental', requireAuth, requireAccess('blackbook'), (req, res) => {
-  const smer = (req.body.smer || '').toString();
-  const osoba = sanitizeText(req.body.osoba, 80);
-  const duvod = sanitizeText(req.body.duvod, 300);
-  const hodnota = parseFloat(req.body.hodnota);
-  const valuta = (req.body.valuta || 'USD').toString().toUpperCase();
-  const splatnost = req.body.splatnost ? sanitizeText(req.body.splatnost, 40) : null;
-
-  if (!['dluzi_nam', 'dluzime'].includes(smer)) return res.json({ ok: false, error: 'Neplatný směr dluhu' });
-  if (!osoba) return res.json({ ok: false, error: 'Vyplň jméno osoby/frakce' });
-  if (!duvod) return res.json({ ok: false, error: 'Vyplň za co je dluh' });
-  if (!isAmount(hodnota, 50_000_000)) return res.json({ ok: false, error: 'Neplatná hodnota dluhu' });
-  if (!inEnum(valuta, VALUTY)) return res.json({ ok: false, error: 'Neplatná valuta' });
-
-  const list = loadContinental();
-  const entry = {
-    id: `cont_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
-    smer, osoba, duvod, hodnota, valuta, splatnost,
-    settled: false, settledAt: null, settledBy: null,
-    createdBy: req.session.icName, createdAt: Date.now(),
-    createdAtText: sheets.timestamp ? sheets.timestamp() : new Date().toLocaleString('cs-CZ'),
-  };
-  list.push(entry);
-  saveContinental(list);
-  broadcastSSE('continentalUpdate', { action: 'add' });
-  res.json({ ok: true, entry });
-});
-app.post('/api/continental/:id/splatit', requireAuth, requireAccess('blackbook'), (req, res) => {
-  const list = loadContinental();
-  const entry = list.find(e => e.id === req.params.id);
-  if (!entry) return res.json({ ok: false, error: 'Záznam nenalezen' });
-  entry.settled = true;
-  entry.settledAt = Date.now();
-  entry.settledBy = req.session.icName;
-  saveContinental(list);
-  broadcastSSE('continentalUpdate', { action: 'settle' });
-  res.json({ ok: true });
-});
-app.delete('/api/continental/:id', requireAuth, requireAccess('blackbook'), (req, res) => {
-  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat záznamy smí jen Founder/Council' });
-  let list = loadContinental();
-  const before = list.length;
-  list = list.filter(e => e.id !== req.params.id);
-  if (list.length === before) return res.json({ ok: false, error: 'Záznam nenalezen' });
-  saveContinental(list);
-  broadcastSSE('continentalUpdate', { action: 'remove' });
-  res.json({ ok: true });
-});
 
 // ── SKLAD — CENÍK (výkupní/prodejní ceny, editovatelné jen Founder/Council) ──
 const CENIK_FILE = path.join(DATA_DIR, 'cenik.json');
@@ -454,6 +350,46 @@ async function checkPenizeMilestone() {
     if (zmena) saveMilestones(ms);
   } catch (e) { console.error('[MILESTONES] penize:', e.message); }
 }
+
+// ── PRAHY NÍZKÝCH ZÁSOB — konfigurovatelné z webu (bez zásahu do kódu) ──
+const THRESHOLDS_FILE = path.join(DATA_DIR, 'thresholds.json');
+const VYCHOZI_PRAHY = { zbrane: 5, weed: 20, drogy: 10, chemky: 10 };
+
+function loadThresholds() {
+  try {
+    if (!fs.existsSync(THRESHOLDS_FILE)) return { ...VYCHOZI_PRAHY };
+    const d = JSON.parse(fs.readFileSync(THRESHOLDS_FILE, 'utf8'));
+    return { ...VYCHOZI_PRAHY, ...d };
+  } catch { return { ...VYCHOZI_PRAHY }; }
+}
+function saveThresholds(data) {
+  fs.writeFileSync(THRESHOLDS_FILE, JSON.stringify(data, null, 2));
+}
+
+// Pro adminy (Founder/Council) — čtení i zápis přes webové rozhraní (sklad.js)
+app.get('/api/thresholds', requireAuth, (req, res) => {
+  res.json({ ok: true, prahy: loadThresholds() });
+});
+app.put('/api/thresholds', requireAuth, requireAccess('audit'), (req, res) => {
+  const { sekce, prah } = req.body;
+  if (!VYCHOZI_PRAHY.hasOwnProperty(sekce)) return res.json({ ok: false, error: 'Neznámá sekce' });
+  const cislo = parseInt(prah);
+  if (isNaN(cislo) || cislo < 0) return res.json({ ok: false, error: 'Neplatná hodnota prahu' });
+  const prahy = loadThresholds();
+  prahy[sekce] = cislo;
+  saveThresholds(prahy);
+  res.json({ ok: true, prahy });
+});
+
+// Pro bota (samostatná služba, viz /api/bot/garage výše pro stejný vzor) —
+// bot si prahy stahuje odsud, aby je mohl zobrazit v progress baru /inventura.
+app.get('/api/bot/thresholds', (req, res) => {
+  const key = req.headers['x-bot-key'];
+  if (!key || key !== process.env.BOT_API_KEY) {
+    return res.status(401).json({ ok: false, error: 'Neautorizováno' });
+  }
+  res.json({ ok: true, prahy: loadThresholds() });
+});
 
 // Uloží base64 obrázek (data URL) na disk a vrátí veřejnou cestu, nebo null při chybě/neplatném vstupu.
 const { addWatermark } = require('./watermark');
@@ -649,6 +585,8 @@ app.post('/register/complete', async (req, res) => {
   try {
     db.prepare('INSERT INTO users (discord_id, discord_username, ic_name, password_hash) VALUES (?, ?, ?, ?)').run(dUser.id, dUser.username, ic_name, hash);
     req.session.pendingDiscord = null;
+    discord.notifyPersonalni('nastup', ic_name, `Discord: @${dUser.username}`).catch(() => {});
+    discord.sendOnboardingDM(dUser.id, ic_name).catch(() => {});
     res.redirect('/login?success=registered');
   } catch { res.redirect('/register/complete?error=exists'); }
 });
@@ -1036,11 +974,12 @@ app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) =>
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Zbraně', [cas, typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe || '-']);
   await discord.notifyZbrane(typUp, polozkaTrim, qty, kategorie, uzivatel, ucelSafe, req.session.accessLevel);
-  sheets.getStockSummary('Zbraně').then(stav => discord.checkNizkaZasoba('zbrane', polozkaTrim, typUp, qty, stav[polozkaTrim])).catch(() => {});
+  sheets.getStockSummary('Zbraně').then(stav => discord.checkNizkaZasoba('zbrane', polozkaTrim, typUp, qty, stav[polozkaTrim], loadThresholds().zbrane)).catch(() => {});
   checkStockMilestone('zbrane', 'Zbraně').catch(() => {});
   await discord.notifyAudit('Zbraně', uzivatel, discordUser, `${typUp} — ${polozkaTrim} (${qty} ks) [${kategorie}]${ucelSafe ? ' | Účel: ' + ucelSafe : ''}`);
   broadcastSSE('skladUpdate', { sekce: 'zbrane', typ: typUp, polozka: polozkaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+  if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
   res.json({ ok: true });
 });
 
@@ -1060,11 +999,12 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Weed', [cas, typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel]);
   await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel, req.session.accessLevel);
-  sheets.getStockSummary('Weed').then(stav => discord.checkNizkaZasoba('weed', odruda_trim, typUp, qty, stav[odruda_trim])).catch(() => {});
+  sheets.getStockSummary('Weed').then(stav => discord.checkNizkaZasoba('weed', odruda_trim, typUp, qty, stav[odruda_trim], loadThresholds().weed)).catch(() => {});
   checkStockMilestone('weed', 'Weed').catch(() => {});
   await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
   broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+  if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
   res.json({ ok: true, celkVyroba: ceny.vyroba * qty, celkProdej: ceny.prodej * qty });
 });
 
@@ -1083,11 +1023,12 @@ app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => 
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Drogy', [cas, typUp, drogaTrim, qty, '-', '-', uzivatel]);
   await discord.notifyDrogy(typUp, drogaTrim, qty, undefined, undefined, uzivatel, req.session.accessLevel);
-  sheets.getStockSummary('Drogy').then(stav => discord.checkNizkaZasoba('drogy', drogaTrim, typUp, qty, stav[drogaTrim])).catch(() => {});
+  sheets.getStockSummary('Drogy').then(stav => discord.checkNizkaZasoba('drogy', drogaTrim, typUp, qty, stav[drogaTrim], loadThresholds().drogy)).catch(() => {});
   checkStockMilestone('drogy', 'Drogy').catch(() => {});
   await discord.notifyAudit('Drogy', uzivatel, discordUser, `${typUp} — ${drogaTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'drogy', typ: typUp, droga: drogaTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+  if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
   res.json({ ok: true });
 });
 
@@ -1129,11 +1070,12 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   const discordUser = req.session.discordUsername;
   await sheets.appendRow('Chemky', [cas, typUp, chemikalieTrim, qty, uzivatel]);
   await discord.notifyChemky(typUp, chemikalieTrim, qty, uzivatel, req.session.accessLevel);
-  sheets.getStockSummary('Chemky').then(stav => discord.checkNizkaZasoba('chemky', chemikalieTrim, typUp, qty, stav[chemikalieTrim])).catch(() => {});
+  sheets.getStockSummary('Chemky').then(stav => discord.checkNizkaZasoba('chemky', chemikalieTrim, typUp, qty, stav[chemikalieTrim], loadThresholds().chemky)).catch(() => {});
   checkStockMilestone('chemky', 'Chemky').catch(() => {});
   await discord.notifyAudit('Chemky', uzivatel, discordUser, `${typUp} — ${chemikalieTrim} (${qty} ks)`);
   broadcastSSE('skladUpdate', { sekce: 'chemky', typ: typUp, chemikalie: chemikalieTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+  if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
   res.json({ ok: true });
 });
 
@@ -1223,6 +1165,7 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
   await discord.notifyAudit(cfg.sheet, uzivatel, discordUser, `${typUp} (HROMADNĚ ×${validated.length}) — ${shrnuti}`);
   broadcastSSE('skladUpdate', { sekce, typ: typUp, polozka: `${validated.length} položek`, qty: validated.reduce((a,v)=>a+v.qty,0), uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+  if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
 
   res.json({ ok: true, count: validated.length });
 });
@@ -1615,8 +1558,7 @@ app.get('/api/stats', requireAuth, requireAccess('statistiky'), async (req, res)
       else                  { if (valuta === 'USD') s.vydaj_usd += castka; else s.vydaj_pesos += castka; }
     }
 
-    const elite = allUsers.filter(u => (u.access_level || 3) === 1).map(u => u.ic_name);
-    res.json({ ok: true, stats, elite });
+    res.json({ ok: true, stats });
   } catch (e) {
     console.error('[STATS]', e);
     res.json({ ok: false, stats: {} });
@@ -1780,8 +1722,7 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
 
     events.sort((a, b) => parseCas(b.cas) - parseCas(a.cas));
 
-    const elite = allUsersAudit.filter(u => (u.access_level || 3) === 1).map(u => u.ic_name);
-    res.json({ ok: true, events: events.slice(0, 200), ucetSouhrn, elite });
+    res.json({ ok: true, events: events.slice(0, 200), ucetSouhrn });
   } catch (e) {
     console.error('[AUDIT]', e);
     res.json({ ok: false, events: [], ucetSouhrn: {} });
@@ -1878,113 +1819,6 @@ app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (
     }
     res.json({ ok:true, income, expense, net: income-expense, ops });
   } catch(e){ res.json({ ok:false }); }
-});
-
-// ── API — EVELYN ASHCROFT: KONTEXTOVÝ BRÍFINK DLE STRÁNKY ──────────────────
-// Sekretářka Albionu — místo jedné náhodné hlášky teď sestaví krátkou
-// "e-mailovou" zprávu podle toho, na jaké stránce se člen právě nachází
-// a co dané datové zdroje reálně obsahují (nízké zásoby, dorostlé odpočty
-// weedu, stav pokladny, nevyrovnané dluhy v Continental knize…).
-app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
-  const page = (req.query.page || 'home').toString();
-  const accessLevel = req.session.accessLevel || 3;
-  const hodina = new Date().getHours();
-  const pozdrav = hodina>=5&&hodina<10?'Dobré ráno':hodina>=10&&hodina<18?'Dobrý den':hodina>=18&&hodina<23?'Dobrý večer':'Dobrou noc';
-
-  const lines = [];
-  const tips = [];
-  const actions = [];
-
-  try {
-    if ((page === 'sklad' || page === 'home') && canAccess(accessLevel, 'sklad')) {
-      const PRAHY = { 'Zbraně': 5, 'Weed': 20, 'Drogy': 10, 'Chemky': 10 };
-      for (const [sheet, prah] of Object.entries(PRAHY)) {
-        try {
-          const stav = await sheets.getStockSummary(sheet);
-          Object.entries(stav).forEach(([item, q]) => {
-            if (q > 0 && q < prah) tips.push(`${item} (${sheet}) — už jen ${q} ks, pod hranicí ${prah}.`);
-          });
-        } catch (e) {}
-      }
-      lines.push(tips.length ? 'Při kontrole skladu jsem narazila na pár položek, které se blíží vyprodání.' : 'Sklad jsem prošla — žádná položka aktuálně nehrozí vyprodáním.');
-      actions.push({ label: 'Otevřít sklad', href: '/sklad' });
-    }
-
-    if (page === 'weed-sazeni' || page === 'home') {
-      try {
-        const timers = loadWeedTimers();
-        const now = Date.now();
-        const hotove = timers.filter(t => t.endsAt <= now).length;
-        const bezici = timers.length - hotove;
-        if (hotove > 0) {
-          tips.push(`${hotove} odpočet(y) sázení už dorostly a čekají na sklizeň.`);
-          actions.push({ label: 'Weed sázení', href: '/weed-sazeni' });
-        } else if (bezici > 0) {
-          lines.push(`Právě běží ${bezici} odpočet(y) sázení.`);
-        }
-      } catch (e) {}
-    }
-
-    if ((page === 'blackbook' || page === 'profit-centrum' || page === 'home') && canAccess(accessLevel, 'blackbook')) {
-      try {
-        const acc = await sheets.getAccountingSummary();
-        lines.push(`Pokladna organizace aktuálně stojí na $${Math.round(acc.usd).toLocaleString('cs-CZ')} a ₱${Math.round(acc.pesos).toLocaleString('cs-CZ')}.`);
-        actions.push({ label: 'Profit centrum', href: '/profit-centrum' });
-      } catch (e) {}
-      try {
-        const cont = loadContinental().filter(c => !c.settled);
-        if (cont.length) {
-          tips.push(`V Continental knize je ${cont.length} nevyrovnaných záznamů.`);
-          actions.push({ label: 'Blackbook', href: '/blackbook' });
-        }
-      } catch (e) {}
-    }
-
-    if (page === 'garaz' || page === 'home') {
-      try {
-        const cars = loadGarage();
-        if (cars.length) lines.push(`Vozový park čítá aktuálně ${cars.length} vozidel.`);
-        actions.push({ label: 'Garáž', href: '/garaz' });
-      } catch (e) {}
-    }
-
-    if (page === 'nastenska') {
-      lines.push('Nástěnka se synchronizuje s Discordem každých 30 sekund — nic vám neuteče.');
-      actions.push({ label: 'Nástěnka', href: '/nastenska' });
-    }
-
-    if (['kodex', 'lore', 'hierarchy'].includes(page)) {
-      lines.push('Pokud si nejste jistí postupem, kodex a hierarchie jsou tu přesně pro tyto chvíle.');
-      actions.push({ label: 'Otevřít stránku', href: '/' + page });
-    }
-
-    if (page === 'audit' || page === 'statistiky') {
-      lines.push('Kompletní historii najdete zde — klidně použijte vyhledávání pro rychlejší orientaci.');
-      actions.push({ label: page === 'audit' ? 'Otevřít audit' : 'Otevřít statistiky', href: '/' + page });
-    }
-
-    try {
-      const season = loadSeason();
-      if (season === 'vanoce') lines.push('Přes svátky je to tu v kanceláři výjimečně klidné.');
-      else if (season === 'halloween') lines.push('Dnešní noc na Discordu je... neklidnější než obvykle.');
-      else if (season === 'novy-rok') lines.push('Nový rok, nové účty — začínáme na nule.');
-    } catch (e) {}
-  } catch (e) {
-    console.error('[EVELYN BRIEF]', e.message);
-  }
-
-  if (!lines.length && !tips.length) {
-    lines.push('Vše je v pořádku, žádné naléhavé záležitosti k řešení.');
-  }
-  actions.push({ label: 'Profil', href: '/profil' });
-
-  res.json({
-    ok: true,
-    subject: `${pozdrav}, ${req.session.icName || 'člene'}.`,
-    lines,
-    tips: tips.slice(0, 5),
-    actions: actions.slice(0, 4),
-  });
 });
 
 // ── API — PROFIL: PROMOTIONS, ACHIEVEMENTY, ONBOARDING ─────────────────────
@@ -2642,10 +2476,6 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
-app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
-  const members = db.prepare('SELECT ic_name FROM users WHERE ic_name IS NOT NULL ORDER BY ic_name ASC').all().map(u => u.ic_name);
-  res.send(renderSpisy(req, members));
-});
 app.get('/galerie', requireAuth, (req, res) => {
   if (req.session.isAssociate) return res.status(403).send('Galerie je dostupná od hodnosti Member. <a href="/home">Zpět</a>');
   res.send(renderGallery(req));
