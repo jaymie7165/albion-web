@@ -33,10 +33,16 @@ function checkActionAchievements(userId, totalActsForUser) {
   if (totalActsForUser === 100) grant(userId, 'hundred_ops');
 }
 
+// Voláno POUZE po VKLADU do skladu (ne po výběru) — logistics odznak
+// sleduje konkrétně počet vkladů, ne všechny akce obecně.
+function checkDepositAchievements(userId, totalDepositsForUser) {
+  if (totalDepositsForUser === 50) grant(userId, 'logistics');
+}
+
 function checkTenureAchievements(userId, createdAtIso) {
   const days = (Date.now() - new Date(createdAtIso).getTime()) / 86400000;
   if (days >= 30) grant(userId, 'first_month');
   if (days >= 180) grant(userId, 'veteran');
 }
 
-module.exports = { ACHIEVEMENTS, checkActionAchievements, checkTenureAchievements };
+module.exports = { ACHIEVEMENTS, checkActionAchievements, checkDepositAchievements, checkTenureAchievements };
