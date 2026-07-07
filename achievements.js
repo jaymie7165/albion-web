@@ -3,11 +3,11 @@ const db = require('./db');
 const discord = require('./discord');
 
 const ACHIEVEMENTS = {
-  first_action:   { label: 'První čin',     desc: 'Provedl první zápis do systému' },
-  hundred_ops:    { label: '100 operací',   desc: 'Dosáhl 100 zápisů celkem' },
-  first_month:    { label: 'První měsíc',   desc: 'Členem organizace déle než 30 dní' },
-  veteran:        { label: 'Veterán',       desc: 'Členem organizace déle než 180 dní' },
-  logistics:      { label: 'Logistika',     desc: 'Více než 50 vkladů do skladu' },
+  first_action:   { label: 'První čin',     desc: 'Provedl první zápis do systému', icon: '✒' },
+  hundred_ops:    { label: '100 operací',   desc: 'Dosáhl 100 zápisů celkem', icon: '⚙' },
+  first_month:    { label: 'První měsíc',   desc: 'Členem organizace déle než 30 dní', icon: '☾' },
+  veteran:        { label: 'Veterán',       desc: 'Členem organizace déle než 180 dní', icon: '⚔' },
+  logistics:      { label: 'Logistika',     desc: 'Více než 50 vkladů do skladu', icon: '⬡' },
 };
 
 // Udělí odznak. checkTenureAchievements se volá při KAŽDÉM loginu, takže
@@ -34,7 +34,9 @@ function checkActionAchievements(userId, totalActsForUser) {
 }
 
 // Voláno POUZE po VKLADU do skladu (ne po výběru) — logistics odznak
-// sleduje konkrétně počet vkladů, ne všechny akce obecně.
+// sleduje konkrétně počet vkladů, ne všechny akce obecně. Dřív popisek
+// odznaku sliboval "50 vkladů", ale kontrolovalo se to na celkovém počtu
+// akcí (VKLAD i VÝBĚR dohromady) — teď se počítá samostatný čítač vkladů.
 function checkDepositAchievements(userId, totalDepositsForUser) {
   if (totalDepositsForUser === 50) grant(userId, 'logistics');
 }
