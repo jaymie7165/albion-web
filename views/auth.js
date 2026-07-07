@@ -9,6 +9,7 @@ function renderAuth(page, error, data) {
     auth_failed: 'Přihlášení selhalo. Zkus to znovu.',
     not_found: 'Záznam nenalezen.',
     wrong_password: 'Špatné heslo.',
+    too_many_attempts: 'Příliš mnoho neúspěšných pokusů. Zkus to znovu za pár minut.',
     missing: 'Vyplň všechna pole.',
     password_mismatch: 'Hesla se neshodují.',
     password_short: 'Heslo musí mít alespoň 6 znaků.',
@@ -251,6 +252,31 @@ function renderAuth(page, error, data) {
       .boot-progress-fill{height:100%;background:linear-gradient(90deg,var(--oxblood),var(--brass));transition:width 0.2s linear;width:0}
       .boot-skip{position:absolute;bottom:24px;right:28px;font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ivory-faint);opacity:0.6}
 
+      /* ── CEREMONIE PŘIJETÍ — pečeť s vyraženým IC jménem po registraci ── */
+      .reg-ceremony{
+        position:fixed;inset:0;z-index:998;background:rgba(0,0,0,0.88);
+        display:flex;align-items:center;justify-content:center;
+        opacity:0;pointer-events:none;transition:opacity 0.4s;backdrop-filter:blur(6px);
+      }
+      .reg-ceremony.show{opacity:1;pointer-events:all}
+      .reg-ceremony-stage{text-align:center}
+      .reg-ceremony-seal{
+        width:120px;height:120px;border-radius:50%;margin:0 auto 1.4rem;
+        display:flex;align-items:center;justify-content:center;
+        background:radial-gradient(circle at 35% 30%, var(--oxblood-bright), var(--oxblood) 55%, #4A0D18 100%);
+        box-shadow:0 18px 40px rgba(0,0,0,0.6), inset 0 0 0 3px rgba(0,0,0,0.2);
+        transform:scale(2.2) rotate(-18deg);opacity:0;
+      }
+      .reg-ceremony.slam .reg-ceremony-seal{animation:regSealSlam 0.6s cubic-bezier(0.32,0.04,0.5,1) forwards}
+      @keyframes regSealSlam{
+        0%{opacity:0;transform:scale(2.2) rotate(-18deg)}
+        55%{opacity:1;transform:scale(1.15) rotate(-6deg)}
+        100%{opacity:1;transform:scale(1) rotate(-8deg)}
+      }
+      .reg-ceremony-seal span{font-family:var(--font-label);font-weight:700;font-size:2.2rem;color:rgba(0,0,0,0.3)}
+      .reg-ceremony-name{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.6rem;color:var(--ivory)}
+      .reg-ceremony-sub{font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--brass);margin-top:0.6rem}
+
       /* Responsivita */
       @media(max-width:900px){
         .auth-page{grid-template-columns:1fr;display:flex;flex-direction:column;padding:3rem 0 2.5rem}
@@ -391,6 +417,37 @@ function renderAuth(page, error, data) {
         </form>
       </div>
     </div>
+    <div class="reg-ceremony" id="regCeremony">
+      <div class="reg-ceremony-stage">
+        <div class="reg-ceremony-seal"><span>A</span></div>
+        <div class="reg-ceremony-name" id="regCeremonyName"></div>
+        <div class="reg-ceremony-sub">Zapsán do rejstříku Albionu</div>
+      </div>
+    </div>
+    <script>
+      (function(){
+        var form=document.querySelector('.auth-body form');
+        var overlay=document.getElementById('regCeremony');
+        var nameEl=document.getElementById('regCeremonyName');
+        if(!form||!overlay)return;
+        form.addEventListener('submit', function(e){
+          e.preventDefault();
+          var fd=new FormData(form);
+          var icName=(fd.get('ic_name')||'').toString();
+          fetch(form.action,{method:'POST',body:fd,redirect:'follow'}).then(function(res){
+            var finalUrl=res.url||'';
+            if(finalUrl.indexOf('/login')!==-1 && finalUrl.indexOf('success=registered')!==-1){
+              nameEl.textContent=icName;
+              overlay.classList.add('show');
+              setTimeout(function(){overlay.classList.add('slam');},50);
+              setTimeout(function(){ window.location.href=finalUrl; },1900);
+            } else {
+              window.location.href=finalUrl||form.action;
+            }
+          }).catch(function(){ form.submit(); });
+        });
+      })();
+    </script>
   </body></html>`;
 
   if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head>

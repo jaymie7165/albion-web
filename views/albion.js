@@ -10,6 +10,7 @@ function renderAlbion(req, data) {
   const accessLevel = req.session.accessLevel || 3;
   const can = (id) => canAccess(accessLevel, id);
   const photo = data.photo || '/logo.png';
+  const lastLoginAt = data.lastLoginAt || null;
 
   const hotspots = [
     {
@@ -237,7 +238,7 @@ function renderAlbion(req, data) {
       <div class="a-stat"><span class="lbl">Vzhled</span><b id="stat-weather">—</b></div>
       <div class="a-stat"><span class="lbl">Čas</span><b id="stat-time">--:--</b></div>
       <div class="a-stat"><span class="lbl">Režim</span><b id="stat-mood">Reality</b></div>
-      <div class="a-stat"><span class="lbl">Město</span><b>Živá aktivita</b></div>
+      <div class="a-stat"><span class="lbl">Naposledy tu</span><b>${lastLoginAt ? new Date(lastLoginAt).toLocaleString('cs-CZ',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'poprvé'}</b></div>
     </div>
     <div style="display:flex;gap:0.6rem">
       <button class="a-btn" id="soundBtn" onclick="toggleSound()">🔈 Zapnout zvuk</button>

@@ -573,6 +573,7 @@ function renderDashboard(req, data) {
       }catch(e){}
     }
     function showModal(title,subtitle,details,actionFn){
+      if(window.albionPaper)window.albionPaper();
       document.getElementById('modalTitle').textContent=title;
       document.getElementById('modalSubtitle').textContent=subtitle;
       const dl=document.getElementById('modalDetail');
@@ -649,6 +650,7 @@ function renderDashboard(req, data) {
     let bulkSekce='zbrane',bulkTyp='VKLAD';
 
     function openBulkModal(sekce){
+      if(window.albionPaper)window.albionPaper();
       bulkSekce=sekce;
       document.getElementById('bulk-rows').innerHTML='';
       addBulkRow();
@@ -893,11 +895,12 @@ function renderDashboard(req, data) {
     }
     window.saveCenik=saveCenik;
 
+    // ── SPRÁVA KATALOGU POLOŽEK ──
     // Sekce se skladovým prahem — jen pro kategorie, které nízké zásoby hlídají
     const PRAH_SEKCE = { zbrane:'zbrane', weed:'weed', drogy:'drogy', chemky:'chemky' };
 
-    // ── SPRÁVA KATALOGU POLOŽEK ──
     async function openKatalogModal(kategorie){
+      if(window.albionPaper)window.albionPaper();
       document.getElementById('katalog-kategorie').value=kategorie;
       document.getElementById('katalog-polozka').value='';
       renderKatalogList();
@@ -907,6 +910,19 @@ function renderDashboard(req, data) {
     window.openKatalogModal=openKatalogModal;
     function closeKatalogModal(){document.getElementById('katalogModal').classList.remove('open');}
     window.closeKatalogModal=closeKatalogModal;
+    function renderKatalogList(){
+      const kat=document.getElementById('katalog-kategorie').value;
+      const items=KATALOG[kat]||[];
+      const list=document.getElementById('katalog-list');
+      if(!items.length){list.innerHTML='<div style="color:var(--ivory-faint);font-size:0.8rem;padding:0.5rem 0">Zatím žádné vlastní položky v této kategorii.</div>';return;}
+      list.innerHTML=items.map(i=>
+        '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:0.8rem;gap:0.4rem">'+
+          '<span style="flex:1">'+i.replace(/</g,'&lt;')+'</span>'+
+          '<button type="button" onclick="renameKatalogItem(\\''+kat+'\\',\\''+i.replace(/'/g,"\\\\'")+'\\')" style="background:none;border:1px solid var(--border-brass);color:var(--brass);width:26px;height:26px;cursor:pointer" title="Přejmenovat">✎</button>'+
+          '<button type="button" onclick="removeKatalogItem(\\''+kat+'\\',\\''+i.replace(/'/g,"\\\\'")+'\\')" style="background:none;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);width:26px;height:26px;cursor:pointer">✕</button>'+
+        '</div>'
+      ).join('');
+    }
     async function nactiPrahProKategorii(){
       const kat=document.getElementById('katalog-kategorie').value;
       const sekce=PRAH_SEKCE[kat];
@@ -917,7 +933,7 @@ function renderDashboard(req, data) {
         const res=await fetch('/api/thresholds');
         const data=await res.json();
         document.getElementById('prah-hodnota').value=(data.prahy&&data.prahy[sekce]!=null)?data.prahy[sekce]:'';
-      }catch{}
+      }catch(e){}
     }
     async function ulozPrah(){
       const kat=document.getElementById('katalog-kategorie').value;
@@ -930,18 +946,6 @@ function renderDashboard(req, data) {
       else showToast(data.error||'Chyba',true);
     }
     window.ulozPrah=ulozPrah;
-    function renderKatalogList(){
-      const kat=document.getElementById('katalog-kategorie').value;
-      const items=KATALOG[kat]||[];
-      const list=document.getElementById('katalog-list');
-      if(!items.length){list.innerHTML='<div style="color:var(--ivory-faint);font-size:0.8rem;padding:0.5rem 0">Zatím žádné vlastní položky v této kategorii.</div>';return;}
-      list.innerHTML=items.map(i=>
-        '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:0.8rem">'+
-          '<span>'+i.replace(/</g,'&lt;')+'</span>'+
-          '<button type="button" onclick="removeKatalogItem(\\''+kat+'\\',\\''+i.replace(/'/g,"\\\\'")+'\\')" style="background:none;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);width:26px;height:26px;cursor:pointer">✕</button>'+
-        '</div>'
-      ).join('');
-    }
     document.getElementById('katalog-kategorie').addEventListener('change',()=>{renderKatalogList();nactiPrahProKategorii();});
     async function submitKatalog(){
       const kategorie=document.getElementById('katalog-kategorie').value;
@@ -953,6 +957,15 @@ function renderDashboard(req, data) {
       else showToast(data.error||'Chyba',true);
     }
     window.submitKatalog=submitKatalog;
+    async function renameKatalogItem(kategorie,stara){
+      const nova=prompt('Nový název položky:',stara);
+      if(!nova||nova.trim()===''||nova.trim()===stara)return;
+      const res=await fetch('/api/sklad/katalog',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({kategorie,stara,nova:nova.trim()})});
+      const data=await res.json();
+      if(data.ok){showToast('Položka přejmenována — obnovuji stránku…');setTimeout(()=>location.reload(),1000);}
+      else showToast(data.error||'Chyba',true);
+    }
+    window.renameKatalogItem=renameKatalogItem;
     async function removeKatalogItem(kategorie,polozka){
       if(!confirm('Odebrat položku "'+polozka+'" z katalogu?'))return;
       const res=await fetch('/api/sklad/katalog',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({kategorie,polozka})});

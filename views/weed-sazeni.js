@@ -3,6 +3,7 @@
 const { baseStyles } = require('../styles');
 const { renderNav } = require('../nav');
 const { WEED_PLANT } = require('../constants');
+const { escapeHtml } = require('../utils');
 
 function renderWeedSazeni(req) {
   const icName = req.session.icName;
@@ -139,7 +140,7 @@ function renderWeedSazeni(req) {
       <div class="card">
         <div class="card-header"><span class="card-title">Odpočty růstu</span><span class="card-badge">Sdílené · všichni vidí</span></div>
         <div class="form-row">
-          <div class="form-group"><label>IC jméno</label><input type="text" id="t-icname" value="${icName ? icName.replace(/"/g,'&quot;') : ''}" placeholder="Jméno postavy"></div>
+          <div class="form-group"><label>IC jméno</label><input type="text" id="t-icname" value="${escapeHtml(icName || '')}" placeholder="Jméno postavy"></div>
           <div class="form-group"><label>Postal</label><input type="text" id="t-postal" maxlength="4" inputmode="numeric" placeholder="1234"></div>
         </div>
         <div class="form-group" style="margin-bottom:0.8rem"><label>Počet kytek</label><input type="number" id="t-plants" min="1" value="1"></div>
@@ -192,6 +193,7 @@ function renderWeedSazeni(req) {
       const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);
       return(h>0?h+'h ':'')+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
     }
+    function escT(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
     function renderTimers(){
       const wrap=document.getElementById('timers-list');
       if(!timers.length){wrap.innerHTML=ledgerEmptyHTML('Žádné probíhající odpočty',true);return;}
@@ -199,8 +201,8 @@ function renderWeedSazeni(req) {
         return '<div class="timer-card">'+
           '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">'+
             '<div>'+
-              '<div style="font-family:var(--font-display);font-weight:600;font-style:italic;font-size:0.95rem;color:var(--ivory)">'+t.icName+' <span style="color:var(--ivory-faint);font-size:0.8rem;font-style:normal;font-family:var(--font-mono)">· Postal '+t.postal+'</span></div>'+
-              '<div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.3rem">'+t.plants+' kytek · '+(t.createdBy||'—')+'</div>'+
+              '<div style="font-family:var(--font-display);font-weight:600;font-style:italic;font-size:0.95rem;color:var(--ivory)">'+escT(t.icName)+' <span style="color:var(--ivory-faint);font-size:0.8rem;font-style:normal;font-family:var(--font-mono)">· Postal '+escT(t.postal)+'</span></div>'+
+              '<div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.3rem">'+t.plants+' kytek · '+escT(t.createdBy||'—')+'</div>'+
             '</div>'+
             '<div style="text-align:right">'+
               '<div class="cd-remain" data-ends="'+t.endsAt+'" style="font-family:var(--font-display);font-style:italic;font-size:1.2rem;color:var(--brass)">–</div>'+

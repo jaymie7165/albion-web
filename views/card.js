@@ -21,34 +21,44 @@ function renderCard(req, icName) {
   </main>
   <script>
     let CARD=null;
+    function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
     async function loadCard(){
       const res=await fetch('/api/card/${encodeURIComponent(icName || '')}');
       const d=await res.json();
       const wrap=document.getElementById('card-wrap');
-      if(!d.ok){wrap.innerHTML='<p style="text-align:center;color:var(--ivory-faint)">'+d.error+'</p>';return;}
+      if(!d.ok){wrap.innerHTML='<p style="text-align:center;color:var(--ivory-faint)">'+esc(d.error)+'</p>';return;}
       CARD=d.card;
       const c=CARD;
       const photo=c.ic_photo||c.avatar_url||'/logo.png';
-      wrap.innerHTML='<div class="trading-card tilt-card" id="tradingCardEl" style="position:relative">'+
+      // Rarity/foil dle hodnosti — sběratelská karta má vypadat jinak pro
+      // Founder/Council (zlatá fólie) než pro Senior Member (stříbrná) nebo
+      // řadového člena (obyčejná, bez fólie).
+      const rankStr=(c.rank||'');
+      const foilClass = rankStr.includes('Founder') ? ' card-foil-gold' : (rankStr.includes('Senior') ? ' card-foil-silver' : '');
+      const foilShine = rankStr.includes('Founder') ? '<div class="tc-foil-shine"></div>' : (rankStr.includes('Senior') ? '<div class="tc-foil-shine silver"></div>' : '');
+      const privacyNote = c.private ? '<div style="text-align:center;font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint);margin-top:0.6rem">🔒 Tato karta je nastavena jako skrytá</div>' : '';
+      wrap.innerHTML='<div class="trading-card tilt-card'+foilClass+'" id="tradingCardEl" style="position:relative">'+
+        foilShine+
         '<div class="tilt-glare"></div>'+
         '<div class="tc-header">'+
           '<img class="tc-avatar" src="'+photo+'" crossorigin="anonymous">'+
-          '<div class="tc-name">'+c.ic_name+'</div>'+
-          '<div class="tc-discord">@'+(c.discord_username||'—')+' · '+c.rank+'</div>'+
+          '<div class="tc-name">'+esc(c.ic_name)+'</div>'+
+          '<div class="tc-discord">@'+esc(c.discord_username||'—')+' · '+esc(c.rank)+'</div>'+
         '</div>'+
         '<div class="tc-body">'+
-          '<div class="tc-line"><span>Telefon</span><span>'+(c.phone||'—')+'</span></div>'+
+          '<div class="tc-line"><span>Telefon</span><span>'+esc(c.phone||'—')+'</span></div>'+
           '<div class="tc-line"><span>Datum narození</span><span>'+(c.birthdate?new Date(c.birthdate).toLocaleDateString('cs-CZ'):'—')+'</span></div>'+
-          '<div class="tc-line"><span>Bankovní účet</span><span>'+(c.bank||'—')+'</span></div>'+
+          '<div class="tc-line"><span>Bankovní účet</span><span>'+esc(c.bank||'—')+'</span></div>'+
           '<div class="folio-rule tight"></div>'+
-          '<div class="tc-stat"><span>Hodnost</span><strong>'+c.rank+'</strong></div>'+
+          '<div class="tc-stat"><span>Hodnost</span><strong>'+esc(c.rank)+'</strong></div>'+
           '<div class="tc-stat"><span>Členem od</span><strong>'+new Date(c.created_at).toLocaleDateString('cs-CZ')+'</strong></div>'+
           '<div class="tc-stat"><span>Celkem akcí</span><strong>'+c.action_count+'</strong></div>'+
           '<div class="tc-stat"><span>Povýšení</span><strong>'+c.promotions.length+'×</strong></div>'+
           '<div class="folio-label" style="margin-top:1rem">Odznaky</div>'+
-          '<div class="tc-badges">'+(c.achievements.length?c.achievements.map(a=>'<span class="tc-badge">'+a.id+'</span>').join(''):'<span style="color:var(--ivory-faint);font-size:0.8rem">žádné zatím</span>')+'</div>'+
+          '<div class="tc-badges">'+(c.achievements.length?c.achievements.map(a=>'<span class="tc-badge"><span class="tc-badge-icon">'+esc(a.icon||'★')+'</span>'+esc(a.label||a.id)+'</span>').join(''):'<span style="color:var(--ivory-faint);font-size:0.8rem">žádné zatím</span>')+'</div>'+
         '</div>'+
       '</div>'+
+      privacyNote+
       '<div style="max-width:380px;margin:1.2rem auto 0;display:flex;gap:0.6rem">'+
         '<button class="btn-submit" style="margin-top:0" onclick="exportCardImage(\\'download\\')">Stáhnout jako obrázek</button>'+
         '<button class="btn-submit" style="margin-top:0" onclick="exportCardImage(\\'copy\\')">Zkopírovat obrázek</button>'+
@@ -84,7 +94,11 @@ function renderCard(req, icName) {
       ctx.scale(SCALE,SCALE); // od teď kreslíme v "logických" souřadnicích 440×660, canvas je ale ostrý ve vysokém rozlišení
 
       ctx.fillStyle='#10150F';ctx.fillRect(0,0,W,H);
-      ctx.strokeStyle='#B68A4E';ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
+      const rankStrExp=(c.rank||'');
+      const isGoldExp=rankStrExp.includes('Founder');
+      const isSilverExp=rankStrExp.includes('Senior');
+      ctx.strokeStyle=isGoldExp?'#E0BD7F':(isSilverExp?'#B7AE99':'#B68A4E');
+      ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
 
       const grad=ctx.createLinearGradient(0,0,W,170);
       grad.addColorStop(0,'#6E1423');grad.addColorStop(1,'#4A0D18');
@@ -94,6 +108,18 @@ function renderCard(req, icName) {
       ctx.strokeStyle='#E0BD7F';ctx.lineWidth=1.4;
       ctx.beginPath();ctx.moveTo(14,28);ctx.lineTo(14,14);ctx.lineTo(28,14);ctx.stroke();
       ctx.beginPath();ctx.moveTo(W-28,H-14);ctx.lineTo(W-14,H-14);ctx.lineTo(W-14,H-28);ctx.stroke();
+
+      // Foil/rarity přechod — stejná logika jako živý náhled (#10): zlatá
+      // fólie pro Founder/Council, stříbrná pro Senior Member, žádná pro
+      // řadového člena. Diagonální pásy napříč celou kartou.
+      if(isGoldExp||isSilverExp){
+        const shine=ctx.createLinearGradient(0,0,W,H);
+        const c1=isGoldExp?'rgba(224,189,127,0)':'rgba(183,174,153,0)';
+        const c2=isGoldExp?'rgba(224,189,127,0.35)':'rgba(183,174,153,0.30)';
+        const c3=isGoldExp?'rgba(255,255,255,0.30)':'rgba(255,255,255,0.22)';
+        shine.addColorStop(0,c1);shine.addColorStop(0.45,c2);shine.addColorStop(0.5,c3);shine.addColorStop(0.55,c2);shine.addColorStop(1,c1);
+        ctx.fillStyle=shine;ctx.fillRect(0,0,W,H);
+      }
 
       function drawPhotoAndText(){
         ctx.font='700 26px Georgia';ctx.fillStyle='#EDE6D4';ctx.textAlign='center';

@@ -3,6 +3,7 @@
 const { baseStyles, ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
 const { canAccess } = require('../roles');
+const { escapeHtml } = require('../utils');
 
 function renderHome(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky } = data;
@@ -286,7 +287,7 @@ function renderHome(req, data) {
       <div class="home-eyebrow">Los Santos · Interní rejstřík</div>
       <h1 class="home-title">ALBION</h1>
       <div class="home-title-rule"></div>
-      <p class="home-greeting">${greeting}, <strong>${icName}</strong></p>
+      <p class="home-greeting">${greeting}, <strong>${escapeHtml(icName)}</strong></p>
       <div class="home-meta">
         <span><span class="dot"></span>Otevřeno · ${dateStr}</span>
         <span id="live-clock-hero">--:--:--</span>

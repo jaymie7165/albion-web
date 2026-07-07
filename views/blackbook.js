@@ -252,11 +252,13 @@ function renderBlackbook(req) {
     function contEntryHtml(e){
       const isUs = e.smer === 'dluzime'; // true = my dlužíme (oxblood pečeť), false = dluží nám (mosazná pečeť)
       const sym = e.valuta === 'USD' ? '$' : '₱';
+      const overdue = !e.settled && isContOverdue(e.splatnost);
       return '<div class="cont-entry'+(e.settled?' settled':'')+'">'+
         '<div class="cont-entry-row"><span class="cont-entry-who">'+esc(e.osoba)+'</span>'+
         '<span class="cont-entry-amount" style="color:'+(isUs?'var(--oxblood-bright)':'#6FBF52')+'">'+sym+Math.round(e.hodnota).toLocaleString('cs-CZ')+'</span></div>'+
         '<div class="cont-entry-reason">'+esc(e.duvod)+'</div>'+
         '<div class="cont-entry-meta"><span>'+esc(e.createdAtText||'')+' · zapsal '+esc(e.createdBy||'—')+'</span>'+(e.splatnost?('<span>splatnost: '+esc(e.splatnost)+'</span>'):'')+'</div>'+
+        (overdue ? '<div class="cont-entry-meta" style="color:var(--oxblood-bright);margin-top:0.3rem">⚠ Po splatnosti</div>' : '')+
         (!e.settled ? '<div class="cont-entry-actions">'+
           '<button class="cont-btn-settle" onclick="settleCont(\\''+e.id+'\\')">'+(isUs?'Splatili jsme':'Splaceno')+'</button>'+
           (CAN_MANAGE_CONT?'<button class="cont-btn-del" onclick="delCont(\\''+e.id+'\\')">✕</button>':'')+
@@ -265,12 +267,30 @@ function renderBlackbook(req) {
       '</div>';
     }
 
+    // Rozpoznává běžné české formáty splatnosti ("do 15.7.", "15. 7. 2026",
+    // "15.7.2026") a porovná s dneškem — bez toho by pole "splatnost" bylo
+    // jen text, který systém nikdy nezkontroluje.
+    function isContOverdue(splatnost){
+      if(!splatnost) return false;
+      const s = splatnost.toString().replace(/^do\s+/i,'').trim();
+      const now = new Date();
+      let m = s.match(/^(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})$/);
+      if(m) return new Date(+m[3], +m[2]-1, +m[1], 23, 59, 59).getTime() < now.getTime();
+      m = s.match(/^(\d{1,2})\.\s*(\d{1,2})\.?$/);
+      if(m){
+        const d = new Date(now.getFullYear(), +m[2]-1, +m[1], 23, 59, 59);
+        return d.getTime() < now.getTime();
+      }
+      return false;
+    }
+
     function renderContinental(){
       const owedToUs = contEntries.filter(e => e.smer === 'dluzi_nam');
       const owedByUs  = contEntries.filter(e => e.smer === 'dluzime');
       let h = '<div class="folio-footnote"><strong>Continental rejstřík.</strong> Sem se zapisují dluhy stylem starého řádu — komu, co, kolik a od kdy. Jakmile je vyrovnáno, záznam dostane pečeť a zůstává v knize jako uzavřená služba.</div>';
-      h += '<div class="card" style="margin-bottom:1.6rem">'+
+      h += '<div class="card" style="margin-bottom:1.6rem;overflow:visible">'+
         '<div class="card-header"><span class="card-title">Nový zápis do knihy</span></div>'+
+        '<div class="seal-stamp" id="contCreateSeal"><span>A</span></div>'+
         '<div class="typ-toggle"><button class="typ-btn active-vklad" id="cont-smer-nam" onclick="setContSmer(\\'dluzi_nam\\')">Dluží nám</button>'+
         '<button class="typ-btn" id="cont-smer-my" onclick="setContSmer(\\'dluzime\\')">Dlužíme my</button></div>'+
         '<input type="hidden" id="cont-smer" value="dluzi_nam">'+
@@ -313,7 +333,13 @@ function renderBlackbook(req) {
       if(!osoba || !duvod || !hodnota) return showToast('Vyplň osobu, důvod a hodnotu', true);
       const res = await fetch('/api/continental', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ smer, osoba, duvod, hodnota, valuta, splatnost }) });
       const d = await res.json();
-      if(d.ok){ if(window.albionSealThud) window.albionSealThud(); showToast('Zapsáno do Continental knihy'); loadContinental(); }
+      if(d.ok){
+        const seal=document.getElementById('contCreateSeal');
+        if(seal) seal.classList.add('slam');
+        if(window.albionSealThud) window.albionSealThud();
+        showToast('Zapsáno do Continental knihy');
+        setTimeout(loadContinental, 900); // ať pečeť doběhne, než se formulář znovu vykreslí
+      }
       else showToast(d.error, true);
     }
     window.submitCont = submitCont;

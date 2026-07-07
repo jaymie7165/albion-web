@@ -67,13 +67,35 @@ function renderAudit(req) {
 
   <script>
     let allEvents=[],ucetSouhrn={},activeFilter='vse',searchTerm='',eliteMembers=[];
+    let auditOffset=0,auditTotal=0;
+    const AUDIT_LIMIT=200;
 
     async function loadAudit(){
-      const res=await fetch('/api/audit',{cache:'no-store'});
+      const res=await fetch('/api/audit?limit='+AUDIT_LIMIT+'&offset='+auditOffset,{cache:'no-store'});
       const data=await res.json();
       allEvents=data.events||[];ucetSouhrn=data.ucetSouhrn||{};eliteMembers=data.elite||[];
-      applyAuditFilters();renderUcetSouhrn();
+      auditTotal=data.total||allEvents.length;
+      applyAuditFilters();renderUcetSouhrn();renderAuditPager();
     }
+
+    function renderAuditPager(){
+      let pager=document.getElementById('audit-pager');
+      if(!pager){
+        pager=document.createElement('div');
+        pager.id='audit-pager';
+        pager.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:1rem;font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)';
+        const tableWrap=document.querySelector('.table-wrap');
+        tableWrap.insertAdjacentElement('afterend',pager);
+      }
+      const from=auditOffset+1,to=Math.min(auditOffset+AUDIT_LIMIT,auditTotal);
+      pager.innerHTML =
+        '<button class="modal-btn-cancel" style="padding:0.4rem 0.9rem"'+(auditOffset<=0?' disabled':'')+' onclick="auditPagePrev()">← Novější</button>'+
+        '<span>'+(auditTotal?(from+'–'+to+' z '+auditTotal+' záznamů'):'0 záznamů')+'</span>'+
+        '<button class="modal-btn-cancel" style="padding:0.4rem 0.9rem"'+((auditOffset+AUDIT_LIMIT)>=auditTotal?' disabled':'')+' onclick="auditPageNext()">Starší →</button>';
+    }
+    function auditPagePrev(){ auditOffset=Math.max(0,auditOffset-AUDIT_LIMIT); loadAudit(); }
+    function auditPageNext(){ auditOffset+=AUDIT_LIMIT; loadAudit(); }
+    window.auditPagePrev=auditPagePrev; window.auditPageNext=auditPageNext;
 
     function renderUcetSouhrn(){
       const users=Object.keys(ucetSouhrn);
@@ -85,7 +107,7 @@ function renderAudit(req) {
         const s=ucetSouhrn[uz];
         const netUsd=s.prijem_usd-s.vydaj_usd,netPesos=s.prijem_pesos-s.vydaj_pesos;
         return '<div class="ucet-card">'+
-          '<div class="ucet-card-name">'+uz+'</div>'+
+          '<div class="ucet-card-name">'+esc(uz)+'</div>'+
           (s.prijem_usd||s.vydaj_usd?
             '<div class="ucet-card-row"><span>Příjem USD</span><span style="color:#6FBF52">$'+s.prijem_usd.toLocaleString('cs-CZ')+'</span></div>'+
             '<div class="ucet-card-row"><span>Výdaj USD</span><span style="color:var(--oxblood-bright)">$'+s.vydaj_usd.toLocaleString('cs-CZ')+'</span></div>'+
@@ -96,6 +118,8 @@ function renderAudit(req) {
         '</div>';
       }).join('');
     }
+
+    function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
     function renderTable(events){
       const tbody=document.getElementById('audit-body');
@@ -114,12 +138,12 @@ function renderAudit(req) {
         const badge='<span class="sekce-badge" style="border-color:'+mono.color+';color:'+mono.color+'">'+mono.letter+'</span>';
         const isElite=eliteMembers.includes(e.uzivatel);
         return '<tr'+(isElite?' class="rank-elite"':'')+'>'+
-          '<td style="white-space:nowrap;color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.78rem">'+e.cas+'</td>'+
+          '<td style="white-space:nowrap;color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.78rem">'+esc(e.cas)+'</td>'+
           '<td>'+src+'</td>'+
-          '<td style="display:flex;align-items:center">'+badge+e.sekce+'</td>'+
-          '<td><span class="badge '+typCls+'">'+e.typ+'</span></td>'+
-          '<td style="color:var(--ivory);font-family:var(--font-display);font-style:italic">'+e.uzivatel+(isElite?'<span class="rank-elite-tag">★</span>':'')+'</td>'+
-          '<td style="color:var(--ivory-dim)">'+e.detail+'</td>'+
+          '<td style="display:flex;align-items:center">'+badge+esc(e.sekce)+'</td>'+
+          '<td><span class="badge '+typCls+'">'+esc(e.typ)+'</span></td>'+
+          '<td style="color:var(--ivory);font-family:var(--font-display);font-style:italic">'+esc(e.uzivatel)+(isElite?'<span class="rank-elite-tag">★</span>':'')+'</td>'+
+          '<td style="color:var(--ivory-dim)">'+esc(e.detail)+'</td>'+
         '</tr>';
       }).join('');
     }

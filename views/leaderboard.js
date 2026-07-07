@@ -23,6 +23,7 @@ function renderLeaderboard(req) {
     <div id="lb-list"></div>
   </main>
   <script>
+    function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
     function medalIcon(i){return i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1).padStart(2,'0');}
     async function loadLB(){
       const res=await fetch('/api/leaderboard',{cache:'no-store'});
@@ -33,7 +34,7 @@ function renderLeaderboard(req) {
       const max=d.leaderboard[0].acts||1;
       wrap.innerHTML=d.leaderboard.map((m,i)=>
         '<div class="ledger-bar-row">'+
-          '<span class="ledger-bar-name">'+medalIcon(i)+' '+m.member+'</span>'+
+          '<span class="ledger-bar-name">'+medalIcon(i)+' '+esc(m.member)+'</span>'+
           '<span class="ledger-bar-track"><span class="ledger-bar-fill" style="width:'+Math.max(1.5,(m.acts/max)*100)+'%"></span></span>'+
           '<span class="ledger-bar-val">'+m.acts+' akcí</span>'+
         '</div>'

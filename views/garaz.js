@@ -219,9 +219,10 @@ function renderGaraz(req) {
         ['car-spz','car-cena','car-nazev','car-kupil','car-ucel'].forEach(id=>document.getElementById(id).value='');
         pendingImageData=null;setUploadPreview(null);editingCarId=null;
       }
-      function openCarModal(){resetCarForm();document.getElementById('carModalTitle').textContent='Přidat vůz';document.getElementById('carModalConfirmBtn').textContent='Uložit vůz';document.getElementById('carModal').classList.add('open');}
+      function openCarModal(){if(window.albionPaper)window.albionPaper();resetCarForm();document.getElementById('carModalTitle').textContent='Přidat vůz';document.getElementById('carModalConfirmBtn').textContent='Uložit vůz';document.getElementById('carModal').classList.add('open');}
       function closeCarModal(){document.getElementById('carModal').classList.remove('open');}
       function editCar(id){
+        if(window.albionPaper)window.albionPaper();
         const car=CARS.find(c=>c.id===id);if(!car)return;
         resetCarForm();editingCarId=id;
         document.getElementById('car-spz').value=car.spz||'';

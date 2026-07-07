@@ -167,6 +167,7 @@ function renderHierarchy(req) {
       <button class="btn-submit" onclick="addVztah()">Zapsat vztah</button>
     </div>` : ''}
 
+    <div class="card" id="vztahy-graph-card" style="margin-bottom:1.6rem"><div id="vztahy-graph"></div></div>
     <div id="vztahy-loading" class="ledger-loading">Načítám vztahy…</div>
     <div class="vztah-grid" id="vztahy-grid"></div>
   </main>
@@ -182,7 +183,9 @@ function renderHierarchy(req) {
       if(names.ok){ document.getElementById('vz-members') && (document.getElementById('vz-members').innerHTML = names.names.map(n=>'<option value="'+esc(n)+'">').join('')); }
       const grid = document.getElementById('vztahy-grid');
       const list = vz.vztahy || [];
-      if(!list.length){ grid.innerHTML = ledgerEmptyHTML('Zatím žádné zaznamenané vztahy'); return; }
+      renderGraph(list);
+      if(!list.length){ grid.innerHTML = ledgerEmptyHTML('Zatím žádné zaznamenané vztahy',false,'people'); document.getElementById('vztahy-graph-card').style.display='none'; return; }
+      document.getElementById('vztahy-graph-card').style.display='block';
       grid.innerHTML = list.map(v =>
         '<div class="vztah-card">' +
           (CAN_MANAGE_VZ ? '<button class="vztah-del" onclick="delVztah(\\''+v.id+'\\')">✕</button>' : '') +
@@ -191,6 +194,43 @@ function renderHierarchy(req) {
           (v.note ? '<div class="vztah-note">' + esc(v.note) + '</div>' : '') +
         '</div>'
       ).join('');
+    }
+
+    // Jednoduchá heraldicky laděná síť vztahů — uzly rozmístěné rovnoměrně
+    // po kružnici, hrany barvené dle typu vztahu. Bez závislosti na externí
+    // knihovně (žádný d3/force layout), stačí to na přehlednou orientaci.
+    function renderGraph(list){
+      const wrap=document.getElementById('vztahy-graph');
+      if(!wrap)return;
+      if(!list.length){wrap.innerHTML='';return;}
+      const names=[...new Set(list.flatMap(v=>[v.a,v.b]))];
+      const n=names.length;
+      const W=760,H=420,cx=W/2,cy=H/2,R=Math.min(W,H)/2-60;
+      const pos={};
+      names.forEach((name,i)=>{
+        const ang=(i/n)*Math.PI*2 - Math.PI/2;
+        pos[name]={x:cx+R*Math.cos(ang), y:cy+R*Math.sin(ang)};
+      });
+      const COLORS={mentor:'#E0BD7F',rodina:'#6FBF52',spojenec:'#6FA8C9',rival:'#A33049'};
+      let edges='';
+      list.forEach(v=>{
+        const a=pos[v.a],b=pos[v.b];
+        if(!a||!b)return;
+        edges+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="'+(COLORS[v.typ]||'#888')+'" stroke-width="1.4" opacity="0.75"/>';
+      });
+      let nodes='';
+      names.forEach(name=>{
+        const p=pos[name];
+        nodes+='<g>'+
+          '<circle cx="'+p.x+'" cy="'+p.y+'" r="5" fill="var(--oxblood)" stroke="var(--brass)" stroke-width="1.2"/>'+
+          '<text x="'+p.x+'" y="'+(p.y-10)+'" text-anchor="middle" font-family="Bodoni Moda, serif" font-style="italic" font-size="11" fill="var(--ivory)">'+esc(name)+'</text>'+
+        '</g>';
+      });
+      wrap.innerHTML = '<div class="folio-label" style="margin-bottom:1rem">Síť vztahů</div>'+
+        '<div style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:520px;height:auto;display:block">'+edges+nodes+'</svg></div>'+
+        '<div style="display:flex;gap:1.2rem;flex-wrap:wrap;margin-top:0.8rem;font-family:var(--font-mono);font-size:0.64rem;color:var(--ivory-faint)">'+
+          Object.entries(COLORS).map(([k,c])=>'<span><span style="display:inline-block;width:10px;height:10px;background:'+c+';margin-right:0.4rem;vertical-align:-1px"></span>'+(VZTAH_LABEL[k]||k)+'</span>').join('')+
+        '</div>';
     }
     async function addVztah(){
       const a=document.getElementById('vz-a').value.trim();

@@ -29,22 +29,24 @@ function renderGallery(req) {
   <div class="toast" id="toast"></div>
   <script>
     const CAN_MANAGE=${canManage};
+    function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
     async function loadGallery(){
       const res=await fetch('/api/gallery',{cache:'no-store'});
       const d=await res.json();
       document.getElementById('gal-loading').style.display='none';
       const grid=document.getElementById('gal-grid');
-      if(!d.ok||!d.items.length){grid.innerHTML=ledgerEmptyHTML('Galerie je zatím prázdná');return;}
+      if(!d.ok||!d.items.length){grid.innerHTML=ledgerEmptyHTML('Galerie je zatím prázdná',false,'photo');return;}
       grid.innerHTML=d.items.map(it=>
         '<div class="gal-item">'+(CAN_MANAGE?'<button class="gal-del" onclick="delGalleryItem(&quot;'+it.id+'&quot;)">✕</button>':'')+
         '<img src="'+it.image+'" loading="lazy">'+
-        '<div class="gal-caption">'+(it.caption||'')+'</div>'+
-        '<div class="gal-meta">'+it.pridal+' · '+new Date(it.createdAt).toLocaleDateString('cs-CZ')+'</div>'+
+        '<div class="gal-caption">'+esc(it.caption||'')+'</div>'+
+        '<div class="gal-meta">'+esc(it.pridal)+' · '+new Date(it.createdAt).toLocaleDateString('cs-CZ')+'</div>'+
       '</div>').join('');
     }
     async function uploadGalleryImage(){
       const f=document.getElementById('gal-file').files[0];
       if(!f)return showToast('Vyber soubor',true);
+      if(window.albionPaper)window.albionPaper();
       const reader=new FileReader();
       reader.onload=async()=>{
         const res=await fetch('/api/gallery',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:reader.result,caption:document.getElementById('gal-caption').value})});

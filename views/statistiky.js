@@ -25,13 +25,15 @@ function renderStatistiky(req) {
   </main>
 
   <script>
+    function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
     function renderItemGroup(obj){
       const keys=[...new Set([...Object.keys(obj.vklad||{}),...Object.keys(obj.vyber||{})])];
       if(!keys.length)return '<div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint);padding:0.2rem 0 0.4rem">— žádné záznamy —</div>';
       return keys.map(k=>{
         const v=obj.vklad[k]||0,b=obj.vyber[k]||0;
         return '<div class="stat-row stat-item-group">'+
-          '<span>'+k+'</span>'+
+          '<span>'+esc(k)+'</span>'+
           '<span style="display:flex;gap:0.5rem">'+
             (v?'<strong style="color:#6FBF52">+'+v+'</strong>':'')+
             (b?'<strong style="color:var(--oxblood-bright)">-'+b+'</strong>':'')+
@@ -61,7 +63,7 @@ function renderStatistiky(req) {
           '<div class="stat-card-tab">SPIS č. '+String(idx+1).padStart(3,'0')+'</div>'+
           '<div class="stat-card-header">'+
             '<div>'+
-              '<div class="stat-card-name">'+icName+(isElite?'<span class="rank-elite-tag">Founder/Council</span>':'')+'</div>'+
+              '<div class="stat-card-name">'+esc(icName)+(isElite?'<span class="rank-elite-tag">Founder/Council</span>':'')+'</div>'+
             '</div>'+
           '</div>'+
           (hasZbrane?'<div class="stat-section-label">Zbraně</div>'+renderItemGroup(s.zbrane):'')+
