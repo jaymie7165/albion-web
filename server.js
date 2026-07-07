@@ -9,6 +9,8 @@ const fs      = require('fs');
 
 const db      = require('./db');
 const sheets  = require('./sheets');
+const { escapeHtml, writeJsonAtomic, buildNameMap, normalizeName } = require('./utils');
+const { ACHIEVEMENTS } = require('./achievements');
 
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
@@ -33,6 +35,7 @@ const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
+const { renderSpisy } = require('./views/spis');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -64,9 +67,18 @@ const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 if (!fs.existsSync(SESSIONS_DIR)) { try { fs.mkdirSync(SESSIONS_DIR, { recursive: true }); } catch (e) { console.error('[SESSIONS]', e.message); } }
 const FileStore = require('session-file-store')(session);
 
+// DŮLEŽITÉ: dřív měl SESSION_SECRET fallback na pevný řetězec přímo v kódu
+// ('albion_secret') — kdokoliv se znalostí repa si tak mohl podvrhnout
+// platnou session cookie, pokud proměnná nebyla na Railway nastavená.
+// Appka teď bez explicitně nastaveného tajemství raději vůbec nenaběhne.
+if (!process.env.SESSION_SECRET) {
+  console.error('[FATAL] SESSION_SECRET není nastaven v prostředí — appka se z bezpečnostních důvodů nespustí s výchozím tajemstvím zabudovaným v kódu. Nastav SESSION_SECRET (Railway → Variables) a restartuj.');
+  process.exit(1);
+}
+
 app.use(session({
   store: new FileStore({ path: SESSIONS_DIR, ttl: 30 * 24 * 60 * 60, retries: 1, logFn: () => {} }),
-  secret: process.env.SESSION_SECRET || 'albion_secret',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   rolling: true, // každý request prodlouží platnost cookie — aktivní uživatel nevyprší
@@ -112,7 +124,7 @@ app.post('/api/content/:key', requireAuth, requireAccess('audit'), (req, res) =>
 // ── SEZÓNNÍ VZHLED ──
 const SEASON_FILE = path.join(DATA_DIR, 'season.json');
 function loadSeason() { try { return JSON.parse(fs.readFileSync(SEASON_FILE, 'utf8')).season || 'none'; } catch { return 'none'; } }
-function saveSeason(season) { try { fs.writeFileSync(SEASON_FILE, JSON.stringify({ season })); } catch(e){} }
+function saveSeason(season) { try { writeJsonAtomic(SEASON_FILE, { season }); } catch(e){} }
 
 app.get('/api/season', requireAuth, (req, res) => res.json({ ok: true, season: loadSeason() }));
 app.post('/api/season', requireAuth, requireAccess('audit'), (req, res) => {
@@ -129,7 +141,7 @@ const GALLERY_FILE = path.join(DATA_DIR, 'gallery.json');
 const GALLERY_UPLOADS_DIR = path.join(DATA_DIR, 'gallery-uploads');
 if (!fs.existsSync(GALLERY_UPLOADS_DIR)) { try { fs.mkdirSync(GALLERY_UPLOADS_DIR, { recursive: true }); } catch(e){ console.error('[GALLERY]', e.message); } }
 function loadGallery() { try { return JSON.parse(fs.readFileSync(GALLERY_FILE, 'utf8')) || []; } catch { return []; } }
-function saveGallery(items) { try { fs.writeFileSync(GALLERY_FILE, JSON.stringify(items, null, 2)); } catch(e){ console.error('[GALLERY]', e.message); } }
+function saveGallery(items) { try { writeJsonAtomic(GALLERY_FILE, items); } catch(e){ console.error('[GALLERY]', e.message); } }
 
 app.get('/gallery-uploads/:filename', (req, res) => {
   const safeName = path.basename(req.params.filename);
@@ -156,7 +168,7 @@ function loadWeedTimers() {
   } catch { return []; }
 }
 function saveWeedTimers(timers) {
-  try { fs.writeFileSync(WEED_TIMERS_FILE, JSON.stringify(timers, null, 2)); } catch (e) { console.error('[WEED-TIMERS]', e.message); }
+  try { writeJsonAtomic(WEED_TIMERS_FILE, timers); } catch (e) { console.error('[WEED-TIMERS]', e.message); }
 }
 
 // ── GARÁŽ — vozový park organizace (sdílené pro všechny uživatele) ────────────
@@ -171,8 +183,111 @@ function loadGarage() {
   } catch { return []; }
 }
 function saveGarage(cars) {
-  try { fs.writeFileSync(GARAGE_FILE, JSON.stringify(cars, null, 2)); } catch (e) { console.error('[GARAGE]', e.message); }
+  try { writeJsonAtomic(GARAGE_FILE, cars); } catch (e) { console.error('[GARAGE]', e.message); }
 }
+
+// ── OSOBNÍ SPISY ČLENŮ — tajné poznámky, jen Founder/Council ────────────────
+const DOSSIERS_FILE = path.join(DATA_DIR, 'dossiers.json');
+function loadDossiers() { try { return JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')) || {}; } catch { return {}; } }
+function saveDossiers(d) { try { writeJsonAtomic(DOSSIERS_FILE, d); } catch (e) { console.error('[DOSSIERS]', e.message); } }
+
+app.get('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
+  const all = loadDossiers();
+  const entry = all[req.params.icName] || { notes: '', updatedAt: null, updatedBy: null };
+  res.json({ ok: true, dossier: entry });
+});
+app.post('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
+  const notes = sanitizeText(req.body.notes, 5000) || '';
+  const all = loadDossiers();
+  all[req.params.icName] = { notes, updatedAt: new Date().toISOString(), updatedBy: req.session.icName };
+  saveDossiers(all);
+  res.json({ ok: true });
+});
+
+// ── VZTAHY MEZI ČLENY — mentor/rodina/spojenec/rival, vidí všichni ──────────
+const RELATIONSHIPS_FILE = path.join(DATA_DIR, 'relationships.json');
+function loadRelationships() { try { return JSON.parse(fs.readFileSync(RELATIONSHIPS_FILE, 'utf8')) || []; } catch { return []; } }
+function saveRelationships(r) { try { writeJsonAtomic(RELATIONSHIPS_FILE, r); } catch (e) { console.error('[VZTAHY]', e.message); } }
+const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival'];
+
+app.get('/api/vztahy', requireAuth, (req, res) => res.json({ ok: true, vztahy: loadRelationships() }));
+app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
+  const a = sanitizeText(req.body.a, 80), b = sanitizeText(req.body.b, 80);
+  const typ = (req.body.typ || '').toString();
+  const note = req.body.note ? sanitizeText(req.body.note, 200) : '';
+  if (!a || !b) return res.json({ ok: false, error: 'Vyplň obě jména' });
+  if (!VZTAH_TYPY.includes(typ)) return res.json({ ok: false, error: 'Neplatný typ vztahu' });
+  const list = loadRelationships();
+  list.push({ id: `vz_${Date.now()}_${Math.floor(Math.random()*1e6)}`, a, b, typ, note: note || '', createdBy: req.session.icName, createdAt: Date.now() });
+  saveRelationships(list);
+  res.json({ ok: true });
+});
+app.delete('/api/vztahy/:id', requireAuth, requireAccess('spis'), (req, res) => {
+  let list = loadRelationships();
+  const before = list.length;
+  list = list.filter(v => v.id !== req.params.id);
+  if (list.length === before) return res.json({ ok: false, error: 'Vztah nenalezen' });
+  saveRelationships(list);
+  res.json({ ok: true });
+});
+
+// ── CONTINENTAL LEDGER — dluhy stylem "Continental": komu/co/kolik/kdy,
+// s voskovou pečetí při vyrovnání. Dva směry: co dluží nám, co dlužíme my. ──
+const CONTINENTAL_FILE = path.join(DATA_DIR, 'continental.json');
+function loadContinental() { try { return JSON.parse(fs.readFileSync(CONTINENTAL_FILE, 'utf8')) || []; } catch { return []; } }
+function saveContinental(d) { try { writeJsonAtomic(CONTINENTAL_FILE, d); } catch (e) { console.error('[CONTINENTAL]', e.message); } }
+
+app.get('/api/continental', requireAuth, requireAccess('blackbook'), (req, res) => {
+  res.json({ ok: true, entries: loadContinental().sort((a,b) => (b.createdAt||0)-(a.createdAt||0)) });
+});
+app.post('/api/continental', requireAuth, requireAccess('blackbook'), (req, res) => {
+  const smer = (req.body.smer || '').toString();
+  const osoba = sanitizeText(req.body.osoba, 80);
+  const duvod = sanitizeText(req.body.duvod, 300);
+  const hodnota = parseFloat(req.body.hodnota);
+  const valuta = (req.body.valuta || 'USD').toString().toUpperCase();
+  const splatnost = req.body.splatnost ? sanitizeText(req.body.splatnost, 40) : null;
+
+  if (!['dluzi_nam', 'dluzime'].includes(smer)) return res.json({ ok: false, error: 'Neplatný směr dluhu' });
+  if (!osoba) return res.json({ ok: false, error: 'Vyplň jméno osoby/frakce' });
+  if (!duvod) return res.json({ ok: false, error: 'Vyplň za co je dluh' });
+  if (!isAmount(hodnota, 50_000_000)) return res.json({ ok: false, error: 'Neplatná hodnota dluhu' });
+  if (!inEnum(valuta, VALUTY)) return res.json({ ok: false, error: 'Neplatná valuta' });
+
+  const list = loadContinental();
+  const entry = {
+    id: `cont_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
+    smer, osoba, duvod, hodnota, valuta, splatnost,
+    settled: false, settledAt: null, settledBy: null,
+    createdBy: req.session.icName, createdAt: Date.now(),
+    createdAtText: sheets.timestamp ? sheets.timestamp() : new Date().toLocaleString('cs-CZ'),
+  };
+  list.push(entry);
+  saveContinental(list);
+  broadcastSSE('continentalUpdate', { action: 'add' });
+  res.json({ ok: true, entry });
+});
+app.post('/api/continental/:id/splatit', requireAuth, requireAccess('blackbook'), (req, res) => {
+  const list = loadContinental();
+  const entry = list.find(e => e.id === req.params.id);
+  if (!entry) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  entry.settled = true;
+  entry.settledAt = Date.now();
+  entry.settledBy = req.session.icName;
+  saveContinental(list);
+  broadcastSSE('continentalUpdate', { action: 'settle' });
+  res.json({ ok: true });
+});
+app.delete('/api/continental/:id', requireAuth, requireAccess('blackbook'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat záznamy smí jen Founder/Council' });
+  let list = loadContinental();
+  const before = list.length;
+  list = list.filter(e => e.id !== req.params.id);
+  if (list.length === before) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  saveContinental(list);
+  broadcastSSE('continentalUpdate', { action: 'remove' });
+  res.json({ ok: true });
+});
 
 // ── SKLAD — CENÍK (výkupní/prodejní ceny, editovatelné jen Founder/Council) ──
 const CENIK_FILE = path.join(DATA_DIR, 'cenik.json');
@@ -252,7 +367,7 @@ function loadCenik() {
   } catch { return CENIK_DEFAULT; }
 }
 function saveCenik(data) {
-  try { fs.writeFileSync(CENIK_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('[CENIK]', e.message); }
+  try { writeJsonAtomic(CENIK_FILE, data); } catch (e) { console.error('[CENIK]', e.message); }
 }
 
 // ── SKLAD — KATALOG POLOŽEK (vlastní přidané položky do select-boxů, jen Founder/Council) ──
@@ -267,7 +382,7 @@ function loadKatalog() {
   } catch { return { zbrane: [], naboje: [], akce: [], weed: [], drogy: [], chemky: [] }; }
 }
 function saveKatalog(data) {
-  try { fs.writeFileSync(KATALOG_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('[KATALOG]', e.message); }
+  try { writeJsonAtomic(KATALOG_FILE, data); } catch (e) { console.error('[KATALOG]', e.message); }
 }
 // Sloučení vlastních položek katalogu (přidaných přes Sklad → Spravovat položky) do CONFIG,
 // aby je server-side validace (inList/allowedList) rovnou uznávala bez nutnosti restartu appky.
@@ -295,8 +410,48 @@ function loadMilestones() {
   } catch { return { dosazene: [] }; }
 }
 function saveMilestones(data) {
-  try { fs.writeFileSync(MILESTONES_FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('[MILESTONES]', e.message); }
+  try { writeJsonAtomic(MILESTONES_FILE, data); } catch (e) { console.error('[MILESTONES]', e.message); }
 }
+
+// ── PRAHY NÍZKÝCH ZÁSOB — konfigurovatelné z webu (bez zásahu do kódu) ──
+const THRESHOLDS_FILE = path.join(DATA_DIR, 'thresholds.json');
+const VYCHOZI_PRAHY = { zbrane: 5, weed: 20, drogy: 10, chemky: 10 };
+
+function loadThresholds() {
+  try {
+    if (!fs.existsSync(THRESHOLDS_FILE)) return { ...VYCHOZI_PRAHY };
+    const d = JSON.parse(fs.readFileSync(THRESHOLDS_FILE, 'utf8'));
+    return { ...VYCHOZI_PRAHY, ...d };
+  } catch { return { ...VYCHOZI_PRAHY }; }
+}
+function saveThresholds(data) {
+  try { writeJsonAtomic(THRESHOLDS_FILE, data); } catch (e) { console.error('[THRESHOLDS]', e.message); }
+}
+
+// Pro adminy (Founder/Council) — čtení i zápis přes webové rozhraní (sklad.js)
+app.get('/api/thresholds', requireAuth, (req, res) => {
+  res.json({ ok: true, prahy: loadThresholds() });
+});
+app.put('/api/thresholds', requireAuth, requireAccess('audit'), (req, res) => {
+  const { sekce, prah } = req.body;
+  if (!VYCHOZI_PRAHY.hasOwnProperty(sekce)) return res.json({ ok: false, error: 'Neznámá sekce' });
+  const cislo = parseInt(prah);
+  if (isNaN(cislo) || cislo < 0) return res.json({ ok: false, error: 'Neplatná hodnota prahu' });
+  const prahy = loadThresholds();
+  prahy[sekce] = cislo;
+  saveThresholds(prahy);
+  res.json({ ok: true, prahy });
+});
+
+// Pro bota (samostatná služba, viz /api/bot/garage výše pro stejný vzor) —
+// bot si prahy stahuje odsud, aby je mohl zobrazit v progress baru /inventura.
+app.get('/api/bot/thresholds', (req, res) => {
+  const key = req.headers['x-bot-key'];
+  if (!key || key !== process.env.BOT_API_KEY) {
+    return res.status(401).json({ ok: false, error: 'Neautorizováno' });
+  }
+  res.json({ ok: true, prahy: loadThresholds() });
+});
 
 const SEKCE_LABEL = { zbrane: 'Arzenál', weed: 'Botanický registr', drogy: 'Farmaceutický registr', chemky: 'Laboratorní registr' };
 
@@ -350,46 +505,6 @@ async function checkPenizeMilestone() {
     if (zmena) saveMilestones(ms);
   } catch (e) { console.error('[MILESTONES] penize:', e.message); }
 }
-
-// ── PRAHY NÍZKÝCH ZÁSOB — konfigurovatelné z webu (bez zásahu do kódu) ──
-const THRESHOLDS_FILE = path.join(DATA_DIR, 'thresholds.json');
-const VYCHOZI_PRAHY = { zbrane: 5, weed: 20, drogy: 10, chemky: 10 };
-
-function loadThresholds() {
-  try {
-    if (!fs.existsSync(THRESHOLDS_FILE)) return { ...VYCHOZI_PRAHY };
-    const d = JSON.parse(fs.readFileSync(THRESHOLDS_FILE, 'utf8'));
-    return { ...VYCHOZI_PRAHY, ...d };
-  } catch { return { ...VYCHOZI_PRAHY }; }
-}
-function saveThresholds(data) {
-  fs.writeFileSync(THRESHOLDS_FILE, JSON.stringify(data, null, 2));
-}
-
-// Pro adminy (Founder/Council) — čtení i zápis přes webové rozhraní (sklad.js)
-app.get('/api/thresholds', requireAuth, (req, res) => {
-  res.json({ ok: true, prahy: loadThresholds() });
-});
-app.put('/api/thresholds', requireAuth, requireAccess('audit'), (req, res) => {
-  const { sekce, prah } = req.body;
-  if (!VYCHOZI_PRAHY.hasOwnProperty(sekce)) return res.json({ ok: false, error: 'Neznámá sekce' });
-  const cislo = parseInt(prah);
-  if (isNaN(cislo) || cislo < 0) return res.json({ ok: false, error: 'Neplatná hodnota prahu' });
-  const prahy = loadThresholds();
-  prahy[sekce] = cislo;
-  saveThresholds(prahy);
-  res.json({ ok: true, prahy });
-});
-
-// Pro bota (samostatná služba, viz /api/bot/garage výše pro stejný vzor) —
-// bot si prahy stahuje odsud, aby je mohl zobrazit v progress baru /inventura.
-app.get('/api/bot/thresholds', (req, res) => {
-  const key = req.headers['x-bot-key'];
-  if (!key || key !== process.env.BOT_API_KEY) {
-    return res.status(401).json({ ok: false, error: 'Neautorizováno' });
-  }
-  res.json({ ok: true, prahy: loadThresholds() });
-});
 
 // Uloží base64 obrázek (data URL) na disk a vrátí veřejnou cestu, nebo null při chybě/neplatném vstupu.
 const { addWatermark } = require('./watermark');
@@ -455,7 +570,14 @@ app.get('/api/me/card-data', requireAuth, (req, res) => {
     birthdate: user.card_birthdate || '',
     bank: user.card_bank || '',
     photo: user.card_photo || null,
+    private: !!user.card_private,
   }});
+});
+
+app.post('/api/me/card-privacy', requireAuth, (req, res) => {
+  const { isPrivate } = req.body;
+  db.setCardPrivate(req.session.userId, !!isPrivate);
+  res.json({ ok: true, isPrivate: !!isPrivate });
 });
 
 app.post('/api/me/card-data', requireAuth, async (req, res) => {
@@ -500,6 +622,26 @@ app.get('/api/events', requireAuth, (req, res) => {
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
 });
+
+// ── NAPLÁNOVANÁ OZNÁMENÍ — úložiště + pravidelná kontrola ───────────────────
+const SCHEDULED_ANN_FILE = path.join(DATA_DIR, 'scheduled-announcements.json');
+function loadScheduledAnn() { try { return JSON.parse(fs.readFileSync(SCHEDULED_ANN_FILE, 'utf8')) || []; } catch { return []; } }
+function saveScheduledAnn(list) { try { writeJsonAtomic(SCHEDULED_ANN_FILE, list); } catch (e) { console.error('[SCHEDULED ANN]', e.message); } }
+
+setInterval(async () => {
+  try {
+    const list = loadScheduledAnn();
+    if (!list.length) return;
+    const now = Date.now();
+    const due = list.filter(a => a.publishAt <= now);
+    if (!due.length) return;
+    for (const a of due) {
+      await discord.sendAnnouncement(a.title || 'Oznámení', a.content, a.uzivatel);
+      broadcastSSE('nastenska', { title: a.title || 'Oznámení', content: a.content, uzivatel: a.uzivatel, timestamp: new Date().toISOString() });
+    }
+    saveScheduledAnn(list.filter(a => a.publishAt > now));
+  } catch (e) { console.error('[SCHEDULED ANN TICK]', e.message); }
+}, 30 * 1000);
 
 // ── DISCORD OAUTH ─────────────────────────────────────────────────────────────
 const DISCORD_AUTH_URL = `https://discord.com/api/oauth2/authorize?client_id=${process.env.CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
@@ -585,11 +727,31 @@ app.post('/register/complete', async (req, res) => {
   try {
     db.prepare('INSERT INTO users (discord_id, discord_username, ic_name, password_hash) VALUES (?, ?, ?, ?)').run(dUser.id, dUser.username, ic_name, hash);
     req.session.pendingDiscord = null;
+    discord.notifyRegistrace(ic_name, dUser.username, dUser.id).catch(e => console.error('[REGISTRACE NOTIFY]', e.message));
     discord.notifyPersonalni('nastup', ic_name, `Discord: @${dUser.username}`).catch(() => {});
     discord.sendOnboardingDM(dUser.id, ic_name).catch(() => {});
     res.redirect('/login?success=registered');
   } catch { res.redirect('/register/complete?error=exists'); }
 });
+
+// ── RATE LIMITING PŘIHLÁŠENÍ ─────────────────────────────────────────────────
+// Heslo má jen měkký limit (min. 6 znaků) — bez omezení počtu pokusů by šlo
+// reálně brute-forceovat. Jednoduchý in-memory limiter na klíč IP+Discord účet.
+const loginAttempts = new Map(); // key -> { count, firstAt }
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 10 * 60 * 1000; // 10 minut
+function loginRateLimited(key) {
+  const rec = loginAttempts.get(key);
+  if (!rec || Date.now() - rec.firstAt > LOGIN_WINDOW_MS) return false;
+  return rec.count >= LOGIN_MAX_ATTEMPTS;
+}
+function loginRecordFail(key) {
+  const now = Date.now();
+  const rec = loginAttempts.get(key);
+  if (!rec || now - rec.firstAt > LOGIN_WINDOW_MS) { loginAttempts.set(key, { count: 1, firstAt: now }); return; }
+  rec.count++;
+}
+function loginRecordSuccess(key) { loginAttempts.delete(key); }
 
 app.get('/login/password', (req, res) => {
   if (!req.session.pendingDiscord) return res.redirect('/login');
@@ -600,10 +762,13 @@ app.post('/login/password', async (req, res) => {
   if (!req.session.pendingDiscord) return res.redirect('/login');
   const { password } = req.body;
   const dUser = req.session.pendingDiscord;
+  const rateKey = `${req.ip}:${dUser.id}`;
+  if (loginRateLimited(rateKey)) return res.redirect('/login/password?error=too_many_attempts');
   const user = db.prepare('SELECT * FROM users WHERE discord_id = ?').get(dUser.id);
   if (!user) return res.redirect('/login?error=not_found');
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return res.redirect('/login/password?error=wrong_password');
+  if (!valid) { loginRecordFail(rateKey); return res.redirect('/login/password?error=wrong_password'); }
+  loginRecordSuccess(rateKey);
   req.session.userId = user.id;
   req.session.icName = user.ic_name;
   req.session.discordUsername = user.discord_username;
@@ -680,7 +845,7 @@ function renderProfil(req, user, aliases) {
         <div class="card-header"><span class="card-title">IC jméno</span><span class="card-badge">Zobrazované jméno</span></div>
         <div class="form-group" style="margin-bottom:0.8rem">
           <label>Jméno postavy (IC)</label>
-          <input type="text" id="ic-name-input" value="${(user.ic_name||'').replace(/"/g,'&quot;')}" maxlength="80">
+          <input type="text" id="ic-name-input" value="${escapeHtml(user.ic_name||'')}" maxlength="80">
         </div>
         <button class="btn-submit" onclick="saveIcName()">Uložit IC jméno</button>
       </div>
@@ -699,7 +864,11 @@ function renderProfil(req, user, aliases) {
       <div class="card">
         <div class="card-header"><span class="card-title">Historie povýšení</span><span class="card-badge">Růst v organizaci</span></div>
         <div id="promotions-list"><div class="ledger-loading">Načítám…</div></div>
-        ${!req.session.isAssociate ? `<a href="/karta" class="btn-submit" style="display:block;text-align:center;text-decoration:none;margin-top:1rem">Moje trading karta</a>` : ''}
+        ${!req.session.isAssociate ? `
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);cursor:pointer">
+          <input type="checkbox" id="card-private-toggle" style="width:auto"> Skrýt mou kartu před ostatními členy
+        </label>
+        <a href="/karta" class="btn-submit" style="display:block;text-align:center;text-decoration:none;margin-top:0.8rem">Moje trading karta</a>` : ''}
       </div>
 
       ${req.session.realAccessLevel === 1 ? `
@@ -739,14 +908,15 @@ function renderProfil(req, user, aliases) {
 
     <div style="margin-top:2rem;padding:1rem 1.4rem;background:var(--panel2);border:1px solid var(--border);font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)">
       <strong style="color:var(--brass)">Tvůj profil:</strong>
-      &nbsp;IC: <strong style="color:var(--ivory)">${user.ic_name||'—'}</strong>
-      &nbsp;·&nbsp; Discord: <strong style="color:var(--ivory)">${user.discord_username||'—'}</strong>
-      &nbsp;·&nbsp; ID: <strong style="color:var(--ivory)">${user.discord_id||'—'}</strong>
+      &nbsp;IC: <strong style="color:var(--ivory)">${escapeHtml(user.ic_name||'—')}</strong>
+      &nbsp;·&nbsp; Discord: <strong style="color:var(--ivory)">${escapeHtml(user.discord_username||'—')}</strong>
+      &nbsp;·&nbsp; ID: <strong style="color:var(--ivory)">${escapeHtml(user.discord_id||'—')}</strong>
     </div>
   </main>
 
   <script>
     let aliases = ${aliasesJson};
+    function escHtml(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
     function renderAliases() {
       const list = document.getElementById('aliases-list');
@@ -756,7 +926,7 @@ function renderProfil(req, user, aliases) {
       }
       list.innerHTML = aliases.map((a, i) =>
         '<div style="display:flex;justify-content:space-between;align-items:center;padding:0.45rem 0;border-bottom:1px solid var(--border)">' +
-        '<span style="font-family:var(--font-mono);font-size:0.84rem;color:var(--ivory)">' + a + '</span>' +
+        '<span style="font-family:var(--font-mono);font-size:0.84rem;color:var(--ivory)">' + escHtml(a) + '</span>' +
         '<button onclick="removeAlias(' + i + ')" style="background:none;border:none;color:var(--oxblood-bright);cursor:pointer;font-size:0.8rem;font-family:var(--font-label);letter-spacing:0.08em">✕ odebrat</button>' +
         '</div>'
       ).join('');
@@ -823,6 +993,15 @@ function renderProfil(req, user, aliases) {
       document.getElementById('card-birthdate').value=d.data.birthdate||'';
       document.getElementById('card-bank').value=d.data.bank||'';
       if(d.data.photo)setCardPhotoPreview(d.data.photo);
+      const cpt=document.getElementById('card-private-toggle');
+      if(cpt){
+        cpt.checked=!!d.data.private;
+        cpt.addEventListener('change',async()=>{
+          const r=await fetch('/api/me/card-privacy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({isPrivate:cpt.checked})});
+          const dd=await r.json();
+          if(dd.ok) showToast(cpt.checked?'Karta je nyní skrytá':'Karta je nyní veřejná');
+        });
+      }
     }
     loadCardData();
 
@@ -1147,17 +1326,23 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
 
-  for (const v of validated) {
-    if (sekce === 'zbrane') {
-      await sheets.appendRow('Zbraně', [cas, typUp, v.polozka, v.qty, v.kategorie || '?', uzivatel, v.ucel || '-']);
-    } else if (sekce === 'weed') {
-      const ceny = CONFIG.weedCeny[v.polozka] || { vyroba: 100, prodej: 150 };
-      await sheets.appendRow('Weed', [cas, typUp, v.polozka, v.qty, ceny.vyroba, ceny.prodej, uzivatel]);
-    } else if (sekce === 'drogy') {
-      await sheets.appendRow('Drogy', [cas, typUp, v.polozka, v.qty, '-', '-', uzivatel]);
-    } else if (sekce === 'chemky') {
-      await sheets.appendRow('Chemky', [cas, typUp, v.polozka, v.qty, uzivatel]);
-    }
+  // Sestavíme všechny řádky předem a zapíšeme JEDNÍM voláním Sheets API —
+  // buď se zapíšou úplně všechny, nebo (při chybě) žádná (na rozdíl od
+  // dřívějšího cyklu jednotlivých appendRow(), kde selhání položky 3 z 5
+  // mohlo zanechat částečný zápis prvních dvou).
+  const rows = validated.map(v => {
+    if (sekce === 'zbrane') return [cas, typUp, v.polozka, v.qty, v.kategorie || '?', uzivatel, v.ucel || '-'];
+    if (sekce === 'weed') { const ceny = CONFIG.weedCeny[v.polozka] || { vyroba: 100, prodej: 150 }; return [cas, typUp, v.polozka, v.qty, ceny.vyroba, ceny.prodej, uzivatel]; }
+    if (sekce === 'drogy') return [cas, typUp, v.polozka, v.qty, '-', '-', uzivatel];
+    if (sekce === 'chemky') return [cas, typUp, v.polozka, v.qty, uzivatel];
+    return null;
+  }).filter(Boolean);
+
+  try {
+    await sheets.appendRows(cfg.sheet, rows);
+  } catch (e) {
+    console.error('[BULK SKLAD]', e.message);
+    return res.json({ ok: false, error: 'Zápis do tabulky selhal, žádná položka nebyla uložena.' });
   }
 
   const shrnuti = validated.map(v => `${v.polozka} (${v.qty} ks)`).join(', ');
@@ -1165,7 +1350,12 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
   await discord.notifyAudit(cfg.sheet, uzivatel, discordUser, `${typUp} (HROMADNĚ ×${validated.length}) — ${shrnuti}`);
   broadcastSSE('skladUpdate', { sekce, typ: typUp, polozka: `${validated.length} položek`, qty: validated.reduce((a,v)=>a+v.qty,0), uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
-  if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
+  if (typUp === 'VKLAD') {
+    try {
+      const ach = require('./achievements');
+      validated.forEach(() => { const dcnt = db.incrementDepositCount(req.session.userId); ach.checkDepositAchievements(req.session.userId, dcnt); });
+    } catch(e){}
+  }
 
   res.json({ ok: true, count: validated.length });
 });
@@ -1207,6 +1397,26 @@ app.post('/api/sklad/katalog', requireAuth, requireAccess('sklad'), (req, res) =
   kat[kategorie].push(polozka);
   saveKatalog(kat);
   CONFIG[cfgKey].push(polozka); // rovnou zpřístupníme validaci bez restartu appky
+  broadcastSSE('katalogUpdate', {});
+  res.json({ ok: true, katalog: kat });
+});
+app.put('/api/sklad/katalog', requireAuth, requireAccess('sklad'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Upravovat položky smí jen Founder/Council' });
+  let { kategorie, stara, nova } = req.body;
+  nova = sanitizeText(nova, 60);
+  stara = (stara || '').toString().trim();
+  const cfgKey = KATALOG_TO_CONFIG_KEY[kategorie];
+  if (!cfgKey) return res.json({ ok: false, error: 'Neplatná kategorie' });
+  if (!nova) return res.json({ ok: false, error: 'Vyplň nový název položky' });
+  const kat = loadKatalog();
+  const idx = (kat[kategorie] || []).indexOf(stara);
+  if (idx === -1) return res.json({ ok: false, error: 'Položku lze upravit, jen pokud byla přidána přes katalog' });
+  if (kat[kategorie].includes(nova)) return res.json({ ok: false, error: 'Tato položka už existuje' });
+  kat[kategorie][idx] = nova;
+  saveKatalog(kat);
+  const cfgIdx = CONFIG[cfgKey].indexOf(stara);
+  if (cfgIdx !== -1) CONFIG[cfgKey][cfgIdx] = nova;
+  else CONFIG[cfgKey].push(nova);
   broadcastSSE('katalogUpdate', {});
   res.json({ ok: true, katalog: kat });
 });
@@ -1431,11 +1641,36 @@ app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, r
 });
 
 app.post('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, res) => {
-  const { title, content } = req.body;
+  const { title, content, publishAt } = req.body;
   if (!content || content.trim().length < 3) return res.json({ ok: false, error: 'Obsah je příliš krátký' });
   const uzivatel = req.session.icName;
+
+  if (publishAt) {
+    const ts = new Date(publishAt).getTime();
+    if (!ts || isNaN(ts)) return res.json({ ok: false, error: 'Neplatné datum/čas naplánování' });
+    if (ts > Date.now() + 5000) {
+      const list = loadScheduledAnn();
+      list.push({ id: `sch_${Date.now()}_${Math.floor(Math.random()*1e6)}`, title: title || 'Oznámení', content, uzivatel, publishAt: ts });
+      saveScheduledAnn(list);
+      return res.json({ ok: true, scheduled: true, publishAt: ts });
+    }
+  }
+
   await discord.sendAnnouncement(title || 'Oznámení', content, uzivatel);
   broadcastSSE('nastenska', { title: title || 'Oznámení', content, uzivatel, timestamp: new Date().toISOString() });
+  res.json({ ok: true });
+});
+
+// ── NAPLÁNOVANÁ OZNÁMENÍ — publikace v budoucím čase ────────────────────────
+app.get('/api/nastenska/scheduled', requireAuth, requireAccess('nastenska'), (req, res) => {
+  res.json({ ok: true, items: loadScheduledAnn().sort((a, b) => a.publishAt - b.publishAt) });
+});
+app.delete('/api/nastenska/scheduled/:id', requireAuth, requireAccess('nastenska'), (req, res) => {
+  let list = loadScheduledAnn();
+  const before = list.length;
+  list = list.filter(a => a.id !== req.params.id);
+  if (list.length === before) return res.json({ ok: false, error: 'Nenalezeno' });
+  saveScheduledAnn(list);
   res.json({ ok: true });
 });
 
@@ -1450,30 +1685,8 @@ app.get('/api/stats', requireAuth, requireAccess('statistiky'), async (req, res)
       sheets.getRows('Chemky').catch(() => []),
     ]);
     const allUsers = db.prepare('SELECT * FROM users').all();
-    const nameMapStats = {};
-    allUsers.forEach(u => {
-      if (u.ic_name) {
-        nameMapStats[u.ic_name.toLowerCase()] = u.ic_name;
-        if (u.discord_username) nameMapStats[u.discord_username.toLowerCase()] = u.ic_name;
-        if (u.discord_display_name) nameMapStats[u.discord_display_name.toLowerCase()] = u.ic_name;
-        if (u.global_name) nameMapStats[u.global_name.toLowerCase()] = u.ic_name;
-        if (u.discord_aliases) {
-          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMapStats[a.toLowerCase()] = u.ic_name; }); } catch {}
-        }
-      }
-    });
-    const icToDiscord = {};
-    allUsers.forEach(u => { if (u.ic_name && u.discord_username) icToDiscord[u.ic_name] = u.discord_username; });
-
-    const normalizeUser = (name) => {
-      if (!name) return null;
-      const lower = name.trim().toLowerCase();
-      if (nameMapStats[lower]) return nameMapStats[lower];
-      for (const [key, icName] of Object.entries(nameMapStats)) {
-        if (key.includes(lower) || lower.includes(key)) return icName;
-      }
-      return name.trim(); // neznámý — vrátíme jak je
-    };
+    const { map: nameMapStats, icToDiscord } = buildNameMap(allUsers);
+    const normalizeUser = (name) => normalizeName(name, nameMapStats);
 
     const stats = {};
 
@@ -1558,7 +1771,8 @@ app.get('/api/stats', requireAuth, requireAccess('statistiky'), async (req, res)
       else                  { if (valuta === 'USD') s.vydaj_usd += castka; else s.vydaj_pesos += castka; }
     }
 
-    res.json({ ok: true, stats });
+    const elite = allUsers.filter(u => (u.access_level || 3) === 1).map(u => u.ic_name);
+    res.json({ ok: true, stats, elite });
   } catch (e) {
     console.error('[STATS]', e);
     res.json({ ok: false, stats: {} });
@@ -1578,29 +1792,8 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
 
     // Normalizace jmen — mapujeme vše co bot může napsat na ic_name
     const allUsersAudit = db.prepare('SELECT * FROM users').all();
-    const nameMap = {};
-    allUsersAudit.forEach(u => {
-      if (u.ic_name) {
-        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
-        if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
-        if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
-        if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
-        if (u.discord_aliases) {
-          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {}
-        }
-      }
-    });
-    const normAudit = (name) => {
-      if (!name || name === '—' || name === '-') return '—';
-      const trimmed = name.trim();
-      const lower = trimmed.toLowerCase();
-      if (nameMap[lower]) return nameMap[lower];
-      for (const [key, icName] of Object.entries(nameMap)) {
-        if (key.includes(lower) || lower.includes(key)) return icName;
-      }
-      // Neznámý uživatel — vrátíme co je v sheetu, ale mohlo by být discord username od bota
-      return trimmed;
-    };
+    const { map: nameMap } = buildNameMap(allUsersAudit);
+    const normAudit = (name) => normalizeName(name, nameMap) || '—';
 
     // Detekuje zdroj záznamu: web zapíše timestamp v prvním sloupci ve formátu DD.MM.YYYY,
     // Discord bot může psát jiný formát nebo ponechat prázdné
@@ -1722,7 +1915,12 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
 
     events.sort((a, b) => parseCas(b.cas) - parseCas(a.cas));
 
-    res.json({ ok: true, events: events.slice(0, 200), ucetSouhrn });
+    const elite = allUsersAudit.filter(u => (u.access_level || 3) === 1).map(u => u.ic_name);
+    const total = events.length;
+    const limit = Math.min(500, Math.max(10, parseInt(req.query.limit) || 200));
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+    const page = events.slice(offset, offset + limit);
+    res.json({ ok: true, events: page, total, limit, offset, ucetSouhrn, elite });
   } catch (e) {
     console.error('[AUDIT]', e);
     res.json({ ok: false, events: [], ucetSouhrn: {} });
@@ -1749,21 +1947,8 @@ app.get('/api/leaderboard', requireAuth, async (req, res) => {
       sheets.getRows('Chemky').catch(() => []),
     ]);
     const allUsers = db.prepare('SELECT * FROM users').all();
-    const nameMap = {};
-    allUsers.forEach(u => {
-      if (u.ic_name) {
-        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
-        if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
-        if (u.discord_aliases) { try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {} }
-      }
-    });
-    const norm = (name) => {
-      if (!name) return null;
-      const lower = name.toString().trim().toLowerCase();
-      if (nameMap[lower]) return nameMap[lower];
-      for (const [k, ic] of Object.entries(nameMap)) if (k.includes(lower) || lower.includes(k)) return ic;
-      return name.toString().trim();
-    };
+    const { map: nameMap } = buildNameMap(allUsers);
+    const norm = (name) => normalizeName(name, nameMap);
 
     const parseCas = (cas) => {
       if (!cas) return 0;
@@ -1821,6 +2006,113 @@ app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (
   } catch(e){ res.json({ ok:false }); }
 });
 
+// ── API — EVELYN ASHCROFT: KONTEXTOVÝ BRÍFINK DLE STRÁNKY ──────────────────
+// Sekretářka Albionu — místo jedné náhodné hlášky teď sestaví krátkou
+// "e-mailovou" zprávu podle toho, na jaké stránce se člen právě nachází
+// a co dané datové zdroje reálně obsahují (nízké zásoby, dorostlé odpočty
+// weedu, stav pokladny, nevyrovnané dluhy v Continental knize…).
+app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
+  const page = (req.query.page || 'home').toString();
+  const accessLevel = req.session.accessLevel || 3;
+  const hodina = new Date().getHours();
+  const pozdrav = hodina>=5&&hodina<10?'Dobré ráno':hodina>=10&&hodina<18?'Dobrý den':hodina>=18&&hodina<23?'Dobrý večer':'Dobrou noc';
+
+  const lines = [];
+  const tips = [];
+  const actions = [];
+
+  try {
+    if ((page === 'sklad' || page === 'home') && canAccess(accessLevel, 'sklad')) {
+      const PRAHY = { 'Zbraně': 5, 'Weed': 20, 'Drogy': 10, 'Chemky': 10 };
+      for (const [sheet, prah] of Object.entries(PRAHY)) {
+        try {
+          const stav = await sheets.getStockSummary(sheet);
+          Object.entries(stav).forEach(([item, q]) => {
+            if (q > 0 && q < prah) tips.push(`${item} (${sheet}) — už jen ${q} ks, pod hranicí ${prah}.`);
+          });
+        } catch (e) {}
+      }
+      lines.push(tips.length ? 'Při kontrole skladu jsem narazila na pár položek, které se blíží vyprodání.' : 'Sklad jsem prošla — žádná položka aktuálně nehrozí vyprodáním.');
+      actions.push({ label: 'Otevřít sklad', href: '/sklad' });
+    }
+
+    if (page === 'weed-sazeni' || page === 'home') {
+      try {
+        const timers = loadWeedTimers();
+        const now = Date.now();
+        const hotove = timers.filter(t => t.endsAt <= now).length;
+        const bezici = timers.length - hotove;
+        if (hotove > 0) {
+          tips.push(`${hotove} odpočet(y) sázení už dorostly a čekají na sklizeň.`);
+          actions.push({ label: 'Weed sázení', href: '/weed-sazeni' });
+        } else if (bezici > 0) {
+          lines.push(`Právě běží ${bezici} odpočet(y) sázení.`);
+        }
+      } catch (e) {}
+    }
+
+    if ((page === 'blackbook' || page === 'profit-centrum' || page === 'home') && canAccess(accessLevel, 'blackbook')) {
+      try {
+        const acc = await sheets.getAccountingSummary();
+        lines.push(`Pokladna organizace aktuálně stojí na $${Math.round(acc.usd).toLocaleString('cs-CZ')} a ₱${Math.round(acc.pesos).toLocaleString('cs-CZ')}.`);
+        actions.push({ label: 'Profit centrum', href: '/profit-centrum' });
+      } catch (e) {}
+      try {
+        const cont = loadContinental().filter(c => !c.settled);
+        if (cont.length) {
+          tips.push(`V Continental knize je ${cont.length} nevyrovnaných záznamů.`);
+          actions.push({ label: 'Blackbook', href: '/blackbook' });
+        }
+      } catch (e) {}
+    }
+
+    if (page === 'garaz' || page === 'home') {
+      try {
+        const cars = loadGarage();
+        if (cars.length) lines.push(`Vozový park čítá aktuálně ${cars.length} vozidel.`);
+        actions.push({ label: 'Garáž', href: '/garaz' });
+      } catch (e) {}
+    }
+
+    if (page === 'nastenska') {
+      lines.push('Nástěnka se synchronizuje s Discordem každých 30 sekund — nic vám neuteče.');
+      actions.push({ label: 'Nástěnka', href: '/nastenska' });
+    }
+
+    if (['kodex', 'lore', 'hierarchy'].includes(page)) {
+      lines.push('Pokud si nejste jistí postupem, kodex a hierarchie jsou tu přesně pro tyto chvíle.');
+      actions.push({ label: 'Otevřít stránku', href: '/' + page });
+    }
+
+    if (page === 'audit' || page === 'statistiky') {
+      lines.push('Kompletní historii najdete zde — klidně použijte vyhledávání pro rychlejší orientaci.');
+      actions.push({ label: page === 'audit' ? 'Otevřít audit' : 'Otevřít statistiky', href: '/' + page });
+    }
+
+    try {
+      const season = loadSeason();
+      if (season === 'vanoce') lines.push('Přes svátky je to tu v kanceláři výjimečně klidné.');
+      else if (season === 'halloween') lines.push('Dnešní noc na Discordu je... neklidnější než obvykle.');
+      else if (season === 'novy-rok') lines.push('Nový rok, nové účty — začínáme na nule.');
+    } catch (e) {}
+  } catch (e) {
+    console.error('[EVELYN BRIEF]', e.message);
+  }
+
+  if (!lines.length && !tips.length) {
+    lines.push('Vše je v pořádku, žádné naléhavé záležitosti k řešení.');
+  }
+  actions.push({ label: 'Profil', href: '/profil' });
+
+  res.json({
+    ok: true,
+    subject: `${pozdrav}, ${req.session.icName || 'člene'}.`,
+    lines,
+    tips: tips.slice(0, 5),
+    actions: actions.slice(0, 4),
+  });
+});
+
 // ── API — PROFIL: PROMOTIONS, ACHIEVEMENTY, ONBOARDING ─────────────────────
 app.get('/api/me/promotions', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
@@ -1872,6 +2164,11 @@ app.get('/api/card/:icName', requireAuth, (req, res) => {
   const accessLevel = req.session.realAccessLevel || req.session.accessLevel || 3;
   // Associate kartu nevidí — ani vlastní, ani cizí
   if (accessLevel >= 3) return res.json({ ok: false, error: 'Karta je dostupná od hodnosti Member' });
+  const isSelf = req.session.icName === user.ic_name;
+  if (user.card_private && !isSelf && accessLevel !== 1) {
+    return res.json({ ok: false, error: 'Tento člen si kartu nastavil jako skrytou.' });
+  }
+  const rank = RANK_LABEL_MAP[user.access_level || 3] || 'Member/Associate';
   res.json({
     ok: true,
     card: {
@@ -1879,14 +2176,19 @@ app.get('/api/card/:icName', requireAuth, (req, res) => {
       discord_username: user.discord_username,
       avatar_url: user.avatar_url || null,
       created_at: user.created_at,
-      achievements: user.achievements || [],
+      achievements: (user.achievements || []).map(a => ({
+        id: a.id, at: a.at,
+        label: ACHIEVEMENTS[a.id]?.label || a.id,
+        icon: ACHIEVEMENTS[a.id]?.icon || '★',
+      })),
       action_count: user.action_count || 0,
       promotions: user.promotions || [],
-      rank: RANK_LABEL_MAP[user.access_level || 3] || 'Member/Associate',
+      rank,
       ic_photo: user.card_photo || null,
       phone: user.card_phone || null,
       birthdate: user.card_birthdate || null,
       bank: user.card_bank || null,
+      private: !!user.card_private,
     },
   });
 });
@@ -1916,7 +2218,7 @@ app.get('/nabor', (req, res) => {
 });
 
 // ── API — DEBUG SHEETS (dočasný endpoint pro diagnostiku) ─────────────────────
-app.get('/api/debug-sheets', requireAuth, async (req, res) => {
+app.get('/api/debug-sheets', requireAuth, requireAccess('audit'), async (req, res) => {
   try {
     const sheet = req.query.sheet || 'Weed';
     const rows = await sheets.getRows(sheet).catch(e => ({ error: e.message }));
@@ -1943,26 +2245,8 @@ app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, r
 
     // ── Normalizace jmen (web/discord účty) ──
     const allUsers = db.prepare('SELECT * FROM users').all();
-    const nameMap = {};
-    const icToDiscord = {};
-    allUsers.forEach(u => {
-      if (u.ic_name) {
-        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
-        if (u.discord_username) { nameMap[u.discord_username.toLowerCase()] = u.ic_name; icToDiscord[u.ic_name] = u.discord_username; }
-        if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
-        if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
-        if (u.discord_aliases) {
-          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {}
-        }
-      }
-    });
-    const norm = (name) => {
-      if (!name || name === '—' || name === '-') return null;
-      const lower = name.toString().trim().toLowerCase();
-      if (nameMap[lower]) return nameMap[lower];
-      for (const [key, ic] of Object.entries(nameMap)) { if (key.includes(lower) || lower.includes(key)) return ic; }
-      return name.toString().trim(); // neznámý — vrátíme jak je
-    };
+    const { map: nameMap, icToDiscord } = buildNameMap(allUsers);
+    const norm = (name) => normalizeName(name, nameMap);
 
     const parseCas = (cas) => {
       if (!cas) return 0;
@@ -2285,25 +2569,8 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
 
     // ── Normalizace jmen (web/discord účty -> IC jméno) ──
     const allUsers = db.prepare('SELECT * FROM users').all();
-    const nameMap = {};
-    allUsers.forEach(u => {
-      if (u.ic_name) {
-        nameMap[u.ic_name.toLowerCase()] = u.ic_name;
-        if (u.discord_username) nameMap[u.discord_username.toLowerCase()] = u.ic_name;
-        if (u.discord_display_name) nameMap[u.discord_display_name.toLowerCase()] = u.ic_name;
-        if (u.global_name) nameMap[u.global_name.toLowerCase()] = u.ic_name;
-        if (u.discord_aliases) {
-          try { JSON.parse(u.discord_aliases).forEach(a => { if (a) nameMap[a.toLowerCase()] = u.ic_name; }); } catch {}
-        }
-      }
-    });
-    const norm = (name) => {
-      if (!name || name === '—' || name === '-') return null;
-      const lower = name.toString().trim().toLowerCase();
-      if (nameMap[lower]) return nameMap[lower];
-      for (const [key, ic] of Object.entries(nameMap)) { if (key.includes(lower) || lower.includes(key)) return ic; }
-      return name.toString().trim(); // neznámý — vrátíme jak je
-    };
+    const { map: nameMap } = buildNameMap(allUsers);
+    const norm = (name) => normalizeName(name, nameMap);
 
     const parseCas = (cas) => {
       if (!cas) return 0;
@@ -2476,6 +2743,10 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
+app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
+  const members = db.prepare('SELECT ic_name FROM users WHERE ic_name IS NOT NULL ORDER BY ic_name ASC').all().map(u => u.ic_name);
+  res.send(renderSpisy(req, members));
+});
 app.get('/galerie', requireAuth, (req, res) => {
   if (req.session.isAssociate) return res.status(403).send('Galerie je dostupná od hodnosti Member. <a href="/home">Zpět</a>');
   res.send(renderGallery(req));
@@ -2488,8 +2759,92 @@ app.get('/albion-world*', requireAuth, (req, res) => res.redirect('/albion'));
 app.get('/albion', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   const photo = (user && (user.card_photo || user.avatar_url)) || '/logo.png';
-  res.send(renderAlbion(req, { photo }));
+  res.send(renderAlbion(req, { photo, lastLoginAt: user?.last_login_at || null }));
 });
+
+// ── /API/HEALTH — kontrola dostupnosti klíčových závislostí ────────────────
+// Výpadky Sheets/DB dřív tiše zapadly do `.catch(() => [])` bez jakékoli
+// systémové notifikace — tohle dává infrastruktuře (nebo člověku) způsob,
+// jak stav appky ověřit zvenčí.
+app.get('/api/health', async (req, res) => {
+  const status = { ok: true, timestamp: new Date().toISOString(), checks: {} };
+  try {
+    await sheets.getRows('Zbraně');
+    status.checks.sheets = 'ok';
+  } catch (e) { status.checks.sheets = 'error'; status.ok = false; }
+  try {
+    db.prepare('SELECT * FROM users WHERE id = ?').get(-1);
+    status.checks.db = 'ok';
+  } catch (e) { status.checks.db = 'error'; status.ok = false; }
+  status.checks.discord = (process.env.DISCORD_TOKEN && process.env.GUILD_ID) ? 'configured' : 'not_configured';
+  res.status(status.ok ? 200 : 503).json(status);
+});
+
+// ── GARBAGE COLLECTION OSAMOCENÝCH NAHRANÝCH SOUBORŮ ────────────────────────
+// Pravidelně porovná soubory v garage-uploads/card-uploads/gallery-uploads
+// s tím, na co se skutečně odkazuje v JSON úložištích, a sirotky smaže.
+function gcOrphanedUploads() {
+  try {
+    const garageFiles = new Set(loadGarage().map(c => c.image && path.basename(c.image)).filter(Boolean));
+    fs.readdirSync(GARAGE_UPLOADS_DIR).forEach(f => {
+      if (!garageFiles.has(f)) { try { fs.unlinkSync(path.join(GARAGE_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený garage upload:', f); } catch (e) {} }
+    });
+  } catch (e) {}
+  try {
+    const allUsersGc = db.prepare('SELECT * FROM users').all();
+    const cardFiles = new Set(allUsersGc.map(u => u.card_photo && path.basename(u.card_photo)).filter(Boolean));
+    fs.readdirSync(CARD_UPLOADS_DIR).forEach(f => {
+      if (!cardFiles.has(f)) { try { fs.unlinkSync(path.join(CARD_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený card upload:', f); } catch (e) {} }
+    });
+  } catch (e) {}
+  try {
+    const galleryFiles = new Set(loadGallery().map(i => i.image && path.basename(i.image)).filter(Boolean));
+    fs.readdirSync(GALLERY_UPLOADS_DIR).forEach(f => {
+      if (!galleryFiles.has(f)) { try { fs.unlinkSync(path.join(GALLERY_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený gallery upload:', f); } catch (e) {} }
+    });
+  } catch (e) {}
+}
+setInterval(gcOrphanedUploads, 6 * 60 * 60 * 1000); // každých 6 hodin
+setTimeout(gcOrphanedUploads, 60 * 1000); // jedna kontrola krátce po startu
+
+// ── AUTOMATICKÝ TÝDENNÍ SOUHRN BLACKBOOKU DO DISCORDU ───────────────────────
+async function sendWeeklyBlackbookSummary() {
+  try {
+    const ucetRows = await sheets.getRows('Účetnictví').catch(() => []);
+    const now = Date.now(), WEEK = 7 * 86400000;
+    let income = 0, expense = 0, ops = 0;
+    for (let i = 1; i < ucetRows.length; i++) {
+      const r = ucetRows[i]; if (!r || !r[0]) continue;
+      const ts = (() => { const s = (r[0] || '').toString(); const m = s.match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4}),?\s*(\d{1,2}):(\d{2}):(\d{2})/); return m ? new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime() : 0; })();
+      if (now - ts > WEEK || ts === 0) continue;
+      ops++;
+      const castka = parseFloat((r[2] || '0').replace(',', '.')) || 0;
+      if ((r[1] || '').toUpperCase() === 'PŘÍJEM') income += castka; else expense += castka;
+    }
+    const allUsersWk = db.prepare('SELECT * FROM users').all();
+    const inactiveCount = allUsersWk.filter(u => {
+      const loginTs = u.last_login_at ? new Date(u.last_login_at).getTime() : 0;
+      return !loginTs || (now - loginTs) > WEEK;
+    }).length;
+    await discord.notifyTydenniSouhrn({ income, expense, net: income - expense, ops, inactiveCount, totalMembers: allUsersWk.length });
+  } catch (e) { console.error('[WEEKLY BLACKBOOK SUMMARY]', e.message); }
+}
+
+const WEEKLY_SUMMARY_FILE = path.join(DATA_DIR, 'weekly-summary-sent.json');
+function loadLastWeeklySummarySent() { try { return JSON.parse(fs.readFileSync(WEEKLY_SUMMARY_FILE, 'utf8')).at || 0; } catch { return 0; } }
+function saveLastWeeklySummarySent(ts) { try { writeJsonAtomic(WEEKLY_SUMMARY_FILE, { at: ts }); } catch (e) {} }
+
+setInterval(() => {
+  try {
+    const now = new Date();
+    const lastSent = loadLastWeeklySummarySent();
+    // Pondělí v 9:00–9:05 (server local time), s pojistkou min. 6 dní od posledního odeslání
+    if (now.getDay() === 1 && now.getHours() === 9 && (Date.now() - lastSent) > 6 * 86400000) {
+      saveLastWeeklySummarySent(Date.now());
+      sendWeeklyBlackbookSummary();
+    }
+  } catch (e) {}
+}, 5 * 60 * 1000); // kontrola každých 5 minut
 
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));

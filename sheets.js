@@ -41,16 +41,60 @@ async function appendRow(sheetName, values) {
     insertDataOption: 'INSERT_ROWS',
     requestBody: { values: [values] },
   });
+  invalidateCache(sheetName);
 }
 
-async function getRows(sheetName) {
+// Zapíše VÍCE řádků jedním voláním API — na rozdíl od cyklu appendRow() je
+// tohle jedna atomická operace (buď se zapíšou všechny řádky, nebo žádný),
+// takže selhání uprostřed nemůže zanechat částečný zápis (viz bulk sklad).
+async function appendRows(sheetName, rowsValues) {
+  if (!rowsValues || !rowsValues.length) return;
+  const sheets = await getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID(),
+    range: `${sheetName}!A1`,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: rowsValues },
+  });
+  invalidateCache(sheetName);
+}
+
+// ── CACHE ────────────────────────────────────────────────────────────────────
+// Sklad/finance stránky (Blackbook, Statistiky, Audit, Profit centrum) dřív
+// při KAŽDÉM načtení tahaly celé listy znovu ze Sheets API. S krátkým TTL
+// cache se opakované požadavky v rychlém sledu (víc lidí online, refresh
+// stránky) obslouží z paměti — a proaktivní "prewarm" níže zajišťuje, že
+// první request po nečinnosti nikdy nečeká na živé Sheets volání.
+const CACHE_TTL_MS = 20000;
+const rowsCache = new Map(); // sheetName -> { data, ts }
+
+function invalidateCache(sheetName) {
+  rowsCache.delete(sheetName);
+}
+
+async function getRows(sheetName, opts = {}) {
+  const cached = rowsCache.get(sheetName);
+  if (!opts.noCache && cached && (Date.now() - cached.ts) < CACHE_TTL_MS) return cached.data;
   const sheets = await getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID(),
     range: `${sheetName}!A:Z`,
   });
-  return res.data.values || [];
+  const data = res.data.values || [];
+  rowsCache.set(sheetName, { data, ts: Date.now() });
+  return data;
 }
+
+// Pravidelně na pozadí obnoví cache nejpoužívanějších listů, ať i "studený"
+// request po delší nečinnosti serveru dostane data okamžitě z cache.
+const PREWARM_SHEETS = ['Zbraně', 'Weed', 'Drogy', 'Chemky', 'Účetnictví'];
+function startPrewarm() {
+  setInterval(() => {
+    PREWARM_SHEETS.forEach(name => { getRows(name, { noCache: true }).catch(() => {}); });
+  }, CACHE_TTL_MS);
+}
+startPrewarm();
 
 async function getStockSummary(sheetName) {
   const rows = await getRows(sheetName);
@@ -91,4 +135,4 @@ async function getAccountingSummary() {
   return { usd, pesos };
 }
 
-module.exports = { appendRow, getRows, getStockSummary, getRecentRows, getAccountingSummary, timestamp };
+module.exports = { appendRow, appendRows, getRows, getStockSummary, getRecentRows, getAccountingSummary, timestamp };

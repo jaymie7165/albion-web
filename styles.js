@@ -2,14 +2,28 @@
 // Estetika: Heraldický noir · Bodoni Moda + Cinzel + Space Mono
 // Paleta: Noir (#0B0F0D) · Oxblood (#6E1423) · Mosaz (#B68A4E) · Slonová kost (#EDE6D4)
 
-function ledgerEmpty(text, compact) {
+const LEDGER_EMPTY_ICONS = {
+  default: `<rect x="3" y="2" width="58" height="44" rx="1" stroke="var(--border-brass)" stroke-width="1"/>
+    <line x1="12" y1="14" x2="44" y2="14" stroke="var(--border)" stroke-width="1"/>
+    <line x1="12" y1="22" x2="52" y2="22" stroke="var(--border)" stroke-width="1"/>
+    <line x1="12" y1="30" x2="38" y2="30" stroke="var(--border)" stroke-width="1"/>
+    <line x1="12" y1="38" x2="48" y2="38" stroke="var(--border)" stroke-width="1"/>`,
+  photo: `<rect x="3" y="2" width="58" height="44" rx="1" stroke="var(--border-brass)" stroke-width="1"/>
+    <circle cx="18" cy="16" r="5" stroke="var(--border)" stroke-width="1"/>
+    <path d="M6 38 L22 24 L34 34 L44 22 L58 36" stroke="var(--border)" stroke-width="1" fill="none"/>`,
+  people: `<circle cx="24" cy="16" r="7" stroke="var(--border-brass)" stroke-width="1"/>
+    <path d="M10 40c0-8 6-13 14-13s14 5 14 13" stroke="var(--border)" stroke-width="1" fill="none"/>
+    <circle cx="46" cy="18" r="5" stroke="var(--border)" stroke-width="1"/>
+    <path d="M38 40c0-6 4-10 10-10" stroke="var(--border)" stroke-width="1" fill="none"/>`,
+  stock: `<rect x="4" y="18" width="14" height="24" stroke="var(--border-brass)" stroke-width="1"/>
+    <rect x="21" y="10" width="14" height="32" stroke="var(--border)" stroke-width="1"/>
+    <rect x="38" y="24" width="14" height="18" stroke="var(--border)" stroke-width="1"/>`,
+};
+
+function ledgerEmpty(text, compact, variant) {
   return `<div class="ledger-empty${compact ? ' compact' : ''}">
     <svg viewBox="0 0 64 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="2" width="58" height="44" rx="1" stroke="var(--border-brass)" stroke-width="1"/>
-      <line x1="12" y1="14" x2="44" y2="14" stroke="var(--border)" stroke-width="1"/>
-      <line x1="12" y1="22" x2="52" y2="22" stroke="var(--border)" stroke-width="1"/>
-      <line x1="12" y1="30" x2="38" y2="30" stroke="var(--border)" stroke-width="1"/>
-      <line x1="12" y1="38" x2="48" y2="38" stroke="var(--border)" stroke-width="1"/>
+      ${LEDGER_EMPTY_ICONS[variant] || LEDGER_EMPTY_ICONS.default}
     </svg>
     <div class="ledger-empty-text">${text}</div>
   </div>`;
@@ -104,7 +118,6 @@ function baseStyles() {
       body.light{
         --noir:#F3EEE3;
         --panel:#EDE5D4;
-        --panel2:#E5DBС8;
         --panel2:#E5DBC8;
         --panel3:#DDD3BD;
         --panel4:#D4C9B0;
@@ -301,7 +314,7 @@ function baseStyles() {
         padding:0.2rem 0.5rem;cursor:default;opacity:0.5;transition:opacity 0.2s;flex-shrink:0;
       }
       .nav-shortcut-hint:hover{opacity:0.9}
-      @media(max-width:880px){.nav-shortcut-hint{display:none}}
+      @media(max-width:600px){.nav-shortcut-hint{display:none}}
 
       .notif-bell{
         position:relative;cursor:pointer;background:none;border:none;
@@ -713,7 +726,7 @@ function baseStyles() {
       /* ══════════════════════════════════════════════
          STATISTIKY — spisy členů
          ══════════════════════════════════════════════ */
-      .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:2rem 1.6rem}
+      .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,360px));gap:2rem 1.6rem}
       .stat-card{
         background:var(--panel2);border:1px solid var(--border-brass);
         padding:1.8rem 1.7rem 1.5rem;transition:border-color 0.25s,transform 0.25s;
@@ -988,10 +1001,16 @@ function baseStyles() {
         padding:0 1.1rem;height:100%;
         font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:500;
         color:var(--ivory-faint);text-decoration:none;
-        border-bottom:2px solid transparent;
+        background:none;border:none;border-bottom:2px solid transparent;
         transition:color 0.2s,border-color 0.2s,background 0.2s;
         white-space:nowrap;position:relative;gap:0.2rem;cursor:pointer;
       }
+      /* Klávesnicová dostupnost — viditelný focus stav pro nav odkazy/tlačítka */
+      .nav-drop-trigger:focus-visible,.nav-menu a:focus-visible,.nav-dropdown-menu a:focus-visible,.theme-dot-btn:focus-visible{
+        outline:2px solid var(--brass-bright);outline-offset:2px;
+      }
+      .theme-switcher-label{font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ivory-faint);margin-right:0.2rem}
+      @media(max-width:1000px){.theme-switcher-label{display:none}}
       .nav-drop-trigger:hover,.nav-dropdown:hover .nav-drop-trigger{color:var(--ivory);background:rgba(182,138,78,0.05)}
       .nav-drop-trigger.active{color:var(--brass-bright);border-bottom-color:var(--oxblood);background:rgba(182,138,78,0.05)}
       .nav-drop-arrow{width:8px;height:5px;margin-top:2px;opacity:0.4;transition:transform 0.2s,opacity 0.2s;flex-shrink:0}
@@ -1136,13 +1155,25 @@ function baseStyles() {
       .tc-body{padding:1.8rem 1.8rem 2rem}
       .tc-stat{display:flex;justify-content:space-between;padding:0.55rem 0;border-bottom:1px solid var(--border);font-size:0.86rem}
       .tc-badges{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.9rem}
-      .tc-badge{font-family:var(--font-label);font-size:0.58rem;padding:0.32rem 0.7rem;background:var(--brass-faint);border:1px solid var(--border-brass);color:var(--brass-bright)}
+      .tc-badge{display:flex;align-items:center;font-family:var(--font-label);font-size:0.58rem;padding:0.32rem 0.7rem;background:var(--brass-faint);border:1px solid var(--border-brass);color:var(--brass-bright)}
+      .tc-badge-icon{margin-right:0.35rem;color:var(--brass-bright);font-size:0.95em}
+
+      /* Rarity / foil efekt podle hodnosti — sběratelská karta má znít jinak
+         pro Founder/Council (zlatá fólie) než pro řadového člena (obyčejná) */
+      .tc-foil-shine{position:absolute;inset:0;z-index:5;pointer-events:none;mix-blend-mode:overlay;
+        background:linear-gradient(115deg,transparent 30%,rgba(224,189,127,0.55) 45%,rgba(255,255,255,0.65) 50%,rgba(224,189,127,0.55) 55%,transparent 70%);
+        background-size:250% 250%;animation:cardFoilShine 4.5s ease-in-out infinite;}
+      .tc-foil-shine.silver{background:linear-gradient(115deg,transparent 30%,rgba(183,174,153,0.5) 45%,rgba(255,255,255,0.55) 50%,rgba(183,174,153,0.5) 55%,transparent 70%)}
+      @keyframes cardFoilShine{0%{background-position:0% 0%}50%{background-position:100% 100%}100%{background-position:0% 0%}}
+      .trading-card.card-foil-gold{border-color:var(--brass-bright);box-shadow:0 0 36px rgba(224,189,127,0.3),var(--shadow)}
+      .trading-card.card-foil-silver{border-color:#B7AE99;box-shadow:0 0 26px rgba(183,174,153,0.25),var(--shadow)}
 
       /* ══════════════════════════════════════════════
          GALERIE
          ══════════════════════════════════════════════ */
       .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.2rem}
       .gal-item{background:var(--panel2);border:1px solid var(--border);overflow:hidden;position:relative}
+      .gal-item::after{content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(182,138,78,0.35)}
       .gal-item img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
       .gal-caption{padding:0.8rem 1rem;font-size:0.82rem;color:var(--ivory-dim)}
       .gal-meta{font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint);padding:0 1rem 0.8rem}
@@ -1174,6 +1205,184 @@ function baseStyles() {
         align-items:center;justify-content:center;font-size:0.6rem;line-height:1;
       }
       .upload-zone.has-image .upload-clear{display:flex}
+
+      /* ══════════════════════════════════════════════
+         SKUTEČNÁ NÁLADA — jemný posun atmosféry dle reálné
+         denní doby, funguje v tmavém i světlém režimu (viz nav.js)
+         ══════════════════════════════════════════════ */
+      body.mood-sunrise::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(224,150,90,0.14), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(110,20,35,0.10), transparent 60%)}
+      body.mood-day::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(182,138,78,0.06), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(110,20,35,0.06), transparent 60%)}
+      body.mood-sunset::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(163,48,49,0.16), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(182,138,78,0.10), transparent 60%)}
+      body.mood-night::before{background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(182,138,78,0.05), transparent 60%),radial-gradient(ellipse 60% 60% at 100% 100%, rgba(20,10,20,0.30), transparent 60%)}
+      body.mood-night{--oxblood-glow:rgba(110,20,35,0.22)}
+      body.mood-sunset{--oxblood-glow:rgba(163,72,40,0.30)}
+      body.light.mood-night{filter:brightness(0.94) saturate(0.94)}
+      body.light.mood-sunset{filter:brightness(1.02) saturate(1.06)}
+      body.light.mood-sunrise{filter:brightness(1.03)}
+
+      /* ══════════════════════════════════════════════
+         VELLUM TEXTURE — jemný pergamenový podklad karet
+         ══════════════════════════════════════════════ */
+      .card,.stat-card,.car-card,.trading-card,.panel-card,.sidebar,.ucet-card{
+        background-image:
+          repeating-linear-gradient(0deg, rgba(182,138,78,0.025) 0px, transparent 1px, transparent 3px),
+          repeating-linear-gradient(90deg, rgba(0,0,0,0.05) 0px, transparent 1px, transparent 3px),
+          radial-gradient(ellipse 140% 100% at 10% 0%, rgba(182,138,78,0.05), transparent 55%),
+          radial-gradient(ellipse 120% 90% at 90% 100%, rgba(0,0,0,0.18), transparent 60%);
+        background-blend-mode:overlay,overlay,normal,normal;
+      }
+      body.light .card,body.light .stat-card,body.light .car-card,body.light .trading-card,body.light .panel-card,body.light .sidebar,body.light .ucet-card{
+        background-image:
+          repeating-linear-gradient(0deg, rgba(110,70,20,0.04) 0px, transparent 1px, transparent 3px),
+          repeating-linear-gradient(90deg, rgba(90,60,20,0.05) 0px, transparent 1px, transparent 3px),
+          radial-gradient(ellipse 140% 100% at 10% 0%, rgba(139,99,37,0.10), transparent 55%),
+          radial-gradient(ellipse 120% 90% at 90% 100%, rgba(90,60,20,0.10), transparent 60%);
+      }
+
+      /* ══════════════════════════════════════════════
+         HODNOST — zlaté zvýraznění řádků Founder/Council
+         přidej třídu "rank-elite" na <tr>/.stream-entry/.stat-card
+         ══════════════════════════════════════════════ */
+      tr.rank-elite td{background:linear-gradient(90deg, var(--brass-faint), transparent 40%);border-left:2px solid var(--brass-bright)}
+      tr.rank-elite td:first-child{padding-left:calc(1rem - 2px)}
+      .stat-card.rank-elite{border-color:var(--brass-bright);box-shadow:0 0 0 1px var(--border-brass),var(--shadow-card)}
+      .stat-card.rank-elite .stat-card-tab{background:var(--brass);color:var(--noir)}
+      .stream-entry.rank-elite{border-left:2px solid var(--brass-bright);padding-left:0.6rem;background:var(--brass-faint)}
+      .rank-elite-tag{font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.08em;color:var(--brass-bright);border:1px solid var(--border-brass);padding:0.04rem 0.35rem;margin-left:0.4rem;text-transform:uppercase;vertical-align:1px}
+
+      /* ══════════════════════════════════════════════
+         3D TILT HOVER — trading karta / vůz
+         JS nastavuje --rx/--ry/--tz přes inline style
+         ══════════════════════════════════════════════ */
+      .tilt-card{transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateZ(var(--tz,0px));transition:transform 0.15s ease-out;will-change:transform}
+      .tilt-card.tilt-reset{transition:transform 0.4s cubic-bezier(0.22,1,0.36,1)}
+      .tilt-glare{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(circle at var(--gx,50%) var(--gy,50%), rgba(255,255,255,0.14), transparent 55%);transition:opacity 0.2s;z-index:5}
+      .tilt-card:hover .tilt-glare{opacity:1}
+
+      /* ══════════════════════════════════════════════
+         PAGE TRANSITION — jemný fade mezi routami
+         ══════════════════════════════════════════════ */
+      @keyframes pageOutFade{to{opacity:0;filter:blur(2px)}}
+      body.page-leaving{animation:pageOutFade 0.22s ease-in forwards}
+      ::view-transition-old(root){animation:pageOutFade 0.22s ease-in forwards}
+      ::view-transition-new(root){animation:pageFadeIn 0.28s ease-out}
+
+      /* ══════════════════════════════════════════════
+         INK-FILL SCROLL PROGRESS (Kodex/Lore)
+         ══════════════════════════════════════════════ */
+      .ink-progress-track{position:fixed;top:var(--nav-h);left:0;right:0;height:3px;background:var(--border);z-index:150}
+      .ink-progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--oxblood),var(--brass));box-shadow:0 0 8px var(--oxblood-glow);transition:width 0.08s linear}
+      .ink-progress-fill::after{content:'';position:absolute;right:-3px;top:-2px;width:7px;height:7px;border-radius:50%;background:var(--brass-bright);box-shadow:0 0 6px var(--brass-bright)}
+
+      /* ══════════════════════════════════════════════
+         EVELYN ASHCROFT — sekretářský widget v navu
+         (bez pevné fotky — placeholder monogram, dokud není
+         nahrána skutečná /evelyn.png, viz nav.js)
+         ══════════════════════════════════════════════ */
+      .evelyn-widget{position:relative;display:flex;align-items:center;gap:0.5rem;cursor:pointer}
+      .evelyn-portrait{width:30px;height:30px;border-radius:50%;border:1px solid var(--brass);object-fit:cover;background:var(--panel3);flex-shrink:0}
+      .evelyn-portrait-placeholder{display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-style:italic;font-size:0.9rem;color:var(--brass-bright);background:var(--oxblood-faint)}
+      .evelyn-bubble{
+        position:fixed;top:calc(var(--nav-h) + 10px);right:1.5rem;max-width:290px;z-index:250;
+        background:rgba(10,12,10,0.96);border:1px solid var(--border-brass);border-top:2px solid var(--oxblood);
+        padding:0.9rem 1.1rem;font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim);line-height:1.7;
+        box-shadow:var(--shadow);opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity 0.25s,transform 0.25s;
+      }
+      .evelyn-bubble.show{opacity:1;transform:translateY(0);pointer-events:all}
+      .evelyn-bubble .ev-name{font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.4rem;display:block}
+      @media(max-width:880px){.evelyn-bubble{right:1rem;left:1rem;max-width:none}}
+
+      /* ── EVELYN — rozšířený "dopis" / e-mail od sekretářky ── */
+      .evelyn-ping{
+        position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;
+        background:var(--oxblood-bright);box-shadow:0 0 6px var(--oxblood-glow);
+        border:1.5px solid var(--noir);opacity:0;transition:opacity 0.2s;
+        animation:evelynPingPulse 1.6s ease-in-out infinite;
+      }
+      .evelyn-ping.show{opacity:1}
+      @keyframes evelynPingPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+
+      .evelyn-letter{
+        position:fixed;top:calc(var(--nav-h) + 10px);right:1.5rem;z-index:250;
+        width:min(380px,92vw);
+        background:rgba(10,12,10,0.97);border:1px solid var(--border-brass);border-top:2px solid var(--oxblood);
+        box-shadow:var(--shadow),0 0 0 1px rgba(182,138,78,0.06);
+        opacity:0;transform:translateY(-10px) scale(0.98);pointer-events:none;
+        transition:opacity 0.3s,transform 0.3s;
+      }
+      .evelyn-letter.show{opacity:1;transform:translateY(0) scale(1);pointer-events:all}
+      .evelyn-letter-head{
+        display:flex;align-items:center;justify-content:space-between;gap:0.6rem;
+        padding:0.75rem 0.95rem;border-bottom:1px solid var(--border-brass);background:var(--brass-faint);
+      }
+      .evelyn-letter-from{display:flex;align-items:center;gap:0.6rem;font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright)}
+      .evelyn-letter-from img{width:22px;height:22px;border-radius:50%;border:1px solid var(--brass);object-fit:cover;flex-shrink:0}
+      .evelyn-letter-avatar{position:relative;width:22px;height:22px;flex-shrink:0;display:inline-block}
+      .evelyn-letter-avatar-fallback{position:absolute;inset:0;border-radius:50%;border:1px solid var(--brass);background:var(--oxblood-faint);color:var(--brass-bright);align-items:center;justify-content:center}
+      .evelyn-letter-close{background:none;border:none;color:var(--ivory-faint);cursor:pointer;font-size:0.85rem;line-height:1;padding:0.2rem;flex-shrink:0}
+      .evelyn-letter-close:hover{color:var(--oxblood-bright)}
+      .evelyn-letter-body{padding:1rem 1.1rem 1.1rem;max-height:62vh;overflow-y:auto}
+      .evelyn-letter-stamp{font-family:var(--font-mono);font-size:0.58rem;color:var(--ivory-faint);letter-spacing:0.05em;margin-bottom:0.6rem}
+      .evelyn-letter-subject{font-family:var(--font-display);font-style:italic;font-weight:600;font-size:0.98rem;color:var(--ivory);margin-bottom:0.6rem;line-height:1.4}
+      .evelyn-letter-line{font-family:var(--font-body);font-size:0.84rem;color:var(--ivory-dim);line-height:1.7;margin-bottom:0.5rem;font-weight:300}
+      .evelyn-letter-tips{margin:0.7rem 0;padding:0.7rem 0.85rem;background:var(--oxblood-faint);border-left:2px solid var(--oxblood)}
+      .evelyn-letter-tip{font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory);line-height:1.65;padding:0.15rem 0}
+      .evelyn-letter-tip::before{content:'⚠ ';color:var(--oxblood-bright)}
+      .evelyn-letter-actions{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.9rem}
+      .evelyn-letter-actions a{
+        font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.08em;text-transform:uppercase;
+        color:var(--ivory-dim);border:1px solid var(--border-brass);padding:0.42rem 0.8rem;text-decoration:none;
+        transition:all 0.15s;
+      }
+      .evelyn-letter-actions a:hover{border-color:var(--brass);color:var(--brass-bright);background:var(--brass-faint)}
+      .evelyn-letter-sig{margin-top:0.9rem;padding-top:0.7rem;border-top:1px solid var(--border);font-family:var(--font-display);font-style:italic;font-size:0.8rem;color:var(--ivory-faint)}
+      @media(max-width:880px){.evelyn-letter{right:1rem;left:1rem;width:auto}}
+
+      /* ══════════════════════════════════════════════
+         AMBIENTNÍ SOUNDTRACK — ikonka v navu
+         ══════════════════════════════════════════════ */
+      .ambient-btn{width:18px;height:18px;border:1px solid var(--border-brass);background:none;color:var(--brass);font-size:0.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer}
+      .ambient-btn.active{color:var(--brass-bright);border-color:var(--brass-bright);box-shadow:0 0 6px var(--oxblood-glow)}
+
+      /* ══════════════════════════════════════════════
+         CONTINENTAL LEDGER — dluhy stylem "Continental"
+         ══════════════════════════════════════════════ */
+      .cont-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+      @media(max-width:980px){.cont-grid{grid-template-columns:1fr}}
+      .cont-col-title{font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;font-weight:600;margin-bottom:1rem;padding-bottom:0.7rem;border-bottom:1px solid var(--border-brass);display:flex;align-items:center;gap:0.5rem}
+      .cont-col-title.owed-to-us{color:var(--brass-bright)}
+      .cont-col-title.owed-by-us{color:var(--oxblood-bright)}
+      .cont-entry{
+        position:relative;background:var(--panel2);border:1px solid var(--border);
+        padding:1.1rem 1.3rem;margin-bottom:0.9rem;overflow:hidden;transition:border-color 0.2s;
+      }
+      .cont-entry:hover{border-color:var(--border-brass)}
+      .cont-entry.settled{opacity:0.62}
+      .cont-entry-row{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;margin-bottom:0.35rem}
+      .cont-entry-who{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:1.02rem;color:var(--ivory)}
+      .cont-entry-amount{font-family:var(--font-mono);font-size:0.92rem;white-space:nowrap}
+      .cont-entry-reason{font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim);line-height:1.6;margin-bottom:0.5rem}
+      .cont-entry-meta{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint);letter-spacing:0.03em}
+      .cont-entry-actions{margin-top:0.7rem;display:flex;gap:0.5rem}
+      .cont-seal{
+        position:absolute;top:50%;right:1.1rem;transform:translateY(-50%) rotate(-11deg);
+        width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        font-family:var(--font-label);font-weight:700;font-size:0.56rem;letter-spacing:0.05em;text-align:center;
+        text-transform:uppercase;color:rgba(255,255,255,0.85);
+        box-shadow:0 8px 20px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(0,0,0,0.25), inset 0 2px 5px rgba(255,255,255,0.12);
+        opacity:0;pointer-events:none;transform-origin:center;
+      }
+      .cont-entry.settled .cont-seal{opacity:1;animation:contSealStamp 0.5s cubic-bezier(0.3,0.05,0.5,1) 1}
+      .cont-seal.seal-brass{background:radial-gradient(circle at 35% 30%, var(--brass-bright), var(--brass) 55%, #6B4A18 100%)}
+      .cont-seal.seal-oxblood{background:radial-gradient(circle at 35% 30%, var(--oxblood-bright), var(--oxblood) 55%, #4A0D18 100%)}
+      @keyframes contSealStamp{0%{opacity:0;transform:translateY(-50%) rotate(-11deg) scale(2.4)}60%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(0.92)}100%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(1)}}
+      .cont-btn-settle{
+        padding:0.4rem 0.9rem;background:transparent;border:1px solid var(--border-brass);
+        color:var(--ivory-dim);font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.1em;
+        text-transform:uppercase;cursor:pointer;transition:all 0.15s;
+      }
+      .cont-btn-settle:hover{border-color:var(--brass);color:var(--brass-bright)}
+      .cont-btn-del{padding:0.4rem 0.7rem;background:transparent;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);font-family:var(--font-label);font-size:0.54rem;cursor:pointer}
     </style>
   `;
 }

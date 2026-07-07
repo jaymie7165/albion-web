@@ -1,6 +1,7 @@
 // nav.js — Albion v3 · Heraldická navigace
 
 const { canAccess } = require('./roles');
+const { escapeHtml } = require('./utils');
 
 function renderNav(req, active) {
   const ic = req.session.icName;
@@ -8,7 +9,7 @@ function renderNav(req, active) {
   const can = (pageId) => canAccess(accessLevel, pageId);
   const skladPages = ['sklad','weed-sazeni'];
   const blackbookPages = ['blackbook','profit-centrum'];
-  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie'];
+  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie','spis'];
   const dataPages  = ['audit','statistiky'];
 
   return `
@@ -68,13 +69,14 @@ function renderNav(req, active) {
         </li>` : ''}
 
         <li class="nav-dropdown ${infoPages.includes(active)?'open':''}">
-          <a href="#" class="nav-drop-trigger ${infoPages.includes(active)?'active':''}">
+          <button type="button" class="nav-drop-trigger ${infoPages.includes(active)?'active':''}" aria-haspopup="true" aria-expanded="${infoPages.includes(active)?'true':'false'}">
             Organizace
             <span class="nav-desc">Nástěnka · Kodex · Lore</span>
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
-          </a>
+          </button>
           <div class="nav-dropdown-menu">
             ${can('nastenska') ? `<a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka</a>` : ''}
+            ${can('spis') ? `<a href="/spis" class="${active==='spis'?'active':''}">Osobní spisy</a>` : ''}
             <a href="/kodex" class="${active==='kodex'?'active':''}">Kodex</a>
             <a href="/lore" class="${active==='lore'?'active':''}">Historie</a>
             <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a>
@@ -85,6 +87,34 @@ function renderNav(req, active) {
       </ul>
 
       <div class="nav-right" id="navRight">
+        <div class="evelyn-widget" id="evelynWidget" title="Evelyn Ashcroft — Sekretariát Albionu">
+          <img src="/evelyn.png" class="evelyn-portrait" alt="Evelyn Ashcroft" id="evelynImg" onerror="this.style.display='none';document.getElementById('evelynFallback').style.display='flex';">
+          <div class="evelyn-portrait evelyn-portrait-placeholder" id="evelynFallback" style="display:none">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4">
+              <circle cx="12" cy="8.5" r="3.4"/>
+              <path d="M5 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/>
+            </svg>
+          </div>
+          <span class="evelyn-ping" id="evelynPing"></span>
+        </div>
+        <div class="evelyn-letter" id="evelynLetter">
+          <div class="evelyn-letter-head">
+            <div class="evelyn-letter-from">
+              <span class="evelyn-letter-avatar">
+                <img src="/evelyn.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                <span class="evelyn-letter-avatar-fallback" style="display:none">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8.5" r="3.4"/><path d="M5 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/></svg>
+                </span>
+              </span>
+              <span>Evelyn Ashcroft · Sekretariát</span>
+            </div>
+            <button class="evelyn-letter-close" id="evelynCloseBtn" title="Zavřít">✕</button>
+          </div>
+          <div class="evelyn-letter-body" id="evelynLetterBody">
+            <div class="ledger-loading">Evelyn píše zprávu…</div>
+          </div>
+        </div>
+        <button class="ambient-btn" id="ambientBtn" title="Ambientní zvuk kanceláře">♫</button>
         ${can('nastenska') ? `
         <button class="notif-bell" id="notifBell" title="Oznámení" onclick="window.location='/nastenska'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -105,11 +135,13 @@ function renderNav(req, active) {
           <button class="theme-dot-btn" id="soundToggle" style="border-radius:0;width:18px;height:18px;background:none;border:1px solid var(--border-brass);color:var(--brass);font-size:0.65rem;display:flex;align-items:center;justify-content:center" title="Zvuky">♪</button>
         </div>
         <div class="theme-switcher" title="Přepnout téma">
-          <button class="theme-dot-btn" id="td-dark"  style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"  title="Heraldický noir"></button>
-          <button class="theme-dot-btn" id="td-light" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
+          <span class="theme-switcher-label">Téma</span>
+          <button class="theme-dot-btn" id="td-dark"  aria-label="Tmavý noir" style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"  title="Heraldický noir"></button>
+          <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
+          <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#F3EEE3,#0B0F0D,#F3EEE3);border:1.5px solid #B68A4E" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
         </div>
         <span class="nav-shortcut-hint" title="g+h Přehled${can('sklad')?' · g+s Sklad':''}${can('blackbook')?' · g+b Blackbook':''}${can('audit')?' · g+a Audit':''}${can('nastenska')?' · g+n Nástěnka':''} · / Hledat">g·_</span>
-        <span class="nav-user" style="border-left:2px solid ${({1:'var(--oxblood-bright)',2:'var(--brass-bright)',3:'var(--ivory-faint)'})[accessLevel]||'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${ic}</strong></span>
+        <span class="nav-user" style="border-left:2px solid ${({1:'var(--oxblood-bright)',2:'var(--brass-bright)',3:'var(--ivory-faint)'})[accessLevel]||'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${escapeHtml(ic)}</strong></span>
         <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
       </div>
@@ -153,34 +185,60 @@ function renderNav(req, active) {
       document.querySelectorAll('.nav-dropdown').forEach(dd => {
         const trigger = dd.querySelector('.nav-drop-trigger');
         let closeTimer = null;
+        function syncExpanded(){ if (trigger.hasAttribute('aria-haspopup')) trigger.setAttribute('aria-expanded', dd.classList.contains('open') ? 'true' : 'false'); }
         trigger.addEventListener('click', (e) => {
           const href = trigger.getAttribute('href');
           if (href && href !== '#') {
-            if (window.innerWidth <= 880) { e.preventDefault(); dd.classList.toggle('open'); return; }
+            if (window.innerWidth <= 880) { e.preventDefault(); dd.classList.toggle('open'); syncExpanded(); return; }
             return;
           }
-          e.preventDefault(); dd.classList.toggle('open');
+          e.preventDefault(); dd.classList.toggle('open'); syncExpanded();
         });
-        dd.addEventListener('mouseenter', () => { if (window.innerWidth <= 880) return; clearTimeout(closeTimer); dd.classList.add('open'); });
-        dd.addEventListener('mouseleave', () => { if (window.innerWidth <= 880) return; clearTimeout(closeTimer); closeTimer = setTimeout(() => dd.classList.remove('open'), 300); });
+        dd.addEventListener('mouseenter', () => { if (window.innerWidth <= 880) return; clearTimeout(closeTimer); dd.classList.add('open'); syncExpanded(); });
+        dd.addEventListener('mouseleave', () => { if (window.innerWidth <= 880) return; clearTimeout(closeTimer); closeTimer = setTimeout(() => { dd.classList.remove('open'); syncExpanded(); }, 300); });
       });
-      document.addEventListener('click', (e) => { if (!e.target.closest('.nav-dropdown')) document.querySelectorAll('.nav-dropdown').forEach(dd => dd.classList.remove('open')); });
+      document.addEventListener('click', (e) => { if (!e.target.closest('.nav-dropdown')) document.querySelectorAll('.nav-dropdown').forEach(dd => { dd.classList.remove('open'); const t=dd.querySelector('.nav-drop-trigger'); if(t&&t.hasAttribute('aria-haspopup'))t.setAttribute('aria-expanded','false'); }); });
       navMenu.querySelectorAll('a[href]:not([href="#"])').forEach(a => a.addEventListener('click', closeMobileNav));
 
-      // ── TÉMATA ──
+      // ── NÁLADA — reálná denní doba, nezávislá na zvoleném tématu ──
+      // Auto téma reaguje na VŠECHNY čtyři fáze dne — svítání a soumrak dostávají
+      // tmavý noir s teplým podbarvením (mood-sunrise/mood-sunset), pergamen
+      // (light) patří jen skutečnému dni. Díky tomu je při přepnutí na "Auto"
+      // vždy vidět, že se něco změnilo, i mimo úzké polední okno.
+      const MOODS = ['mood-sunrise','mood-day','mood-sunset','mood-night'];
+      const MOOD_LABEL = { 'mood-sunrise':'svítání', 'mood-day':'den', 'mood-sunset':'soumrak', 'mood-night':'noc' };
+      function moodFromHour(h){ if(h>=5&&h<7)return'mood-sunrise'; if(h>=7&&h<17)return'mood-day'; if(h>=17&&h<21)return'mood-sunset'; return'mood-night'; }
+      function applyMoodTick(){
+        const m = moodFromHour(new Date().getHours());
+        MOODS.forEach(c=>document.body.classList.remove(c));
+        document.body.classList.add(m);
+        if (currentTheme === 'auto') {
+          // Jen "den" je pergamen — svítání, soumrak i noc zůstávají v noiru
+          // (ale s vlastním teplým/chladným podbarvením dle mood- třídy výše)
+          document.body.classList.toggle('light', m === 'mood-day');
+        }
+      }
+
+      // ── TÉMATA ── ('dark' | 'light' | 'auto' = dle reálné denní doby)
       const THEMES = ['dark','light'];
       let currentTheme = localStorage.getItem('albion_theme') || 'dark';
       function applyTheme(t) {
-        THEMES.forEach(c => document.body.classList.remove(c));
-        if (t !== 'dark') document.body.classList.add(t);
         currentTheme = t;
         localStorage.setItem('albion_theme', t);
-        THEMES.forEach(th => {
+        THEMES.forEach(c => document.body.classList.remove(c));
+        if (t === 'light') document.body.classList.add('light');
+        ['dark','light','auto'].forEach(th => {
           const btn = document.getElementById('td-' + th);
           if (btn) btn.classList.toggle('active', th === t);
         });
+        applyMoodTick(); // pro 'auto' tady doreší light/dark dle aktuální fáze dne
+        if (t === 'auto' && window.showToast) {
+          const m = moodFromHour(new Date().getHours());
+          showToast('Auto režim aktivní — právě je ' + MOOD_LABEL[m]);
+        }
       }
       applyTheme(currentTheme);
+      setInterval(applyMoodTick, 60000);
       function setTheme(t) { applyTheme(t); }
 
       // ── SSE NOTIFIKACE ──
@@ -210,7 +268,16 @@ function renderNav(req, active) {
         if (d.action === 'add' && d.timer) showToast('Weed sázení · ' + d.timer.icName + ' (' + d.timer.postal + ')');
       });
 
+      let _toastQueue = [];
+      let _toastActive = false;
       function showToast(msg, isError) {
+        _toastQueue.push({ msg, isError });
+        _processToastQueue();
+      }
+      function _processToastQueue() {
+        if (_toastActive || !_toastQueue.length) return;
+        _toastActive = true;
+        const { msg, isError } = _toastQueue.shift();
         let t = document.getElementById('toast');
         if (!t) { t = document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
         t.className = 'toast' + (isError ? ' error' : '');
@@ -225,19 +292,35 @@ function renderNav(req, active) {
         void t.offsetWidth;
         t.classList.add('show');
         clearTimeout(t._timer);
-        t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+        t._timer = setTimeout(() => {
+          t.classList.remove('show');
+          // Počkat na doběhnutí fade-out (0.3s v CSS), pak pustit další zprávu z fronty
+          setTimeout(() => { _toastActive = false; _processToastQueue(); }, 320);
+        }, 3500);
       }
       window.showToast = showToast;
 
-      window.ledgerEmptyHTML = function(text, compact) {
+      window.ledgerEmptyHTML = function(text, compact, variant) {
+        const ICONS = {
+          default: '<rect x="3" y="2" width="58" height="44" rx="1" stroke="var(--border-brass)" stroke-width="1"/>' +
+            '<line x1="12" y1="14" x2="44" y2="14" stroke="var(--border)" stroke-width="1"/>' +
+            '<line x1="12" y1="22" x2="52" y2="22" stroke="var(--border)" stroke-width="1"/>' +
+            '<line x1="12" y1="30" x2="38" y2="30" stroke="var(--border)" stroke-width="1"/>' +
+            '<line x1="12" y1="38" x2="48" y2="38" stroke="var(--border)" stroke-width="1"/>',
+          photo: '<rect x="3" y="2" width="58" height="44" rx="1" stroke="var(--border-brass)" stroke-width="1"/>' +
+            '<circle cx="18" cy="16" r="5" stroke="var(--border)" stroke-width="1"/>' +
+            '<path d="M6 38 L22 24 L34 34 L44 22 L58 36" stroke="var(--border)" stroke-width="1" fill="none"/>',
+          people: '<circle cx="24" cy="16" r="7" stroke="var(--border-brass)" stroke-width="1"/>' +
+            '<path d="M10 40c0-8 6-13 14-13s14 5 14 13" stroke="var(--border)" stroke-width="1" fill="none"/>' +
+            '<circle cx="46" cy="18" r="5" stroke="var(--border)" stroke-width="1"/>' +
+            '<path d="M38 40c0-6 4-10 10-10" stroke="var(--border)" stroke-width="1" fill="none"/>',
+          stock: '<rect x="4" y="18" width="14" height="24" stroke="var(--border-brass)" stroke-width="1"/>' +
+            '<rect x="21" y="10" width="14" height="32" stroke="var(--border)" stroke-width="1"/>' +
+            '<rect x="38" y="24" width="14" height="18" stroke="var(--border)" stroke-width="1"/>',
+        };
         return '<div class="ledger-empty' + (compact ? ' compact' : '') + '">' +
-          '<svg viewBox="0 0 64 48" fill="none">' +
-          '<rect x="3" y="2" width="58" height="44" rx="1" stroke="var(--border-brass)" stroke-width="1"/>' +
-          '<line x1="12" y1="14" x2="44" y2="14" stroke="var(--border)" stroke-width="1"/>' +
-          '<line x1="12" y1="22" x2="52" y2="22" stroke="var(--border)" stroke-width="1"/>' +
-          '<line x1="12" y1="30" x2="38" y2="30" stroke="var(--border)" stroke-width="1"/>' +
-          '<line x1="12" y1="38" x2="48" y2="38" stroke="var(--border)" stroke-width="1"/>' +
-          '</svg><div class="ledger-empty-text">' + text + '</div></div>';
+          '<svg viewBox="0 0 64 48" fill="none">' + (ICONS[variant] || ICONS.default) + '</svg>' +
+          '<div class="ledger-empty-text">' + text + '</div></div>';
       };
 
       window.skeletonRows = function(n, cols) {
@@ -308,6 +391,41 @@ function renderNav(req, active) {
           timerDone: () => { playTone(523,0.3,0.12); setTimeout(()=>playTone(659,0.3,0.12),150); },
         };
 
+        // Pečeťovací "thud" — sdíleno napříč Sklad/Garáž/Galerie/Nástěnka/Karta/Spisy,
+        // aby každé potvrzení důležité akce znělo stejně heraldicky.
+        window.albionSealThud = function(){
+          if(!enabled)return;
+          try{
+            const ctx=window._albionAudioCtx||(window._albionAudioCtx=new (window.AudioContext||window.webkitAudioContext)());
+            if(ctx.state==='suspended')ctx.resume();
+            const now=ctx.currentTime;
+            const osc=ctx.createOscillator();osc.type='sine';osc.frequency.setValueAtTime(180,now);osc.frequency.exponentialRampToValueAtTime(48,now+0.16);
+            const gain=ctx.createGain();gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(0.5,now+0.012);gain.gain.exponentialRampToValueAtTime(0.0001,now+0.32);
+            osc.connect(gain);const master=ctx.createGain();master.gain.value=0.9;gain.connect(master);master.connect(ctx.destination);osc.start(now);osc.stop(now+0.34);
+          }catch(e){}
+        };
+
+        // Jemný "papírový" mikro-zvuk pro otevírání modalů/karet MIMO Albion
+        // World — dřív tam bylo úplné ticho. Generovaný filtrovaným šumem,
+        // takže nepotřebuje žádný audio soubor.
+        window.albionPaper = function(){
+          if(!enabled)return;
+          try{
+            const ctx=window._albionAudioCtx||(window._albionAudioCtx=new (window.AudioContext||window.webkitAudioContext)());
+            if(ctx.state==='suspended')ctx.resume();
+            const now=ctx.currentTime;
+            const bufferSize=Math.floor(ctx.sampleRate*0.12);
+            const buffer=ctx.createBuffer(1,bufferSize,ctx.sampleRate);
+            const data=buffer.getChannelData(0);
+            for(let i=0;i<bufferSize;i++){ data[i]=(Math.random()*2-1)*Math.pow(1-i/bufferSize,2); }
+            const noise=ctx.createBufferSource();noise.buffer=buffer;
+            const filter=ctx.createBiquadFilter();filter.type='highpass';filter.frequency.value=1200;
+            const gain=ctx.createGain();gain.gain.setValueAtTime(0.16,now);gain.gain.exponentialRampToValueAtTime(0.0001,now+0.12);
+            noise.connect(filter);filter.connect(gain);gain.connect(ctx.destination);
+            noise.start(now);noise.stop(now+0.13);
+          }catch(e){}
+        };
+
         const btn = document.getElementById('soundToggle');
         if (btn) {
           function renderBtn(){ btn.style.opacity = enabled ? '1' : '0.35'; }
@@ -318,6 +436,58 @@ function renderNav(req, active) {
             renderBtn();
           });
         }
+      })();
+
+      // Sdílená informace o aktuální stránce — používá ambientní zvuk (jiná
+      // ambience pro Kodex/Historii) i Evelyn (kontextový brífink níže).
+      const CURRENT_PAGE = '${active}' || 'home';
+
+      // ── AMBIENTNÍ ZVUK KANCELÁŘE — napříč celým webem (ne jen /albion) ──
+      // Tlačítko ♫ v navu dřív nebylo na nic napojené. Sdílí localStorage klíč
+      // s /albion, takže stav (zapnuto/vypnuto) je konzistentní na celém webu,
+      // i když se přehrávání při přechodu na jinou stránku vždy znovu nastartuje
+      // (klasický multi-page web, ne SPA). Na Kodexu/Historii hraje místo
+      // kancelářské ambience tišší "kronikářská" stopa, ať sedí k tónu textu.
+      (function globalAmbient(){
+        const KEY = 'albion_ambient_on';
+        const btn = document.getElementById('ambientBtn');
+        if (!btn) return;
+        const AUDIO_BY_ENV = {
+          day: '/albion/audio/den.mp3', fog: '/albion/audio/mlha.mp3',
+          sunrise: '/albion/audio/vychod-slunce.mp3', sunset: '/albion/audio/zapad-slunce.mp3',
+          winter: '/albion/audio/snih.mp3', night: '/albion/audio/noc.mp3',
+        };
+        const KRONIKA_PAGES = ['kodex', 'lore'];
+        function envFromHour(h){ if(h>=5&&h<7)return'sunrise'; if(h>=7&&h<17)return'day'; if(h>=17&&h<21)return'sunset'; return'night'; }
+        function currentAudioSrc(){
+          if (KRONIKA_PAGES.includes(CURRENT_PAGE)) return '/albion/audio/kronika.mp3';
+          return AUDIO_BY_ENV[envFromHour(new Date().getHours())];
+        }
+        let on = localStorage.getItem(KEY) === '1';
+        function render(){ btn.classList.toggle('active', on); btn.textContent = on ? '♪' : '♫'; }
+        render();
+        let audioEl = null;
+        function ensureAudio(){
+          if (audioEl) return audioEl;
+          audioEl = new Audio();
+          audioEl.loop = true;
+          audioEl.volume = 0.22;
+          audioEl.src = currentAudioSrc();
+          return audioEl;
+        }
+        if (on) { const a = ensureAudio(); a.play().catch(() => { /* autoplay blokován do prvního kliku */ }); }
+        btn.addEventListener('click', () => {
+          on = !on;
+          localStorage.setItem(KEY, on ? '1' : '0');
+          render();
+          const a = ensureAudio();
+          if (on) a.play().catch(() => {});
+          else a.pause();
+        });
+        // Pokud autoplay selhal, spustí se při prvním kliknutí kamkoliv na stránku
+        document.addEventListener('click', function once(){
+          if (on && audioEl && audioEl.paused) audioEl.play().catch(() => {});
+        }, { once: true });
       })();
 
       // ── VIEW AS ──
@@ -339,15 +509,145 @@ function renderNav(req, active) {
         };
       })();
 
-      // ── SEZÓNNÍ VZHLED ──
+      // ── SEZÓNNÍ VZHLED ── (+ malý odznak vedle loga, ať se sezónnost propíše i do brandingu)
+      function applySeasonalBadge(season){
+        const logoText=document.querySelector('.nav-logo-text');
+        if(!logoText)return;
+        let badge=document.getElementById('seasonBadge');
+        if(!badge){ badge=document.createElement('span'); badge.id='seasonBadge'; badge.style.marginLeft='0.4rem'; badge.style.fontSize='0.85em'; logoText.appendChild(badge); }
+        const GLYPH={ vanoce:'❄', halloween:'🎃', 'novy-rok':'✦' };
+        badge.textContent = GLYPH[season] || '';
+      }
       fetch('/api/season').then(r=>r.json()).then(d=>{
         if(d.season && d.season!=='none') document.body.classList.add('season-'+d.season);
+        applySeasonalBadge(d.season);
       }).catch(()=>{});
       window.evtSource && window.evtSource.addEventListener('seasonChange', (e)=>{
         const d=JSON.parse(e.data);
         ['vanoce','halloween','novy-rok'].forEach(s=>document.body.classList.remove('season-'+s));
         if(d.season!=='none') document.body.classList.add('season-'+d.season);
+        applySeasonalBadge(d.season);
       });
+
+      // ── EVELYN ASHCROFT — sekretářka Albionu: kontextová "e-mailová" zpráva ──
+      // Místo jedné náhodné hlášky teď Evelyn posílá skutečný krátký brífink
+      // podle toho, na jaké stránce jste (nízké zásoby na Skladu, dorostlé
+      // odpočty na Weed sázení, stav pokladny na Blackbooku…) — data táhne
+      // z /api/evelyn/brief. Panel se navíc sám automaticky vysune po chvíli
+      // na každé stránce, je větší a vydrží otevřený déle.
+      (function evelyn(){
+        const letter=document.getElementById('evelynLetter');
+        const widget=document.getElementById('evelynWidget');
+        const body=document.getElementById('evelynLetterBody');
+        const closeBtn=document.getElementById('evelynCloseBtn');
+        const ping=document.getElementById('evelynPing');
+        if(!letter||!widget||!body)return;
+
+        const PAGE_ID = CURRENT_PAGE;
+        let shown=false, autoCloseTimer=null, briefCache=null;
+
+        function esc(s){return (s==null?'':String(s)).replace(/</g,'&lt;');}
+
+        function renderBrief(d){
+          const stamp=new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
+          let html='<div class="evelyn-letter-stamp">Doručeno '+stamp+'</div>';
+          html+='<div class="evelyn-letter-subject">'+esc(d.subject)+'</div>';
+          (d.lines||[]).forEach(l=>{ html+='<div class="evelyn-letter-line">'+esc(l)+'</div>'; });
+          if(d.tips&&d.tips.length){
+            html+='<div class="evelyn-letter-tips">'+d.tips.map(t=>'<div class="evelyn-letter-tip">'+esc(t)+'</div>').join('')+'</div>';
+          }
+          if(d.actions&&d.actions.length){
+            html+='<div class="evelyn-letter-actions">'+d.actions.map(a=>'<a href="'+a.href+'">'+esc(a.label)+'</a>').join('')+'</div>';
+          }
+          html+='<div class="evelyn-letter-sig">— E. Ashcroft</div>';
+          body.innerHTML=html;
+        }
+
+        function fetchBrief(){
+          return fetch('/api/evelyn/brief?page='+encodeURIComponent(PAGE_ID))
+            .then(r=>r.json())
+            .then(d=>{
+              if(!d.ok) throw new Error('no data');
+              briefCache=d;
+              renderBrief(d);
+              if(d.tips&&d.tips.length) ping.classList.add('show');
+              return d;
+            })
+            .catch(()=>{
+              body.innerHTML='<div class="evelyn-letter-line">Omlouvám se, momentálně nemám zprávu připravenou.</div>';
+            });
+        }
+
+        function openLetter(autoHideMs){
+          letter.classList.add('show');
+          shown=true;
+          ping.classList.remove('show');
+          clearTimeout(autoCloseTimer);
+          if(autoHideMs) autoCloseTimer=setTimeout(closeLetter,autoHideMs);
+        }
+        function closeLetter(){
+          letter.classList.remove('show');
+          shown=false;
+          clearTimeout(autoCloseTimer);
+        }
+        function toggleLetter(){
+          if(shown){closeLetter();return;}
+          openLetter(0);
+          if(!briefCache) fetchBrief();
+        }
+
+        widget.addEventListener('click',toggleLetter);
+        closeBtn.addEventListener('click',(e)=>{e.stopPropagation();closeLetter();});
+        document.addEventListener('click',(e)=>{
+          if(shown&&!e.target.closest('.evelyn-widget')&&!e.target.closest('.evelyn-letter'))closeLetter();
+        });
+
+        // Automatické vysunutí — na každé stránce, o něco větší panel a delší výdrž
+        setTimeout(()=>{ fetchBrief().then(()=>{ openLetter(11000); }); },1000);
+      })();
+
+      // ── AMBIENTNÍ SOUNDTRACK KANCELÁŘE — opt-in, hraje napříč celým webem ──
+      (function ambient(){
+        const KEY='albion_ambient_on';
+        const btn=document.getElementById('ambientBtn');
+        if(!btn)return;
+        const AUDIO_BY_ENV={day:'/albion/audio/den.mp3',fog:'/albion/audio/mlha.mp3',sunrise:'/albion/audio/vychod-slunce.mp3',sunset:'/albion/audio/zapad-slunce.mp3',winter:'/albion/audio/snih.mp3',night:'/albion/audio/noc.mp3'};
+        function envFromHour(h){if(h>=5&&h<7)return'sunrise';if(h>=7&&h<17)return'day';if(h>=17&&h<21)return'sunset';return'night';}
+        let on=localStorage.getItem(KEY)==='1';
+        function render(){btn.classList.toggle('active',on);btn.textContent=on?'♪':'♫';}
+        render();
+        let audioEl=null;
+        function ensureAudio(){
+          if(audioEl)return audioEl;
+          audioEl=new Audio();audioEl.loop=true;audioEl.volume=0.22;
+          audioEl.src=AUDIO_BY_ENV[envFromHour(new Date().getHours())];
+          return audioEl;
+        }
+        if(on){ const a=ensureAudio(); a.play().catch(()=>{ /* autoplay může být blokováno do prvního kliku */ }); }
+        btn.addEventListener('click',()=>{
+          on=!on;localStorage.setItem(KEY,on?'1':'0');render();
+          const a=ensureAudio();
+          if(on)a.play().catch(()=>{});else a.pause();
+        });
+        // Pokud autoplay selhal, spustí se při prvním kliknutí kamkoliv na stránku
+        document.addEventListener('click',function once(){ if(on&&audioEl&&audioEl.paused)audioEl.play().catch(()=>{}); },{once:true});
+      })();
+
+      // ── PAGE TRANSITION — jemný fade při odchodu na jinou stránku webu ──
+      (function pageTransition(){
+        document.addEventListener('click',(e)=>{
+          const a=e.target.closest('a[href]');
+          if(!a)return;
+          const href=a.getAttribute('href');
+          if(!href||href.startsWith('#')||href.startsWith('javascript:')||a.target==='_blank'||e.metaKey||e.ctrlKey||e.shiftKey)return;
+          if(a.hasAttribute('download'))return;
+          let url; try{url=new URL(href,location.href);}catch(err){return;}
+          if(url.origin!==location.origin)return;
+          e.preventDefault();
+          document.body.classList.add('page-leaving');
+          setTimeout(()=>{location.href=url.href;},180);
+        });
+      })();
 
       // ── KLÁVESOVÉ ZKRATKY ──
       (function(){

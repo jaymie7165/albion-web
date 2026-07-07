@@ -2,6 +2,7 @@
 // Founder/Council mohou měnit obsah bez zásahu do kódu.
 const fs = require('fs');
 const path = require('path');
+const { writeJsonAtomic } = require('./utils');
 
 function makeStore(dataDir, filename, defaults) {
   const FILE = path.join(dataDir, filename);
@@ -13,7 +14,7 @@ function makeStore(dataDir, filename, defaults) {
     } catch { return defaults; }
   }
   function save(data) {
-    try { fs.writeFileSync(FILE, JSON.stringify(data, null, 2)); } catch (e) { console.error('[CONTENT]', filename, e.message); }
+    try { writeJsonAtomic(FILE, data); } catch (e) { console.error('[CONTENT]', filename, e.message); }
   }
   return { load, save };
 }

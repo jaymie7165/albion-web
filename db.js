@@ -1,6 +1,7 @@
 // db.js — jednoduchá JSON databáze (bez nativních závislostí)
 const fs   = require('fs');
 const path = require('path');
+const { writeJsonAtomic } = require('./utils');
 
 // DŮLEŽITÉ: dřív bylo DB_FILE v __dirname (kód appky) — to Railway při
 // KAŽDÉM redeployi přepíše čerstvým buildem z gitu, takže se veškerá data
@@ -31,7 +32,7 @@ function load() {
 }
 
 function save(users) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2));
+  writeJsonAtomic(DB_FILE, users);
 }
 
 const db = {
@@ -185,6 +186,14 @@ db.setAccessLevel = (id, level) => {
   const users = load();
   const u = users.find(x => x.id === id);
   if (u) { u.access_level = level; save(users); return true; }
+  return false;
+};
+
+// ── SOUKROMÍ TRADING KARTY ──
+db.setCardPrivate = (id, isPrivate) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.card_private = !!isPrivate; save(users); return true; }
   return false;
 };
 

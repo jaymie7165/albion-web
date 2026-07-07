@@ -612,12 +612,58 @@ async function sendOnboardingDM(discordId, icName) {
 async function sendAnnouncement(title, content, uzivatel) {
   const channelId = process.env.CHANNEL_OZNAMENI;
   if (!channelId) return;
+  const FRAZE_OZNAMENI = [
+    'ráda bych předala následující oznámení organizaci.',
+    'na žádost vedení zveřejňuji toto sdělení.',
+    'níže naleznete aktuální oznámení pro všechny členy.',
+  ];
   await sendEmbed(channelId, {
     title: `📢 ${title}`,
-    description: content,
+    description: `*${nahodna(FRAZE_OZNAMENI)}*\n\n${content}`,
     color: 0xC9A84C,
+    author: EVELYN_AUTHOR,
     footer: { text: `Zveřejnil: ${uzivatel}` },
     timestamp: new Date().toISOString()
+  });
+}
+
+// Nová registrace člena — krátký zápis do interního kanálu, ať vedení vidí
+// přírůstky bez nutnosti procházet Discord OAuth log.
+async function notifyRegistrace(icName, discordUsername, discordId) {
+  const channelId = process.env.CHANNEL_REGISTRACE || process.env.CHANNEL_AUDIT;
+  if (!channelId) return;
+  await sendEmbed(channelId, {
+    title: '📝 NOVÁ REGISTRACE',
+    color: 0x6FA8C9,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, do rejstříku organizace jsem právě zapsala nového člena.`,
+    fields: [
+      { name: '👤 IC jméno', value: icName || '—', inline: true },
+      { name: '🔗 Discord', value: discordUsername ? `@${discordUsername}` : '—', inline: true },
+      { name: '🆔 Discord ID', value: discordId || '—', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// Automatický týdenní souhrn Blackbooku — pravidelný přehled financí a
+// aktivity organizace, ať to vedení nemusí samo chodit dohledávat na web.
+async function notifyTydenniSouhrn({ income, expense, net, ops, inactiveCount, totalMembers }) {
+  const channelId = process.env.CHANNEL_BLACKBOOK || process.env.CHANNEL_AUDIT;
+  if (!channelId) return;
+  await sendEmbed(channelId, {
+    title: '📊 TÝDENNÍ SOUHRN BLACKBOOKU',
+    color: net >= 0 ? 0x57F287 : 0xED4245,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, připravila jsem pro vedení pravidelný týdenní přehled organizace.`,
+    fields: [
+      { name: '💚 Příjem (7 dní)', value: `$${Math.round(income).toLocaleString('cs-CZ')}`, inline: true },
+      { name: '🔴 Výdaj (7 dní)', value: `$${Math.round(expense).toLocaleString('cs-CZ')}`, inline: true },
+      { name: net >= 0 ? '📈 Čistý zisk' : '📉 Čistá ztráta', value: `$${Math.round(Math.abs(net)).toLocaleString('cs-CZ')}`, inline: true },
+      { name: '⚙ Operací', value: `${ops}`, inline: true },
+      { name: '👥 Neaktivní 7+ dní', value: `${inactiveCount} / ${totalMembers}`, inline: true },
+    ],
+    timestamp: new Date().toISOString(),
   });
 }
 
@@ -664,4 +710,4 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
