@@ -26,7 +26,7 @@ async function sendEmbed(channelId, embed) {
 // se neměnil, přibyla jen osobnostní vrstva (description + author).
 // ══════════════════════════════════════════════════════════════════════
 
-const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Albionu' };
+const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Caledonie' };
 
 // ── Pečeť Albionu (thumbnail) — stejný princip jako v botovi (helpers.js) ──
 // Dokud nemáte hostovaný obrázek erbu, zůstává vypnuté. Nastavte na
@@ -591,7 +591,7 @@ async function sendOnboardingDM(discordId, icName) {
     const channelId = dmChannel.data.id;
 
     const zpravy = [
-      `Vítejte v Albionu${icName ? `, ${icName}` : ''}! Jsem Evelyn Ashcroft a starám se o administrativní chod organizace — ceník, sklad, garáž a spoustu dalšího najdete na webovém rozhraní.`,
+      `Vítejte v Caledonie${icName ? `, ${icName}` : ''}! Jsem Evelyn Ashcroft a starám se o administrativní chod organizace — ceník, sklad, garáž a spoustu dalšího najdete na webovém rozhraní.`,
       `Pár tipů na začátek: aktuální ceník najdete v sekci **Ceník** na webu (i jako \`/cenik\` zde na Discordu). Zápisy do skladu (zbraně, weed, drogy, chemikálie) se dělají výhradně přes web — Discord slouží jako živá kronika toho, co se v organizaci děje.`,
       `Pokud si nebudete s něčím jistí, obraťte se na Senior Membera nebo výše — a přeji vám v organizaci mnoho úspěchů.`,
     ];

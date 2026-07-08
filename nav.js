@@ -15,10 +15,10 @@ function renderNav(req, active) {
   return `
     <nav>
       <a href="/home" class="nav-logo">
-        <img src="/logo.png" class="nav-logo-img" alt="Albion">
+        <img src="/logo.png" class="nav-logo-img" alt="Caledonia">
         <span class="nav-logo-text">AL<span class="b-red">B</span>ION</span>
       </a>
-      <a href="/albion" title="Vstoupit do ALBION" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--border-brass);color:var(--brass);flex-shrink:0;margin-left:0.6rem;text-decoration:none;transition:border-color .2s,color .2s" onmouseover="this.style.borderColor='var(--brass-bright)';this.style.color='var(--brass-bright)'" onmouseout="this.style.borderColor='var(--border-brass)';this.style.color='var(--brass)'">
+      <a href="/albion" title="Vstoupit do CALEDONIA" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--border-brass);color:var(--brass);flex-shrink:0;margin-left:0.6rem;text-decoration:none;transition:border-color .2s,color .2s" onmouseover="this.style.borderColor='var(--brass-bright)';this.style.color='var(--brass-bright)'" onmouseout="this.style.borderColor='var(--border-brass)';this.style.color='var(--brass)'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
       </a>
       <button class="nav-burger" id="navBurger" aria-label="Menu">
@@ -87,7 +87,7 @@ function renderNav(req, active) {
       </ul>
 
       <div class="nav-right" id="navRight">
-        <div class="evelyn-widget" id="evelynWidget" title="Evelyn Ashcroft — Sekretariát Albionu">
+        <div class="evelyn-widget" id="evelynWidget" title="Evelyn Ashcroft — Sekretariát Caledonie">
           <img src="/evelyn.png" class="evelyn-portrait" alt="Evelyn Ashcroft" id="evelynImg" onerror="this.style.display='none';document.getElementById('evelynFallback').style.display='flex';">
           <div class="evelyn-portrait evelyn-portrait-placeholder" id="evelynFallback" style="display:none">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4">
