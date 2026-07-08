@@ -471,7 +471,7 @@ async function checkStockMilestone(sekce, sheetName) {
         await discord.notifyVyznamenani(
           `Milník — ${SEKCE_LABEL[sekce] || sekce}`,
           `${SEKCE_LABEL[sekce] || sekce} poprvé přesáhl **${hranice.toLocaleString('cs-CZ')} ks** celkem.`,
-          'Organizace Albion', null,
+          'Organizace Caledonia', null,
         );
         return; // jedna hranice na zápis stačí, další se chytí příště
       }
@@ -496,7 +496,7 @@ async function checkPenizeMilestone() {
           await discord.notifyVyznamenani(
             `Milník — Pokladna (${mena.toUpperCase()})`,
             `Pokladna organizace poprvé přesáhla **${symbol}${hranice.toLocaleString('cs-CZ')}**.`,
-            'Organizace Albion', null,
+            'Organizace Caledonia', null,
           );
           break; // jedna hranice na měnu na zápis stačí
         }
@@ -693,9 +693,9 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/manifest.webmanifest', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.json({
-    name: 'Albion',
-    short_name: 'Albion',
-    description: 'Albion — interní rejstřík organizace',
+    name: 'Caledonia',
+    short_name: 'Caledonia',
+    description: 'Caledonia — interní rejstřík organizace',
     start_url: '/home',
     display: 'standalone',
     background_color: '#0A0908',
@@ -825,14 +825,14 @@ function renderProfil(req, user, aliases) {
   const aliasesJson = JSON.stringify(aliases);
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Profil</title>
+  <title>Caledonia — Profil</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, '')}
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Albion</div>
+        <div class="page-label">Organizace Caledonia</div>
         <h1 class="page-title">Profil</h1>
         <p class="page-sub">Nastavení IC jména a Discord aliasů pro správné přiřazení záznamů</p>
       </div>
@@ -1607,8 +1607,6 @@ app.post('/api/gallery', requireAuth, requireAccess('audit'), async (req, res) =
   const item = { id: filename, image: `/gallery-uploads/${filename}`, caption: (caption||'').toString().slice(0,200), pridal: req.session.icName, createdAt: Date.now() };
   items.push(item);
   saveGallery(items);
-  const imageUrl = `${req.protocol}://${req.get('host')}${item.image}`;
-  discord.notifyFotoalbum(item, req.session.icName, imageUrl).catch(() => {});
   res.json({ ok: true, item });
 });
 
@@ -1630,7 +1628,7 @@ app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, r
       .filter(m => m.content || (m.embeds && m.embeds.length))
       .map(m => ({
         id: m.id,
-        author: m.author?.username || 'Albion',
+        author: m.author?.username || 'Caledonia',
         content: m.content || (m.embeds[0]?.description || ''),
         title: m.embeds?.[0]?.title || null,
         timestamp: m.timestamp,
@@ -2204,12 +2202,12 @@ app.get('/karta/:icName?', requireAuth, (req, res) => {
 app.get('/nabor', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Připoj se</title>
+  <title>Caledonia — Připoj se</title>
   ${require('./styles').baseStyles()}
   </head><body>
   <main style="text-align:center;padding-top:5rem">
     <img src="/logo.png" style="width:140px;margin-bottom:2rem;filter:drop-shadow(0 0 30px rgba(110,20,35,0.6))">
-    <h1 class="page-title" style="font-size:3.5rem">ALBION</h1>
+    <h1 class="page-title" style="font-size:3.5rem">CALEDONIA</h1>
     <p class="page-sub" style="max-width:560px;margin:1rem auto 3rem">Organizace postavená na ambicích, loajalitě a důvěře. Nehledáme hlasité — hledáme schopné.</p>
     <div class="folio-footnote" style="text-align:left;max-width:600px;margin:0 auto 2rem">
       <strong>Poslání.</strong> Budovat dlouhodobý vliv v Los Santos skrze kontakty, důvěru a profesionalitu — ne násilí.
