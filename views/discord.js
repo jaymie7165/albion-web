@@ -4,18 +4,16 @@ const axios = require('axios');
 const BOT_TOKEN = () => process.env.DISCORD_TOKEN;
 
 async function sendEmbed(channelId, embed) {
-  if (!channelId || !BOT_TOKEN()) return null;
+  if (!channelId || !BOT_TOKEN()) return;
   if (ALBION_SEAL_URL && !embed.thumbnail) embed.thumbnail = { url: ALBION_SEAL_URL };
   try {
-    const res = await axios.post(
+    await axios.post(
       `https://discord.com/api/v10/channels/${channelId}/messages`,
       { embeds: [embed] },
       { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
     );
-    return res.data; // obsahuje mj. id zprávy — potřebné např. pro vytvoření vlákna
   } catch (err) {
     console.error('[DISCORD] Chyba odeslání embedu:', err.response?.data || err.message);
-    return null;
   }
 }
 
@@ -28,7 +26,7 @@ async function sendEmbed(channelId, embed) {
 // se neměnil, přibyla jen osobnostní vrstva (description + author).
 // ══════════════════════════════════════════════════════════════════════
 
-const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Albionu' };
+const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Caledonie' };
 
 // ── Pečeť Albionu (thumbnail) — stejný princip jako v botovi (helpers.js) ──
 // Dokud nemáte hostovaný obrázek erbu, zůstává vypnuté. Nastavte na
@@ -384,27 +382,7 @@ async function notifyGarage(car, uzivatel, discordUsername, imageUrl) {
   };
   if (imageUrl) embed.image = { url: imageUrl };
 
-  const posted = await sendEmbed(channelId, embed);
-
-  // Vlákno k tomuto konkrétnímu vozu — historie oprav/fotek/poznámek na
-  // jednom místě, ne rozházená mezi ostatními auty v hlavním kanálu.
-  if (posted?.id && BOT_TOKEN()) {
-    try {
-      const nazevVlakna = `${car.spz || 'Vůz'} — ${car.nazev || 'bez modelu'}`.slice(0, 100);
-      const threadRes = await axios.post(
-        `https://discord.com/api/v10/channels/${channelId}/messages/${posted.id}/threads`,
-        { name: nazevVlakna, auto_archive_duration: 10080 },
-        { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
-      );
-      await axios.post(
-        `https://discord.com/api/v10/channels/${threadRes.data.id}/messages`,
-        { content: 'Toto vlákno slouží jako evidence tohoto konkrétního vozu — opravy, další fotky či poznámky patří sem, ať se neztrácí mezi ostatními auty v hlavním kanálu.' },
-        { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
-      );
-    } catch (err) {
-      console.warn('[DISCORD] Nepodařilo se vytvořit vlákno k vozu:', err.response?.data || err.message);
-    }
-  }
+  await sendEmbed(channelId, embed);
 }
 
 async function notifyUcet(typ, castka, valuta, poznamka, uzivatel) {
@@ -599,29 +577,6 @@ async function notifyPersonalni(typ, jmeno, detail) {
   });
 }
 
-// ── Fotoalbum — nová fotka přidaná do galerie na webu ───────────────────
-async function notifyFotoalbum(item, uzivatel, imageUrl) {
-  const channelId = process.env.CHANNEL_FOTOALBUM;
-  if (!channelId) {
-    console.error('[DISCORD] CHANNEL_FOTOALBUM není nastaven v .env, fotka se nezapsala do Discordu.');
-    return;
-  }
-  const embed = {
-    title: '📷 NOVÁ FOTOGRAFIE V GALERII (web)',
-    color: 0xC9A84C,
-    author: EVELYN_AUTHOR,
-    description: `${pozdrav()}. Do fotoalba organizace přibyl nový snímek.`,
-    fields: [
-      { name: '👤 Přidal/a', value: uzivatel || item?.pridal || '—', inline: true },
-    ],
-    timestamp: new Date().toISOString(),
-  };
-  if (item?.caption) embed.fields.push({ name: '📝 Popisek', value: item.caption, inline: false });
-  if (imageUrl) embed.image = { url: imageUrl };
-
-  await sendEmbed(channelId, embed);
-}
-
 // ── Onboarding DM ────────────────────────────────────────────────────────
 // Krátká uvítací sekvence do soukromé zprávy novému členovi po registraci.
 // Použití: await sendOnboardingDM(discordId, icName)
@@ -636,7 +591,7 @@ async function sendOnboardingDM(discordId, icName) {
     const channelId = dmChannel.data.id;
 
     const zpravy = [
-      `Vítejte v Albionu${icName ? `, ${icName}` : ''}! Jsem Evelyn Ashcroft a starám se o administrativní chod organizace — ceník, sklad, garáž a spoustu dalšího najdete na webovém rozhraní.`,
+      `Vítejte v Caledonie${icName ? `, ${icName}` : ''}! Jsem Evelyn Ashcroft a starám se o administrativní chod organizace — ceník, sklad, garáž a spoustu dalšího najdete na webovém rozhraní.`,
       `Pár tipů na začátek: aktuální ceník najdete v sekci **Ceník** na webu (i jako \`/cenik\` zde na Discordu). Zápisy do skladu (zbraně, weed, drogy, chemikálie) se dělají výhradně přes web — Discord slouží jako živá kronika toho, co se v organizaci děje.`,
       `Pokud si nebudete s něčím jistí, obraťte se na Senior Membera nebo výše — a přeji vám v organizaci mnoho úspěchů.`,
     ];
@@ -755,4 +710,4 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyFotoalbum, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };

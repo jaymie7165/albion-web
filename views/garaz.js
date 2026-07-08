@@ -7,7 +7,7 @@ function renderGaraz(req) {
   const canManage = req.session.accessLevel === 1; // jen Founder/Council smí mazat/upravovat vozy
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Garáž</title>
+  <title>Caledonia — Garáž</title>
   ${baseStyles()}
   <style>
     .garage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1.6rem}
@@ -92,7 +92,7 @@ function renderGaraz(req) {
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Albion — Majetek organizace</div>
+        <div class="page-label">Caledonia — Majetek organizace</div>
         <h1 class="page-title">Garáž</h1>
         <p class="page-sub">Vozový park, SPZ, hodnota a určení každého vozu</p>
       </div>

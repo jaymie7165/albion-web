@@ -3,7 +3,7 @@
 function renderAuth(page, error, data) {
   const errors = {
     no_code: 'Discord autorizace selhala.',
-    not_on_server: 'Nejsi členem serveru Albion.',
+    not_on_server: 'Nejsi členem serveru Caledonia.',
     already_registered: 'Tento Discord účet je již v rejstříku.',
     not_registered: 'Nemáš záznam v rejstříku. Zaregistruj se.',
     auth_failed: 'Přihlášení selhalo. Zkus to znovu.',
@@ -289,7 +289,7 @@ function renderAuth(page, error, data) {
   `;
 
   // Heraldický SVG erb — shodný s logem webu
-  const crestSvg = `<img src="/logo.png" alt="Albion" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 20px rgba(110,20,35,0.5))">`;
+  const crestSvg = `<img src="/logo.png" alt="Caledonia" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 20px rgba(110,20,35,0.5))">`;
 
   const bootScreen = `
     <div class="boot-screen" id="bootScreen">
@@ -347,14 +347,14 @@ function renderAuth(page, error, data) {
   const heraldsCol = `
     <div class="auth-herald">
       <div class="herald-crest" id="heraldryCrest">${crestSvg}</div>
-      <p class="herald-motto">Albion nepotřebuje být <strong>hlasitý</strong>.<br>Stačí, že je <strong>nepřehlédnutelný</strong>.</p>
+      <p class="herald-motto">Caledonia nepotřebuje být <strong>hlasitá</strong>.<br>Stačí, že je <strong>nepřehlédnutelná</strong>.</p>
     </div>
     <div class="auth-divider-line"></div>
   `;
 
   if (page === 'login') return `<!DOCTYPE html><html lang="cs"><head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Albion — Přihlášení</title>${style}
+    <title>Caledonia — Přihlášení</title>${style}
   </head><body>
     ${bootScreen}
     <div class="auth-page">
@@ -375,14 +375,14 @@ function renderAuth(page, error, data) {
 
   if (page === 'register') return `<!DOCTYPE html><html lang="cs"><head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Albion — Registrace</title>${style}
+    <title>Caledonia — Registrace</title>${style}
   </head><body>
     <div class="auth-page">
       ${heraldsCol}
       <div class="auth-body">
         <div class="auth-eyebrow">Rejstřík organizace</div>
         <h1 class="auth-h1">Žádost o <span class="b-brass">členství</span></h1>
-        <p class="auth-subcopy">Pro registraci musíš být členem Discord serveru Albion. Po ověření tě rejstřík vyzve k zapsání jména a hesla.</p>
+        <p class="auth-subcopy">Pro registraci musíš být členem Discord serveru Caledonia. Po ověření tě rejstřík vyzve k zapsání jména a hesla.</p>
         ${errMsg}
         <a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a>
         <div class="auth-sep-line">nebo</div>
@@ -393,7 +393,7 @@ function renderAuth(page, error, data) {
 
   if (page === 'register_complete') return `<!DOCTYPE html><html lang="cs"><head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Albion — Zápis do rejstříku</title>${style}
+    <title>Caledonia — Zápis do rejstříku</title>${style}
   </head><body>
     <div class="auth-page">
       ${heraldsCol}
@@ -421,7 +421,7 @@ function renderAuth(page, error, data) {
       <div class="reg-ceremony-stage">
         <div class="reg-ceremony-seal"><span>A</span></div>
         <div class="reg-ceremony-name" id="regCeremonyName"></div>
-        <div class="reg-ceremony-sub">Zapsán do rejstříku Albionu</div>
+        <div class="reg-ceremony-sub">Zapsán do rejstříku Caledonie</div>
       </div>
     </div>
     <script>
@@ -452,7 +452,7 @@ function renderAuth(page, error, data) {
 
   if (page === 'login_password') return `<!DOCTYPE html><html lang="cs"><head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Albion — Potvrzení totožnosti</title>${style}
+    <title>Caledonia — Potvrzení totožnosti</title>${style}
   </head><body>
     <div class="auth-page">
       ${heraldsCol}

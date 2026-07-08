@@ -6,7 +6,7 @@ const { renderNav } = require('../nav');
 function renderAudit(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Audit</title>
+  <title>Caledonia — Audit</title>
   ${baseStyles()}
   <style>
     .ucet-souhrn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:1rem;margin-bottom:2rem}
@@ -24,7 +24,7 @@ function renderAudit(req) {
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Albion</div>
+        <div class="page-label">Organizace Caledonia</div>
         <h1 class="page-title">Audit</h1>
         <p class="page-sub">Kompletní záznam všech akcí — posledních 200 záznamů</p>
       </div>

@@ -6,7 +6,7 @@ const { renderNav } = require('../nav');
 function renderProfitCentrum(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Profit centrum</title>
+  <title>Caledonia — Profit centrum</title>
   ${baseStyles()}
   <style>
     /* Period tally plaques */
@@ -49,7 +49,7 @@ function renderProfitCentrum(req) {
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Albion — Blackbook</div>
+        <div class="page-label">Caledonia — Blackbook</div>
         <h1 class="page-title">Profit centrum</h1>
         <p class="page-sub">Přehled ziskovosti — počítáno z účetnictví a skladů</p>
       </div>

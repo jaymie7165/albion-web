@@ -91,7 +91,7 @@ function renderHome(req, data) {
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Rejstřík</title>
+  <title>Caledonia — Rejstřík</title>
   ${baseStyles()}
   <style>
     /* ── HERO — heraldická záhlavní strana s radiálními paprsky ── */
@@ -281,11 +281,11 @@ function renderHome(req, data) {
 
       <!-- Erb -->
       <div class="home-crest" id="homeCrest">
-        <img src="/logo.png" alt="Albion" style="width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:lighten;filter:drop-shadow(0 0 28px rgba(110,20,35,0.7))">
+        <img src="/logo.png" alt="Caledonia" style="width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:lighten;filter:drop-shadow(0 0 28px rgba(110,20,35,0.7))">
       </div>
 
       <div class="home-eyebrow">Los Santos · Interní rejstřík</div>
-      <h1 class="home-title">ALBION</h1>
+      <h1 class="home-title">CALEDONIA</h1>
       <div class="home-title-rule"></div>
       <p class="home-greeting">${greeting}, <strong>${escapeHtml(icName)}</strong></p>
       <div class="home-meta">
@@ -301,7 +301,7 @@ function renderHome(req, data) {
     ${isRestricted ? `
     <div class="tally" style="grid-template-columns:1fr">
       <div class="plaque">
-        <div class="plaque-label">Vítej v Albionu</div>
+        <div class="plaque-label">Vítej v Caledonii</div>
         <div class="plaque-value" style="font-size:1.1rem">Finance a sklad jsou viditelné jen od hodnosti Senior Member výš</div>
         <div class="plaque-sub">obrať se na Council nebo Foundera ohledně přístupu</div>
       </div>
@@ -413,7 +413,7 @@ function renderHome(req, data) {
   </main>
   <div class="modal-overlay" id="onboardModal">
     <div class="modal-box" style="max-width:560px;text-align:left">
-      <div class="modal-title">Vítej v Albionu</div>
+      <div class="modal-title">Vítej v Caledonii</div>
       <div class="modal-subtitle" id="onb-step-content" style="line-height:1.8"></div>
       <div style="display:flex;justify-content:center;gap:0.4rem;margin:1rem 0">
         <span class="onb-dot" data-i="0"></span><span class="onb-dot" data-i="1"></span><span class="onb-dot" data-i="2"></span><span class="onb-dot" data-i="3"></span>
@@ -494,17 +494,17 @@ function renderHome(req, data) {
     fetch('/api/weekly-summary').then(r=>r.json()).then(d=>{
       if(!d.ok)return;
       const el=document.getElementById('weekly-banner');
-      const netTxt=(d.net>=0?'vydělal':'prodělal')+' $'+Math.abs(Math.round(d.net)).toLocaleString('cs-CZ');
-      el.innerHTML='<strong style="color:var(--brass-bright)">Tento týden Albion</strong> '+netTxt+' a provedl '+d.ops+' finančních operací.';
+      const netTxt=(d.net>=0?'vydělala':'prodělala')+' $'+Math.abs(Math.round(d.net)).toLocaleString('cs-CZ');
+      el.innerHTML='<strong style="color:var(--brass-bright)">Tento týden Caledonia</strong> '+netTxt+' a provedl '+d.ops+' finančních operací.';
       el.style.display='block';
     }).catch(()=>{});` : ''}
 
     // ── ONBOARDING ──
     const ONB_STEPS = [
-      '<strong style="color:var(--brass-bright)">Krátká historie.</strong><br>Albion vznikl krátce po příchodu Christophera Sinclaira do Los Santos — organizace postavená na důvěře, ne na strachu. <a href="/lore" style="color:var(--brass)">Číst celou kroniku →</a>',
+      '<strong style="color:var(--brass-bright)">Krátká historie.</strong><br>Caledonia vznikla krátce po příchodu Christophera Sinclaira do Los Santos — organizace postavená na důvěře, ne na strachu. <a href="/lore" style="color:var(--brass)">Číst celou kroniku →</a>',
       '<strong style="color:var(--brass-bright)">Kodex.</strong><br>Deset principů, které jsou závazné pro každého člena bez výjimky — loajalita, diskrétnost, profesionalita. <a href="/kodex" style="color:var(--brass)">Přečíst kodex →</a>',
       '<strong style="color:var(--brass-bright)">Hierarchie.</strong><br>Pět úrovní členství — od Associate po Foundera. Postup závisí na loajalitě, schopnostech a přínosu organizaci. <a href="/hierarchy" style="color:var(--brass)">Zobrazit hierarchii →</a>',
-      '<strong style="color:var(--brass-bright)">První kroky.</strong><br>Sleduj Nástěnku pro oznámení, drž se Kodexu a v případě dotazů kontaktuj svého Senior Membera nebo Council. Albion roste — staň se jeho součástí.',
+      '<strong style="color:var(--brass-bright)">První kroky.</strong><br>Sleduj Nástěnku pro oznámení, drž se Kodexu a v případě dotazů kontaktuj svého Senior Membera nebo Council. Caledonia roste — staň se její součástí.',
     ];
     let onbStep=0;
     function onbRender(){
@@ -533,7 +533,7 @@ function renderHome(req, data) {
           '<div class="seal-stamp slam" style="position:static;transform:scale(1.3);opacity:1;margin:0 auto 1rem"><span>A</span></div>'+
           '<div class="modal-title">Povýšení!</div>'+
           '<div class="modal-subtitle">Byl jsi povýšen na novou hodnost: <strong style="color:var(--brass-bright)">'+d.toLabel+'</strong><br><br>'+
-            'Než tvá pečeť vejde v platnost, stvrď přísahu věrnosti Albionu. Napiš do pole níže slovo <strong style="color:var(--brass-bright)">'+OATH_TEXT+'</strong> a přilož svou pečeť.</div>'+
+            'Než tvá pečeť vejde v platnost, stvrď přísahu věrnosti Caledonii. Napiš do pole níže slovo <strong style="color:var(--brass-bright)">'+OATH_TEXT+'</strong> a přilož svou pečeť.</div>'+
           '<input type="text" id="oathInput" placeholder="'+OATH_TEXT+'" style="text-align:center;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:1rem">'+
           '<button class="modal-btn-confirm" style="width:100%" id="oathBtn" disabled>Složit přísahu</button>'+
         '</div>';

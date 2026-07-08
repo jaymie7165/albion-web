@@ -72,7 +72,7 @@ function renderAlbion(req, data) {
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ALBION — Kancelář</title>
+  <title>CALEDONIA — Kancelář</title>
   <link rel="icon" type="image/png" href="/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -211,7 +211,7 @@ function renderAlbion(req, data) {
   <div class="vignette"></div>
 
   <nav class="a-nav">
-    <a href="/home" class="a-logo"><img src="/logo.png" alt="Albion">ALBION</a>
+    <a href="/home" class="a-logo"><img src="/logo.png" alt="Caledonia">CALEDONIA</a>
     <div class="a-menu">
       <button onclick="openFocus('/home','Dashboard')">Dashboard</button>
       ${can('garaz') ? `<button onclick="openFocus('/garaz','Garáž')">Garáž</button>` : ''}
@@ -227,7 +227,7 @@ function renderAlbion(req, data) {
     </div>
     <div class="a-user">
       <img src="${photo}" alt="${icName || ''}">
-      <div class="a-user-text"><small>VÍTEJ ZPĚT,</small>${icName || 'Albion'}</div>
+      <div class="a-user-text"><small>VÍTEJ ZPĚT,</small>${icName || 'Caledonia'}</div>
     </div>
   </nav>
 
@@ -243,7 +243,7 @@ function renderAlbion(req, data) {
     <div style="display:flex;gap:0.6rem">
       <button class="a-btn" id="soundBtn" onclick="toggleSound()">🔈 Zapnout zvuk</button>
       <button class="a-btn" onclick="toggleSettings()">Nastavení prostředí</button>
-      <button class="a-btn a-leave" onclick="leaveAlbion()">Opustit Albion</button>
+      <button class="a-btn a-leave" onclick="leaveAlbion()">Opustit Caledonii</button>
     </div>
   </div>
 

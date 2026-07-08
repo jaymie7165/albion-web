@@ -7,14 +7,14 @@ function renderBlackbook(req) {
   const canManageCont = req.session.accessLevel === 1;
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Blackbook</title>
+  <title>Caledonia — Blackbook</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'blackbook')}
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Albion</div>
+        <div class="page-label">Organizace Caledonia</div>
         <h1 class="page-title">Blackbook</h1>
         <p class="page-sub">Analytické reporty — sklad, finance, členové, bezpečnost</p>
       </div>

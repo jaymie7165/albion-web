@@ -9,7 +9,7 @@ function renderWeedSazeni(req) {
   const icName = req.session.icName;
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Weed sázení</title>
+  <title>Caledonia — Weed sázení</title>
   ${baseStyles()}
   <style>
     /* Ceník tabulka — vertikální plaque styl */
@@ -56,7 +56,7 @@ function renderWeedSazeni(req) {
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Albion — Sklad</div>
+        <div class="page-label">Caledonia — Sklad</div>
         <h1 class="page-title">Weed sázení</h1>
         <p class="page-sub">Ceník, kalkulačka materiálu a sdílené odpočty růstu</p>
       </div>

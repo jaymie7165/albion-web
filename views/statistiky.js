@@ -6,14 +6,14 @@ const { renderNav } = require('../nav');
 function renderStatistiky(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Statistiky</title>
+  <title>Caledonia — Statistiky</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'statistiky')}
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Albion</div>
+        <div class="page-label">Organizace Caledonia</div>
         <h1 class="page-title">Statistiky členů</h1>
         <p class="page-sub">Detailní přehled příspěvků každého člena organizace</p>
       </div>

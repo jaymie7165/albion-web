@@ -7,13 +7,13 @@ function renderGallery(req) {
   const canManage = (req.session.realAccessLevel || req.session.accessLevel) === 1;
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Galerie</title>
+  <title>Caledonia — Galerie</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'galerie')}
   <main>
     <div class="page-header"><div>
-      <div class="page-label">Organizace Albion</div>
+      <div class="page-label">Organizace Caledonia</div>
       <h1 class="page-title">Galerie</h1>
       <p class="page-sub">Kronika frakce ve fotografiích</p>
     </div></div>

@@ -6,7 +6,7 @@ const { renderNav } = require('../nav');
 function renderNastenska(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Nástěnka</title>
+  <title>Caledonia — Nástěnka</title>
   ${baseStyles()}
   <style>
     .nastenska-layout{display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start}
@@ -17,7 +17,7 @@ function renderNastenska(req) {
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Albion</div>
+        <div class="page-label">Organizace Caledonia</div>
         <h1 class="page-title">Nástěnka</h1>
         <p class="page-sub">Oznámení synchronizovaná s Discord kanálem v reálném čase</p>
       </div>

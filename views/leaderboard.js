@@ -6,14 +6,14 @@ const { renderNav } = require('../nav');
 function renderLeaderboard(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Leaderboard aktivity</title>
+  <title>Caledonia — Leaderboard aktivity</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'leaderboard')}
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Albion</div>
+        <div class="page-label">Organizace Caledonia</div>
         <h1 class="page-title">Aktivita členů</h1>
         <p class="page-sub">Kdo nejvíc pracuje pro frakci — bez ohledu na finance</p>
       </div>

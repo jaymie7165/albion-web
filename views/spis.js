@@ -7,7 +7,7 @@ function renderSpisy(req, members) {
   const membersJson = JSON.stringify(members);
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Osobní spisy</title>
+  <title>Caledonia — Osobní spisy</title>
   ${baseStyles()}
   <style>
     .spis-shell{display:grid;grid-template-columns:280px 1fr;gap:1.6rem;align-items:start}
@@ -26,7 +26,7 @@ function renderSpisy(req, members) {
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Albion — Interní</div>
+        <div class="page-label">Caledonia — Interní</div>
         <h1 class="page-title">Osobní spisy</h1>
         <p class="page-sub">Důvěrné poznámky o členech — vidí jen Founder/Council</p>
       </div>

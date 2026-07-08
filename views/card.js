@@ -6,7 +6,7 @@ const { renderNav } = require('../nav');
 function renderCard(req, icName) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Karta člena</title>
+  <title>Caledonia — Karta člena</title>
   ${baseStyles()}
   <style>
     .tc-line{display:flex;justify-content:space-between;padding:0.55rem 0;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:0.84rem}

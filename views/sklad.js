@@ -64,7 +64,7 @@ function renderDashboard(req, data) {
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Sklad</title>
+  <title>Caledonia — Sklad</title>
   ${baseStyles()}
   <style>
     /* ── SKLAD OPENER ── */
