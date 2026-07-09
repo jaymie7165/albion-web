@@ -157,14 +157,39 @@ function renderNemovitosti(req) {
     }
     function removeNemImage(i){ pendingImages.splice(i,1); renderThumbs(); }
     window.removeNemImage = removeNemImage;
-    function addFilesToPending(files){
-      [...files].forEach(function(f){
-        if(!f||!f.type||!f.type.startsWith('image/'))return;
-        if(pendingImages.length>=8){ showToast('Max 8 fotek na nemovitost', true); return; }
-        const reader = new FileReader();
-        reader.onload = function(){ pendingImages.push(reader.result); renderThumbs(); };
-        reader.readAsDataURL(f);
+
+    // Zmenší obrázek (screenshoty a fotky z mobilu bývají řádově MB) na rozumnou
+    // velikost pro web, ať se pak zbytečně neposílají desítky MB v JSON body.
+    function resizeImage(file, maxDim, quality){
+      maxDim = maxDim || 1600; quality = quality || 0.82;
+      return new Promise(function(resolve){
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = function(){
+          let { width, height } = img;
+          if(width > maxDim || height > maxDim){
+            const scale = maxDim / Math.max(width, height);
+            width = Math.round(width*scale); height = Math.round(height*scale);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = function(){ URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
       });
+    }
+
+    async function addFilesToPending(files){
+      for(const f of [...files]){
+        if(!f||!f.type||!f.type.startsWith('image/'))continue;
+        if(pendingImages.length>=8){ showToast('Max 8 fotek na nemovitost', true); break; }
+        const resized = await resizeImage(f);
+        if(resized){ pendingImages.push(resized); renderThumbs(); }
+        else showToast('Fotku se nepodařilo zpracovat, zkus jinou', true);
+      }
     }
     const nemZone = document.getElementById('nemUploadZone');
     const nemFile = document.getElementById('nemImageFile');
@@ -228,8 +253,9 @@ function renderNemovitosti(req) {
       const url = editingId ? ('/api/nemovitosti/'+editingId) : '/api/nemovitosti';
       const method = editingId ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      const d = await res.json();
       btn.disabled = false; btn.textContent = 'Uložit nemovitost';
+      if(!res.ok){ showToast('Server odmítl požadavek (moc velké fotky?), zkus jich přidat méně', true); return; }
+      const d = await res.json();
       if(d.ok){ if(window.albionSealThud) window.albionSealThud(); showToast(editingId?'Nemovitost upravena':'Nemovitost zapsána'); closeNemModal(); loadNem(); }
       else showToast(d.error, true);
     }
