@@ -2,9 +2,9 @@
 
 function renderAuth(page, error, data) {
   const errors = {
-    no_code: 'Discord autorizace selhala.',
-    not_on_server: 'Nejsi členem serveru Caledonia.',
-    already_registered: 'Tento Discord účet je již v rejstříku.',
+    no_code: 'Ověření se nezdařilo, zkus to prosím znovu.',
+    not_on_server: 'Nejsi evidován/a v systému organizace Caledonia. Obrať se na sekretariát.',
+    already_registered: 'Tento účet je již v rejstříku organizace.',
     not_registered: 'Nemáš záznam v rejstříku. Zaregistruj se.',
     auth_failed: 'Přihlášení selhalo. Zkus to znovu.',
     not_found: 'Záznam nenalezen.',
@@ -362,7 +362,7 @@ function renderAuth(page, error, data) {
       <div class="auth-body">
         <div class="auth-eyebrow">Rejstřík organizace</div>
         <h1 class="auth-h1">Vstup pro <span class="b-brass">členy</span></h1>
-        <p class="auth-subcopy">Přihlášení vyžaduje příslušnost na Discordu a heslo do interního rejstříku.</p>
+        <p class="auth-subcopy">Přihlášení vyžaduje ověřenou příslušnost k organizaci a heslo do interního rejstříku.</p>
         <div class="auth-seal-status"><div class="auth-seal-dot"></div><span>Kanál zapečetěn</span></div>
         ${errMsg}
         <a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a>
@@ -382,7 +382,7 @@ function renderAuth(page, error, data) {
       <div class="auth-body">
         <div class="auth-eyebrow">Rejstřík organizace</div>
         <h1 class="auth-h1">Žádost o <span class="b-brass">členství</span></h1>
-        <p class="auth-subcopy">Pro registraci musíš být členem Discord serveru Caledonia. Po ověření tě rejstřík vyzve k zapsání jména a hesla.</p>
+        <p class="auth-subcopy">Pro registraci musíš být evidován/a v systému organizace Caledonia. Po ověření tě rejstřík vyzve k zapsání jména a hesla.</p>
         ${errMsg}
         <a href="/auth/discord?action=register" class="auth-btn">Pokračovat přes Discord</a>
         <div class="auth-sep-line">nebo</div>

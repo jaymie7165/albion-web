@@ -13,7 +13,7 @@ function renderHome(req, data) {
   // vychází z toho, že nemají přístup ke Skladu, Auditu ani Blackbooku.
   const isRestricted = accessLevel >= 3;
 
-  const WEED_P = {"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
+  const WEED_P = {"Žlutý kanabis":165,"Zelený kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
 
   let totalValue = 0;
   Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += q * WEED_P[k]; });

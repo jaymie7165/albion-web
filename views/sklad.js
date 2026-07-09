@@ -46,11 +46,23 @@ function renderDashboard(req, data) {
   };
 
   const totalValue = (() => {
-    const W={"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
+    const W={"Žlutý kanabis":165,"Zelený kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
     let t=0;
     Object.entries(weed).forEach(([k,q])=>{if(q>0&&W[k])t+=q*W[k];});
     return t;
   })();
+
+  // ── PŘEPOČET GRAMY ⇄ SÁČKY ──────────────────────────────────────────────
+  // Weed a drogy se do skladu zapisují v gramech. 1 sáček = 5 g, takže ze
+  // stavu skladu (v gramech) jde vždy dopočítat, kolik hotových sáčků na
+  // prodej z toho reálně jde poskládat a kolik gramů zbývá "navíc".
+  const GRAMU_NA_SACEK = 5;
+  const totalWeedG = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalDrogyG = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const weedSacky = Math.floor(totalWeedG / GRAMU_NA_SACEK);
+  const weedZbytekG = totalWeedG % GRAMU_NA_SACEK;
+  const drogySacky = Math.floor(totalDrogyG / GRAMU_NA_SACEK);
+  const drogyZbytekG = totalDrogyG % GRAMU_NA_SACEK;
 
   const sekceMeta = [
     { id: 'ucet',   label: 'Účetnictví', sub: 'Finance',     icon: '◉' },
@@ -246,6 +258,12 @@ function renderDashboard(req, data) {
       </div>
     </div>
 
+    <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-dim);margin:-1.4rem 0 2rem;padding:0.8rem 1.1rem;border:1px solid var(--border-brass);background:var(--brass-faint)">
+      <strong style="color:var(--brass-bright)">Jednotky skladu:</strong> Weed a drogy se do skladu zapisují v <strong>gramech</strong>. Přepočet: <strong>5 g = 1 sáček</strong> na prodej.
+      &ensp;·&ensp; Weed: <strong style="color:#7A9A4A">${totalWeedG} g</strong> = <strong style="color:#7A9A4A">${weedSacky} sáčků</strong>${weedZbytekG ? ` (+ ${weedZbytekG} g navíc)` : ''}
+      &ensp;·&ensp; Drogy: <strong style="color:var(--oxblood-bright)">${totalDrogyG} g</strong> = <strong style="color:var(--oxblood-bright)">${drogySacky} sáčků</strong>${drogyZbytekG ? ` (+ ${drogyZbytekG} g navíc)` : ''}
+    </div>
+
     <!-- ── TAB SHELL ── -->
     <div class="sklad-shell">
 
@@ -366,7 +384,7 @@ function renderDashboard(req, data) {
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
-                ${formatSklad(weed, {"Žlutý kanabis":{prodej:150},"Zelený kanabis":{prodej:150},"Kanabis":{prodej:150},"Červený kanabis":{prodej:150},"Modrý kanabis":{prodej:150}})}
+                ${formatSklad(weed, {"Žlutý kanabis":{prodej:165},"Zelený kanabis":{prodej:165},"Kanabis":{prodej:165},"Červený kanabis":{prodej:165},"Modrý kanabis":{prodej:165}})}
               </div>
               <div>
                 <div class="typ-toggle">
@@ -376,7 +394,7 @@ function renderDashboard(req, data) {
                 <input type="hidden" id="weed-typ" value="VKLAD">
                 <div class="form-row">
                   <div class="form-group select-wrap"><label>Odrůda</label><select id="weed-odruda" class="select-expandable"><option>Žlutý kanabis</option><option>Zelený kanabis</option><option>Kanabis</option><option>Červený kanabis</option><option>Modrý kanabis</option></select><span class="select-count-badge">5</span></div>
-                  <div class="form-group"><label>Množství</label><input type="number" id="weed-mnozstvi" min="1" value="1"></div>
+                  <div class="form-group"><label>Množství (g)</label><input type="number" id="weed-mnozstvi" min="1" value="1"></div>
                 </div>
                 <div class="info-box" id="weed-info"></div>
                 <button class="btn-submit" onclick="submitWeed()">Potvrdit akci</button>
@@ -402,7 +420,7 @@ function renderDashboard(req, data) {
                 <input type="hidden" id="drogy-typ" value="VKLAD">
                 <div class="form-row">
                   <div class="form-group select-wrap"><label>Droga</label><select id="drogy-droga" class="select-expandable"><option>Kapky</option><option>Kokain</option><option>Extáze</option><option>Metamfetamin</option><option>Benzo</option><option>Joyka</option><option>Heroin</option><option>Speed</option><option>LSD</option></select><span class="select-count-badge">9</span></div>
-                  <div class="form-group"><label>Množství</label><input type="number" id="drogy-mnozstvi" min="1" value="1"></div>
+                  <div class="form-group"><label>Množství (g)</label><input type="number" id="drogy-mnozstvi" min="1" value="1"></div>
                 </div>
                 <button class="btn-submit" onclick="submitDrogy()">Potvrdit akci</button>
               </div>
@@ -608,7 +626,7 @@ function renderDashboard(req, data) {
     const ZBRANE=["Pump Shotgun","Pistol MK2","Pistol","Combat Pistol","Double Action Revolver","Navy Revolver","Vintage Pistol","Gusenberg","Dlouhé"];
     const NABOJE=["9mm","9mm Mk2",".75cal",".50cal","12-gauge"];
     const AKCE=["Malá C4","Velká C4","Přístupová karta","Pokročilá zvláštní karta","EMP zařízení","Řezací laser","Cable Cutter","Zvláštní karta"];
-    const WEED_CENY={"Žlutý kanabis":{vyroba:100,prodej:150},"Zelený kanabis":{vyroba:100,prodej:150},"Kanabis":{vyroba:100,prodej:150},"Červený kanabis":{vyroba:100,prodej:150},"Modrý kanabis":{vyroba:100,prodej:150}};
+    const WEED_CENY={"Žlutý kanabis":{vyroba:100,prodej:165},"Zelený kanabis":{vyroba:100,prodej:165},"Kanabis":{vyroba:100,prodej:165},"Červený kanabis":{vyroba:100,prodej:165},"Modrý kanabis":{vyroba:100,prodej:165}};
     const DROGY_LIST=["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"];
     const CHEMKY_LIST=["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná"];
 
@@ -617,7 +635,7 @@ function renderDashboard(req, data) {
     (KATALOG.zbrane||[]).forEach(i=>{if(!ZBRANE.includes(i))ZBRANE.push(i);});
     (KATALOG.naboje||[]).forEach(i=>{if(!NABOJE.includes(i))NABOJE.push(i);});
     (KATALOG.akce||[]).forEach(i=>{if(!AKCE.includes(i))AKCE.push(i);});
-    (KATALOG.weed||[]).forEach(i=>{if(!WEED_CENY[i])WEED_CENY[i]={vyroba:100,prodej:150};});
+    (KATALOG.weed||[]).forEach(i=>{if(!WEED_CENY[i])WEED_CENY[i]={vyroba:100,prodej:165};});
     (KATALOG.drogy||[]).forEach(i=>{if(!DROGY_LIST.includes(i))DROGY_LIST.push(i);});
     (KATALOG.chemky||[]).forEach(i=>{if(!CHEMKY_LIST.includes(i))CHEMKY_LIST.push(i);});
     function refreshStaticSelects(){
@@ -752,7 +770,7 @@ function renderDashboard(req, data) {
       const typ=document.getElementById('weed-typ').value;
       const odruda=document.getElementById('weed-odruda').value;
       const mnozstvi=document.getElementById('weed-mnozstvi').value;
-      const c=WEED_CENY[odruda]||{vyroba:100,prodej:150};
+      const c=WEED_CENY[odruda]||{vyroba:100,prodej:165};
       showModal(
         typ==='VKLAD'?'Vložit weed':'Vybrat weed',
         'Potvrzením zapečetíš zápis do rejstříku.',
