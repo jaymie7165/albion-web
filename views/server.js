@@ -16,7 +16,7 @@ const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
 
-const { CONFIG, WEED_PLANT, pocetSacku } = require('./constants');
+const { CONFIG, WEED_PLANT } = require('./constants');
 const { makeStore } = require('./content-store');
 const { renderHome } = require('./views/home');
 const { renderDashboard } = require('./views/sklad');
@@ -27,6 +27,7 @@ const { renderStatistiky } = require('./views/statistiky');
 const { renderLore } = require('./views/lore');
 const { renderHierarchy } = require('./views/hierarchy');
 const { renderGaraz } = require('./views/garaz');
+const { renderNemovitosti } = require('./views/nemovitosti');
 const { renderWeedSazeni } = require('./views/weed-sazeni');
 const { renderBlackbook } = require('./views/blackbook');
 const { renderProfitCentrum } = require('./views/profit-centrum');
@@ -1432,9 +1433,6 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   if (!isQty(qty))                             return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
 
   const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 165 };
-  // Weed se zapisuje v GRAMECH, ale ceny (vyroba/prodej) jsou stanovené ZA SÁČEK
-  // (5 g = 1 sáček) — proto se hodnota vždy počítá z počtu sáčků, ne z gramů.
-  const sacky = pocetSacku(qty);
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
@@ -1442,11 +1440,11 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel, req.session.accessLevel);
   sheets.getStockSummary('Weed').then(stav => discord.checkNizkaZasoba('weed', odruda_trim, typUp, qty, stav[odruda_trim], loadThresholds().weed)).catch(() => {});
   checkStockMilestone('weed', 'Weed').catch(() => {});
-  await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} g = ${sacky} sáčků) | Výroba: ~$${ceny.vyroba * sacky} | Prodej: $${ceny.prodej * sacky}`);
+  await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
   broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
-  res.json({ ok: true, celkVyroba: ceny.vyroba * sacky, celkProdej: ceny.prodej * sacky, sacky });
+  res.json({ ok: true, celkVyroba: ceny.vyroba * qty, celkProdej: ceny.prodej * qty });
 });
 
 app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => {
@@ -1847,6 +1845,134 @@ app.delete('/api/garage/:id', requireAuth, (req, res) => {
   broadcastSSE('garageUpdate', { action: 'remove', id: req.params.id });
   res.json({ ok: true });
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// NEMOVITOSTI — podsložka "Majetek" vedle Garáže. Lokace organizace s
+// vícero fotkami, postal, cenou a popisem. Každá lokace může být viditelná
+// pro úplně všechny (viditelnost: 'vsichni'), nebo jen pro vedení
+// (viditelnost: 'vedeni' = accessLevel <= 2, tedy Senior Member a výš) —
+// GET /api/nemovitosti filtruje odpověď podle role volajícího, takže
+// řadový člen o skryté lokaci vůbec neví. Karta se stahuje jako obrázek
+// (canvas na frontendu, viz views/nemovitosti.js) pro sdílení na Discordu.
+// ══════════════════════════════════════════════════════════════════════
+const NEMOVITOSTI_FILE = path.join(DATA_DIR, 'nemovitosti.json');
+const NEMOVITOSTI_UPLOADS_DIR = path.join(DATA_DIR, 'nemovitosti-uploads');
+if (!fs.existsSync(NEMOVITOSTI_UPLOADS_DIR)) { try { fs.mkdirSync(NEMOVITOSTI_UPLOADS_DIR, { recursive: true }); } catch (e) { console.error('[NEMOVITOSTI]', e.message); } }
+
+function loadNemovitosti() { try { const d = JSON.parse(fs.readFileSync(NEMOVITOSTI_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
+function saveNemovitosti(d) { try { writeJsonAtomic(NEMOVITOSTI_FILE, d); } catch (e) { console.error('[NEMOVITOSTI]', e.message); } }
+function isVedeniSession(req) { return (req.session.accessLevel || 3) <= 2; }
+
+app.get('/nemovitosti-uploads/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  res.sendFile(path.join(NEMOVITOSTI_UPLOADS_DIR, safeName), (err) => { if (err) res.status(404).end(); });
+});
+
+async function saveNemovitostImage(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) return null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  let buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 8 * 1024 * 1024) return null; // 8MB strop na fotku
+  const filename = `nem_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`;
+  try {
+    buffer = await addWatermark(buffer);
+    fs.writeFileSync(path.join(NEMOVITOSTI_UPLOADS_DIR, filename), buffer);
+    return `/nemovitosti-uploads/${filename}`;
+  } catch (e) { console.error('[NEMOVITOSTI IMG]', e.message); return null; }
+}
+
+app.get('/api/nemovitosti', requireAuth, (req, res) => {
+  const all = loadNemovitosti().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const visible = isVedeniSession(req) ? all : all.filter(n => n.viditelnost !== 'vedeni');
+  res.json({ ok: true, items: visible });
+});
+
+app.post('/api/nemovitosti', requireAuth, async (req, res) => {
+  const nazev = sanitizeText(req.body.nazev, 100);
+  const popis = req.body.popis ? sanitizeText(req.body.popis, 1000) : '';
+  const postal = sanitizeText(req.body.postal, 20);
+  const cena = parseFloat(req.body.cena);
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název nemovitosti' });
+  if (!postal) return res.json({ ok: false, error: 'Vyplň postal' });
+  if (!isAmount(cena, 100_000_000) && cena !== 0) return res.json({ ok: false, error: 'Neplatná cena' });
+
+  let viditelnost = req.body.viditelnost === 'vedeni' ? 'vedeni' : 'vsichni';
+  if (viditelnost === 'vedeni' && !isVedeniSession(req)) viditelnost = 'vsichni'; // pojistka — jen vedení smí skrýt lokaci před ostatními
+
+  const imagesRaw = Array.isArray(req.body.images) ? req.body.images.slice(0, 8) : [];
+  const images = [];
+  for (const dataUrl of imagesRaw) {
+    const p = await saveNemovitostImage(dataUrl);
+    if (p) images.push(p);
+  }
+
+  const list = loadNemovitosti();
+  const item = {
+    id: `nem_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    nazev, popis: popis || '', postal, cena, viditelnost, images,
+    pridal: req.session.icName,
+    discordUsername: req.session.discordUsername,
+    createdAt: Date.now(),
+    createdAtText: sheets.timestamp ? sheets.timestamp() : new Date().toLocaleString('cs-CZ'),
+  };
+  list.push(item);
+  saveNemovitosti(list);
+  broadcastSSE('nemovitostiUpdate', { action: 'add' });
+  res.json({ ok: true, item });
+});
+
+app.put('/api/nemovitosti/:id', requireAuth, async (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Úpravu nemovitostí smí provádět jen Founder/Council' });
+  const list = loadNemovitosti();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nemovitost nenalezena' });
+
+  const nazev = sanitizeText(req.body.nazev, 100);
+  const popis = req.body.popis != null ? sanitizeText(req.body.popis, 1000) : '';
+  const postal = sanitizeText(req.body.postal, 20);
+  const cena = parseFloat(req.body.cena);
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název nemovitosti' });
+  if (!postal) return res.json({ ok: false, error: 'Vyplň postal' });
+  if (!isAmount(cena, 100_000_000) && cena !== 0) return res.json({ ok: false, error: 'Neplatná cena' });
+
+  const viditelnost = req.body.viditelnost === 'vedeni' ? 'vedeni' : 'vsichni';
+
+  if (Array.isArray(req.body.images)) {
+    const imagesRaw = req.body.images.slice(0, 8);
+    const images = [];
+    for (const dataUrl of imagesRaw) {
+      if (typeof dataUrl === 'string' && dataUrl.startsWith('/nemovitosti-uploads/')) { images.push(dataUrl); continue; } // beze změny
+      const p = await saveNemovitostImage(dataUrl);
+      if (p) images.push(p);
+    }
+    // smaž soubory, které v novém seznamu už nejsou
+    (item.images || []).forEach(old => {
+      if (!images.includes(old) && old.startsWith('/nemovitosti-uploads/')) fs.unlink(path.join(NEMOVITOSTI_UPLOADS_DIR, path.basename(old)), () => {});
+    });
+    item.images = images;
+  }
+
+  item.nazev = nazev; item.popis = popis || ''; item.postal = postal; item.cena = cena; item.viditelnost = viditelnost;
+  item.updatedAt = Date.now();
+  saveNemovitosti(list);
+  broadcastSSE('nemovitostiUpdate', { action: 'edit' });
+  res.json({ ok: true, item });
+});
+
+app.delete('/api/nemovitosti/:id', requireAuth, (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazání nemovitostí smí provádět jen Founder/Council' });
+  const list = loadNemovitosti();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nemovitost nenalezena' });
+  (item.images || []).forEach(p => { if (p.startsWith('/nemovitosti-uploads/')) fs.unlink(path.join(NEMOVITOSTI_UPLOADS_DIR, path.basename(p)), () => {}); });
+  saveNemovitosti(list.filter(i => i.id !== req.params.id));
+  broadcastSSE('nemovitostiUpdate', { action: 'remove' });
+  res.json({ ok: true });
+});
+
+app.get('/nemovitosti', requireAuth, requireAccess('nemovitosti'), (req, res) => res.send(renderNemovitosti(req)));
 
 // ── API — GALERIE ORGANIZACE ──────────────────────────────────────────────────
 app.get('/api/gallery', requireAuth, (req, res) => {
@@ -2525,10 +2651,9 @@ app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, r
     };
 
     // ── Ceníky ──
-    // Ceny zbraní a drog byly záměrně odstraněny — evidují se přesně v Profit
-    // centru a dřívější odhady zde neodpovídaly realitě. Weed cenu má (165$
-    // za SÁČEK), ale zapisuje se v gramech, proto se hodnota počítá ze sáčků.
-    const WEED_SELL = 165;
+    const WEED_SELL = 165; // zdraženo ze 150$ na 165$
+    const DROGY_P = {}; Object.entries(CONFIG.drogyCeny).forEach(([k,v]) => DROGY_P[k] = v.prodej);
+    const ZBRANE_P = {}; Object.entries(CONFIG.zbraneCeny).forEach(([k,v]) => ZBRANE_P[k] = v.prodej);
 
     // ── Sjednocený proud událostí ──
     const ev = []; // {ts, cas, sekce, typ, member, item, qty, kat, castka, valuta, hodnota, pozn, ucel}
@@ -2538,17 +2663,17 @@ app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, r
       const r = zbraneRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
       const member = norm(r[5]); const qty = parseInt(r[3]) || 0;
       const kat = (r[4]||'').toString().toLowerCase();
-      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Zbraně', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, kat, ucel: (r[6] && r[6] !== '-') ? r[6] : '' });
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Zbraně', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, kat, ucel: (r[6] && r[6] !== '-') ? r[6] : '', hodnota: (ZBRANE_P[r[2]]||0)*qty });
     }
     for (let i = 1; i < weedRows.length; i++) {
       const r = weedRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
       const member = norm((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6])); const qty = parseInt(r[3]) || 0;
-      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Weed', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, hodnota: WEED_SELL*pocetSacku(qty) });
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Weed', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, hodnota: WEED_SELL*qty });
     }
     for (let i = 1; i < drogyRows.length; i++) {
       const r = drogyRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
       const member = norm((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6])); const qty = parseInt(r[3]) || 0;
-      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Drogy', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty });
+      push({ ts: parseCas(r[0]), cas: r[0]||'', sekce: 'Drogy', typ: (r[1]||'').toUpperCase(), member, item: r[2]||'?', qty, hodnota: (DROGY_P[r[2]]||0)*qty });
     }
     for (let i = 1; i < chemkyRows.length; i++) {
       const r = chemkyRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
@@ -2772,11 +2897,10 @@ app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, r
     // ════════ 5) DROGY A VÝROBY ════════
     const drogyEv = ev.filter(e => e.sekce === 'Drogy');
     const weedEv  = ev.filter(e => e.sekce === 'Weed');
-    // Zisk z drog se už nepočítá (ceny odstraněny — evidují se přesně v Profit centru).
     const drugProd = {}, drugVyber = {}, drugZisk = {};
     drogyEv.forEach(e => {
       if (isVklad(e.typ)) { drugProd[e.item] = (drugProd[e.item]||0) + e.qty; }
-      else { drugVyber[e.item] = (drugVyber[e.item]||0) + e.qty; }
+      else { drugVyber[e.item] = (drugVyber[e.item]||0) + e.qty; drugZisk[e.item] = (drugZisk[e.item]||0) + e.hodnota; }
     });
     let weedProd = 0, weedVyber = 0, weedZisk = 0;
     weedEv.forEach(e => { if (isVklad(e.typ)) weedProd += e.qty; else { weedVyber += e.qty; weedZisk += e.hodnota; } });
@@ -2850,26 +2974,33 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
       return 0;
     };
 
-    const WEED_SELL = 165; // cena za SÁČEK (weed se zapisuje v gramech, 5g=1 sáček)
-    // Ceny drog byly záměrně odstraněny — evidují se přesně v Profit centru
-    // manuálně a dřívější odhad zde neodpovídal realitě, proto se do
-    // automatických "tržeb" už nezapočítávají.
+    const WEED_SELL = 165; // zdraženo ze 150$ na 165$
+    const DROGY_P = {}; Object.entries(CONFIG.drogyCeny).forEach(([k,v]) => DROGY_P[k] = v.prodej);
     const isVklad = (t) => t === 'VKLAD' || t === 'PŘÍJEM';
     const now = Date.now();
     const DAY = 86400000;
     const inWindow = (ts, days) => ts > 0 && (now - ts) <= days * DAY;
 
-    // ── Prodeje (výběry ze skladu) z Weed — reálné tržby dle ceníku ──
+    // ── Prodeje (výběry ze skladu) z Drogy + Weed — reálné tržby dle ceníku ──
     const sales = [];
+    for (let i = 1; i < drogyRows.length; i++) {
+      const r = drogyRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
+      const typ = (r[1]||'').toUpperCase();
+      if (isVklad(typ)) continue; // počítáme jen výběry (prodej), ne výrobu
+      const member = norm((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6]));
+      const qty = parseInt(r[3]) || 0;
+      const item = r[2] || '?';
+      sales.push({ ts: parseCas(r[0]), member, droga: item, qty, hodnota: (DROGY_P[item]||0) * qty });
+    }
     for (let i = 1; i < weedRows.length; i++) {
       const r = weedRows[i]; if (!r || !r.some(c => c && c.toString().trim())) continue;
       const typ = (r[1]||'').toUpperCase();
       if (isVklad(typ)) continue;
       const member = norm((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6]));
-      const qty = parseInt(r[3]) || 0; // gramy
+      const qty = parseInt(r[3]) || 0;
       const item = r[2] || '?';
       const price = (CONFIG.weedCeny[item] && CONFIG.weedCeny[item].prodej) || WEED_SELL;
-      sales.push({ ts: parseCas(r[0]), member, droga: item, qty, hodnota: price * pocetSacku(qty) });
+      sales.push({ ts: parseCas(r[0]), member, droga: item, qty, hodnota: price * qty });
     }
 
     // ── Účetnictví — skutečné peníze organizace ──
@@ -3062,6 +3193,12 @@ function gcOrphanedUploads() {
     const galleryFiles = new Set(loadGallery().map(i => i.image && path.basename(i.image)).filter(Boolean));
     fs.readdirSync(GALLERY_UPLOADS_DIR).forEach(f => {
       if (!galleryFiles.has(f)) { try { fs.unlinkSync(path.join(GALLERY_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený gallery upload:', f); } catch (e) {} }
+    });
+  } catch (e) {}
+  try {
+    const nemFiles = new Set(loadNemovitosti().flatMap(n => (n.images || []).map(p => path.basename(p))));
+    fs.readdirSync(NEMOVITOSTI_UPLOADS_DIR).forEach(f => {
+      if (!nemFiles.has(f)) { try { fs.unlinkSync(path.join(NEMOVITOSTI_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený nemovitosti upload:', f); } catch (e) {} }
     });
   } catch (e) {}
 }

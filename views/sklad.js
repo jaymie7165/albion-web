@@ -74,6 +74,7 @@ function renderDashboard(req, data) {
     { id: 'smena',  label: 'Směnárna',   sub: 'SAD ⇄ Pesos', icon: '⇄' },
     { id: 'zbrane', label: 'Zbraně',     sub: 'Sklad',       icon: '⚔' },
     { id: 'weed',   label: 'Weed',       sub: 'Sklad',       icon: '◈' },
+    { id: 'vyroba', label: 'Výroba',     sub: 'Připravuje se', icon: '⚒' },
     { id: 'drogy',  label: 'Drogy',      sub: 'Sklad',       icon: '◆' },
     { id: 'chemky', label: 'Chemikálie', sub: 'Sklad',       icon: '⬡' },
     { id: 'cenik',  label: 'Ceník',      sub: 'Referenční ceny', icon: '$' },
@@ -405,6 +406,19 @@ function renderDashboard(req, data) {
                 <button class="btn-submit" onclick="submitWeed()">Potvrdit akci</button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Výroba -->
+        <div class="sklad-panel" id="panel-vyroba">
+          <div class="panel-card">
+            <div class="panel-head">
+              <span class="panel-title">Výroba</span>
+              <span class="panel-badge">Připravuje se</span>
+            </div>
+            <p style="font-family:var(--font-body);font-size:0.9rem;color:var(--ivory-dim);line-height:1.85;max-width:640px">
+              Tahle sekce je zatím ve výstavbě — brzy tu přibude evidence výroby. Zůstaň naladěn.
+            </p>
           </div>
         </div>
 
