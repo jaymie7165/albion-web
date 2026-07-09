@@ -44,8 +44,8 @@ const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
 app.set('trust proxy', 1); // Railway běží appku za reverse proxy — potřebujeme správně detekovat https pro veřejné URL (např. fotky vozů pro Discord embed)
 
-app.use(express.json({ limit: '12mb' }));
-app.use(express.urlencoded({ extended: true, limit: '12mb' }));
+app.use(express.json({ limit: '30mb' }));
+app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 // Logo is served from public/logo.png via express.static above
 
