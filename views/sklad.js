@@ -18,12 +18,17 @@ function renderDashboard(req, data) {
       </div>`
     : `<div class="cenik-row cenik-row-static"><span>${esc(row.label)}</span><span class="cenik-cena">${esc(row.cena)}</span></div>`;
 
-  const formatSklad = (obj, ceny) => {
+  const formatSklad = (obj, ceny, jeGramy) => {
     const entries = Object.entries(obj).filter(([,q]) => q > 0);
     if (!entries.length) return ledgerEmpty('Sklad prázdný', true);
     return entries.map(([item, qty]) => {
-      const hodnota = ceny && ceny[item] ? qty * ceny[item].prodej : null;
-      return `<div class="sklad-row"><span>${item}</span><span>${qty} ks${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
+      if (jeGramy) {
+        // Gramy → sáčky (5 g = 1 sáček). Ceny v ceníku jsou ZA SÁČEK, ne za gram.
+        const sacky = Math.floor(qty / 5);
+        const hodnota = ceny && ceny[item] ? sacky * ceny[item].prodej : null;
+        return `<div class="sklad-row"><span>${item}</span><span>${qty} g <em>(${sacky} sáčků)</em>${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
+      }
+      return `<div class="sklad-row"><span>${item}</span><span>${qty} ks</span></div>`;
     }).join('');
   };
 
@@ -48,7 +53,7 @@ function renderDashboard(req, data) {
   const totalValue = (() => {
     const W={"Žlutý kanabis":165,"Zelený kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
     let t=0;
-    Object.entries(weed).forEach(([k,q])=>{if(q>0&&W[k])t+=q*W[k];});
+    Object.entries(weed).forEach(([k,q])=>{if(q>0&&W[k])t+=Math.floor(q/5)*W[k];});
     return t;
   })();
 
@@ -242,11 +247,11 @@ function renderDashboard(req, data) {
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Weed</div>
-        <div class="tally-cell-val" style="color:#7A9A4A">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)} ks</div>
+        <div class="tally-cell-val" style="color:#7A9A4A">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)} g</div>
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Drogy</div>
-        <div class="tally-cell-val" style="color:var(--oxblood-bright)">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)} ks</div>
+        <div class="tally-cell-val" style="color:var(--oxblood-bright)">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)} g</div>
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Chemikálie</div>
@@ -384,7 +389,7 @@ function renderDashboard(req, data) {
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
-                ${formatSklad(weed, {"Žlutý kanabis":{prodej:165},"Zelený kanabis":{prodej:165},"Kanabis":{prodej:165},"Červený kanabis":{prodej:165},"Modrý kanabis":{prodej:165}})}
+                ${formatSklad(weed, {"Žlutý kanabis":{prodej:165},"Zelený kanabis":{prodej:165},"Kanabis":{prodej:165},"Červený kanabis":{prodej:165},"Modrý kanabis":{prodej:165}}, true)}
               </div>
               <div>
                 <div class="typ-toggle">
@@ -410,7 +415,7 @@ function renderDashboard(req, data) {
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
-                ${formatSklad(drogy, null)}
+                ${formatSklad(drogy, null, true)}
               </div>
               <div>
                 <div class="typ-toggle">
@@ -758,9 +763,10 @@ function renderDashboard(req, data) {
       const odruda=document.getElementById('weed-odruda').value;
       const qty=parseInt(document.getElementById('weed-mnozstvi').value)||1;
       const c=WEED_CENY[odruda];if(!c)return;
+      const sacky=Math.floor(qty/5);
       const box=document.getElementById('weed-info');
       box.style.display='block';
-      box.innerHTML='Výroba: ~$'+(c.vyroba*qty)+'&ensp;·&ensp;Prodej: $'+(c.prodej*qty);
+      box.innerHTML=qty+' g = '+sacky+' sáčků&ensp;·&ensp;Výroba: ~$'+(c.vyroba*sacky)+'&ensp;·&ensp;Prodej: $'+(c.prodej*sacky);
     }
     document.getElementById('weed-odruda').addEventListener('change',updateWeedInfo);
     document.getElementById('weed-mnozstvi').addEventListener('input',updateWeedInfo);
@@ -771,10 +777,11 @@ function renderDashboard(req, data) {
       const odruda=document.getElementById('weed-odruda').value;
       const mnozstvi=document.getElementById('weed-mnozstvi').value;
       const c=WEED_CENY[odruda]||{vyroba:100,prodej:165};
+      const sacky=Math.floor((parseInt(mnozstvi)||0)/5);
       showModal(
         typ==='VKLAD'?'Vložit weed':'Vybrat weed',
         'Potvrzením zapečetíš zápis do rejstříku.',
-        [['Typ',typ],['Odrůda',odruda],['Množství',mnozstvi+' ks'],['Výroba','~$'+(c.vyroba*mnozstvi)],['Prodej','$'+(c.prodej*mnozstvi)]],
+        [['Typ',typ],['Odrůda',odruda],['Množství',mnozstvi+' g ('+sacky+' sáčků)'],['Výroba','~$'+(c.vyroba*sacky)],['Prodej','$'+(c.prodej*sacky)]],
         async()=>{
           const r=await post('/api/weed',{typ,odruda,mnozstvi});
           if(r.ok){showToast('Weed uložen — Výroba: ~$'+r.celkVyroba+' · Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
