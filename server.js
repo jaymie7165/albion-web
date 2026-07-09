@@ -27,6 +27,7 @@ const { renderStatistiky } = require('./views/statistiky');
 const { renderLore } = require('./views/lore');
 const { renderHierarchy } = require('./views/hierarchy');
 const { renderGaraz } = require('./views/garaz');
+const { renderNemovitosti } = require('./views/nemovitosti');
 const { renderWeedSazeni } = require('./views/weed-sazeni');
 const { renderBlackbook } = require('./views/blackbook');
 const { renderProfitCentrum } = require('./views/profit-centrum');
@@ -1845,6 +1846,134 @@ app.delete('/api/garage/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ══════════════════════════════════════════════════════════════════════
+// NEMOVITOSTI — podsložka "Majetek" vedle Garáže. Lokace organizace s
+// vícero fotkami, postal, cenou a popisem. Každá lokace může být viditelná
+// pro úplně všechny (viditelnost: 'vsichni'), nebo jen pro vedení
+// (viditelnost: 'vedeni' = accessLevel <= 2, tedy Senior Member a výš) —
+// GET /api/nemovitosti filtruje odpověď podle role volajícího, takže
+// řadový člen o skryté lokaci vůbec neví. Karta se stahuje jako obrázek
+// (canvas na frontendu, viz views/nemovitosti.js) pro sdílení na Discordu.
+// ══════════════════════════════════════════════════════════════════════
+const NEMOVITOSTI_FILE = path.join(DATA_DIR, 'nemovitosti.json');
+const NEMOVITOSTI_UPLOADS_DIR = path.join(DATA_DIR, 'nemovitosti-uploads');
+if (!fs.existsSync(NEMOVITOSTI_UPLOADS_DIR)) { try { fs.mkdirSync(NEMOVITOSTI_UPLOADS_DIR, { recursive: true }); } catch (e) { console.error('[NEMOVITOSTI]', e.message); } }
+
+function loadNemovitosti() { try { const d = JSON.parse(fs.readFileSync(NEMOVITOSTI_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
+function saveNemovitosti(d) { try { writeJsonAtomic(NEMOVITOSTI_FILE, d); } catch (e) { console.error('[NEMOVITOSTI]', e.message); } }
+function isVedeniSession(req) { return (req.session.accessLevel || 3) <= 2; }
+
+app.get('/nemovitosti-uploads/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  res.sendFile(path.join(NEMOVITOSTI_UPLOADS_DIR, safeName), (err) => { if (err) res.status(404).end(); });
+});
+
+async function saveNemovitostImage(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) return null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  let buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 8 * 1024 * 1024) return null; // 8MB strop na fotku
+  const filename = `nem_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`;
+  try {
+    buffer = await addWatermark(buffer);
+    fs.writeFileSync(path.join(NEMOVITOSTI_UPLOADS_DIR, filename), buffer);
+    return `/nemovitosti-uploads/${filename}`;
+  } catch (e) { console.error('[NEMOVITOSTI IMG]', e.message); return null; }
+}
+
+app.get('/api/nemovitosti', requireAuth, (req, res) => {
+  const all = loadNemovitosti().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const visible = isVedeniSession(req) ? all : all.filter(n => n.viditelnost !== 'vedeni');
+  res.json({ ok: true, items: visible });
+});
+
+app.post('/api/nemovitosti', requireAuth, async (req, res) => {
+  const nazev = sanitizeText(req.body.nazev, 100);
+  const popis = req.body.popis ? sanitizeText(req.body.popis, 1000) : '';
+  const postal = sanitizeText(req.body.postal, 20);
+  const cena = parseFloat(req.body.cena);
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název nemovitosti' });
+  if (!postal) return res.json({ ok: false, error: 'Vyplň postal' });
+  if (!isAmount(cena, 100_000_000) && cena !== 0) return res.json({ ok: false, error: 'Neplatná cena' });
+
+  let viditelnost = req.body.viditelnost === 'vedeni' ? 'vedeni' : 'vsichni';
+  if (viditelnost === 'vedeni' && !isVedeniSession(req)) viditelnost = 'vsichni'; // pojistka — jen vedení smí skrýt lokaci před ostatními
+
+  const imagesRaw = Array.isArray(req.body.images) ? req.body.images.slice(0, 8) : [];
+  const images = [];
+  for (const dataUrl of imagesRaw) {
+    const p = await saveNemovitostImage(dataUrl);
+    if (p) images.push(p);
+  }
+
+  const list = loadNemovitosti();
+  const item = {
+    id: `nem_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    nazev, popis: popis || '', postal, cena, viditelnost, images,
+    pridal: req.session.icName,
+    discordUsername: req.session.discordUsername,
+    createdAt: Date.now(),
+    createdAtText: sheets.timestamp ? sheets.timestamp() : new Date().toLocaleString('cs-CZ'),
+  };
+  list.push(item);
+  saveNemovitosti(list);
+  broadcastSSE('nemovitostiUpdate', { action: 'add' });
+  res.json({ ok: true, item });
+});
+
+app.put('/api/nemovitosti/:id', requireAuth, async (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Úpravu nemovitostí smí provádět jen Founder/Council' });
+  const list = loadNemovitosti();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nemovitost nenalezena' });
+
+  const nazev = sanitizeText(req.body.nazev, 100);
+  const popis = req.body.popis != null ? sanitizeText(req.body.popis, 1000) : '';
+  const postal = sanitizeText(req.body.postal, 20);
+  const cena = parseFloat(req.body.cena);
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název nemovitosti' });
+  if (!postal) return res.json({ ok: false, error: 'Vyplň postal' });
+  if (!isAmount(cena, 100_000_000) && cena !== 0) return res.json({ ok: false, error: 'Neplatná cena' });
+
+  const viditelnost = req.body.viditelnost === 'vedeni' ? 'vedeni' : 'vsichni';
+
+  if (Array.isArray(req.body.images)) {
+    const imagesRaw = req.body.images.slice(0, 8);
+    const images = [];
+    for (const dataUrl of imagesRaw) {
+      if (typeof dataUrl === 'string' && dataUrl.startsWith('/nemovitosti-uploads/')) { images.push(dataUrl); continue; } // beze změny
+      const p = await saveNemovitostImage(dataUrl);
+      if (p) images.push(p);
+    }
+    // smaž soubory, které v novém seznamu už nejsou
+    (item.images || []).forEach(old => {
+      if (!images.includes(old) && old.startsWith('/nemovitosti-uploads/')) fs.unlink(path.join(NEMOVITOSTI_UPLOADS_DIR, path.basename(old)), () => {});
+    });
+    item.images = images;
+  }
+
+  item.nazev = nazev; item.popis = popis || ''; item.postal = postal; item.cena = cena; item.viditelnost = viditelnost;
+  item.updatedAt = Date.now();
+  saveNemovitosti(list);
+  broadcastSSE('nemovitostiUpdate', { action: 'edit' });
+  res.json({ ok: true, item });
+});
+
+app.delete('/api/nemovitosti/:id', requireAuth, (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazání nemovitostí smí provádět jen Founder/Council' });
+  const list = loadNemovitosti();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nemovitost nenalezena' });
+  (item.images || []).forEach(p => { if (p.startsWith('/nemovitosti-uploads/')) fs.unlink(path.join(NEMOVITOSTI_UPLOADS_DIR, path.basename(p)), () => {}); });
+  saveNemovitosti(list.filter(i => i.id !== req.params.id));
+  broadcastSSE('nemovitostiUpdate', { action: 'remove' });
+  res.json({ ok: true });
+});
+
+app.get('/nemovitosti', requireAuth, requireAccess('nemovitosti'), (req, res) => res.send(renderNemovitosti(req)));
+
 // ── API — GALERIE ORGANIZACE ──────────────────────────────────────────────────
 app.get('/api/gallery', requireAuth, (req, res) => {
   if (req.session.isAssociate) return res.status(403).json({ ok: false, error: 'Galerie je dostupná od hodnosti Member' });
@@ -3064,6 +3193,12 @@ function gcOrphanedUploads() {
     const galleryFiles = new Set(loadGallery().map(i => i.image && path.basename(i.image)).filter(Boolean));
     fs.readdirSync(GALLERY_UPLOADS_DIR).forEach(f => {
       if (!galleryFiles.has(f)) { try { fs.unlinkSync(path.join(GALLERY_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený gallery upload:', f); } catch (e) {} }
+    });
+  } catch (e) {}
+  try {
+    const nemFiles = new Set(loadNemovitosti().flatMap(n => (n.images || []).map(p => path.basename(p))));
+    fs.readdirSync(NEMOVITOSTI_UPLOADS_DIR).forEach(f => {
+      if (!nemFiles.has(f)) { try { fs.unlinkSync(path.join(NEMOVITOSTI_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený nemovitosti upload:', f); } catch (e) {} }
     });
   } catch (e) {}
 }

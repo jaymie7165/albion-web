@@ -52,6 +52,7 @@ const PAGE_ACCESS = {
   mentoring:       3, // Mentorský program — vidí každý, zápisy jen Senior Member výš (řeší se v UI/API)
   // Volně přístupné všem přihlášeným (level 3 = bez omezení):
   garaz:           3,
+  nemovitosti:     3, // viditelnost jednotlivých lokací (vsichni/vedeni) se řeší v API, ne na úrovni stránky
   'weed-sazeni':   3,
   kodex:           3,
   lore:            3,

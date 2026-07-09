@@ -8,6 +8,7 @@ function renderNav(req, active) {
   const accessLevel = req.session.accessLevel || 3;
   const can = (pageId) => canAccess(accessLevel, pageId);
   const skladPages = ['sklad','weed-sazeni'];
+  const majetekPages = ['garaz','nemovitosti'];
   const blackbookPages = ['blackbook','profit-centrum'];
   const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie','spis','mentoring'];
   const dataPages  = ['audit','statistiky'];
@@ -26,7 +27,17 @@ function renderNav(req, active) {
       </button>
       <ul class="nav-menu" id="navMenu">
         <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Rejstřík</span></a></li>
-        <li><a href="/garaz" class="${active==='garaz'?'active':''}">Garáž<span class="nav-desc">Vozový park</span></a></li>
+        <li class="nav-dropdown ${majetekPages.includes(active)?'open':''}">
+          <a href="/garaz" class="nav-drop-trigger ${majetekPages.includes(active)?'active':''}">
+            Majetek
+            <span class="nav-desc">Garáž · Nemovitosti</span>
+            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
+          </a>
+          <div class="nav-dropdown-menu">
+            <a href="/garaz" class="${active==='garaz'?'active':''}">Garáž</a>
+            <a href="/nemovitosti" class="${active==='nemovitosti'?'active':''}">Nemovitosti</a>
+          </div>
+        </li>
         <li><a href="/bazar" class="${active==='bazar'?'active':''}">Bazar<span class="nav-desc">Vnitřní tržiště</span></a></li>
 
         ${can('sklad') ? `
