@@ -309,12 +309,15 @@ async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel, a
 async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel, accessLevel) {
   const channelId = process.env.CHANNEL_WEED;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
+  // Weed se zapisuje v gramech, ale ceny (vyroba/prodej) jsou stanovené za
+  // sáček (5 g = 1 sáček) — proto se před výpočtem hodnoty musí gramy převést.
+  const sacky = Math.floor((mnozstvi || 0) / 5);
   const fields = [
     { name: 'Odrůda', value: odruda, inline: true },
-    { name: 'Množství', value: `${mnozstvi} ks`, inline: true },
+    { name: 'Množství', value: `${mnozstvi} g (${sacky} sáčků)`, inline: true },
     { name: typ === 'VKLAD' ? 'Vložil' : 'Vzal', value: uzivatel, inline: true },
-    { name: '💸 Výroba stála', value: `~$${vyroba * mnozstvi}`, inline: true },
-    { name: '💰 Doporučená prodejní', value: `$${prodej * mnozstvi}`, inline: true },
+    { name: '💸 Výroba stála', value: `~$${vyroba * sacky}`, inline: true },
+    { name: '💰 Doporučená prodejní', value: `$${prodej * sacky}`, inline: true },
   ];
   await sendEmbed(channelId, {
     title: typ === 'VKLAD' ? '🌿 VLOŽENO DO SKLADU (web)' : '🌿 VYBRÁNO ZE SKLADU (web)',
@@ -484,7 +487,8 @@ async function notifyBulkSklad(sekce, typ, items, uzivatel) {
   const ikonyMap = { zbrane: '🔫', weed: '🌿', drogy: '💊', chemky: '⚗️' };
   const channelId = channelMap[sekce];
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
-  const seznam = items.map(v => `• ${v.polozka} — ${v.qty} ks`).join('\n').slice(0, 1000);
+  const jednotka = (sekce === 'weed' || sekce === 'drogy') ? 'g' : 'ks';
+  const seznam = items.map(v => `• ${v.polozka} — ${v.qty} ${jednotka}`).join('\n').slice(0, 1000);
 
   await sendEmbed(channelId, {
     title: `${ikonyMap[sekce] || '📦'} HROMADNÝ ${typ === 'VKLAD' ? 'VKLAD' : 'VÝBĚR'} (web)`,

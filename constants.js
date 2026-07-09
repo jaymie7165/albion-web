@@ -1,5 +1,11 @@
 // constants.js — shared static configuration (item catalogs, prices, weed-growing recipe)
 
+// Weed (a drogy) se do skladu zapisují v GRAMECH. Ceny v CONFIG.weedCeny
+// (vyroba/prodej) jsou stanovené ZA SÁČEK, ne za gram — proto je při každém
+// výpočtu hodnoty nutné gramy nejdřív převést na sáčky (5 g = 1 sáček).
+const GRAMU_NA_SACEK = 5;
+function pocetSacku(gramy) { return Math.floor((gramy || 0) / GRAMU_NA_SACEK); }
+
 const CONFIG = {
   zbrane: ["Pump Shotgun","Pistol MK2","Pistol","Combat Pistol","Double Action Revolver","Navy Revolver","Vintage Pistol","Gusenberg","Dlouhé"],
   naboje: ["9mm","9mm Mk2",".75cal",".50cal","12-gauge"],
@@ -14,33 +20,8 @@ const CONFIG = {
   },
   drogyTypy: ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"],
   chemkyTypy: ["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná"],
-  drogyCeny: {
-    "Kapky":       { prodej: 200 },
-    "Kokain":      { prodej: 500 },
-    "Extáze":      { prodej: 350 },
-    "Metamfetamin":{ prodej: 450 },
-    "Benzo":       { prodej: 300 },
-    "Joyka":       { prodej: 250 },
-    "Heroin":      { prodej: 600 },
-    "Speed":       { prodej: 280 },
-    "LSD":         { prodej: 400 },
-  },
-  zbraneCeny: {
-    "Pump Shotgun":           { prodej: 8000 },
-    "Pistol MK2":             { prodej: 12000 },
-    "Pistol":                 { prodej: 5000 },
-    "Combat Pistol":          { prodej: 7000 },
-    "Double Action Revolver": { prodej: 15000 },
-    "Navy Revolver":          { prodej: 14000 },
-    "Vintage Pistol":         { prodej: 6000 },
-    "Gusenberg":              { prodej: 18000 },
-    "Dlouhé":                 { prodej: 25000 },
-    "9mm":                    { prodej: 100 },
-    "9mm Mk2":                { prodej: 150 },
-    ".75cal":                 { prodej: 300 },
-    ".50cal":                 { prodej: 250 },
-    "12-gauge":               { prodej: 200 },
-  },
+  // Ceny drog a zbraní/střeliva byly záměrně odstraněny — evidují se přesně
+  // v Profit centru a hodnoty dřív uložené zde neodpovídaly realitě.
 };
 
 // ── WEED SÁZENÍ — recept a ceny na jednu kytku ────────────────────────────────
@@ -64,4 +45,4 @@ WEED_PLANT.revenuePerPlant = WEED_PLANT.bagsPerPlant * WEED_PLANT.bagPrice;     
 WEED_PLANT.profitPerPlant  = WEED_PLANT.revenuePerPlant - WEED_PLANT.costPerPlant;        // 145
 WEED_PLANT.growMs          = WEED_PLANT.growHours * 60 * 60 * 1000;
 
-module.exports = { CONFIG, WEED_PLANT };
+module.exports = { CONFIG, WEED_PLANT, GRAMU_NA_SACEK, pocetSacku };

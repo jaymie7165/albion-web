@@ -16,7 +16,7 @@ function renderNav(req, active) {
     <nav>
       <a href="/home" class="nav-logo">
         <img src="/logo.png" class="nav-logo-img" alt="Caledonia">
-        <span class="nav-logo-text">AL<span class="b-red">B</span>ION</span>
+        <span class="nav-logo-text"><span class="b-red">C</span>ALEDONIA</span>
       </a>
       <a href="/albion" title="Vstoupit do CALEDONIA" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--border-brass);color:var(--brass);flex-shrink:0;margin-left:0.6rem;text-decoration:none;transition:border-color .2s,color .2s" onmouseover="this.style.borderColor='var(--brass-bright)';this.style.color='var(--brass-bright)'" onmouseout="this.style.borderColor='var(--border-brass)';this.style.color='var(--brass)'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
