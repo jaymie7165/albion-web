@@ -434,7 +434,7 @@ function renderAuth(page, error, data) {
           e.preventDefault();
           var fd=new FormData(form);
           var icName=(fd.get('ic_name')||'').toString();
-          fetch(form.action,{method:'POST',body:fd,redirect:'follow'}).then(function(res){
+          fetch(form.action,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(fd),redirect:'follow'}).then(function(res){
             var finalUrl=res.url||'';
             if(finalUrl.indexOf('/login')!==-1 && finalUrl.indexOf('success=registered')!==-1){
               nameEl.textContent=icName;
