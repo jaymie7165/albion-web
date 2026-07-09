@@ -820,15 +820,18 @@ function baseStyles() {
       .modal-box{overflow:visible}
       .seal-stamp{
         position:absolute;top:50%;left:50%;
-        width:108px;height:108px;border-radius:50%;
+        width:128px;height:128px;
         transform:translate(-50%,-50%) translateY(-340px) scale(2.2) rotate(-18deg);
         opacity:0;pointer-events:none;z-index:50;
         display:flex;align-items:center;justify-content:center;
-        background:radial-gradient(circle at 35% 30%, var(--oxblood-bright), var(--oxblood) 55%, #4A0D18 100%);
-        box-shadow:0 18px 40px rgba(0,0,0,0.6), inset 0 0 0 3px rgba(0,0,0,0.2), inset 0 2px 6px rgba(255,255,255,0.08);
+        background-image:url('/pecet.png');
+        background-size:contain;background-repeat:no-repeat;background-position:center;
+        filter:drop-shadow(0 18px 28px rgba(0,0,0,0.55));
       }
-      .seal-stamp::before{content:'';position:absolute;inset:9px;border-radius:50%;border:1px solid rgba(182,138,78,0.3)}
-      .seal-stamp span{font-family:var(--font-label);font-weight:700;font-size:2rem;color:rgba(0,0,0,0.25);letter-spacing:0.05em}
+      /* Skutečná pečeť (public/pecet.png) nahrazuje dřívější CSS placeholder —
+         písmeno uvnitř .seal-stamp span se dál nepoužívá, obrázek pečetě
+         už nese vlastní kresbu, proto je skryté. */
+      .seal-stamp span{display:none}
       .seal-stamp.slam{animation:sealSlam 0.62s cubic-bezier(0.32,0.04,0.5,1) forwards}
       @keyframes sealSlam{
         0%{opacity:0;transform:translate(-50%,-50%) translateY(-340px) scale(2.2) rotate(-18deg)}
@@ -1366,15 +1369,20 @@ function baseStyles() {
       .cont-entry-actions{margin-top:0.7rem;display:flex;gap:0.5rem}
       .cont-seal{
         position:absolute;top:50%;right:1.1rem;transform:translateY(-50%) rotate(-11deg);
-        width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-        font-family:var(--font-label);font-weight:700;font-size:0.56rem;letter-spacing:0.05em;text-align:center;
-        text-transform:uppercase;color:rgba(255,255,255,0.85);
-        box-shadow:0 8px 20px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(0,0,0,0.25), inset 0 2px 5px rgba(255,255,255,0.12);
+        width:86px;height:86px;display:flex;align-items:flex-end;justify-content:center;
+        font-family:var(--font-label);font-weight:700;font-size:0.5rem;letter-spacing:0.04em;text-align:center;
+        text-transform:uppercase;color:var(--ivory);padding-bottom:6px;
+        background-image:url('/pecet.png');background-size:contain;background-repeat:no-repeat;background-position:center;
+        filter:drop-shadow(0 8px 16px rgba(0,0,0,0.45));
         opacity:0;pointer-events:none;transform-origin:center;
+        text-shadow:0 1px 3px rgba(0,0,0,0.9);
       }
       .cont-entry.settled .cont-seal{opacity:1;animation:contSealStamp 0.5s cubic-bezier(0.3,0.05,0.5,1) 1}
-      .cont-seal.seal-brass{background:radial-gradient(circle at 35% 30%, var(--brass-bright), var(--brass) 55%, #6B4A18 100%)}
-      .cont-seal.seal-oxblood{background:radial-gradient(circle at 35% 30%, var(--oxblood-bright), var(--oxblood) 55%, #4A0D18 100%)}
+      /* Barevný nádech pečetě podle směru dluhu — pečeť zůstává reálný obrázek,
+         jen se jemně probarví filtrem, aby "dlužíme my" (oxblood) šlo odlišit
+         od "dluží nám" (mosaz). */
+      .cont-seal.seal-brass{filter:drop-shadow(0 8px 16px rgba(0,0,0,0.45)) sepia(0.4) saturate(2) hue-rotate(-6deg)}
+      .cont-seal.seal-oxblood{filter:drop-shadow(0 8px 16px rgba(0,0,0,0.45)) sepia(0.6) saturate(3) hue-rotate(-30deg)}
       @keyframes contSealStamp{0%{opacity:0;transform:translateY(-50%) rotate(-11deg) scale(2.4)}60%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(0.92)}100%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(1)}}
       .cont-btn-settle{
         padding:0.4rem 0.9rem;background:transparent;border:1px solid var(--border-brass);

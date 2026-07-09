@@ -36,6 +36,8 @@ const { renderCard } = require('./views/card');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
 const { renderSpisy } = require('./views/spis');
+const { renderBazar } = require('./views/bazar');
+const { renderMentoring } = require('./views/mentoring');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -186,21 +188,65 @@ function saveGarage(cars) {
   try { writeJsonAtomic(GARAGE_FILE, cars); } catch (e) { console.error('[GARAGE]', e.message); }
 }
 
-// ── OSOBNÍ SPISY ČLENŮ — tajné poznámky, jen Founder/Council ────────────────
+// ── OSOBNÍ SPISY ČLENŮ — tajné poznámky, Founder/Council/GenK + Senior Member ──
+// Nová podoba (#6): pole záznamů místo objektu klíčovaného IC jménem, aby šlo
+// založit spis na kohokoliv (i mimo evidované účty), rozdělené na dvě sekce
+// (uvnitř / vně organizace) a kdykoliv znovu otevřené k úpravě.
 const DOSSIERS_FILE = path.join(DATA_DIR, 'dossiers.json');
-function loadDossiers() { try { return JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')) || {}; } catch { return {}; } }
+function loadDossiers() { try { const d = JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
 function saveDossiers(d) { try { writeJsonAtomic(DOSSIERS_FILE, d); } catch (e) { console.error('[DOSSIERS]', e.message); } }
 
-app.get('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
-  const all = loadDossiers();
-  const entry = all[req.params.icName] || { notes: '', updatedAt: null, updatedBy: null };
-  res.json({ ok: true, dossier: entry });
+app.get('/api/spis', requireAuth, requireAccess('spis'), (req, res) => {
+  res.json({ ok: true, entries: loadDossiers() });
 });
-app.post('/api/spis/:icName', requireAuth, requireAccess('spis'), (req, res) => {
-  const notes = sanitizeText(req.body.notes, 5000) || '';
-  const all = loadDossiers();
-  all[req.params.icName] = { notes, updatedAt: new Date().toISOString(), updatedBy: req.session.icName };
-  saveDossiers(all);
+
+app.post('/api/spis', requireAuth, requireAccess('spis'), (req, res) => {
+  const jmeno = sanitizeText(req.body.jmeno, 80);
+  if (!jmeno) return res.json({ ok: false, error: 'Vyplň jméno' });
+  const kategorie = req.body.kategorie === 'externi' ? 'externi' : 'interni';
+  const entry = {
+    id: `spis_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
+    jmeno, kategorie,
+    pozice: sanitizeText(req.body.pozice, 100) || '',
+    kontakt: sanitizeText(req.body.kontakt, 120) || '',
+    rizika: sanitizeText(req.body.rizika, 2000) || '',
+    historie: sanitizeText(req.body.historie, 2000) || '',
+    poznamky: sanitizeText(req.body.poznamky, 5000) || '',
+    vytvoril: req.session.icName, vytvorenoAt: new Date().toISOString(),
+    upravil: null, upravenoAt: null,
+  };
+  const list = loadDossiers();
+  list.push(entry);
+  saveDossiers(list);
+  res.json({ ok: true, entry });
+});
+
+app.put('/api/spis/:id', requireAuth, requireAccess('spis'), (req, res) => {
+  const list = loadDossiers();
+  const entry = list.find(e => e.id === req.params.id);
+  if (!entry) return res.json({ ok: false, error: 'Spis nenalezen' });
+  const jmeno = sanitizeText(req.body.jmeno, 80);
+  if (!jmeno) return res.json({ ok: false, error: 'Vyplň jméno' });
+  entry.jmeno = jmeno;
+  entry.kategorie = req.body.kategorie === 'externi' ? 'externi' : 'interni';
+  entry.pozice = sanitizeText(req.body.pozice, 100) || '';
+  entry.kontakt = sanitizeText(req.body.kontakt, 120) || '';
+  entry.rizika = sanitizeText(req.body.rizika, 2000) || '';
+  entry.historie = sanitizeText(req.body.historie, 2000) || '';
+  entry.poznamky = sanitizeText(req.body.poznamky, 5000) || '';
+  entry.upravil = req.session.icName;
+  entry.upravenoAt = new Date().toISOString();
+  saveDossiers(list);
+  res.json({ ok: true, entry });
+});
+
+app.delete('/api/spis/:id', requireAuth, requireAccess('spis'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat spisy smí jen Founder/Council/GenK' });
+  let list = loadDossiers();
+  const before = list.length;
+  list = list.filter(e => e.id !== req.params.id);
+  if (list.length === before) return res.json({ ok: false, error: 'Spis nenalezen' });
+  saveDossiers(list);
   res.json({ ok: true });
 });
 
@@ -289,6 +335,219 @@ app.delete('/api/continental/:id', requireAuth, requireAccess('blackbook'), (req
   res.json({ ok: true });
 });
 
+// ══════════════════════════════════════════════════════════════════════
+// BAZAR — vnitřní tržiště organizace, viditelné a použitelné pro úplně
+// každou hodnost (viz roles.js PAGE_ACCESS.bazar = 3). Foto+popis+cena,
+// zájemci se hlásí s vlastní nabídkou, prodávající vybere jednoho a obchod
+// se uzavře až po potvrzení OBOU stran → pak dostane pečeť "PRODÁNO".
+// Nové nabídky i uzavřené obchody jdou i do interního kanálu bazaru.
+// ══════════════════════════════════════════════════════════════════════
+const BAZAR_FILE = path.join(DATA_DIR, 'bazar.json');
+const BAZAR_UPLOADS_DIR = path.join(DATA_DIR, 'bazar-uploads');
+if (!fs.existsSync(BAZAR_UPLOADS_DIR)) { try { fs.mkdirSync(BAZAR_UPLOADS_DIR, { recursive: true }); } catch (e) { console.error('[BAZAR]', e.message); } }
+function loadBazar() { try { const d = JSON.parse(fs.readFileSync(BAZAR_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
+function saveBazar(d) { try { writeJsonAtomic(BAZAR_FILE, d); } catch (e) { console.error('[BAZAR]', e.message); } }
+
+app.get('/bazar-uploads/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  res.sendFile(path.join(BAZAR_UPLOADS_DIR, safeName), (err) => { if (err) res.status(404).end(); });
+});
+
+async function saveBazarImage(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) return null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  let buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 8 * 1024 * 1024) return null;
+  const filename = `bz_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`;
+  try {
+    buffer = await addWatermark(buffer);
+    fs.writeFileSync(path.join(BAZAR_UPLOADS_DIR, filename), buffer);
+    return `/bazar-uploads/${filename}`;
+  } catch (e) { console.error('[BAZAR IMG]', e.message); return null; }
+}
+
+app.get('/api/bazar', requireAuth, (req, res) => {
+  res.json({ ok: true, items: loadBazar().sort((a,b) => (b.createdAt||0)-(a.createdAt||0)) });
+});
+
+app.post('/api/bazar', requireAuth, async (req, res) => {
+  const nazev = sanitizeText(req.body.nazev, 100);
+  const popis = req.body.popis ? sanitizeText(req.body.popis, 800) : '';
+  const cena = parseFloat(req.body.cena);
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název položky' });
+  if (!isAmount(cena, 50_000_000)) return res.json({ ok: false, error: 'Neplatná cena' });
+  const imagePath = await saveBazarImage(req.body.image);
+  const list = loadBazar();
+  const item = {
+    id: `bz_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
+    nazev, popis: popis || '', cena, image: imagePath,
+    prodavajici: req.session.icName,
+    zajemci: [], vybranyZajemce: null,
+    potvrdilProdavajici: false, potvrdilKupujici: false,
+    prodano: false, dohodnutaCena: null, kupec: null,
+    createdAt: Date.now(),
+  };
+  list.push(item);
+  saveBazar(list);
+  broadcastSSE('bazarUpdate', { action: 'add' });
+  const imageUrl = imagePath ? `${req.protocol}://${req.get('host')}${imagePath}` : null;
+  discord.notifyBazarNove(item, imageUrl).catch(e => console.error('[DISCORD BAZAR]', e.message));
+  res.json({ ok: true, item });
+});
+
+app.post('/api/bazar/:id/zajem', requireAuth, (req, res) => {
+  const list = loadBazar();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nabídka nenalezena' });
+  if (item.prodano) return res.json({ ok: false, error: 'Položka je už prodaná' });
+  if (item.prodavajici === req.session.icName) return res.json({ ok: false, error: 'Nemůžeš projevit zájem o vlastní nabídku' });
+  const nabidka = parseFloat(req.body.nabidka);
+  if (!isAmount(nabidka, 50_000_000)) return res.json({ ok: false, error: 'Neplatná částka nabídky' });
+  item.zajemci = (item.zajemci || []).filter(z => z.jmeno !== req.session.icName);
+  item.zajemci.push({ jmeno: req.session.icName, nabidka, at: Date.now() });
+  saveBazar(list);
+  broadcastSSE('bazarUpdate', { action: 'zajem' });
+  res.json({ ok: true, item });
+});
+
+app.post('/api/bazar/:id/vyber', requireAuth, (req, res) => {
+  const list = loadBazar();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nabídka nenalezena' });
+  if (item.prodavajici !== req.session.icName) return res.status(403).json({ ok: false, error: 'Jen prodávající může vybrat zájemce' });
+  const jmeno = (req.body.jmeno || '').toString();
+  const existuje = (item.zajemci || []).some(z => z.jmeno === jmeno);
+  if (!existuje) return res.json({ ok: false, error: 'Zájemce nenalezen' });
+  item.vybranyZajemce = jmeno;
+  item.potvrdilProdavajici = false;
+  item.potvrdilKupujici = false;
+  saveBazar(list);
+  broadcastSSE('bazarUpdate', { action: 'vyber' });
+  res.json({ ok: true, item });
+});
+
+// Potvrzení obchodu — musí kliknout OBĚ strany (prodávající i vybraný
+// zájemce), teprve pak se položka uzavře a orazítkuje jako "PRODÁNO".
+app.post('/api/bazar/:id/potvrdit', requireAuth, async (req, res) => {
+  const list = loadBazar();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nabídka nenalezena' });
+  if (item.prodano) return res.json({ ok: false, error: 'Obchod je už uzavřen' });
+  if (!item.vybranyZajemce) return res.json({ ok: false, error: 'Prodávající zatím nevybral zájemce' });
+
+  const isProdavajici = item.prodavajici === req.session.icName;
+  const isKupujici = item.vybranyZajemce === req.session.icName;
+  if (!isProdavajici && !isKupujici) return res.status(403).json({ ok: false, error: 'Potvrdit obchod smí jen prodávající nebo vybraný zájemce' });
+
+  if (isProdavajici) item.potvrdilProdavajici = true;
+  if (isKupujici) item.potvrdilKupujici = true;
+
+  if (item.potvrdilProdavajici && item.potvrdilKupujici) {
+    item.prodano = true;
+    item.kupec = item.vybranyZajemce;
+    const zaj = (item.zajemci || []).find(z => z.jmeno === item.vybranyZajemce);
+    item.dohodnutaCena = zaj ? zaj.nabidka : item.cena;
+    item.prodanoAt = Date.now();
+    discord.notifyBazarProdano(item, item.kupec).catch(e => console.error('[DISCORD BAZAR]', e.message));
+  }
+
+  saveBazar(list);
+  broadcastSSE('bazarUpdate', { action: 'potvrzeno' });
+  res.json({ ok: true, item });
+});
+
+app.delete('/api/bazar/:id', requireAuth, (req, res) => {
+  const list = loadBazar();
+  const item = list.find(i => i.id === req.params.id);
+  if (!item) return res.json({ ok: false, error: 'Nabídka nenalezena' });
+  if (item.prodavajici !== req.session.icName && req.session.accessLevel !== 1) {
+    return res.status(403).json({ ok: false, error: 'Nabídku smí stáhnout jen prodávající nebo vedení' });
+  }
+  const filtered = list.filter(i => i.id !== req.params.id);
+  saveBazar(filtered);
+  if (item.image && item.image.startsWith('/bazar-uploads/')) {
+    fs.unlink(path.join(BAZAR_UPLOADS_DIR, path.basename(item.image)), () => {});
+  }
+  broadcastSSE('bazarUpdate', { action: 'remove' });
+  res.json({ ok: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// MENTORSKÝ PROGRAM — formální proces s cílem, checkpointy a hodnocením
+// (nahrazuje prostý tag "mentor" ve Vztazích mezi členy strukturovaným
+// průběhem). Vidí každý, zakládat/upravovat smí Senior Member a výš.
+// ══════════════════════════════════════════════════════════════════════
+const MENTORING_FILE = path.join(DATA_DIR, 'mentoring.json');
+function loadMentoring() { try { const d = JSON.parse(fs.readFileSync(MENTORING_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
+function saveMentoring(d) { try { writeJsonAtomic(MENTORING_FILE, d); } catch (e) { console.error('[MENTORING]', e.message); } }
+function requireMentoringManage(req, res, next) {
+  if ((req.session.accessLevel || 3) > 2) return res.status(403).json({ ok: false, error: 'Zakládat a upravovat mentorské programy smí od hodnosti Senior Member výš' });
+  next();
+}
+
+app.get('/api/mentoring', requireAuth, (req, res) => {
+  res.json({ ok: true, programs: loadMentoring().sort((a,b) => (b.vytvorenoAt ? new Date(b.vytvorenoAt) : 0) - (a.vytvorenoAt ? new Date(a.vytvorenoAt) : 0)) });
+});
+
+app.post('/api/mentoring', requireAuth, requireMentoringManage, (req, res) => {
+  const mentor = sanitizeText(req.body.mentor, 80);
+  const chranenec = sanitizeText(req.body.chranenec, 80);
+  const cil = req.body.cil ? sanitizeText(req.body.cil, 600) : '';
+  if (!mentor || !chranenec) return res.json({ ok: false, error: 'Vyplň mentora i chráněnce' });
+  const checkpoints = Array.isArray(req.body.checkpoints) ? req.body.checkpoints
+    .map(c => ({ id: `cp_${Date.now()}_${Math.floor(Math.random()*1e6)}`, text: sanitizeText(c.text, 200), termin: c.termin ? sanitizeText(c.termin, 40) : '', hotovo: false, hotovoAt: null }))
+    .filter(c => c.text) : [];
+  const program = {
+    id: `ment_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
+    mentor, chranenec, cil: cil || '', status: 'aktivni',
+    checkpoints, hodnoceni: null,
+    vytvoril: req.session.icName, vytvorenoAt: new Date().toISOString(),
+  };
+  const list = loadMentoring();
+  list.push(program);
+  saveMentoring(list);
+  res.json({ ok: true, program });
+});
+
+app.put('/api/mentoring/:id/checkpoint/:cpId', requireAuth, requireMentoringManage, (req, res) => {
+  const list = loadMentoring();
+  const program = list.find(p => p.id === req.params.id);
+  if (!program) return res.json({ ok: false, error: 'Program nenalezen' });
+  if (program.status !== 'aktivni') return res.json({ ok: false, error: 'Program už není aktivní' });
+  const cp = (program.checkpoints || []).find(c => c.id === req.params.cpId);
+  if (!cp) return res.json({ ok: false, error: 'Checkpoint nenalezen' });
+  cp.hotovo = !!req.body.hotovo;
+  cp.hotovoAt = cp.hotovo ? new Date().toISOString() : null;
+  saveMentoring(list);
+  res.json({ ok: true, program });
+});
+
+app.post('/api/mentoring/:id/hodnoceni', requireAuth, requireMentoringManage, (req, res) => {
+  const list = loadMentoring();
+  const program = list.find(p => p.id === req.params.id);
+  if (!program) return res.json({ ok: false, error: 'Program nenalezen' });
+  const znamka = parseInt(req.body.znamka);
+  if (![1,2,3,4,5].includes(znamka)) return res.json({ ok: false, error: 'Neplatná známka (1–5)' });
+  program.hodnoceni = {
+    znamka, text: sanitizeText(req.body.text, 1000) || '',
+    hodnotil: req.session.icName, hodnocenoAt: new Date().toISOString(),
+  };
+  program.status = 'dokoncen';
+  saveMentoring(list);
+  res.json({ ok: true, program });
+});
+
+app.delete('/api/mentoring/:id', requireAuth, requireMentoringManage, (req, res) => {
+  const list = loadMentoring();
+  const program = list.find(p => p.id === req.params.id);
+  if (!program) return res.json({ ok: false, error: 'Program nenalezen' });
+  program.status = 'zruseny';
+  saveMentoring(list);
+  res.json({ ok: true });
+});
+
 // ── SKLAD — CENÍK (výkupní/prodejní ceny, editovatelné jen Founder/Council) ──
 const CENIK_FILE = path.join(DATA_DIR, 'cenik.json');
 const CENIK_DEFAULT = {
@@ -313,8 +572,8 @@ const CENIK_DEFAULT = {
     {
       id: 'sazeni', label: 'Sázení',
       rows: [
-        { label: 'Jedna kytka (bez květináče, nůžek a sáčků)', cena: '455$' },
-        { label: 'Pytlík na prodej (firemní účet)', cena: '150$' },
+        { label: 'Jedna kytka (bez květináče, nůžek a sáčků)', cena: '505$' },
+        { label: 'Pytlík na prodej (firemní účet)', cena: '165$' },
         { label: 'Hnojivo', cena: '25$' },
         { label: 'Konev s vodou', cena: '20$' },
         { label: 'Kvalitní hnojivo', cena: '50$ (x4 — 200$)' },
@@ -1059,7 +1318,7 @@ async function requireDiscordMember(req, res, next) {
     if (roles === null) {
       req.session.destroy(() => {});
       const isApi = req.path.startsWith('/api/');
-      if (isApi) return res.json({ ok: false, error: 'Přístup odepřen — nejsi na Discord serveru' });
+      if (isApi) return res.json({ ok: false, error: 'Přístup odepřen — nejsi evidován/a v systému organizace' });
       return res.redirect('/login?error=not_on_server');
     }
     const newLevel = levelFromRoleIds(roles);
@@ -1172,7 +1431,7 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   if (!inList(odruda_trim, CONFIG.weedOdrudy)) return res.json({ ok: false, error: 'Nepovolená odrůda' });
   if (!isQty(qty))                             return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
 
-  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 150 };
+  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 165 };
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
@@ -1332,7 +1591,7 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
   // mohlo zanechat částečný zápis prvních dvou).
   const rows = validated.map(v => {
     if (sekce === 'zbrane') return [cas, typUp, v.polozka, v.qty, v.kategorie || '?', uzivatel, v.ucel || '-'];
-    if (sekce === 'weed') { const ceny = CONFIG.weedCeny[v.polozka] || { vyroba: 100, prodej: 150 }; return [cas, typUp, v.polozka, v.qty, ceny.vyroba, ceny.prodej, uzivatel]; }
+    if (sekce === 'weed') { const ceny = CONFIG.weedCeny[v.polozka] || { vyroba: 100, prodej: 165 }; return [cas, typUp, v.polozka, v.qty, ceny.vyroba, ceny.prodej, uzivatel]; }
     if (sekce === 'drogy') return [cas, typUp, v.polozka, v.qty, '-', '-', uzivatel];
     if (sekce === 'chemky') return [cas, typUp, v.polozka, v.qty, uzivatel];
     return null;
@@ -1607,6 +1866,9 @@ app.post('/api/gallery', requireAuth, requireAccess('audit'), async (req, res) =
   const item = { id: filename, image: `/gallery-uploads/${filename}`, caption: (caption||'').toString().slice(0,200), pridal: req.session.icName, createdAt: Date.now() };
   items.push(item);
   saveGallery(items);
+  // Nová fotka jde i do interního kanálu #fotoalbum (viz discord.js — notifyGalerie)
+  const imageUrl = `${req.protocol}://${req.get('host')}${item.image}`;
+  discord.notifyGalerie(imageUrl, item.caption, req.session.icName).catch(e => console.error('[DISCORD GALERIE]', e.message));
   res.json({ ok: true, item });
 });
 
@@ -2260,7 +2522,7 @@ app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, r
     };
 
     // ── Ceníky ──
-    const WEED_SELL = 150;
+    const WEED_SELL = 165; // zdraženo ze 150$ na 165$
     const DROGY_P = {}; Object.entries(CONFIG.drogyCeny).forEach(([k,v]) => DROGY_P[k] = v.prodej);
     const ZBRANE_P = {}; Object.entries(CONFIG.zbraneCeny).forEach(([k,v]) => ZBRANE_P[k] = v.prodej);
 
@@ -2583,7 +2845,7 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
       return 0;
     };
 
-    const WEED_SELL = 150;
+    const WEED_SELL = 165; // zdraženo ze 150$ na 165$
     const DROGY_P = {}; Object.entries(CONFIG.drogyCeny).forEach(([k,v]) => DROGY_P[k] = v.prodej);
     const isVklad = (t) => t === 'VKLAD' || t === 'PŘÍJEM';
     const now = Date.now();
@@ -2744,9 +3006,10 @@ app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)))
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
 app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
-  const members = db.prepare('SELECT ic_name FROM users WHERE ic_name IS NOT NULL ORDER BY ic_name ASC').all().map(u => u.ic_name);
-  res.send(renderSpisy(req, members));
+  res.send(renderSpisy(req));
 });
+app.get('/bazar', requireAuth, requireAccess('bazar'), (req, res) => res.send(renderBazar(req)));
+app.get('/mentoring', requireAuth, requireAccess('mentoring'), (req, res) => res.send(renderMentoring(req)));
 app.get('/galerie', requireAuth, (req, res) => {
   if (req.session.isAssociate) return res.status(403).send('Galerie je dostupná od hodnosti Member. <a href="/home">Zpět</a>');
   res.send(renderGallery(req));

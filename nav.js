@@ -9,7 +9,7 @@ function renderNav(req, active) {
   const can = (pageId) => canAccess(accessLevel, pageId);
   const skladPages = ['sklad','weed-sazeni'];
   const blackbookPages = ['blackbook','profit-centrum'];
-  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie','spis'];
+  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie','spis','mentoring'];
   const dataPages  = ['audit','statistiky'];
 
   return `
@@ -27,6 +27,7 @@ function renderNav(req, active) {
       <ul class="nav-menu" id="navMenu">
         <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Rejstřík</span></a></li>
         <li><a href="/garaz" class="${active==='garaz'?'active':''}">Garáž<span class="nav-desc">Vozový park</span></a></li>
+        <li><a href="/bazar" class="${active==='bazar'?'active':''}">Bazar<span class="nav-desc">Vnitřní tržiště</span></a></li>
 
         ${can('sklad') ? `
         <li class="nav-dropdown ${skladPages.includes(active)?'open':''}">
@@ -77,6 +78,7 @@ function renderNav(req, active) {
           <div class="nav-dropdown-menu">
             ${can('nastenska') ? `<a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka</a>` : ''}
             ${can('spis') ? `<a href="/spis" class="${active==='spis'?'active':''}">Osobní spisy</a>` : ''}
+            <a href="/mentoring" class="${active==='mentoring'?'active':''}">Mentorský program</a>
             <a href="/kodex" class="${active==='kodex'?'active':''}">Kodex</a>
             <a href="/lore" class="${active==='lore'?'active':''}">Historie</a>
             <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a>

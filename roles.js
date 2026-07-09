@@ -6,6 +6,9 @@
 const ROLE_IDS = {
   FOUNDER:        '1511034407597637712',
   COUNCIL:        '1512329904446771220',
+  // GenK (General Koordinátor) — z rozhodnutí vedení má stejné pravomoce
+  // jako Founder (level 1), viz LEVELS níže.
+  GENERAL_KOORDINATOR: '1512330331343294675',
   SENIOR_MEMBER:  '1512330140401795124',
   MEMBER:         '1511034483015680020',
   ASSOCIATE:      '1512330396547682335',
@@ -15,6 +18,7 @@ const ROLE_IDS = {
 const LEVELS = {
   FOUNDER: 1,
   COUNCIL: 1,
+  GENERAL_KOORDINATOR: 1,
   SENIOR_MEMBER: 2,
   MEMBER: 3,
   ASSOCIATE: 3,
@@ -43,7 +47,9 @@ const PAGE_ACCESS = {
   blackbook:       1, // Blackbook
   'profit-centrum':1, // Profit centrum
   nastenska:       2, // Nástěnka
-  spis:            1, // Osobní spisy členů — jen Founder/Council
+  spis:            2, // Osobní spisy členů — Founder/Council/GenK + Senior Member
+  bazar:           3, // Bazar — vidí a nakupuje úplně každý přihlášený člen
+  mentoring:       3, // Mentorský program — vidí každý, zápisy jen Senior Member výš (řeší se v UI/API)
   // Volně přístupné všem přihlášeným (level 3 = bez omezení):
   garaz:           3,
   'weed-sazeni':   3,
@@ -85,10 +91,10 @@ function renderForbidden(req) {
       <div>
         <div class="page-label">Caledonia</div>
         <h1 class="page-title">Přístup odepřen</h1>
-        <p class="page-sub">Tvoje hodnost na Discordu nemá oprávnění k této sekci.</p>
+        <p class="page-sub">Tvoje hodnost v organizaci nemá oprávnění k této sekci.</p>
       </div>
     </div>
-    <p class="folio-footnote">Pokud věříš, že je to chyba, kontaktuj Council nebo Foundera organizace.</p>
+    <p class="folio-footnote">Pokud věříš, že je to chyba, kontaktuj sekretariát nebo vedení organizace.</p>
   </main>
   </body></html>`;
 }

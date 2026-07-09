@@ -592,7 +592,7 @@ async function sendOnboardingDM(discordId, icName) {
 
     const zpravy = [
       `Vítejte v Caledonie${icName ? `, ${icName}` : ''}! Jsem Evelyn Ashcroft a starám se o administrativní chod organizace — ceník, sklad, garáž a spoustu dalšího najdete na webovém rozhraní.`,
-      `Pár tipů na začátek: aktuální ceník najdete v sekci **Ceník** na webu (i jako \`/cenik\` zde na Discordu). Zápisy do skladu (zbraně, weed, drogy, chemikálie) se dělají výhradně přes web — Discord slouží jako živá kronika toho, co se v organizaci děje.`,
+      `Pár tipů na začátek: aktuální ceník najdete v sekci **Ceník** na aplikaci (i jako \`/cenik\` zde). Zápisy do skladu (zbraně, weed, drogy, chemikálie) se dělají výhradně přes interní aplikaci Caledonie — tento kanál slouží jako živá kronika toho, co se v organizaci děje.`,
       `Pokud si nebudete s něčím jistí, obraťte se na Senior Membera nebo výše — a přeji vám v organizaci mnoho úspěchů.`,
     ];
 
@@ -682,6 +682,67 @@ async function getAnnouncementMessages(limit = 20) {
   }
 }
 
+// ── GALERIE ORGANIZACE — každá nahraná fotka jde i do kanálu #fotoalbum ────
+async function notifyGalerie(imageUrl, caption, uzivatel) {
+  const channelId = process.env.CHANNEL_FOTOALBUM || '1521532400113553488';
+  if (!channelId) return;
+  const embed = {
+    title: '📸 NOVÁ FOTOGRAFIE V GALERII',
+    color: 0xC9A84C,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, do galerie organizace přibyla nová fotografie.`,
+    fields: [
+      { name: '👤 Přidal', value: uzivatel || '—', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  };
+  if (caption) embed.fields.push({ name: '📝 Popisek', value: caption, inline: false });
+  if (imageUrl) embed.image = { url: imageUrl };
+  await sendEmbed(channelId, embed);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// BAZAR — vnitřní tržiště organizace, viditelné pro každou hodnost.
+// Nová nabídka i uzavřený obchod se posílají do kanálu #bazar.
+// ══════════════════════════════════════════════════════════════════════
+async function notifyBazarNove(item, imageUrl) {
+  const channelId = process.env.CHANNEL_BAZAR || '1524010210853916787';
+  if (!channelId) return;
+  const embed = {
+    title: '🛍️ NOVÁ NABÍDKA V BAZARU',
+    color: 0xC9A84C,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, do bazaru organizace přibyla nová položka k prodeji.`,
+    fields: [
+      { name: 'Položka', value: item.nazev || '—', inline: true },
+      { name: 'Cena', value: item.cena != null ? `$${Number(item.cena).toLocaleString('cs-CZ')}` : '—', inline: true },
+      { name: 'Nabízí', value: item.prodavajici || '—', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  };
+  if (item.popis) embed.fields.push({ name: 'Popis', value: item.popis, inline: false });
+  if (imageUrl) embed.image = { url: imageUrl };
+  await sendEmbed(channelId, embed);
+}
+
+async function notifyBazarProdano(item, kupec) {
+  const channelId = process.env.CHANNEL_BAZAR || '1524010210853916787';
+  if (!channelId) return;
+  await sendEmbed(channelId, {
+    title: '✅ PRODÁNO — bazar',
+    color: 0x57F287,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, obchod byl oboustranně potvrzen a je uzavřen.`,
+    fields: [
+      { name: 'Položka', value: item.nazev || '—', inline: true },
+      { name: 'Cena', value: item.dohodnutaCena != null ? `$${Number(item.dohodnutaCena).toLocaleString('cs-CZ')}` : '—', inline: true },
+      { name: 'Prodal', value: item.prodavajici || '—', inline: true },
+      { name: 'Koupil', value: kupec || '—', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
 async function isUserOnServer(discordId) {
   const guildId = process.env.GUILD_ID;
   try {
@@ -710,4 +771,4 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles, notifyGalerie, notifyBazarNove, notifyBazarProdano };
