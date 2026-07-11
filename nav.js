@@ -40,15 +40,15 @@ function renderNav(req, active) {
         </li>
         <li><a href="/bazar" class="${active==='bazar'?'active':''}">Bazar<span class="nav-desc">Vnitřní tržiště</span></a></li>
 
-        ${can('sklad') ? `
+        ${can('sklad-view') ? `
         <li class="nav-dropdown ${skladPages.includes(active)?'open':''}">
           <a href="/sklad" class="nav-drop-trigger ${skladPages.includes(active)?'active':''}">
             Sklad
-            <span class="nav-desc">Zbraně · Weed · Drogy</span>
+            <span class="nav-desc">${can('sklad') ? 'Zbraně · Weed · Drogy' : 'Reserve Fund · Ceník'}</span>
             <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
           </a>
           <div class="nav-dropdown-menu">
-            <a href="/sklad" class="${active==='sklad'?'active':''}">Správa skladu</a>
+            <a href="/sklad" class="${active==='sklad'?'active':''}">${can('sklad') ? 'Správa skladu' : 'Reserve Fund'}</a>
             <a href="/weed-sazeni" class="${active==='weed-sazeni'?'active':''}">Weed sázení</a>
           </div>
         </li>` : `
@@ -153,7 +153,7 @@ function renderNav(req, active) {
           <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
           <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#F3EEE3,#0B0F0D,#F3EEE3);border:1.5px solid #B68A4E" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
         </div>
-        <span class="nav-shortcut-hint" title="g+h Přehled${can('sklad')?' · g+s Sklad':''}${can('blackbook')?' · g+b Blackbook':''}${can('audit')?' · g+a Audit':''}${can('nastenska')?' · g+n Nástěnka':''} · / Hledat">g·_</span>
+        <span class="nav-shortcut-hint" title="g+h Přehled${can('sklad-view')?' · g+s Sklad':''}${can('blackbook')?' · g+b Blackbook':''}${can('audit')?' · g+a Audit':''}${can('nastenska')?' · g+n Nástěnka':''} · / Hledat">g·_</span>
         <span class="nav-user" style="border-left:2px solid ${({1:'var(--oxblood-bright)',2:'var(--brass-bright)',3:'var(--ivory-faint)'})[accessLevel]||'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${escapeHtml(ic)}</strong></span>
         <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
@@ -664,7 +664,7 @@ function renderNav(req, active) {
 
       // ── KLÁVESOVÉ ZKRATKY ──
       (function(){
-        const ROUTES = { h:'/home'${can('sklad')?", s:'/sklad'":''}${can('blackbook')?", b:'/blackbook'":''}${can('profit-centrum')?", p:'/profit-centrum'":''}${can('audit')?", a:'/audit'":''}${can('statistiky')?", t:'/statistiky'":''}${can('nastenska')?", n:'/nastenska'":''}, k:'/kodex', l:'/lore', o:'/hierarchy', w:'/weed-sazeni' };
+        const ROUTES = { h:'/home'${can('sklad-view')?", s:'/sklad'":''}${can('blackbook')?", b:'/blackbook'":''}${can('profit-centrum')?", p:'/profit-centrum'":''}${can('audit')?", a:'/audit'":''}${can('statistiky')?", t:'/statistiky'":''}${can('nastenska')?", n:'/nastenska'":''}, k:'/kodex', l:'/lore', o:'/hierarchy', w:'/weed-sazeni' };
         let awaitingSecond = false, chordTimer = null;
         function isTyping(el) { if(!el) return false; const tag=el.tagName; return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||el.isContentEditable; }
         document.addEventListener('keydown', (e) => {

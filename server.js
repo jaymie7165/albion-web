@@ -807,7 +807,7 @@ function loadReserveFund() {
 function saveReserveFund(list) { try { writeJsonAtomic(RESERVE_FUND_FILE, list); } catch (e) { console.error('[RESERVE FUND]', e.message); } }
 
 // Přehled aktuálního týdne — kdo z registrovaných členů už zaplatil a podepsal.
-app.get('/api/reserve-fund', requireAuth, requireAccess('sklad'), (req, res) => {
+app.get('/api/reserve-fund', requireAuth, (req, res) => {
   const weekKey = getReserveWeekKey();
   const list = loadReserveFund();
   const entriesThisWeek = list.filter(r => r.weekKey === weekKey);
@@ -828,7 +828,7 @@ app.get('/api/reserve-fund', requireAuth, requireAccess('sklad'), (req, res) => 
 
 // Zaplacení + podpis Reserve Fondu pro aktuální týden — jde do Účetnictví jako
 // běžný příjem a zároveň se zapíše podepsaný záznam do reserve-fund.json.
-app.post('/api/reserve-fund/pay', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.post('/api/reserve-fund/pay', requireAuth, async (req, res) => {
   const weekKey = getReserveWeekKey();
   const list = loadReserveFund();
   if (list.some(r => r.weekKey === weekKey && r.icName === req.session.icName)) {
@@ -1742,7 +1742,7 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
 });
 
 // ── API — CENÍK (referenční ceny, editovatelné jen Founder/Council) ───────────
-app.get('/api/cenik', requireAuth, requireAccess('sklad'), (req, res) => {
+app.get('/api/cenik', requireAuth, (req, res) => {
   res.json({ ok: true, cenik: loadCenik() });
 });
 app.put('/api/cenik', requireAuth, requireAccess('sklad'), (req, res) => {
@@ -3226,7 +3226,7 @@ app.get('/home', requireAuth, async (req, res) => {
 app.get('/dashboard', requireAuth, async (req, res) => res.redirect('/home'));
 
 
-app.get('/sklad', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.get('/sklad', requireAuth, requireAccess('sklad-view'), async (req, res) => {
   try {
     const [zbrane, weed, drogy, chemky, ucet, recentUcet] = await Promise.all([
       sheets.getStockSummary('Zbraně').catch(() => ({})),

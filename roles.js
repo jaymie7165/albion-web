@@ -42,6 +42,7 @@ function levelFromRoleIds(roleIds) {
 // level 1 = Founder/Council, level 2 = + Senior Member, level 3 = všichni (Member/Associate)
 const PAGE_ACCESS = {
   sklad:           2, // Sklad — zápisy zbraně/weed/drogy/chemky/účet/směnárna
+  'sklad-view':    3, // Stejná stránka /sklad, ale jen ke čtení Reserve Fondu a Ceníku — vidí každý člen
   audit:           1, // Audit
   statistiky:      2, // Statistiky členů
   blackbook:       1, // Blackbook
