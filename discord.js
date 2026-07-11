@@ -309,15 +309,14 @@ async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel, a
 async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel, accessLevel) {
   const channelId = process.env.CHANNEL_WEED;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
-  // Weed se zapisuje v gramech, ale ceny (vyroba/prodej) jsou stanovené za
-  // sáček (5 g = 1 sáček) — proto se před výpočtem hodnoty musí gramy převést.
-  const sacky = Math.floor((mnozstvi || 0) / 5);
+  // Weed se zapisuje přímo v SÁČCÍCH — ceny (vyroba/prodej) jsou stanovené za
+  // 1 sáček, žádný přepočet z gramů se tedy nedělá.
   const fields = [
     { name: 'Odrůda', value: odruda, inline: true },
-    { name: 'Množství', value: `${mnozstvi} g (${sacky} sáčků)`, inline: true },
+    { name: 'Množství', value: `${mnozstvi} sáčků`, inline: true },
     { name: typ === 'VKLAD' ? 'Vložil' : 'Vzal', value: uzivatel, inline: true },
-    { name: '💸 Výroba stála', value: `~$${vyroba * sacky}`, inline: true },
-    { name: '💰 Doporučená prodejní', value: `$${prodej * sacky}`, inline: true },
+    { name: '💸 Výroba stála', value: `~$${vyroba * mnozstvi}`, inline: true },
+    { name: '💰 Doporučená prodejní', value: `$${prodej * mnozstvi}`, inline: true },
   ];
   await sendEmbed(channelId, {
     title: typ === 'VKLAD' ? '🌿 VLOŽENO DO SKLADU (web)' : '🌿 VYBRÁNO ZE SKLADU (web)',
@@ -487,7 +486,7 @@ async function notifyBulkSklad(sekce, typ, items, uzivatel) {
   const ikonyMap = { zbrane: '🔫', weed: '🌿', drogy: '💊', chemky: '⚗️' };
   const channelId = channelMap[sekce];
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
-  const jednotka = (sekce === 'weed' || sekce === 'drogy') ? 'g' : 'ks';
+  const jednotka = (sekce === 'weed') ? 'sáčků' : 'ks';
   const seznam = items.map(v => `• ${v.polozka} — ${v.qty} ${jednotka}`).join('\n').slice(0, 1000);
 
   await sendEmbed(channelId, {
@@ -671,6 +670,43 @@ async function notifyTydenniSouhrn({ income, expense, net, ops, inactiveCount, t
   });
 }
 
+// ── RESERVE FUND — týdenní povinný odvod (splatnost neděle) ────────────────
+// Po víkendu (kontrola v pondělí, viz server.js) se ověří, kdo za uplynulý
+// týden nezaplatil a nepodepsal Reserve Fund — jejich jména jdou sem.
+async function notifyReserveFundDluznici(weekKey, jmena) {
+  const channelId = process.env.CHANNEL_UCETNICTVI || process.env.CHANNEL_AUDIT;
+  if (!channelId || !jmena || !jmena.length) return;
+  await sendEmbed(channelId, {
+    title: '⚠️ RESERVE FUND — NEZAPLACENO',
+    color: 0xE8A33D,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, po víkendu jsem zkontrolovala Reserve Fund za týden do ${weekKey} a níže uvedení členové jej dosud nezaplatili ani nepodepsali.`,
+    fields: [
+      { name: '👤 Dlužníci', value: jmena.join('\n').slice(0, 1000) || '—' },
+      { name: '💰 Povinná částka', value: '$5 000 / osoba', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// Potvrzení, že člen Reserve Fund za daný týden zaplatil a podepsal —
+// jde do stejného kanálu jako běžné příjmy, ale s vlastním razítkem.
+async function notifyReserveFundZaplaceno(weekKey, uzivatel, discordUsername) {
+  const channelId = process.env.CHANNEL_UCETNICTVI;
+  if (!channelId) return;
+  await sendEmbed(channelId, {
+    title: '🔏 RESERVE FUND PODEPSÁN',
+    color: 0x57F287,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, ${uzivatel} právě uhradil/a a podepsal/a Reserve Fund za týden do ${weekKey}.`,
+    fields: [
+      { name: '👤 Člen', value: discordUsername ? `${uzivatel} (@${discordUsername})` : uzivatel, inline: true },
+      { name: '💰 Částka', value: '$5 000', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
 async function getAnnouncementMessages(limit = 20) {
   const channelId = process.env.CHANNEL_OZNAMENI;
   if (!channelId || !BOT_TOKEN()) return [];
@@ -775,4 +811,4 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles, notifyGalerie, notifyBazarNove, notifyBazarProdano };
+module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles, notifyGalerie, notifyBazarNove, notifyBazarProdano, notifyReserveFundDluznici, notifyReserveFundZaplaceno };

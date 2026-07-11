@@ -766,6 +766,127 @@ async function checkPenizeMilestone() {
   } catch (e) { console.error('[MILESTONES] penize:', e.message); }
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// RESERVE FUND — povinný týdenní odvod do pokladny organizace
+// Fixní částka $5 000 na člena, splatnost vždy v NEDĚLI. Zaplacením se
+// zároveň zapíše "podpis" (jméno + čas) — bez podpisu se odvod nepovažuje
+// za vyřízený. V pondělí ráno se zkontroluje, kdo za uplynulý týden (do
+// minulé neděle) nezaplatil, a pošle se upozornění na Discord.
+// ══════════════════════════════════════════════════════════════════════
+const RESERVE_FUND_FILE = path.join(DATA_DIR, 'reserve-fund.json');
+const RESERVE_FUND_AMOUNT = 5000;
+
+// Vrátí datum (YYYY-MM-DD) nejbližší neděle TOHOTO týdne (týden bereme Po–Ne) —
+// tím pádem každý den v týdnu (Po–Ne) spadá pod stejný klíč = neděli daného týdne.
+function getReserveWeekKey(date) {
+  const d = date ? new Date(date) : new Date();
+  const day = d.getDay(); // 0 = Ne, 1 = Po, … 6 = So
+  const diffToSunday = day === 0 ? 0 : 7 - day;
+  const sunday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToSunday);
+  return sunday.toISOString().slice(0, 10);
+}
+
+function loadReserveFund() {
+  try {
+    if (!fs.existsSync(RESERVE_FUND_FILE)) {
+      // Výchozí stav — Sauvage Yildiz a Christopher Anthony Sinclair mají
+      // aktuální týden už uhrazený a podepsaný.
+      const seedWeek = getReserveWeekKey();
+      const seedNow = new Date().toISOString();
+      const seed = [
+        { id: 'rf_seed_1', weekKey: seedWeek, icName: 'Sauvage Yildiz', amount: RESERVE_FUND_AMOUNT, paidAt: seedNow, signed: true, signedAt: seedNow },
+        { id: 'rf_seed_2', weekKey: seedWeek, icName: 'Christopher Anthony Sinclair', amount: RESERVE_FUND_AMOUNT, paidAt: seedNow, signed: true, signedAt: seedNow },
+      ];
+      writeJsonAtomic(RESERVE_FUND_FILE, seed);
+      return seed;
+    }
+    const d = JSON.parse(fs.readFileSync(RESERVE_FUND_FILE, 'utf8'));
+    return Array.isArray(d) ? d : [];
+  } catch { return []; }
+}
+function saveReserveFund(list) { try { writeJsonAtomic(RESERVE_FUND_FILE, list); } catch (e) { console.error('[RESERVE FUND]', e.message); } }
+
+// Přehled aktuálního týdne — kdo z registrovaných členů už zaplatil a podepsal.
+app.get('/api/reserve-fund', requireAuth, requireAccess('sklad'), (req, res) => {
+  const weekKey = getReserveWeekKey();
+  const list = loadReserveFund();
+  const entriesThisWeek = list.filter(r => r.weekKey === weekKey);
+  const paidSet = new Set(entriesThisWeek.map(r => r.icName));
+  const allUsers = db.prepare('SELECT * FROM users').all();
+  const members = allUsers.filter(u => u.ic_name).map(u => ({ icName: u.ic_name, paid: paidSet.has(u.ic_name) }))
+    .sort((a, b) => Number(a.paid) - Number(b.paid) || a.icName.localeCompare(b.icName, 'cs'));
+  res.json({
+    ok: true,
+    weekKey,
+    amount: RESERVE_FUND_AMOUNT,
+    paidByMe: paidSet.has(req.session.icName),
+    members,
+    paidCount: members.filter(m => m.paid).length,
+    totalCount: members.length,
+  });
+});
+
+// Zaplacení + podpis Reserve Fondu pro aktuální týden — jde do Účetnictví jako
+// běžný příjem a zároveň se zapíše podepsaný záznam do reserve-fund.json.
+app.post('/api/reserve-fund/pay', requireAuth, requireAccess('sklad'), async (req, res) => {
+  const weekKey = getReserveWeekKey();
+  const list = loadReserveFund();
+  if (list.some(r => r.weekKey === weekKey && r.icName === req.session.icName)) {
+    return res.json({ ok: false, error: 'Za tento týden jsi Reserve Fund už zaplatil/a a podepsal/a.' });
+  }
+
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+  const cas = sheets.timestamp();
+  const poznamka = `Reserve Fund — týden do ${weekKey} — ${uzivatel}`;
+
+  await sheets.appendRow('Účetnictví', [cas, 'PŘÍJEM', RESERVE_FUND_AMOUNT, 'USD', poznamka, uzivatel]);
+  await discord.notifyUcet('PŘÍJEM', RESERVE_FUND_AMOUNT, 'USD', poznamka, uzivatel);
+  await discord.notifyReserveFundZaplaceno(weekKey, uzivatel, discordUser).catch(() => {});
+  await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `PŘÍJEM — SAD ${RESERVE_FUND_AMOUNT} | ${poznamka}`);
+  checkPenizeMilestone().catch(() => {});
+
+  const entry = {
+    id: `rf_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    weekKey, icName: uzivatel, amount: RESERVE_FUND_AMOUNT,
+    paidAt: new Date().toISOString(), signed: true, signedAt: new Date().toISOString(),
+  };
+  list.push(entry);
+  saveReserveFund(list);
+  broadcastSSE('ucetUpdate', { typ: 'PŘÍJEM', castka: RESERVE_FUND_AMOUNT, valuta: 'USD', poznamka, uzivatel, cas });
+  broadcastSSE('reserveFundUpdate', { weekKey, icName: uzivatel });
+
+  res.json({ ok: true, entry });
+});
+
+// ── KONTROLA PO VÍKENDU — kdo nezaplatil, jde do upozornění na Discord ──────
+// Kontrola běží denně; jakmile jednou vyhodnotí danou (uplynulou) neděli,
+// znovu už pro stejný týden neupozorňuje (uloženo v RESERVE_FUND_ALERT_FILE).
+const RESERVE_FUND_ALERT_FILE = path.join(DATA_DIR, 'reserve-fund-alert-sent.json');
+function loadLastReserveAlertWeek() { try { return JSON.parse(fs.readFileSync(RESERVE_FUND_ALERT_FILE, 'utf8')).week || null; } catch { return null; } }
+function saveLastReserveAlertWeek(week) { try { writeJsonAtomic(RESERVE_FUND_ALERT_FILE, { week }); } catch (e) {} }
+
+function checkReserveFundAfterWeekend() {
+  try {
+    const now = new Date();
+    if (now.getDay() === 0) return; // v neděli ještě běží splatnost, nekontrolovat
+    // Poslední uplynulá neděle = neděle týdne, do kterého patřilo "včera" (nebo dřív)
+    const lastSundayKey = getReserveWeekKey(new Date(now.getTime() - 86400000));
+    if (new Date(lastSundayKey).getTime() > now.getTime()) return; // ta neděle ještě nenastala
+    if (loadLastReserveAlertWeek() === lastSundayKey) return; // už jednou upozorněno
+
+    const list = loadReserveFund();
+    const paidSet = new Set(list.filter(r => r.weekKey === lastSundayKey).map(r => r.icName));
+    const allUsers = db.prepare('SELECT * FROM users').all();
+    const dluznici = allUsers.filter(u => u.ic_name && !paidSet.has(u.ic_name)).map(u => u.ic_name);
+
+    if (dluznici.length) discord.notifyReserveFundDluznici(lastSundayKey, dluznici).catch(() => {});
+    saveLastReserveAlertWeek(lastSundayKey);
+  } catch (e) { console.error('[RESERVE FUND CHECK]', e.message); }
+}
+setInterval(checkReserveFundAfterWeekend, 30 * 60 * 1000); // kontrola každých 30 minut
+setTimeout(checkReserveFundAfterWeekend, 20 * 1000); // i krátce po startu appky
+
 // Uloží base64 obrázek (data URL) na disk a vrátí veřejnou cestu, nebo null při chybě/neplatném vstupu.
 const { addWatermark } = require('./watermark');
 async function saveGarageImage(dataUrl, existingPath) {

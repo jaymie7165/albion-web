@@ -1,8 +1,10 @@
 // constants.js — shared static configuration (item catalogs, prices, weed-growing recipe)
 
-// Weed (a drogy) se do skladu zapisují v GRAMECH. Ceny v CONFIG.weedCeny
-// (vyroba/prodej) jsou stanovené ZA SÁČEK, ne za gram — proto je při každém
-// výpočtu hodnoty nutné gramy nejdřív převést na sáčky (5 g = 1 sáček).
+// Weed i drogy se do skladu zapisují přímo v SÁČCÍCH (ne v gramech). Ceny
+// v CONFIG.weedCeny (vyroba/prodej) jsou stanovené za 1 sáček, takže žádný
+// další přepočet není potřeba — množství zapsané do skladu = počet sáčků.
+// (GRAMU_NA_SACEK/pocetSacku zůstávají exportované jen pro zpětnou kompatibilitu
+// s případnými staršími voláními, sklad je už na nich nezávislý.)
 const GRAMU_NA_SACEK = 5;
 function pocetSacku(gramy) { return Math.floor((gramy || 0) / GRAMU_NA_SACEK); }
 
