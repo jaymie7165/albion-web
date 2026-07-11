@@ -14,10 +14,10 @@ function renderHome(req, data) {
   const isRestricted = accessLevel >= 3;
 
   const WEED_P = {"Žlutý kanabis":165,"Zelený kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
-  const GRAMU_NA_SACEK = 5; // weed se eviduje v gramech, cena je za sáček (5 g)
+  // Weed se eviduje přímo v SÁČCÍCH, cena je za 1 sáček — žádný přepočet.
 
   let totalValue = 0;
-  Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += Math.floor(q / GRAMU_NA_SACEK) * WEED_P[k]; });
+  Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
 
   const totalWeed   = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalDrogy  = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);

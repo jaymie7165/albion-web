@@ -7,6 +7,7 @@ function renderDashboard(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet, cenik, katalog } = data;
   const icName = req.session.icName;
   const canManage = req.session.accessLevel === 1; // jen Founder/Council smí upravovat ceník a katalog položek
+  const RESERVE_FUND_AMOUNT = 5000; // fixní týdenní odvod — musí sedět s hodnotou v server.js
 
   const esc = (s) => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -18,15 +19,14 @@ function renderDashboard(req, data) {
       </div>`
     : `<div class="cenik-row cenik-row-static"><span>${esc(row.label)}</span><span class="cenik-cena">${esc(row.cena)}</span></div>`;
 
-  const formatSklad = (obj, ceny, jeGramy) => {
+  const formatSklad = (obj, ceny, jsouSacky) => {
     const entries = Object.entries(obj).filter(([,q]) => q > 0);
     if (!entries.length) return ledgerEmpty('Sklad prázdný', true);
     return entries.map(([item, qty]) => {
-      if (jeGramy) {
-        // Gramy → sáčky (5 g = 1 sáček). Ceny v ceníku jsou ZA SÁČEK, ne za gram.
-        const sacky = Math.floor(qty / 5);
-        const hodnota = ceny && ceny[item] ? sacky * ceny[item].prodej : null;
-        return `<div class="sklad-row"><span>${item}</span><span>${qty} g <em>(${sacky} sáčků)</em>${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
+      if (jsouSacky) {
+        // Weed/drogy se evidují přímo v sáčcích — ceny v ceníku jsou ZA SÁČEK.
+        const hodnota = ceny && ceny[item] ? qty * ceny[item].prodej : null;
+        return `<div class="sklad-row"><span>${item}</span><span>${qty} sáčků${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
       }
       return `<div class="sklad-row"><span>${item}</span><span>${qty} ks</span></div>`;
     }).join('');
@@ -53,21 +53,13 @@ function renderDashboard(req, data) {
   const totalValue = (() => {
     const W={"Žlutý kanabis":165,"Zelený kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
     let t=0;
-    Object.entries(weed).forEach(([k,q])=>{if(q>0&&W[k])t+=Math.floor(q/5)*W[k];});
+    Object.entries(weed).forEach(([k,q])=>{if(q>0&&W[k])t+=q*W[k];});
     return t;
   })();
 
-  // ── PŘEPOČET GRAMY ⇄ SÁČKY ──────────────────────────────────────────────
-  // Weed a drogy se do skladu zapisují v gramech. 1 sáček = 5 g, takže ze
-  // stavu skladu (v gramech) jde vždy dopočítat, kolik hotových sáčků na
-  // prodej z toho reálně jde poskládat a kolik gramů zbývá "navíc".
-  const GRAMU_NA_SACEK = 5;
-  const totalWeedG = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
-  const totalDrogyG = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
-  const weedSacky = Math.floor(totalWeedG / GRAMU_NA_SACEK);
-  const weedZbytekG = totalWeedG % GRAMU_NA_SACEK;
-  const drogySacky = Math.floor(totalDrogyG / GRAMU_NA_SACEK);
-  const drogyZbytekG = totalDrogyG % GRAMU_NA_SACEK;
+  // Weed a drogy se evidují přímo v SÁČCÍCH (ne v gramech) — žádný přepočet.
+  const totalWeedSacky = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalDrogySacky = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
 
   const sekceMeta = [
     { id: 'ucet',   label: 'Účetnictví', sub: 'Finance',     icon: '◉' },
@@ -248,11 +240,11 @@ function renderDashboard(req, data) {
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Weed</div>
-        <div class="tally-cell-val" style="color:#7A9A4A">${Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0)} g</div>
+        <div class="tally-cell-val" style="color:#7A9A4A">${totalWeedSacky} sáčků</div>
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Drogy</div>
-        <div class="tally-cell-val" style="color:var(--oxblood-bright)">${Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0)} g</div>
+        <div class="tally-cell-val" style="color:var(--oxblood-bright)">${totalDrogySacky} sáčků</div>
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Chemikálie</div>
@@ -265,9 +257,9 @@ function renderDashboard(req, data) {
     </div>
 
     <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-dim);margin:-1.4rem 0 2rem;padding:0.8rem 1.1rem;border:1px solid var(--border-brass);background:var(--brass-faint)">
-      <strong style="color:var(--brass-bright)">Jednotky skladu:</strong> Weed a drogy se do skladu zapisují v <strong>gramech</strong>. Přepočet: <strong>5 g = 1 sáček</strong> na prodej.
-      &ensp;·&ensp; Weed: <strong style="color:#7A9A4A">${totalWeedG} g</strong> = <strong style="color:#7A9A4A">${weedSacky} sáčků</strong>${weedZbytekG ? ` (+ ${weedZbytekG} g navíc)` : ''}
-      &ensp;·&ensp; Drogy: <strong style="color:var(--oxblood-bright)">${totalDrogyG} g</strong> = <strong style="color:var(--oxblood-bright)">${drogySacky} sáčků</strong>${drogyZbytekG ? ` (+ ${drogyZbytekG} g navíc)` : ''}
+      <strong style="color:var(--brass-bright)">Jednotky skladu:</strong> Weed a drogy se do skladu zapisují přímo v <strong>sáčcích</strong> — ceny (výroba/prodej) jsou stanovené za 1 sáček.
+      &ensp;·&ensp; Weed: <strong style="color:#7A9A4A">${totalWeedSacky} sáčků</strong>
+      &ensp;·&ensp; Drogy: <strong style="color:var(--oxblood-bright)">${totalDrogySacky} sáčků</strong>
     </div>
 
     <!-- ── TAB SHELL ── -->
@@ -314,6 +306,18 @@ function renderDashboard(req, data) {
                 <button class="btn-submit" onclick="submitUcet()">Potvrdit transakci</button>
               </div>
             </div>
+
+            <div class="folio-rule tight"></div>
+
+            <div class="panel-head" style="margin-bottom:1rem;padding-bottom:0.8rem">
+              <span class="panel-title" style="font-size:1.15rem">Reserve Fund</span>
+              <span class="panel-badge" id="rf-badge">Povinný týdenní odvod · splatnost neděle</span>
+            </div>
+            <p style="font-family:var(--font-body);font-size:0.84rem;color:var(--ivory-dim);line-height:1.7;margin-bottom:1.2rem;max-width:640px">
+              Každý člen musí do konce <strong style="color:var(--brass-bright)">neděle</strong> zaplatit a podepsat fixní odvod <strong style="color:var(--brass-bright)">$${RESERVE_FUND_AMOUNT.toLocaleString('cs-CZ')}</strong> do Reserve Fondu organizace. Kdo do pondělí nezaplatí, jde automaticky do upozornění na Discordu.
+            </p>
+            <div id="rf-status" style="margin-bottom:1rem"></div>
+            <div id="rf-list"></div>
           </div>
         </div>
 
@@ -400,7 +404,7 @@ function renderDashboard(req, data) {
                 <input type="hidden" id="weed-typ" value="VKLAD">
                 <div class="form-row">
                   <div class="form-group select-wrap"><label>Odrůda</label><select id="weed-odruda" class="select-expandable"><option>Žlutý kanabis</option><option>Zelený kanabis</option><option>Kanabis</option><option>Červený kanabis</option><option>Modrý kanabis</option></select><span class="select-count-badge">5</span></div>
-                  <div class="form-group"><label>Množství (g)</label><input type="number" id="weed-mnozstvi" min="1" value="1"></div>
+                  <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="weed-mnozstvi" min="1" value="1"></div>
                 </div>
                 <div class="info-box" id="weed-info"></div>
                 <button class="btn-submit" onclick="submitWeed()">Potvrdit akci</button>
@@ -439,7 +443,7 @@ function renderDashboard(req, data) {
                 <input type="hidden" id="drogy-typ" value="VKLAD">
                 <div class="form-row">
                   <div class="form-group select-wrap"><label>Droga</label><select id="drogy-droga" class="select-expandable"><option>Kapky</option><option>Kokain</option><option>Extáze</option><option>Metamfetamin</option><option>Benzo</option><option>Joyka</option><option>Heroin</option><option>Speed</option><option>LSD</option></select><span class="select-count-badge">9</span></div>
-                  <div class="form-group"><label>Množství (g)</label><input type="number" id="drogy-mnozstvi" min="1" value="1"></div>
+                  <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="drogy-mnozstvi" min="1" value="1"></div>
                 </div>
                 <button class="btn-submit" onclick="submitDrogy()">Potvrdit akci</button>
               </div>
@@ -777,10 +781,9 @@ function renderDashboard(req, data) {
       const odruda=document.getElementById('weed-odruda').value;
       const qty=parseInt(document.getElementById('weed-mnozstvi').value)||1;
       const c=WEED_CENY[odruda];if(!c)return;
-      const sacky=Math.floor(qty/5);
       const box=document.getElementById('weed-info');
       box.style.display='block';
-      box.innerHTML=qty+' g = '+sacky+' sáčků&ensp;·&ensp;Výroba: ~$'+(c.vyroba*sacky)+'&ensp;·&ensp;Prodej: $'+(c.prodej*sacky);
+      box.innerHTML=qty+' sáčků&ensp;·&ensp;Výroba: ~$'+(c.vyroba*qty)+'&ensp;·&ensp;Prodej: $'+(c.prodej*qty);
     }
     document.getElementById('weed-odruda').addEventListener('change',updateWeedInfo);
     document.getElementById('weed-mnozstvi').addEventListener('input',updateWeedInfo);
@@ -791,11 +794,11 @@ function renderDashboard(req, data) {
       const odruda=document.getElementById('weed-odruda').value;
       const mnozstvi=document.getElementById('weed-mnozstvi').value;
       const c=WEED_CENY[odruda]||{vyroba:100,prodej:165};
-      const sacky=Math.floor((parseInt(mnozstvi)||0)/5);
+      const qty=parseInt(mnozstvi)||0;
       showModal(
         typ==='VKLAD'?'Vložit weed':'Vybrat weed',
         'Potvrzením zapečetíš zápis do rejstříku.',
-        [['Typ',typ],['Odrůda',odruda],['Množství',mnozstvi+' g ('+sacky+' sáčků)'],['Výroba','~$'+(c.vyroba*sacky)],['Prodej','$'+(c.prodej*sacky)]],
+        [['Typ',typ],['Odrůda',odruda],['Množství',mnozstvi+' sáčků'],['Výroba','~$'+(c.vyroba*qty)],['Prodej','$'+(c.prodej*qty)]],
         async()=>{
           const r=await post('/api/weed',{typ,odruda,mnozstvi});
           if(r.ok){showToast('Weed uložen — Výroba: ~$'+r.celkVyroba+' · Prodej: $'+r.celkProdej);setTimeout(()=>location.reload(),2000);}
@@ -811,7 +814,7 @@ function renderDashboard(req, data) {
       showModal(
         typ==='VKLAD'?'Vložit drogy':'Vybrat drogy',
         'Potvrzením zapečetíš zápis do rejstříku.',
-        [['Typ',typ],['Droga',droga],['Množství',mnozstvi+' ks']],
+        [['Typ',typ],['Droga',droga],['Množství',mnozstvi+' sáčků']],
         async()=>{
           const r=await post('/api/drogy',{typ,droga,mnozstvi});
           if(r.ok){showToast('Drogy uloženy');setTimeout(()=>location.reload(),1500);}
@@ -838,6 +841,48 @@ function renderDashboard(req, data) {
         }
       );
     }
+
+    // ── RESERVE FUND ──────────────────────────────────────────────────────
+    function escRf(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    async function loadReserveFund(){
+      try{
+        const res=await fetch('/api/reserve-fund',{cache:'no-store'});
+        const d=await res.json();
+        if(!d.ok)return;
+        const badge=document.getElementById('rf-badge');
+        if(badge)badge.textContent='Týden do '+new Date(d.weekKey).toLocaleDateString('cs-CZ')+' · '+d.paidCount+'/'+d.totalCount+' zaplaceno';
+
+        const statusBox=document.getElementById('rf-status');
+        if(d.paidByMe){
+          statusBox.innerHTML='<div class="info-box" style="display:block;border-color:rgba(58,125,45,0.4);background:rgba(58,125,45,0.08);color:#8FE070">✓ Tento týden máš Reserve Fund zaplacený a podepsaný.</div>';
+        } else {
+          statusBox.innerHTML='<button class="btn-submit" style="margin-top:0" onclick="payReserveFund()">Zaplatit a podepsat $'+d.amount.toLocaleString('cs-CZ')+'</button>';
+        }
+
+        const list=document.getElementById('rf-list');
+        if(!d.members.length){ list.innerHTML=ledgerEmptyHTML('Žádní registrovaní členové',true); return; }
+        list.innerHTML='<div class="panel-list-label" style="margin-top:1.2rem">Stav členů — tento týden</div>'+
+          d.members.map(m=>
+            '<div class="manifest-row"><span class="mr-name">'+escRf(m.icName)+'</span><span class="mr-dots"></span>'+
+            '<span class="mr-val" style="color:'+(m.paid?'#6FBF52':'var(--oxblood-bright)')+'">'+(m.paid?'✓ zaplaceno':'✕ nezaplaceno')+'</span></div>'
+          ).join('');
+      }catch(e){}
+    }
+    async function payReserveFund(){
+      showModal(
+        'Reserve Fund',
+        'Zaplacením potvrzuješ a podepisuješ povinný týdenní odvod do pokladny organizace.',
+        [['Částka','$5 000'],['Splatnost','neděle']],
+        async()=>{
+          const r=await post('/api/reserve-fund/pay',{});
+          if(r.ok){showToast('Reserve Fund zaplacen a podepsán');loadReserveFund();setTimeout(()=>location.reload(),1200);}
+          else showToast(r.error,true);
+        }
+      );
+    }
+    window.payReserveFund=payReserveFund;
+    loadReserveFund();
+    (window.evtSource||new EventSource('/api/events')).addEventListener('reserveFundUpdate',()=>setTimeout(loadReserveFund,400));
 
     async function submitChemky(){
       const typ=document.getElementById('chemky-typ').value;
