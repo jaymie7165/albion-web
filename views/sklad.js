@@ -61,7 +61,7 @@ function renderDashboard(req, data) {
   const totalWeedSacky = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalDrogySacky = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
 
-  const sekceMeta = [
+  const sekceMetaVse = [
     { id: 'ucet',   label: 'Účetnictví', sub: 'Finance',     icon: '◉' },
     { id: 'smena',  label: 'Směnárna',   sub: 'SAD ⇄ Pesos', icon: '⇄' },
     { id: 'zbrane', label: 'Zbraně',     sub: 'Sklad',       icon: '⚔' },
@@ -71,6 +71,13 @@ function renderDashboard(req, data) {
     { id: 'chemky', label: 'Chemikálie', sub: 'Sklad',       icon: '⬡' },
     { id: 'cenik',  label: 'Ceník',      sub: 'Referenční ceny', icon: '$' },
   ];
+  // Member/Associate (level 3) mají do /sklad přístup jen na Reserve Fund
+  // (uvnitř karty Účetnictví) a na Ceník ke čtení — zbytek správy skladu
+  // zůstává vyhrazený od Senior Member výš (viz roles.js PAGE_ACCESS.sklad).
+  const memberOnly = (req.session.accessLevel || 3) >= 3;
+  const sekceMeta = memberOnly
+    ? sekceMetaVse.filter(s => s.id === 'ucet' || s.id === 'cenik').map(s => s.id === 'ucet' ? { ...s, label: 'Reserve Fund', sub: 'Povinný odvod' } : s)
+    : sekceMetaVse;
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -220,7 +227,7 @@ function renderDashboard(req, data) {
       <div>
         <div class="sklad-opener-tag">Centrální sklad organizace</div>
         <h1>Vítej, ${icName}</h1>
-        <p>Eviduj pohyb zbraní, weedu, drog, chemikálií, financí a směn. Každý zápis se ihned promítne do tabulky a odešle na Discord.</p>
+        <p>${memberOnly ? 'Zde najdeš svůj týdenní Reserve Fund a aktuální ceník organizace.' : 'Eviduj pohyb zbraní, weedu, drog, chemikálií, financí a směn. Každý zápis se ihned promítne do tabulky a odešle na Discord.'}</p>
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div class="sklad-clock" id="live-clock">--:--:--</div>
@@ -228,6 +235,7 @@ function renderDashboard(req, data) {
       </div>
     </div>
 
+    ${!memberOnly ? `
     <!-- Tally strip -->
     <div class="tally-strip">
       <div class="tally-cell">
@@ -261,6 +269,7 @@ function renderDashboard(req, data) {
       &ensp;·&ensp; Weed: <strong style="color:#7A9A4A">${totalWeedSacky} sáčků</strong>
       &ensp;·&ensp; Drogy: <strong style="color:var(--oxblood-bright)">${totalDrogySacky} sáčků</strong>
     </div>
+    ` : ''}
 
     <!-- ── TAB SHELL ── -->
     <div class="sklad-shell">
@@ -283,6 +292,7 @@ function renderDashboard(req, data) {
         <!-- Účetnictví -->
         <div class="sklad-panel active" id="panel-ucet">
           <div class="panel-card">
+            ${!memberOnly ? `
             <div class="panel-head">
               <span class="panel-title">Účetnictví organizace</span>
               <span class="panel-badge">Finance · vede rejstřík</span>
@@ -308,9 +318,10 @@ function renderDashboard(req, data) {
             </div>
 
             <div class="folio-rule tight"></div>
+            ` : ''}
 
             <div class="panel-head" style="margin-bottom:1rem;padding-bottom:0.8rem">
-              <span class="panel-title" style="font-size:1.15rem">Reserve Fund</span>
+              <span class="panel-title" style="font-size:${memberOnly ? '1.5' : '1.15'}rem">Reserve Fund</span>
               <span class="panel-badge" id="rf-badge">Povinný týdenní odvod · splatnost neděle</span>
             </div>
             <p style="font-family:var(--font-body);font-size:0.84rem;color:var(--ivory-dim);line-height:1.7;margin-bottom:1.2rem;max-width:640px">
