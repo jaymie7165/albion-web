@@ -675,7 +675,7 @@ function saveMilestones(data) {
 
 // ── PRAHY NÍZKÝCH ZÁSOB — konfigurovatelné z webu (bez zásahu do kódu) ──
 const THRESHOLDS_FILE = path.join(DATA_DIR, 'thresholds.json');
-const VYCHOZI_PRAHY = { zbrane: 5, weed: 20, drogy: 10, chemky: 10 };
+const VYCHOZI_PRAHY = { weed: 10, drogy: 5 };
 
 function loadThresholds() {
   try {
@@ -807,18 +807,21 @@ function loadReserveFund() {
 function saveReserveFund(list) { try { writeJsonAtomic(RESERVE_FUND_FILE, list); } catch (e) { console.error('[RESERVE FUND]', e.message); } }
 
 // Přehled aktuálního týdne — kdo z registrovaných členů už zaplatil a podepsal.
+// Associates jsou z povinnosti vyňati (viz roles.js isAssociateOnly) — do
+// přehledu se vůbec nepočítají.
 app.get('/api/reserve-fund', requireAuth, (req, res) => {
   const weekKey = getReserveWeekKey();
   const list = loadReserveFund();
   const entriesThisWeek = list.filter(r => r.weekKey === weekKey);
   const paidSet = new Set(entriesThisWeek.map(r => r.icName));
   const allUsers = db.prepare('SELECT * FROM users').all();
-  const members = allUsers.filter(u => u.ic_name).map(u => ({ icName: u.ic_name, paid: paidSet.has(u.ic_name) }))
+  const members = allUsers.filter(u => u.ic_name && !u.is_associate).map(u => ({ icName: u.ic_name, paid: paidSet.has(u.ic_name) }))
     .sort((a, b) => Number(a.paid) - Number(b.paid) || a.icName.localeCompare(b.icName, 'cs'));
   res.json({
     ok: true,
     weekKey,
     amount: RESERVE_FUND_AMOUNT,
+    exempt: !!req.session.isAssociate,
     paidByMe: paidSet.has(req.session.icName),
     members,
     paidCount: members.filter(m => m.paid).length,
@@ -878,7 +881,7 @@ function checkReserveFundAfterWeekend() {
     const list = loadReserveFund();
     const paidSet = new Set(list.filter(r => r.weekKey === lastSundayKey).map(r => r.icName));
     const allUsers = db.prepare('SELECT * FROM users').all();
-    const dluznici = allUsers.filter(u => u.ic_name && !paidSet.has(u.ic_name)).map(u => u.ic_name);
+    const dluznici = allUsers.filter(u => u.ic_name && !u.is_associate && !paidSet.has(u.ic_name)).map(u => u.ic_name);
 
     if (dluznici.length) discord.notifyReserveFundDluznici(lastSundayKey, dluznici).catch(() => {});
     saveLastReserveAlertWeek(lastSundayKey);
@@ -1163,6 +1166,7 @@ app.post('/login/password', async (req, res) => {
     req.session.isAssociate = isAssociateOnly(roles);
     req.session.discordCheckedAt = Date.now();
     try { db.setAccessLevel(user.id, req.session.accessLevel); } catch (e) {}
+    try { db.setIsAssociate(user.id, req.session.isAssociate); } catch (e) {}
   } catch (e) {
     console.error('[LOGIN ROLES]', e.message);
     req.session.accessLevel = 3; // fail-safe — nejnižší úroveň přístupu
@@ -1457,6 +1461,7 @@ async function requireDiscordMember(req, res, next) {
     req.session.realAccessLevel = newLevel;
     req.session.isAssociate = isAssociateOnly(roles);
     try { db.setAccessLevel(req.session.userId, newLevel); } catch (e) {}
+    try { db.setIsAssociate(req.session.userId, req.session.isAssociate); } catch (e) {}
     // accessLevel zůstává realAccessLevel, POKUD není aktivní view-as (viz applyViewAs middleware)
     if (!req.session.viewAsLevel) req.session.accessLevel = newLevel;
     req.session.discordCheckedAt = now;
@@ -2535,7 +2540,7 @@ app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
 
   try {
     if ((page === 'sklad' || page === 'home') && canAccess(accessLevel, 'sklad')) {
-      const PRAHY = { 'Zbraně': 5, 'Weed': 20, 'Drogy': 10, 'Chemky': 10 };
+      const PRAHY = { 'Weed': 10, 'Drogy': 5 };
       for (const [sheet, prah] of Object.entries(PRAHY)) {
         try {
           const stav = await sheets.getStockSummary(sheet);
@@ -2583,6 +2588,18 @@ app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
         const cars = loadGarage();
         if (cars.length) lines.push(`Vozový park čítá aktuálně ${cars.length} vozidel.`);
         actions.push({ label: 'Garáž', href: '/garaz' });
+      } catch (e) {}
+    }
+
+    if (page === 'home' && !req.session.isAssociate) {
+      try {
+        const weekKey = getReserveWeekKey();
+        const rfList = loadReserveFund();
+        const paid = rfList.some(r => r.weekKey === weekKey && r.icName === req.session.icName);
+        if (!paid) {
+          tips.push(`Ještě jsi nezaplatil/a a nepodepsal/a Reserve Fund za tento týden ($${RESERVE_FUND_AMOUNT.toLocaleString('cs-CZ')}) — splatnost je do neděle.`);
+          actions.push({ label: 'Zaplatit Reserve Fund', href: '/sklad' });
+        }
       } catch (e) {}
     }
 
@@ -2773,8 +2790,8 @@ app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, r
 
     // ── Ceníky ──
     const WEED_SELL = 165; // zdraženo ze 150$ na 165$
-    const DROGY_P = {}; Object.entries(CONFIG.drogyCeny).forEach(([k,v]) => DROGY_P[k] = v.prodej);
-    const ZBRANE_P = {}; Object.entries(CONFIG.zbraneCeny).forEach(([k,v]) => ZBRANE_P[k] = v.prodej);
+    const DROGY_P = {}; Object.entries(CONFIG.drogyCeny || {}).forEach(([k,v]) => DROGY_P[k] = v.prodej);
+    const ZBRANE_P = {}; Object.entries(CONFIG.zbraneCeny || {}).forEach(([k,v]) => ZBRANE_P[k] = v.prodej);
 
     // ── Sjednocený proud událostí ──
     const ev = []; // {ts, cas, sekce, typ, member, item, qty, kat, castka, valuta, hodnota, pozn, ucel}
@@ -3096,7 +3113,7 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
     };
 
     const WEED_SELL = 165; // zdraženo ze 150$ na 165$
-    const DROGY_P = {}; Object.entries(CONFIG.drogyCeny).forEach(([k,v]) => DROGY_P[k] = v.prodej);
+    const DROGY_P = {}; Object.entries(CONFIG.drogyCeny || {}).forEach(([k,v]) => DROGY_P[k] = v.prodej);
     const isVklad = (t) => t === 'VKLAD' || t === 'PŘÍJEM';
     const now = Date.now();
     const DAY = 86400000;

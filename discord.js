@@ -182,13 +182,11 @@ function uvod(uzivatel, klic, accessLevel) {
 // NÍZKÉ ZÁSOBY — hlídání prahů + upozornění do příslušné roomky
 // ══════════════════════════════════════════════════════════════════════
 //
-// Prahy jsou výchozí odhad — klidně uprav podle reálné spotřeby organizace.
-// Číslo = pod kolika kusy JEDNÉ položky se má poslat upozornění.
+// Hlídají se jen drogy (weed a tvrdé drogy) — zbraně a chemikálie prahy
+// nemají. Množství je v sáčcích: weed pod 10 sáčků, drogy pod 5 sáčků.
 const PRAH_NIZKE_ZASOBY = {
-  zbrane: 5,
-  weed:   20,
-  drogy:  10,
-  chemky: 10,
+  weed:   10,
+  drogy:  5,
 };
 
 const KANAL_PODLE_SEKCE = {

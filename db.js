@@ -189,6 +189,15 @@ db.setAccessLevel = (id, level) => {
   return false;
 };
 
+// ── ASSOCIATE STATUS (persistuje se, aby ho server znal i mimo aktivní session —
+// potřeba např. pro výjimku z Reserve Fondu, který kontroluje všechny uživatele v DB) ──
+db.setIsAssociate = (id, isAssociate) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.is_associate = !!isAssociate; save(users); return true; }
+  return false;
+};
+
 // ── SOUKROMÍ TRADING KARTY ──
 db.setCardPrivate = (id, isPrivate) => {
   const users = load();
