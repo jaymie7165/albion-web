@@ -234,6 +234,53 @@ function renderHome(req, data) {
     .home-clock{font-family:var(--font-mono);font-size:0.9rem;color:var(--ivory-dim);letter-spacing:0.06em}
     .home-clock-date{font-family:var(--font-label);font-size:0.56rem;color:var(--ivory-faint);letter-spacing:0.14em;text-transform:uppercase;margin-top:0.3rem}
 
+    /* ── PORTÁL DO ALBION WORLD — velké, nepřehlédnutelné pozvání ── */
+    .portal-banner{
+      position:relative;overflow:hidden;
+      display:flex;align-items:center;justify-content:space-between;gap:2rem;
+      margin:0 0 3rem;padding:2.2rem 2.6rem;
+      background:radial-gradient(ellipse 120% 140% at 0% 0%, rgba(110,20,35,0.35), var(--panel2) 65%);
+      border:1px solid var(--border-brass);
+      box-shadow:var(--shadow-card);
+      text-decoration:none;
+      transition:border-color 0.25s,transform 0.25s,box-shadow 0.25s;
+    }
+    .portal-banner::before{content:'';position:absolute;top:0;left:0;width:22px;height:22px;border-top:1px solid var(--brass-bright);border-left:1px solid var(--brass-bright)}
+    .portal-banner::after{content:'';position:absolute;bottom:0;right:0;width:22px;height:22px;border-bottom:1px solid var(--brass-bright);border-right:1px solid var(--brass-bright)}
+    .portal-banner:hover{border-color:var(--brass-bright);transform:translateY(-2px);box-shadow:0 12px 44px rgba(110,20,35,0.35)}
+    .portal-banner-glow{
+      position:absolute;top:50%;right:-40px;width:220px;height:220px;border-radius:50%;
+      background:radial-gradient(circle,rgba(224,189,127,0.35),transparent 70%);
+      transform:translateY(-50%);pointer-events:none;
+      animation:portalPulse 3.5s ease-in-out infinite;
+    }
+    @keyframes portalPulse{0%,100%{opacity:0.5;transform:translateY(-50%) scale(1)}50%{opacity:0.9;transform:translateY(-50%) scale(1.15)}}
+    .portal-banner-left{position:relative;z-index:1;display:flex;align-items:center;gap:1.4rem}
+    .portal-banner-icon{
+      flex-shrink:0;width:56px;height:56px;display:flex;align-items:center;justify-content:center;
+      border:1px solid var(--border-brass);background:var(--brass-faint);color:var(--brass-bright);
+    }
+    .portal-banner-icon svg{width:28px;height:28px}
+    .portal-banner-eyebrow{font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.26em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
+    .portal-banner-title{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.5rem;color:var(--ivory);line-height:1.1}
+    .portal-banner-sub{font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);margin-top:0.4rem;max-width:440px}
+    .portal-banner-btn{
+      position:relative;z-index:1;flex-shrink:0;
+      display:inline-flex;align-items:center;gap:0.6rem;
+      padding:0.95rem 1.6rem;
+      background:var(--oxblood);border:1px solid var(--oxblood);color:var(--ivory);
+      font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:600;
+      box-shadow:0 0 24px var(--oxblood-glow);
+      transition:background 0.2s,box-shadow 0.2s,transform 0.2s;
+      white-space:nowrap;
+    }
+    .portal-banner-btn:hover{background:var(--oxblood-bright);box-shadow:0 0 40px var(--oxblood-glow);transform:translateX(2px)}
+    .portal-banner-btn svg{width:14px;height:14px}
+    @media(max-width:760px){
+      .portal-banner{flex-direction:column;align-items:flex-start;padding:1.8rem}
+      .portal-banner-btn{width:100%;justify-content:center}
+    }
+
     @media(max-width:1100px){.stock-manifest{grid-template-columns:1fr 1fr;gap:1.5rem 3rem}}
     @media(max-width:900px){
       .home-hero{padding:4rem 1.2rem 3rem;margin:-1.5rem -1rem 0}
@@ -297,6 +344,25 @@ function renderHome(req, data) {
 
     <!-- Fret ornament -->
     <div class="home-fret"></div>
+
+    <!-- ── PORTÁL DO ALBION WORLD ── -->
+    <a href="/albion" class="portal-banner">
+      <div class="portal-banner-glow"></div>
+      <div class="portal-banner-left">
+        <div class="portal-banner-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+        </div>
+        <div>
+          <div class="portal-banner-eyebrow">Immersivní zážitek</div>
+          <div class="portal-banner-title">Vstup do Caledonia World</div>
+          <div class="portal-banner-sub">Interaktivní kancelář organizace — projdi kanceláří, otevři jednotlivé sekce přímo z prostoru a nech na sebe Evelyn dýchnout atmosférou.</div>
+        </div>
+      </div>
+      <span class="portal-banner-btn">
+        Vstoupit
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </span>
+    </a>
 
     <!-- ── TALLY PLAQUES — čtyři dominantní čísla ── -->
     ${isRestricted ? `

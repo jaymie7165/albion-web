@@ -23,7 +23,7 @@ function renderAlbion(req, data) {
     },
     {
       id: 'sklad', x: 5.0, y: 71.0, kind: 'nav', label: 'Sklad', sub: 'Účetnictví, zbraně, drogy, směnárna, weed',
-      items: [{ label: 'Správa skladu', href: '/sklad', need: 'sklad' }],
+      items: [{ label: 'Sklad', href: '/sklad', need: 'sklad-view' }],
     },
     {
       id: 'dashboard', x: 42.4, y: 61.8, kind: 'nav', label: 'Dashboard', sub: 'Přehled, statistiky, profit centrum, blackbook',
@@ -130,7 +130,8 @@ function renderAlbion(req, data) {
     .a-user img{width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid #B68A4E}
     .a-user-text{line-height:1.3}
     .a-user-text small{display:block;color:#7E7868;font-size:0.5rem;letter-spacing:0.16em}
-    .hotspot{position:absolute;z-index:10;transform:translate(-50%,-50%);cursor:pointer}
+    #hotspots{position:absolute;inset:0;z-index:10;pointer-events:none}
+    .hotspot{position:absolute;z-index:10;transform:translate(-50%,-50%);cursor:pointer;pointer-events:auto}
     .hotspot-dot{width:9px;height:9px;border-radius:50%;background:#E0BD7F;box-shadow:0 0 10px 2px rgba(224,189,127,0.7);
       animation:dotPulse 2.6s ease-in-out infinite;transition:transform .2s}
     .hotspot.lamp .hotspot-dot{background:#8FD3FF;box-shadow:0 0 10px 2px rgba(143,211,255,0.7)}
@@ -204,6 +205,11 @@ function renderAlbion(req, data) {
       <canvas id="snowCanvas"></canvas>
       <canvas id="rainCanvas"></canvas>
     </div>
+    <!-- Hotspoty musí sedět ve STEJNÉM souřadnicovém prostoru jako pozadí
+         kanceláře (.albion-stage uvnitř .zoom-wrap, který má inset:-4%) —
+         dřív byl #hotspots mimo .zoom-wrap a procenta x/y tak neseděla se
+         skutečnou pozicí artworku, takže kliky často mířily vedle. -->
+    <div id="hotspots"></div>
   </div>
 
   <div class="lightshaft"></div>
@@ -215,7 +221,7 @@ function renderAlbion(req, data) {
     <div class="a-menu">
       <button onclick="openFocus('/home','Dashboard')">Dashboard</button>
       ${can('garaz') ? `<button onclick="openFocus('/garaz','Garáž')">Garáž</button>` : ''}
-      ${can('sklad') ? `<button onclick="openFocus('/sklad','Sklad')">Sklad</button>` : ''}
+      ${can('sklad-view') ? `<button onclick="openFocus('/sklad','Sklad')">Sklad</button>` : ''}
       ${can('blackbook') ? `<button onclick="openFocus('/blackbook','BlackBook')">BlackBook</button>` : ''}
       ${can('profit-centrum') ? `<button onclick="openFocus('/profit-centrum','Profit centrum')">Profit centrum</button>` : ''}
       ${can('audit') ? `<button onclick="openFocus('/audit','Audit')">Audit</button>` : ''}
@@ -230,8 +236,6 @@ function renderAlbion(req, data) {
       <div class="a-user-text"><small>VÍTEJ ZPĚT,</small>${icName || 'Caledonia'}</div>
     </div>
   </nav>
-
-  <div id="hotspots"></div>
 
   <div class="a-bottom">
     <div class="a-stats-row">

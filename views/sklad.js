@@ -325,7 +325,7 @@ function renderDashboard(req, data) {
               <span class="panel-badge" id="rf-badge">Povinný týdenní odvod · splatnost neděle</span>
             </div>
             <p style="font-family:var(--font-body);font-size:0.84rem;color:var(--ivory-dim);line-height:1.7;margin-bottom:1.2rem;max-width:640px">
-              Každý člen musí do konce <strong style="color:var(--brass-bright)">neděle</strong> zaplatit a podepsat fixní odvod <strong style="color:var(--brass-bright)">$${RESERVE_FUND_AMOUNT.toLocaleString('cs-CZ')}</strong> do Reserve Fondu organizace. Kdo do pondělí nezaplatí, jde automaticky do upozornění na Discordu.
+              Každý člen musí do konce <strong style="color:var(--brass-bright)">neděle</strong> zaplatit a podepsat fixní odvod <strong style="color:var(--brass-bright)">$${RESERVE_FUND_AMOUNT.toLocaleString('cs-CZ')}</strong> do Reserve Fondu organizace. Kdo do pondělí nezaplatí, jde automaticky do upozornění v aplikaci.
             </p>
             <div id="rf-status" style="margin-bottom:1rem"></div>
             <div id="rf-list"></div>
@@ -496,9 +496,12 @@ function renderDashboard(req, data) {
               ${canManage ? `<button class="quick-btn" onclick="addCenikRow()" style="margin-left:auto">+ Přidat řádek</button>
               <button class="quick-btn primary" onclick="saveCenik()">Uložit ceník</button>` : ''}
             </div>
-            <p style="font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-faint);line-height:1.7;margin-bottom:1.4rem;max-width:640px">
+            <p style="font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-faint);line-height:1.7;margin-bottom:0.6rem;max-width:640px">
               Referenční výkupní a prodejní ceny. ${canManage ? 'Uprav hodnoty přímo v tabulce a klikni na <strong style="color:var(--brass-bright)">Uložit ceník</strong>.' : 'Upravovat může jen Founder/Council.'}
             </p>
+            <div style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-bottom:1.2rem">
+              ${cenik.updatedAt ? `Naposledy upraveno ${new Date(cenik.updatedAt).toLocaleString('cs-CZ')}${cenik.updatedBy ? ' — ' + esc(cenik.updatedBy) : ''}` : 'Ceník zatím nebyl ručně upraven — zobrazují se výchozí hodnoty.'}
+            </div>
             <div id="cenik-categories">
               ${(cenik.categories || []).map((cat, ci) => `
                 <div class="cenik-cat" data-cat="${ci}">
@@ -864,7 +867,9 @@ function renderDashboard(req, data) {
         if(badge)badge.textContent='Týden do '+new Date(d.weekKey).toLocaleDateString('cs-CZ')+' · '+d.paidCount+'/'+d.totalCount+' zaplaceno';
 
         const statusBox=document.getElementById('rf-status');
-        if(d.paidByMe){
+        if(d.exempt){
+          statusBox.innerHTML='<div class="info-box" style="display:block;border-color:var(--border-brass);background:var(--brass-faint);color:var(--ivory-dim)">Jako Associate máš z Reserve Fondu zatím výjimku — povinnost platit začíná od hodnosti Member.</div>';
+        } else if(d.paidByMe){
           statusBox.innerHTML='<div class="info-box" style="display:block;border-color:rgba(58,125,45,0.4);background:rgba(58,125,45,0.08);color:#8FE070">✓ Tento týden máš Reserve Fund zaplacený a podepsaný.</div>';
         } else {
           statusBox.innerHTML='<button class="btn-submit" style="margin-top:0" onclick="payReserveFund()">Zaplatit a podepsat $'+d.amount.toLocaleString('cs-CZ')+'</button>';
@@ -992,7 +997,7 @@ function renderDashboard(req, data) {
 
     // ── SPRÁVA KATALOGU POLOŽEK ──
     // Sekce se skladovým prahem — jen pro kategorie, které nízké zásoby hlídají
-    const PRAH_SEKCE = { zbrane:'zbrane', weed:'weed', drogy:'drogy', chemky:'chemky' };
+    const PRAH_SEKCE = { weed:'weed', drogy:'drogy' };
 
     async function openKatalogModal(kategorie){
       if(window.albionPaper)window.albionPaper();
