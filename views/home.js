@@ -13,7 +13,7 @@ function renderHome(req, data) {
   // vychází z toho, že nemají přístup ke Skladu, Auditu ani Blackbooku.
   const isRestricted = accessLevel >= 3;
 
-  const WEED_P = {"Žlutý kanabis":165,"Zelený kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
+  const WEED_P = {"Žlutý kanabis":165,"Fialový kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
   // Weed se eviduje přímo v SÁČCÍCH, cena je za 1 sáček — žádný přepočet.
 
   let totalValue = 0;
