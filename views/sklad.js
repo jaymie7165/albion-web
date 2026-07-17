@@ -66,7 +66,7 @@ function renderDashboard(req, data) {
     { id: 'smena',  label: 'Směnárna',   sub: 'SAD ⇄ Pesos', icon: '⇄' },
     { id: 'zbrane', label: 'Zbraně',     sub: 'Sklad',       icon: '⚔' },
     { id: 'weed',   label: 'Weed',       sub: 'Sklad',       icon: '◈' },
-    { id: 'vyroba', label: 'Výroba',     sub: 'Připravuje se', icon: '⚒' },
+    { id: 'vyroba', label: 'Výroba',     sub: 'Substance',      icon: '⚒' },
     { id: 'drogy',  label: 'Drogy',      sub: 'Sklad',       icon: '◆' },
     { id: 'chemky', label: 'Chemikálie', sub: 'Sklad',       icon: '⬡' },
     { id: 'cenik',  label: 'Ceník',      sub: 'Referenční ceny', icon: '$' },
@@ -194,41 +194,53 @@ function renderDashboard(req, data) {
     }
     .smena-preview .arrow{color:var(--brass);opacity:0.7}
 
-    /* ── VÝROBA — přehledné karty kroků receptu ── */
+    /* ── VÝROBA — stat strip ── */
+    .vyroba-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border-brass);margin-bottom:2rem}
+    .vyroba-stat{background:var(--panel3);padding:1.3rem 1.2rem;text-align:center;border-top:2px solid transparent;transition:background 0.2s}
+    .vyroba-stat:hover{background:var(--panel4)}
+    .vyroba-stat-label{font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.55rem}
+    .vyroba-stat-val{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.5rem;color:var(--ivory);line-height:1}
+    .vyroba-stat-sub{font-family:var(--font-mono);font-size:0.58rem;color:var(--ivory-faint);margin-top:0.4rem}
+
+    /* ── VÝROBA — časová osa postupu vaření ── */
+    .vyroba-timeline{position:relative;padding-left:2.2rem;margin-bottom:0.4rem}
+    .vyroba-timeline::before{
+      content:'';position:absolute;left:0.6rem;top:6px;bottom:6px;width:1px;
+      background:linear-gradient(180deg,var(--oxblood) 0%,var(--border-brass) 85%,transparent);
+    }
     .vyroba-step-card{
-      display:flex;align-items:flex-start;gap:1rem;
-      padding:1rem 1.2rem;margin-bottom:0.7rem;
-      background:var(--panel3);border:1px solid var(--border);border-left:2px solid var(--border-brass);
-      transition:border-color 0.2s;
+      position:relative;
+      padding:1rem 1.3rem;margin-bottom:0.75rem;
+      background:var(--panel3);border:1px solid var(--border);
+      transition:border-color 0.2s,transform 0.2s,background 0.2s;
     }
-    .vyroba-step-card:hover{border-left-color:var(--brass)}
-    .vyroba-step-num{
-      flex-shrink:0;width:28px;height:28px;border-radius:50%;
-      display:flex;align-items:center;justify-content:center;
-      font-family:var(--font-display);font-weight:700;font-style:italic;font-size:0.9rem;
-      color:var(--oxblood-bright);border:1px solid var(--border-oxblood);background:var(--oxblood-faint);
+    .vyroba-step-card:last-child{margin-bottom:0}
+    .vyroba-step-card:hover{border-color:var(--border-brass);background:var(--panel4);transform:translateX(3px)}
+    .vyroba-step-card::before{
+      content:'';position:absolute;left:-1.72rem;top:1.35rem;
+      width:8px;height:8px;background:var(--oxblood);border:1px solid var(--brass);
+      transform:rotate(45deg);
     }
-    .vyroba-step-body{flex:1;min-width:0}
-    .vyroba-step-label{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.55rem}
+    .vyroba-step-card.final{border-color:var(--border-oxblood);background:radial-gradient(ellipse 90% 100% at 0% 0%, rgba(110,20,35,0.14) 0%, var(--panel3) 65%)}
+    .vyroba-step-card.final::before{width:12px;height:12px;left:-1.83rem;top:1.3rem;background:var(--oxblood-bright);border:2px solid var(--brass);box-shadow:0 0 10px var(--oxblood-glow)}
+    .vyroba-step-meta{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
+    .vyroba-step-label{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:1.02rem;color:var(--ivory);margin-bottom:0.6rem}
     .vyroba-step-flow{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap}
     .vyroba-chip{
       display:inline-flex;align-items:center;
-      font-family:var(--font-mono);font-size:0.76rem;color:var(--ivory-dim);
+      font-family:var(--font-mono);font-size:0.74rem;color:var(--ivory-dim);
       padding:0.3rem 0.7rem;background:var(--panel4);border:1px solid var(--border);
       white-space:nowrap;
     }
     .vyroba-chip.raw{color:var(--ivory);border-color:var(--border-brass);background:var(--brass-faint)}
+    .vyroba-chip.final{color:var(--ivory);border-color:var(--border-oxblood);background:var(--oxblood-faint);font-weight:700}
     .vyroba-plus{color:var(--ivory-faint);font-size:0.72rem}
     .vyroba-arrow{color:var(--brass);font-size:0.9rem;margin:0 0.1rem}
-    .vyroba-step-final{
-      flex-shrink:0;align-self:center;
-      font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;
-      color:var(--brass);border:1px solid var(--border-brass);background:var(--brass-faint);
-      padding:0.3rem 0.6rem;white-space:nowrap;
-    }
+
+    @media(max-width:900px){.vyroba-stats{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:640px){
-      .vyroba-step-card{flex-direction:column;gap:0.6rem}
-      .vyroba-step-final{align-self:flex-start}
+      .vyroba-timeline{padding-left:1.7rem}
+      .vyroba-step-card::before,.vyroba-step-card.final::before{left:-1.25rem}
     }
 
     /* ── CENÍK ── */
@@ -466,32 +478,57 @@ function renderDashboard(req, data) {
           <div class="panel-card">
             <div class="panel-head">
               <span class="panel-title">Výroba — Metamfetamin</span>
-              <span class="panel-badge">Recept 1 vaření · 5 dávek → 150× Metamfetamin</span>
+              <span class="panel-badge">Recept 1 vaření</span>
             </div>
             <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
-              Postup vaření v šesti krocích. Kalkulačka níže počítá z aktuálního stavu skladu chemikálií, kolik celých várek lze uvařit hned teď, a co případně chybí nakoupit.
+              Postup vaření v šesti krocích. Kalkulačka dole počítá přímo z aktuálního stavu skladu chemikálií — kolik várek lze uvařit hned teď a co případně chybí nakoupit.
             </p>
 
-            <div class="panel-list-label">Postup vaření (na 1 várku · 5 dávek)</div>
-            <div id="vyroba-steps" style="margin-bottom:1.6rem"></div>
+            <!-- Stat strip -->
+            <div class="vyroba-stats">
+              <div class="vyroba-stat">
+                <div class="vyroba-stat-label">Várka</div>
+                <div class="vyroba-stat-val">5 dávek</div>
+              </div>
+              <div class="vyroba-stat" style="border-top-color:var(--brass)">
+                <div class="vyroba-stat-label">Výtěžnost</div>
+                <div class="vyroba-stat-val" style="color:var(--brass)">150×</div>
+                <div class="vyroba-stat-sub">metamfetamin / várka</div>
+              </div>
+              <div class="vyroba-stat" style="border-top-color:var(--oxblood-bright)">
+                <div class="vyroba-stat-label">Náklad / várka</div>
+                <div class="vyroba-stat-val" style="color:var(--oxblood-bright);font-size:1.15rem">₱22 500 <span style="color:var(--ivory-faint);font-size:0.6em">+</span> $80</div>
+              </div>
+              <div class="vyroba-stat" id="vyroba-stat-max" style="border-top-color:#6FBF52">
+                <div class="vyroba-stat-label">Uvaříš hned teď</div>
+                <div class="vyroba-stat-val" style="color:#6FBF52">—</div>
+                <div class="vyroba-stat-sub">várek dle skladu</div>
+              </div>
+            </div>
 
-            <div class="folio-rule tight"></div>
+            <div class="folio-label" style="margin-bottom:1.1rem">Postup vaření</div>
+            <div class="vyroba-timeline" id="vyroba-steps"></div>
+
+            <div class="folio-rule"></div>
 
             <div class="panel-split">
               <div>
-                <div class="panel-list-label">Suroviny na 1 várku</div>
-                <div id="vyroba-raw-list"></div>
-                <div class="folio-rule tight"></div>
-                <div class="panel-list-label">Aktuální stav skladu (chemikálie)</div>
-                <div id="vyroba-stock-list"></div>
+                <div class="panel-list-label">Suroviny vs. aktuální sklad</div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>Surovina</th><th style="text-align:right">Potřeba</th><th style="text-align:right">Na skladě</th><th>Zásoba</th><th>Stav</th></tr></thead>
+                    <tbody id="vyroba-materials-body"></tbody>
+                  </table>
+                </div>
               </div>
               <div>
-                <div class="info-box" id="vyroba-max-box" style="display:block;margin-top:0"></div>
-                <div class="form-group" style="margin:1rem 0 0.5rem">
+                <div class="panel-list-label">Kalkulačka vaření</div>
+                <div class="form-group" style="margin-bottom:1rem">
                   <label>Kolik várek chceš uvařit?</label>
                   <input type="number" id="vyroba-batches" min="1" value="1">
                 </div>
-                <div id="vyroba-calc-result"></div>
+                <div id="vyroba-yield-box" style="margin-bottom:1rem"></div>
+                <div class="info-box" id="vyroba-status-box" style="display:block;margin-top:0"></div>
               </div>
             </div>
           </div>
@@ -770,46 +807,24 @@ function renderDashboard(req, data) {
     function money(n){ return '$'+Math.round(n||0).toLocaleString('cs-CZ'); }
     function pesosF(n){ return '₱'+Math.round(n||0).toLocaleString('cs-CZ'); }
 
-    // Krok jako přehledná karta: vstupní "chipy" → šipka → výstupní chip.
-    // Meziprodukty (výstup kroku, který je zároveň vstupem dalšího) jsou
-    // graficky odlišené od skutečných skladových surovin.
+    // Krok jako přehledná karta na časové ose: vstupní "chipy" → šipka →
+    // výstupní chip. Meziprodukty (výstup kroku, který je zároveň vstupem
+    // dalšího) jsou graficky odlišené od skutečných skladových surovin.
     const VYROBA_RAW_ITEMS = new Set(Object.keys(METH_RECIPE.rawPerBatch));
-    function vyrobaChip(text, qty, isRaw){
-      return '<span class="vyroba-chip'+(isRaw?' raw':'')+'">'+qty+'× '+text+'</span>';
+    function vyrobaChip(text, qty, isRaw, isFinalOutput){
+      return '<span class="vyroba-chip'+(isRaw?' raw':'')+(isFinalOutput?' final':'')+'">'+qty+'× '+text+'</span>';
     }
     function renderVyrobaSteps(){
       const wrap=document.getElementById('vyroba-steps');
       if(!wrap)return;
       wrap.innerHTML=METH_RECIPE.steps.map((s,i)=>{
-        const chips=s.inputs.map(inp=>vyrobaChip(inp.item,inp.qty,VYROBA_RAW_ITEMS.has(inp.item))).join('<span class="vyroba-plus">+</span>');
+        const chips=s.inputs.map(inp=>vyrobaChip(inp.item,inp.qty,VYROBA_RAW_ITEMS.has(inp.item),false)).join('<span class="vyroba-plus">+</span>');
         const isFinal=i===METH_RECIPE.steps.length-1;
-        return '<div class="vyroba-step-card">'+
-          '<div class="vyroba-step-num">'+(i+1)+'</div>'+
-          '<div class="vyroba-step-body">'+
-            '<div class="vyroba-step-label">'+s.label+'</div>'+
-            '<div class="vyroba-step-flow">'+chips+'<span class="vyroba-arrow">→</span>'+vyrobaChip(s.output,s.outputQty,false)+'</div>'+
-          '</div>'+
-          (isFinal?'<div class="vyroba-step-final">Finální produkt</div>':'')+
+        return '<div class="vyroba-step-card'+(isFinal?' final':'')+'">'+
+          '<div class="vyroba-step-meta">Krok '+String(i+1).padStart(2,'0')+' / '+String(METH_RECIPE.steps.length).padStart(2,'0')+(isFinal?' · Finální produkt':'')+'</div>'+
+          '<div class="vyroba-step-label">'+s.label+'</div>'+
+          '<div class="vyroba-step-flow">'+chips+'<span class="vyroba-arrow">→</span>'+vyrobaChip(s.output,s.outputQty,false,isFinal)+'</div>'+
         '</div>';
-      }).join('');
-    }
-
-    function renderVyrobaRawList(){
-      const wrap=document.getElementById('vyroba-raw-list');
-      if(!wrap)return;
-      wrap.innerHTML=Object.entries(METH_RECIPE.rawPerBatch).map(([item,qty])=>
-        '<div class="manifest-row"><span class="mr-name">'+item+'</span><span class="mr-dots"></span><span class="mr-val">'+qty+'× / várka</span></div>'
-      ).join('')+
-      '<div class="manifest-row"><span class="mr-name" style="color:var(--brass)">Náklad na 1 várku</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--brass)">'+pesosF(METH_RECIPE.costPesosPerBatch)+' + '+money(METH_RECIPE.costSadPerBatch)+'</span></div>';
-    }
-
-    function renderVyrobaStockList(){
-      const wrap=document.getElementById('vyroba-stock-list');
-      if(!wrap)return;
-      const items=Object.keys(METH_RECIPE.rawPerBatch);
-      wrap.innerHTML=items.map(item=>{
-        const have=VYROBA_STOCK[item]||0;
-        return '<div class="manifest-row"><span class="mr-name">'+item+'</span><span class="mr-dots"></span><span class="mr-val" style="color:'+(have>0?'var(--ivory)':'var(--oxblood-bright)')+'">'+have+' ks</span></div>';
       }).join('');
     }
 
@@ -822,38 +837,62 @@ function renderDashboard(req, data) {
       return isFinite(max)?Math.max(0,max):0;
     }
 
-    function renderVyrobaMaxBox(){
-      const box=document.getElementById('vyroba-max-box');
-      if(!box)return;
+    function renderVyrobaStatMax(){
+      const cell=document.getElementById('vyroba-stat-max');
+      if(!cell)return;
       const max=maxVyrobaBatches();
-      box.innerHTML='Ze současných zásob skladu lze uvařit <strong style="color:var(--brass)">'+max+' várek</strong>'+
-        ' — celkem <strong style="color:var(--brass)">'+(max*METH_RECIPE.dávkyPerBatch)+' dávek</strong>'+
-        ' · <strong style="color:var(--brass)">'+(max*METH_RECIPE.yieldPerBatch)+'× Metamfetamin</strong>.';
+      const valEl=cell.querySelector('.vyroba-stat-val');
+      if(valEl)valEl.textContent=max;
     }
 
-    function calcVyroba(){
+    // Jedna sjednocená tabulka + kalkulačka — obojí se přepočítá společně
+    // podle počtu várek zadaných uživatelem, ať nejsou data duplicitně
+    // rozdrobená do víc samostatných seznamů.
+    function renderVyrobaCalc(){
       const batches=Math.max(1,parseInt(document.getElementById('vyroba-batches').value)||1);
-      const resWrap=document.getElementById('vyroba-calc-result');
-      if(!resWrap)return;
+
       const rows=Object.entries(METH_RECIPE.rawPerBatch).map(([item,qtyPerBatch])=>{
         const needed=qtyPerBatch*batches;
         const have=VYROBA_STOCK[item]||0;
         const missing=Math.max(0,needed-have);
         const ok=missing===0;
-        return {item,needed,have,missing,ok};
+        const pct=needed>0?Math.min(100,Math.round((have/needed)*100)):100;
+        return {item,needed,have,missing,ok,pct};
       });
       const allOk=rows.every(r=>r.ok);
-      let html='<div class="panel-list-label">Potřeba pro '+batches+' várek ('+(batches*METH_RECIPE.dávkyPerBatch)+' dávek → '+(batches*METH_RECIPE.yieldPerBatch)+'× Metamfetamin)</div>';
-      html+=rows.map(r=>
-        '<div class="manifest-row"><span class="mr-name" style="color:'+(r.ok?'var(--ivory)':'var(--oxblood-bright)')+'">'+r.item+'</span><span class="mr-dots"></span>'+
-        '<span class="mr-val">'+r.have+' / '+r.needed+' ks'+(r.ok?'':' <strong style="color:var(--oxblood-bright)">(chybí '+r.missing+')</strong>')+'</span></div>'
-      ).join('');
-      html+='<div class="info-box" style="display:block;margin-top:1rem;'+(allOk?'border-color:rgba(58,125,45,0.4);background:rgba(58,125,45,0.08);color:#8FE070':'border-color:var(--border-oxblood);background:var(--oxblood-faint);color:var(--oxblood-bright)')+'">'+
-        (allOk?'✓ Na sklad je dost surovin — várky lze uvařit hned.':'✕ Na sklad chybí suroviny uvedené výše.')+'</div>';
-      resWrap.innerHTML=html;
+
+      const body=document.getElementById('vyroba-materials-body');
+      if(body){
+        body.innerHTML=rows.map(r=>
+          '<tr>'+
+            '<td style="color:'+(r.ok?'var(--ivory)':'var(--oxblood-bright)')+';font-family:var(--font-display);font-style:italic">'+r.item+'</td>'+
+            '<td style="text-align:right">'+r.needed+' ks</td>'+
+            '<td style="text-align:right">'+r.have+' ks</td>'+
+            '<td><div class="mini-stock-bar-wrap" style="width:90px"><div class="mini-stock-bar-fill" style="width:'+r.pct+'%;background:'+(r.ok?'linear-gradient(90deg,#3A7D2D,#6FBF52)':'linear-gradient(90deg,var(--oxblood),var(--oxblood-bright))')+'"></div></div></td>'+
+            '<td>'+(r.ok?'<span class="badge vklad">OK</span>':'<span class="badge vyber">chybí '+r.missing+'</span>')+'</td>'+
+          '</tr>'
+        ).join('');
+      }
+
+      const yieldBox=document.getElementById('vyroba-yield-box');
+      if(yieldBox){
+        yieldBox.innerHTML=
+          '<div class="manifest-row"><span class="mr-name">Výtěžnost</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--brass)">'+(batches*METH_RECIPE.dávkyPerBatch)+' dávek · '+(batches*METH_RECIPE.yieldPerBatch)+'× Metamfetamin</span></div>'+
+          '<div class="manifest-row"><span class="mr-name">Celkový náklad</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--oxblood-bright)">'+pesosF(batches*METH_RECIPE.costPesosPerBatch)+' + '+money(batches*METH_RECIPE.costSadPerBatch)+'</span></div>';
+      }
+
+      const statusBox=document.getElementById('vyroba-status-box');
+      if(statusBox){
+        statusBox.style.borderColor=allOk?'rgba(58,125,45,0.4)':'var(--border-oxblood)';
+        statusBox.style.background=allOk?'rgba(58,125,45,0.08)':'var(--oxblood-faint)';
+        statusBox.style.color=allOk?'#8FE070':'var(--oxblood-bright)';
+        statusBox.innerHTML=allOk
+          ? ('✓ Na skladě je dost surovin na '+batches+' '+(batches===1?'várku':batches<5?'várky':'várek')+' — lze uvařit hned.')
+          : '✕ Na sklad chybí suroviny uvedené v tabulce (sloupec „Stav“).';
+      }
     }
-    document.getElementById('vyroba-batches') && document.getElementById('vyroba-batches').addEventListener('input',calcVyroba);
-    renderVyrobaSteps();renderVyrobaRawList();renderVyrobaStockList();renderVyrobaMaxBox();calcVyroba();
+    document.getElementById('vyroba-batches') && document.getElementById('vyroba-batches').addEventListener('input',renderVyrobaCalc);
+    renderVyrobaSteps();renderVyrobaStatMax();renderVyrobaCalc();
 
     function updateZbraneItems(){
       const kat=document.getElementById('zbrane-kat').value;
