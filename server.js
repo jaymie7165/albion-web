@@ -654,6 +654,16 @@ const KATALOG_TO_CONFIG_KEY = { zbrane: 'zbrane', naboje: 'naboje', akce: 'akce'
   });
 })();
 
+// ── CHEMIKÁLIE PRO RECEPT NA METAMFETAMIN (views/sklad.js — panel Výroba) ──
+// "Kerosen", "Pekáč" a "Potravinářský kofein" (přejmenováno z "Kofein") jsou
+// potřeba pro recept výroby, ale nejsou součástí výchozího seznamu v
+// constants.js ani katalog.json — bez tohoto doplnění by je server u
+// POST /api/chemky vždy odmítl jako "Nepovolená chemikálie", i když je
+// select na frontendu nabízí. Doplňujeme je natvrdo při startu appky, ať
+// zápis funguje ihned po nasazení bez ručního zásahu přes "Spravovat položky".
+const VYROBA_EXTRA_CHEMKY = ['Kerosen', 'Pekáč', 'Potravinářský kofein'];
+VYROBA_EXTRA_CHEMKY.forEach(item => { if (!CONFIG.chemkyTypy.includes(item)) CONFIG.chemkyTypy.push(item); });
+
 // ── ORGANIZAČNÍ MILNÍKY — celoorganizační momenty (ne osobní achievementy) ──
 // Ukládá se do stejného trvalého úložiště jako ceník/katalog (přežije redeploy).
 // Jakmile celkový stav kategorie/pokladny poprvé překročí danou hranici,
