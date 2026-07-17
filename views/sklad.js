@@ -9,6 +9,29 @@ function renderDashboard(req, data) {
   const canManage = req.session.accessLevel === 1; // jen Founder/Council smí upravovat ceník a katalog položek
   const RESERVE_FUND_AMOUNT = 5000; // fixní týdenní odvod — musí sedět s hodnotou v server.js
 
+  // Ceník chemikálií (nákupní cena za 1 ks) — jediný zdroj pravdy pro zobrazení
+  // hodnoty skladu i pro výpočet nákladu na várku ve Výrobě.
+  const CHEMKY_CENY = {
+    "Aceton": { cena: 60, mena: "PESOS" },
+    "Peroxid vodíku": { cena: 40, mena: "PESOS" },
+    "Potravinářský kofein": { cena: 80, mena: "PESOS" },
+    "Propylenglykol": { cena: 40, mena: "PESOS" },
+    "Toluen": { cena: 55, mena: "PESOS" },
+    "Technický benzín": { cena: 80, mena: "PESOS" },
+    "Bismut": { cena: 55, mena: "PESOS" },
+    "Kyselina fosforečná": { cena: 75, mena: "PESOS" },
+    "Kerosen": { cena: 120, mena: "PESOS" },
+    "Pekáč": { cena: 16, mena: "USD" },
+    "Genkadon": { cena: 130, mena: "PESOS" },
+    "Amanita Genkia": { cena: 50, mena: "PESOS" },
+    "Kapátka": { cena: 1, mena: "USD" },
+    "Forma": { cena: 50, mena: "USD" },
+    "Lithiová baterie": { cena: 200, mena: "USD" },
+    "Semínko (co)": { cena: 5, mena: "USD" },
+    "Cukr": { cena: 50, mena: "USD" },
+    "Nadrcené listy": { cena: 1, mena: "USD" },
+  };
+
   const esc = (s) => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
   const cenikRowHtml = (row, ci, ri, editable) => editable
@@ -27,6 +50,12 @@ function renderDashboard(req, data) {
         // Weed/drogy se evidují přímo v sáčcích — ceny v ceníku jsou ZA SÁČEK.
         const hodnota = ceny && ceny[item] ? qty * ceny[item].prodej : null;
         return `<div class="sklad-row"><span>${item}</span><span>${qty} sáčků${hodnota ? ` <em>$${hodnota}</em>` : ''}</span></div>`;
+      }
+      if (ceny && ceny[item]) {
+        const c = ceny[item];
+        const sym = c.mena === 'PESOS' ? '₱' : '$';
+        const hodnota = qty * c.cena;
+        return `<div class="sklad-row"><span>${item}</span><span>${qty} ks <em>${sym}${hodnota.toLocaleString('cs-CZ')}</em></span></div>`;
       }
       return `<div class="sklad-row"><span>${item}</span><span>${qty} ks</span></div>`;
     }).join('');
@@ -495,9 +524,9 @@ function renderDashboard(req, data) {
                 <div class="vyroba-stat-val" style="color:var(--brass)">150×</div>
                 <div class="vyroba-stat-sub">metamfetamin / várka</div>
               </div>
-              <div class="vyroba-stat" style="border-top-color:var(--oxblood-bright)">
+              <div class="vyroba-stat" id="vyroba-stat-cost" style="border-top-color:var(--oxblood-bright)">
                 <div class="vyroba-stat-label">Náklad / várka</div>
-                <div class="vyroba-stat-val" style="color:var(--oxblood-bright);font-size:1.15rem">₱22 500 <span style="color:var(--ivory-faint);font-size:0.6em">+</span> $80</div>
+                <div class="vyroba-stat-val" style="color:var(--oxblood-bright);font-size:1.15rem">—</div>
               </div>
               <div class="vyroba-stat" id="vyroba-stat-max" style="border-top-color:#6FBF52">
                 <div class="vyroba-stat-label">Uvaříš hned teď</div>
@@ -566,7 +595,7 @@ function renderDashboard(req, data) {
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
-                ${formatSklad(chemky||{}, null)}
+                ${formatSklad(chemky||{}, CHEMKY_CENY)}
               </div>
               <div>
                 <div class="typ-toggle">
@@ -575,7 +604,7 @@ function renderDashboard(req, data) {
                 </div>
                 <input type="hidden" id="chemky-typ" value="VKLAD">
                 <div class="form-row">
-                  <div class="form-group select-wrap"><label>Chemikálie</label><select id="chemky-chemikalie" class="select-expandable"><option>Aceton</option><option>Peroxid vodíku</option><option>Potravinářský kofein</option><option>Propylenglykol</option><option>Toluen</option><option>Benzín</option><option>Bismut</option><option>Kyselina fosforečná</option><option>Kerosen</option><option>Pekáč</option></select><span class="select-count-badge">10</span></div>
+                  <div class="form-group select-wrap"><label>Chemikálie</label><select id="chemky-chemikalie" class="select-expandable">${Object.keys(CHEMKY_CENY).map(i => `<option>${esc(i)}</option>`).join('')}</select><span class="select-count-badge">${Object.keys(CHEMKY_CENY).length}</span></div>
                   <div class="form-group"><label>Množství</label><input type="number" id="chemky-mnozstvi" min="1" value="1"></div>
                 </div>
                 <button class="btn-submit" onclick="submitChemky()">Potvrdit akci</button>
@@ -762,7 +791,8 @@ function renderDashboard(req, data) {
     const AKCE=["Malá C4","Velká C4","Přístupová karta","Pokročilá zvláštní karta","EMP zařízení","Řezací laser","Cable Cutter","Zvláštní karta"];
     const WEED_CENY={"Žlutý kanabis":{vyroba:100,prodej:165},"Fialový kanabis":{vyroba:100,prodej:165},"Kanabis":{vyroba:100,prodej:165},"Červený kanabis":{vyroba:100,prodej:165},"Modrý kanabis":{vyroba:100,prodej:165}};
     const DROGY_LIST=["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"];
-    const CHEMKY_LIST=["Aceton","Peroxid vodíku","Potravinářský kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná","Kerosen","Pekáč"];
+    const CHEMKY_CENY=${JSON.stringify(CHEMKY_CENY)};
+    const CHEMKY_LIST=Object.keys(CHEMKY_CENY);
 
     // ── Sloučení vlastních položek katalogu (přidaných přes "Spravovat položky") ──
     const KATALOG=${JSON.stringify(katalog || { zbrane: [], naboje: [], akce: [], weed: [], drogy: [], chemky: [] })};
@@ -790,8 +820,6 @@ function renderDashboard(req, data) {
     const METH_RECIPE = {
       dávkyPerBatch: 5,
       yieldPerBatch: 150,
-      costPesosPerBatch: 22500,
-      costSadPerBatch: 80,
       steps: [
         { label: 'Drcení', inputs: [{item:'Bismut',qty:70}], output: 'Drcený bismut', outputQty: 10 },
         { label: 'Směs na meth', inputs: [{item:'Drcený bismut',qty:10},{item:'Toluen',qty:70},{item:'Aceton',qty:70}], output: 'Směs na meth', outputQty: 10 },
@@ -806,6 +834,26 @@ function renderDashboard(req, data) {
     const VYROBA_STOCK = ${JSON.stringify(chemky || {})};
     function money(n){ return '$'+Math.round(n||0).toLocaleString('cs-CZ'); }
     function pesosF(n){ return '₱'+Math.round(n||0).toLocaleString('cs-CZ'); }
+
+    // Náklad na várku se počítá přímo z ceníku chemikálií (CHEMKY_CENY) ×
+    // spotřeby surovin (rawPerBatch) — žádné pevně zadané číslo, takže se
+    // automaticky přepočítá při každé změně cen v ceníku.
+    function calcVyrobaCostPerBatch(){
+      let pesos=0, sad=0;
+      Object.entries(METH_RECIPE.rawPerBatch).forEach(([item,qty])=>{
+        const c=CHEMKY_CENY[item];
+        if(!c)return;
+        if(c.mena==='PESOS')pesos+=qty*c.cena; else sad+=qty*c.cena;
+      });
+      return {pesos,sad};
+    }
+    const VYROBA_COST_PER_BATCH = calcVyrobaCostPerBatch();
+    function renderVyrobaCostStat(){
+      const cell=document.getElementById('vyroba-stat-cost');
+      if(!cell)return;
+      const valEl=cell.querySelector('.vyroba-stat-val');
+      if(valEl)valEl.innerHTML=pesosF(VYROBA_COST_PER_BATCH.pesos)+' <span style="color:var(--ivory-faint);font-size:0.6em">+</span> '+money(VYROBA_COST_PER_BATCH.sad);
+    }
 
     // Krok jako přehledná karta na časové ose: vstupní "chipy" → šipka →
     // výstupní chip. Meziprodukty (výstup kroku, který je zároveň vstupem
@@ -878,7 +926,7 @@ function renderDashboard(req, data) {
       if(yieldBox){
         yieldBox.innerHTML=
           '<div class="manifest-row"><span class="mr-name">Výtěžnost</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--brass)">'+(batches*METH_RECIPE.dávkyPerBatch)+' dávek · '+(batches*METH_RECIPE.yieldPerBatch)+'× Metamfetamin</span></div>'+
-          '<div class="manifest-row"><span class="mr-name">Celkový náklad</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--oxblood-bright)">'+pesosF(batches*METH_RECIPE.costPesosPerBatch)+' + '+money(batches*METH_RECIPE.costSadPerBatch)+'</span></div>';
+          '<div class="manifest-row"><span class="mr-name">Celkový náklad</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--oxblood-bright)">'+pesosF(batches*VYROBA_COST_PER_BATCH.pesos)+' + '+money(batches*VYROBA_COST_PER_BATCH.sad)+'</span></div>';
       }
 
       const statusBox=document.getElementById('vyroba-status-box');
@@ -892,7 +940,7 @@ function renderDashboard(req, data) {
       }
     }
     document.getElementById('vyroba-batches') && document.getElementById('vyroba-batches').addEventListener('input',renderVyrobaCalc);
-    renderVyrobaSteps();renderVyrobaStatMax();renderVyrobaCalc();
+    renderVyrobaSteps();renderVyrobaStatMax();renderVyrobaCalc();renderVyrobaCostStat();
 
     function updateZbraneItems(){
       const kat=document.getElementById('zbrane-kat').value;
