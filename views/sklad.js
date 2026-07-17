@@ -194,6 +194,43 @@ function renderDashboard(req, data) {
     }
     .smena-preview .arrow{color:var(--brass);opacity:0.7}
 
+    /* ── VÝROBA — přehledné karty kroků receptu ── */
+    .vyroba-step-card{
+      display:flex;align-items:flex-start;gap:1rem;
+      padding:1rem 1.2rem;margin-bottom:0.7rem;
+      background:var(--panel3);border:1px solid var(--border);border-left:2px solid var(--border-brass);
+      transition:border-color 0.2s;
+    }
+    .vyroba-step-card:hover{border-left-color:var(--brass)}
+    .vyroba-step-num{
+      flex-shrink:0;width:28px;height:28px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-family:var(--font-display);font-weight:700;font-style:italic;font-size:0.9rem;
+      color:var(--oxblood-bright);border:1px solid var(--border-oxblood);background:var(--oxblood-faint);
+    }
+    .vyroba-step-body{flex:1;min-width:0}
+    .vyroba-step-label{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.55rem}
+    .vyroba-step-flow{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap}
+    .vyroba-chip{
+      display:inline-flex;align-items:center;
+      font-family:var(--font-mono);font-size:0.76rem;color:var(--ivory-dim);
+      padding:0.3rem 0.7rem;background:var(--panel4);border:1px solid var(--border);
+      white-space:nowrap;
+    }
+    .vyroba-chip.raw{color:var(--ivory);border-color:var(--border-brass);background:var(--brass-faint)}
+    .vyroba-plus{color:var(--ivory-faint);font-size:0.72rem}
+    .vyroba-arrow{color:var(--brass);font-size:0.9rem;margin:0 0.1rem}
+    .vyroba-step-final{
+      flex-shrink:0;align-self:center;
+      font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.1em;text-transform:uppercase;
+      color:var(--brass);border:1px solid var(--border-brass);background:var(--brass-faint);
+      padding:0.3rem 0.6rem;white-space:nowrap;
+    }
+    @media(max-width:640px){
+      .vyroba-step-card{flex-direction:column;gap:0.6rem}
+      .vyroba-step-final{align-self:flex-start}
+    }
+
     /* ── CENÍK ── */
     .cenik-row{display:grid;grid-template-columns:1fr 140px 30px;gap:0.6rem;align-items:center;padding:0.4rem 0;border-bottom:1px solid var(--border)}
     .cenik-row-static{display:flex;justify-content:space-between;padding:0.5rem 0.2rem}
@@ -501,7 +538,7 @@ function renderDashboard(req, data) {
                 </div>
                 <input type="hidden" id="chemky-typ" value="VKLAD">
                 <div class="form-row">
-                  <div class="form-group select-wrap"><label>Chemikálie</label><select id="chemky-chemikalie" class="select-expandable"><option>Aceton</option><option>Peroxid vodíku</option><option>Kofein</option><option>Propylenglykol</option><option>Toluen</option><option>Benzín</option><option>Bismut</option><option>Kyselina fosforečná</option><option>Kerosen</option><option>Tray</option></select><span class="select-count-badge">10</span></div>
+                  <div class="form-group select-wrap"><label>Chemikálie</label><select id="chemky-chemikalie" class="select-expandable"><option>Aceton</option><option>Peroxid vodíku</option><option>Potravinářský kofein</option><option>Propylenglykol</option><option>Toluen</option><option>Benzín</option><option>Bismut</option><option>Kyselina fosforečná</option><option>Kerosen</option><option>Pekáč</option></select><span class="select-count-badge">10</span></div>
                   <div class="form-group"><label>Množství</label><input type="number" id="chemky-mnozstvi" min="1" value="1"></div>
                 </div>
                 <button class="btn-submit" onclick="submitChemky()">Potvrdit akci</button>
@@ -688,7 +725,7 @@ function renderDashboard(req, data) {
     const AKCE=["Malá C4","Velká C4","Přístupová karta","Pokročilá zvláštní karta","EMP zařízení","Řezací laser","Cable Cutter","Zvláštní karta"];
     const WEED_CENY={"Žlutý kanabis":{vyroba:100,prodej:165},"Fialový kanabis":{vyroba:100,prodej:165},"Kanabis":{vyroba:100,prodej:165},"Červený kanabis":{vyroba:100,prodej:165},"Modrý kanabis":{vyroba:100,prodej:165}};
     const DROGY_LIST=["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"];
-    const CHEMKY_LIST=["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná","Kerosen","Tray"];
+    const CHEMKY_LIST=["Aceton","Peroxid vodíku","Potravinářský kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná","Kerosen","Pekáč"];
 
     // ── Sloučení vlastních položek katalogu (přidaných přes "Spravovat položky") ──
     const KATALOG=${JSON.stringify(katalog || { zbrane: [], naboje: [], akce: [], weed: [], drogy: [], chemky: [] })};
@@ -711,31 +748,49 @@ function renderDashboard(req, data) {
     // ── VÝROBA — recept na Metamfetamin ("Recept 1 vaření") ──
     // 1 várka = 5 dávek → 150× Metamfetamin. Kroky se řetězí (výstup kroku N
     // je vstup kroku N+1), takže spotřeba SUROVIN na 1 várku je fixní součet
-    // požadavků prvních kroků (meziprodukty typu "Meth směs" nejsou skladové
+    // požadavků prvních kroků (meziprodukty typu "Směs na meth" nejsou skladové
     // položky, spotřebovávají se okamžitě v dalším kroku).
     const METH_RECIPE = {
       dávkyPerBatch: 5,
       yieldPerBatch: 150,
+      costPesosPerBatch: 22500,
+      costSadPerBatch: 80,
       steps: [
         { label: 'Drcení', inputs: [{item:'Bismut',qty:70}], output: 'Drcený bismut', outputQty: 10 },
-        { label: 'Meth směs', inputs: [{item:'Drcený bismut',qty:10},{item:'Toluen',qty:70},{item:'Aceton',qty:70}], output: 'Meth směs', outputQty: 10 },
-        { label: 'Chemický mix', inputs: [{item:'Meth směs',qty:10},{item:'Kerosen',qty:35},{item:'Kofein',qty:50}], output: 'Chemický mix', outputQty: 5 },
-        { label: 'Chemtray', inputs: [{item:'Chemický mix',qty:5},{item:'Tray',qty:5}], output: 'Chemtray', outputQty: 5 },
-        { label: 'Methtray', inputs: [{item:'Chemtray',qty:5}], output: 'Methtray', outputQty: 5 },
-        { label: 'Výroba', inputs: [{item:'Methtray',qty:5}], output: 'Metamfetamin', outputQty: 150 },
+        { label: 'Směs na meth', inputs: [{item:'Drcený bismut',qty:10},{item:'Toluen',qty:70},{item:'Aceton',qty:70}], output: 'Směs na meth', outputQty: 10 },
+        { label: 'Mateč', inputs: [{item:'Směs na meth',qty:10},{item:'Kerosen',qty:35},{item:'Potravinářský kofein',qty:50}], output: 'Mateč', outputQty: 5 },
+        { label: 'Pekáč s Matečem', inputs: [{item:'Mateč',qty:5},{item:'Pekáč',qty:5}], output: 'Pekáč s Matečem', outputQty: 5 },
+        { label: 'Pekáč s methem', inputs: [{item:'Pekáč s Matečem',qty:5}], output: 'Pekáč s methem', outputQty: 5 },
+        { label: 'Výroba', inputs: [{item:'Pekáč s methem',qty:5}], output: 'Metamfetamin', outputQty: 150 },
       ],
       // Suroviny, které se reálně berou ze skladu (ne meziprodukty vzniklé v předchozím kroku)
-      rawPerBatch: { 'Bismut':70, 'Toluen':70, 'Aceton':70, 'Kerosen':35, 'Kofein':50, 'Tray':5 },
+      rawPerBatch: { 'Bismut':70, 'Toluen':70, 'Aceton':70, 'Kerosen':35, 'Potravinářský kofein':50, 'Pekáč':5 },
     };
     const VYROBA_STOCK = ${JSON.stringify(chemky || {})};
+    function money(n){ return '$'+Math.round(n||0).toLocaleString('cs-CZ'); }
+    function pesosF(n){ return '₱'+Math.round(n||0).toLocaleString('cs-CZ'); }
 
+    // Krok jako přehledná karta: vstupní "chipy" → šipka → výstupní chip.
+    // Meziprodukty (výstup kroku, který je zároveň vstupem dalšího) jsou
+    // graficky odlišené od skutečných skladových surovin.
+    const VYROBA_RAW_ITEMS = new Set(Object.keys(METH_RECIPE.rawPerBatch));
+    function vyrobaChip(text, qty, isRaw){
+      return '<span class="vyroba-chip'+(isRaw?' raw':'')+'">'+qty+'× '+text+'</span>';
+    }
     function renderVyrobaSteps(){
       const wrap=document.getElementById('vyroba-steps');
       if(!wrap)return;
       wrap.innerHTML=METH_RECIPE.steps.map((s,i)=>{
-        const inTxt=s.inputs.map(inp=>inp.qty+'× '+inp.item).join(' + ');
-        return '<div class="manifest-row"><span class="mr-name">'+(i+1)+'. '+s.label+'</span><span class="mr-dots"></span>'+
-          '<span class="mr-val">'+inTxt+' → '+s.outputQty+'× '+s.output+'</span></div>';
+        const chips=s.inputs.map(inp=>vyrobaChip(inp.item,inp.qty,VYROBA_RAW_ITEMS.has(inp.item))).join('<span class="vyroba-plus">+</span>');
+        const isFinal=i===METH_RECIPE.steps.length-1;
+        return '<div class="vyroba-step-card">'+
+          '<div class="vyroba-step-num">'+(i+1)+'</div>'+
+          '<div class="vyroba-step-body">'+
+            '<div class="vyroba-step-label">'+s.label+'</div>'+
+            '<div class="vyroba-step-flow">'+chips+'<span class="vyroba-arrow">→</span>'+vyrobaChip(s.output,s.outputQty,false)+'</div>'+
+          '</div>'+
+          (isFinal?'<div class="vyroba-step-final">Finální produkt</div>':'')+
+        '</div>';
       }).join('');
     }
 
@@ -744,7 +799,8 @@ function renderDashboard(req, data) {
       if(!wrap)return;
       wrap.innerHTML=Object.entries(METH_RECIPE.rawPerBatch).map(([item,qty])=>
         '<div class="manifest-row"><span class="mr-name">'+item+'</span><span class="mr-dots"></span><span class="mr-val">'+qty+'× / várka</span></div>'
-      ).join('');
+      ).join('')+
+      '<div class="manifest-row"><span class="mr-name" style="color:var(--brass)">Náklad na 1 várku</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--brass)">'+pesosF(METH_RECIPE.costPesosPerBatch)+' + '+money(METH_RECIPE.costSadPerBatch)+'</span></div>';
     }
 
     function renderVyrobaStockList(){
