@@ -42,7 +42,10 @@ function baseStyles() {
       *{margin:0;padding:0;box-sizing:border-box}
 
       :root{
-        /* ── PALETA — heraldický noir ── */
+        /* ══════════════════════════════════════════════════════════════
+           SEKCE A — ZDROJOVÉ PROMĚNNÉ (aktivní paleta, "single source of truth")
+           Nové styly by měly čerpat odsud, ne ze SEKCE B níže.
+           ══════════════════════════════════════════════════════════════ */
         --noir:#0B0F0D;
         --panel:#10150F;
         --panel2:#141A14;
@@ -74,7 +77,21 @@ function baseStyles() {
         --font-label:'Cinzel',serif;
         --font-body:'Jost',sans-serif;
         --font-mono:'Space Mono',monospace;
-        /* Legacy aliasy pro komponenty které ještě nebyly přepsány */
+
+        /* ══════════════════════════════════════════════════════════════
+           SEKCE B — LEGACY ALIASY (zpětná kompatibilita)
+           Tyto proměnné existují jen proto, že starší views ještě používají
+           dřívější názvy (--ink, --leather, --seal, --blood, --gold-dim…).
+           NEODSTRAŇOVAT bez ověření, že žádný view soubor (views/*.js) je
+           přímo nepoužívá — v repu jich je přes 20 a část jsem při téhle
+           úpravě neměl možnost všechny prověřit. Až budete mít čas na
+           samostatnou revizi, doporučený postup je:
+             1) grep přes views/*.js na každý název z téhle sekce,
+             2) přepsat nalezené výskyty na ekvivalent ze SEKCE A,
+             3) teprve pak SEKCI B smazat.
+           Dokud to neuděláte, nový kód pište proti SEKCI A a tuhle sekci
+           nechte být — je neškodná, jen trochu delší, než by musela být.
+           ══════════════════════════════════════════════════════════════ */
         --ink:var(--noir);
         --ink-soft:var(--panel);
         --leather:var(--panel);
@@ -479,7 +496,7 @@ function baseStyles() {
         font-size:0.58rem;letter-spacing:0.16em;text-transform:uppercase;
         color:var(--brass);font-weight:500;
       }
-      select,input[type=text],input[type=number],textarea{
+      select,input[type=text],input[type=number],input[type=password],input[type=date],textarea{
         background:var(--input-bg);
         border:1px solid var(--border-brass);
         color:var(--ivory);
@@ -828,9 +845,6 @@ function baseStyles() {
         background-size:contain;background-repeat:no-repeat;background-position:center;
         filter:drop-shadow(0 18px 28px rgba(0,0,0,0.55));
       }
-      /* Skutečná pečeť (public/pecet.png) nahrazuje dřívější CSS placeholder —
-         písmeno uvnitř .seal-stamp span se dál nepoužívá, obrázek pečetě
-         už nese vlastní kresbu, proto je skryté. */
       .seal-stamp span{display:none}
       .seal-stamp.slam{animation:sealSlam 0.62s cubic-bezier(0.32,0.04,0.5,1) forwards}
       @keyframes sealSlam{
@@ -1008,7 +1022,6 @@ function baseStyles() {
         transition:color 0.2s,border-color 0.2s,background 0.2s;
         white-space:nowrap;position:relative;gap:0.2rem;cursor:pointer;
       }
-      /* Klávesnicová dostupnost — viditelný focus stav pro nav odkazy/tlačítka */
       .nav-drop-trigger:focus-visible,.nav-menu a:focus-visible,.nav-dropdown-menu a:focus-visible,.theme-dot-btn:focus-visible{
         outline:2px solid var(--brass-bright);outline-offset:2px;
       }
@@ -1161,8 +1174,6 @@ function baseStyles() {
       .tc-badge{display:flex;align-items:center;font-family:var(--font-label);font-size:0.58rem;padding:0.32rem 0.7rem;background:var(--brass-faint);border:1px solid var(--border-brass);color:var(--brass-bright)}
       .tc-badge-icon{margin-right:0.35rem;color:var(--brass-bright);font-size:0.95em}
 
-      /* Rarity / foil efekt podle hodnosti — sběratelská karta má znít jinak
-         pro Founder/Council (zlatá fólie) než pro řadového člena (obyčejná) */
       .tc-foil-shine{position:absolute;inset:0;z-index:5;pointer-events:none;mix-blend-mode:overlay;
         background:linear-gradient(115deg,transparent 30%,rgba(224,189,127,0.55) 45%,rgba(255,255,255,0.65) 50%,rgba(224,189,127,0.55) 55%,transparent 70%);
         background-size:250% 250%;animation:cardFoilShine 4.5s ease-in-out infinite;}
@@ -1279,8 +1290,6 @@ function baseStyles() {
 
       /* ══════════════════════════════════════════════
          EVELYN ASHCROFT — sekretářský widget v navu
-         (bez pevné fotky — placeholder monogram, dokud není
-         nahrána skutečná /evelyn.png, viz nav.js)
          ══════════════════════════════════════════════ */
       .evelyn-widget{position:relative;display:flex;align-items:center;gap:0.5rem;cursor:pointer}
       .evelyn-portrait{width:30px;height:30px;border-radius:50%;border:1px solid var(--brass);object-fit:cover;background:var(--panel3);flex-shrink:0}
@@ -1295,7 +1304,6 @@ function baseStyles() {
       .evelyn-bubble .ev-name{font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.4rem;display:block}
       @media(max-width:880px){.evelyn-bubble{right:1rem;left:1rem;max-width:none}}
 
-      /* ── EVELYN — rozšířený "dopis" / e-mail od sekretářky ── */
       .evelyn-ping{
         position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;
         background:var(--oxblood-bright);box-shadow:0 0 6px var(--oxblood-glow);
@@ -1378,9 +1386,6 @@ function baseStyles() {
         text-shadow:0 1px 3px rgba(0,0,0,0.9);
       }
       .cont-entry.settled .cont-seal{opacity:1;animation:contSealStamp 0.5s cubic-bezier(0.3,0.05,0.5,1) 1}
-      /* Barevný nádech pečetě podle směru dluhu — pečeť zůstává reálný obrázek,
-         jen se jemně probarví filtrem, aby "dlužíme my" (oxblood) šlo odlišit
-         od "dluží nám" (mosaz). */
       .cont-seal.seal-brass{filter:drop-shadow(0 8px 16px rgba(0,0,0,0.45)) sepia(0.4) saturate(2) hue-rotate(-6deg)}
       .cont-seal.seal-oxblood{filter:drop-shadow(0 8px 16px rgba(0,0,0,0.45)) sepia(0.6) saturate(3) hue-rotate(-30deg)}
       @keyframes contSealStamp{0%{opacity:0;transform:translateY(-50%) rotate(-11deg) scale(2.4)}60%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(0.92)}100%{opacity:1;transform:translateY(-50%) rotate(-11deg) scale(1)}}

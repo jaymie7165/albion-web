@@ -17,6 +17,40 @@ async function sendEmbed(channelId, embed) {
   }
 }
 
+// ── PŘÍMÁ SOUKROMÁ ZPRÁVA (DM) ──────────────────────────────────────────────
+// Obecný pomocník pro odeslání DM konkrétnímu Discord uživateli — používá se
+// pro reset hesla i pro upozornění prodávajícího v Bazaru na nového zájemce.
+async function dmUser(discordId, content) {
+  if (!discordId || !BOT_TOKEN()) return false;
+  try {
+    const dmChannel = await axios.post(
+      'https://discord.com/api/v10/users/@me/channels',
+      { recipient_id: discordId },
+      { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
+    );
+    await axios.post(
+      `https://discord.com/api/v10/channels/${dmChannel.data.id}/messages`,
+      { content },
+      { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
+    );
+    return true;
+  } catch (err) {
+    console.error('[DISCORD] DM se nepodařilo odeslat (uživatel může mít vypnuté DM):', err.response?.data || err.message);
+    return false;
+  }
+}
+
+// Odešle nově vygenerované (dočasné) heslo přes DM — používá se jak pro
+// "Zapomenuté heslo" (server.js /auth/callback, action=forgot), tak pro
+// admin reset hesla jinému členovi.
+async function sendPasswordResetDM(discordId, icName, tempPassword) {
+  const jmeno = icName ? `${icName}, v` : 'V';
+  const content = `${jmeno}yžádal/a jsi si (nebo ti bylo vedením vystaveno) nové heslo do rejstříku Caledonie.\n\n` +
+    `Tvé nové dočasné heslo je: **${tempPassword}**\n\n` +
+    `Přihlas se jím a co nejdřív si ho v sekci **Profil → Změna hesla** změň za vlastní.`;
+  return dmUser(discordId, content);
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // OSOBNOST EVELYN ASHCROFT — sdílená filozofie s Discord botem
 // (viz utils/helpers.js a utils/registry.js v repu bota). Bot posílá
@@ -32,19 +66,6 @@ const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Caledonie'
 // Dokud nemáte hostovaný obrázek erbu, zůstává vypnuté. Nastavte na
 // Railway ALBION_SEAL_URL a projeví se to automaticky ve všech embedech.
 const ALBION_SEAL_URL = process.env.ALBION_SEAL_URL || null;
-
-// ── Nálada dne — STEJNÝ algoritmus jako bot (utils/helpers.js::denniNalada) ──
-// Obě strany (bot i web) počítají náladu ze stejného seedu (dnešní datum),
-// takže i když jde o dva nezávislé procesy, jejich "nálada" je ten samý den
-// konzistentní — to je nejvíc, co lze udělat bez sdíleného balíčku (viz
-// diskuse o konsolidaci hlasu bota a webu).
-const NALADY_DNE = ['klidná', 'čilá', 'mírně zamyšlená', 'soustředěná', 'dobře naladěná', 'pracovitá'];
-function denniNalada() {
-  const dnes = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
-  let seed = 0;
-  for (let i = 0; i < dnes.length; i++) seed = (seed * 31 + dnes.charCodeAt(i)) >>> 0;
-  return NALADY_DNE[seed % NALADY_DNE.length];
-}
 
 // ── Sezónní období — stejná logika jako bot ────────────────────────────
 function sezonniObdobi() {
@@ -66,9 +87,6 @@ const SEZONNI_FRAZE = {
     'navzdory halloweenské atmosféře v Los Santos jsem u svého stolu jako obvykle.',
   ],
 };
-
-// Motiv, který se má opakovat napříč kanály — malá "podpisová" kontinuita.
-const MOTTO = 'Vedu záznamy, abyste vy mohli vést organizaci.';
 
 function pozdrav() {
   const hodina = parseInt(
@@ -138,12 +156,12 @@ const FRAZE = {
     'do evidence právě přibývá tato hromadná dávka záznamů.',
     'zpracovala jsem pro vás hromadný zápis do skladu.',
   ],
+  undo: [
+    'na vaši žádost jsem poslední zápis vzala zpět a smazala z knihy.',
+    'poslední zápis byl na vaše přání zrušen a odstraněn z registru.',
+  ],
 };
 
-// Formálnější varianty pro nejvyšší hodnosti (accessLevel 1 = Founder/Council,
-// viz roles.js). Používají se jen ČÁSTEČNĚ (ne pokaždé), ať to nepůsobí
-// vykonstruovaně — ale jednou za čas Evelyn dá jasně najevo, že si je
-// vědoma, s kým mluví.
 const FRAZE_VYSOKA_HODNOST = {
   vklad: [
     'dovolte, abych tomuto zápisu věnovala patřičnou pečlivost.',
@@ -156,15 +174,9 @@ const FRAZE_VYSOKA_HODNOST = {
   ],
 };
 
-// Sestaví úvodní řádek (description) — pozdrav podle denní doby, oslovení
-// jménem a rotující sekretářská poznámka. `klic` volí banku frází.
-// `accessLevel` (nepovinné, 1/2/3 dle roles.js) — u úrovně 1 (Founder/Council)
-// se část času použije formálnější fráze místo běžné rotace.
 function uvod(uzivatel, klic, accessLevel) {
   const jmeno = uzivatel ? `, **${uzivatel}**` : '';
 
-  // Sezónní období má občas (ne pokaždé, ať to nezačne nudit) přednost
-  // před běžnou rotací frází.
   const sezona = sezonniObdobi();
   if (sezona && SEZONNI_FRAZE[sezona] && Math.random() < 0.3) {
     return `${pozdrav()}${jmeno}. ${nahodna(SEZONNI_FRAZE[sezona])}`;
@@ -181,12 +193,11 @@ function uvod(uzivatel, klic, accessLevel) {
 // ══════════════════════════════════════════════════════════════════════
 // NÍZKÉ ZÁSOBY — hlídání prahů + upozornění do příslušné roomky
 // ══════════════════════════════════════════════════════════════════════
-//
-// Hlídají se jen drogy (weed a tvrdé drogy) — zbraně a chemikálie prahy
-// nemají. Množství je v sáčcích: weed pod 10 sáčků, drogy pod 5 sáčků.
 const PRAH_NIZKE_ZASOBY = {
-  weed:   10,
-  drogy:  5,
+  zbrane: 5,
+  weed:   20,
+  drogy:  10,
+  chemky: 10,
 };
 
 const KANAL_PODLE_SEKCE = {
@@ -196,33 +207,9 @@ const KANAL_PODLE_SEKCE = {
   chemky: () => process.env.CHANNEL_CHEMKY,
 };
 
-const IKONA_PODLE_SEKCE = { zbrane: '🔫', weed: '🌿', drogy: '💊', chemky: '⚗️' };
-const NAZEV_SEKCE = { zbrane: 'arzenálu', weed: 'botanického registru', drogy: 'farmaceutického registru', chemky: 'laboratorního registru' };
-
-const FRAZE_NIZKE_ZASOBY = [
-  'ráda bych upozornila, že zásoby klesly pod bezpečnou hranici.',
-  's jistými obavami hlásím pokles zásob pod doporučenou úroveň.',
-  'dovoluji si upozornit na klesající stav zásob u této položky.',
-  'prosím o pozornost — tahle položka se blíží vyprodání.',
-];
-
-// Bezpečnostní pojistka proti spamu — i kdyby detekce "přechodu přes
-// hranici" z nějakého důvodu vyhodnotila víc upozornění za sebou (např.
-// při rychlém testování mnoha akcí najednou), tenhle cooldown zaručí
-// max. jedno upozornění na stejnou položku za 30 minut.
 const POSLEDNI_UPOZORNENI = new Map(); // klíč: "sekce:polozka" → timestamp (ms)
 const COOLDOWN_MS = 30 * 60 * 1000;
 
-// Vyhodnotí, jestli akce (VKLAD/VÝBĚR o `mnozstvi` ks) právě STÁHLA položku
-// POD práh — a pokud ano, pošle upozornění. Neopakuje se při každém dalším
-// výběru, dokud se zásoba znovu nedostane nad práh a zase pod něj neklesne
-// (kontrolujeme, že PŘEDCHOZÍ stav byl ještě nad prahem).
-// `vlastniPrah` — nepovinné, umožňuje serveru dodat prah nakonfigurovaný
-// přes web (viz /api/thresholds) místo pevně daného výchozího čísla.
-// ── Prediktivní odhad — "za kolik dní dojde" ────────────────────────────
-// V paměti (ne persistentní — restart appky historii vynuluje, což je pro
-// tenhle "orientační odhad" účel v pořádku) sledujeme poslední stavy
-// každé položky za posledních 7 dní a z poklesu odhadneme tempo spotřeby.
 const HISTORIE_ZASOB = new Map(); // "sekce:polozka" → [{ t, v }, ...]
 const HISTORIE_OKNO_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -241,10 +228,10 @@ function odhadniDnyDoVyprodani(sekce, polozka, aktualniStav) {
 
   const nejstarsi = zaznamy[0];
   const dnyUplynulo = (Date.now() - nejstarsi.t) / 86400000;
-  if (dnyUplynulo < 0.5) return null; // příliš málo dat na rozumný odhad
+  if (dnyUplynulo < 0.5) return null;
 
   const pokles = nejstarsi.v - aktualniStav;
-  if (pokles <= 0) return null; // zásoby rostou/stagnují — nic k predikci
+  if (pokles <= 0) return null;
 
   const tempoZaDen = pokles / dnyUplynulo;
   return Math.max(1, Math.round(aktualniStav / tempoZaDen));
@@ -271,6 +258,13 @@ async function checkNizkaZasoba(sekce, polozka, typ, mnozstvi, aktualniStav, vla
 
   const odhad = odhadniDnyDoVyprodani(sekce, polozka, aktualniStav);
   const predikceText = odhad ? `\n\n📉 Při současném tempu spotřeby odhaduji vyprodání za přibližně **${odhad} ${odhad === 1 ? 'den' : odhad < 5 ? 'dny' : 'dní'}**.` : '';
+
+  const FRAZE_NIZKE_ZASOBY = [
+    'ráda bych upozornila, že zásoby klesly pod bezpečnou hranici.',
+    's jistými obavami hlásím pokles zásob pod doporučenou úroveň.',
+    'dovoluji si upozornit na klesající stav zásob u této položky.',
+    'prosím o pozornost — tahle položka se blíží vyprodání.',
+  ];
 
   await sendEmbed(channelId, {
     title: `⚠️ NÍZKÉ ZÁSOBY — ${polozka}`,
@@ -307,8 +301,6 @@ async function notifyZbrane(typ, polozka, mnozstvi, kategorie, uzivatel, ucel, a
 async function notifyWeed(typ, odruda, mnozstvi, vyroba, prodej, uzivatel, accessLevel) {
   const channelId = process.env.CHANNEL_WEED;
   const color = typ === 'VKLAD' ? 0x00FF88 : 0xFF4444;
-  // Weed se zapisuje přímo v SÁČCÍCH — ceny (vyroba/prodej) jsou stanovené za
-  // 1 sáček, žádný přepočet z gramů se tedy nedělá.
   const fields = [
     { name: 'Odrůda', value: odruda, inline: true },
     { name: 'Množství', value: `${mnozstvi} sáčků`, inline: true },
@@ -332,8 +324,6 @@ async function notifyDrogy(typ, droga, mnozstvi, vyroba, prodej, uzivatel, acces
     { name: 'Množství', value: `${mnozstvi} ks`, inline: true },
     { name: typ === 'VKLAD' ? 'Vložil' : 'Vzal', value: uzivatel, inline: true },
   ];
-  // Drogy v configu nemají nastavené ceny (na rozdíl od weedu) — pole
-  // přidáváme jen pokud reálně dorazila platná čísla, ať nezobrazujeme "$NaN".
   if (typeof vyroba === 'number' && !isNaN(vyroba)) fields.push({ name: '💸 Výroba', value: `~$${vyroba * mnozstvi}`, inline: true });
   if (typeof prodej === 'number' && !isNaN(prodej)) fields.push({ name: '💰 Prodej', value: `$${prodej * mnozstvi}`, inline: true });
   await sendEmbed(channelId, {
@@ -431,21 +421,18 @@ async function notifyAudit(akce, uzivatel, discordUsername, detail) {
     return;
   }
 
-  // Určit typ akce a barvu
   const detailUpper = (detail || '').toUpperCase();
   const isVklad = detailUpper.startsWith('VKLAD') || detailUpper.startsWith('PŘÍJEM');
   const isVyber = detailUpper.startsWith('VÝBĚR') || detailUpper.startsWith('VÝDAJ');
-  const color = isVklad ? 0x57F287 : isVyber ? 0xED4245 : 0x5865F2;
+  const isZruseno = detailUpper.startsWith('ZRUŠENO');
+  const color = isZruseno ? 0x99AAB5 : isVklad ? 0x57F287 : isVyber ? 0xED4245 : 0x5865F2;
 
-  // Ikona sekce
-  const ikonySekcí = { 'Zbraně': '🔫', 'Weed': '🌿', 'Drogy': '💊', 'Účetnictví': '💰' };
+  const ikonySekcí = { 'Zbraně': '🔫', 'Weed': '🌿', 'Drogy': '💊', 'Chemky': '⚗️', 'Účetnictví': '💰' };
   const ikona = ikonySekcí[akce] || '📋';
 
-  // Čas v CZ formátu
   const now = new Date();
   const casText = now.toLocaleString('cs-CZ', { timeZone: 'Europe/Prague', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-  // Rozebrat detail na typ a zbytek
   const [typAkce, ...zbytek] = (detail || '').split(' — ');
   const zbytekText = zbytek.join(' — ');
 
@@ -455,12 +442,11 @@ async function notifyAudit(akce, uzivatel, discordUsername, detail) {
     { name: '🕐 Čas', value: casText, inline: true },
   ];
   if (zbytekText) fields.push({ name: '📝 Detail', value: zbytekText, inline: false });
-  fields.push({ name: '👤 Provedl', value: discordUsername ? `${uzivatel}
-(@${discordUsername})` : uzivatel, inline: true });
+  fields.push({ name: '👤 Provedl', value: discordUsername ? `${uzivatel}\n(@${discordUsername})` : uzivatel, inline: true });
 
   try {
     await sendEmbed(channelId, {
-      title: isVklad ? `✅ VKLAD / PŘÍJEM` : isVyber ? `❌ VÝBĚR / VÝDAJ` : `📋 ZÁZNAM`,
+      title: isZruseno ? '↩️ VRÁCENO ZPĚT' : isVklad ? `✅ VKLAD / PŘÍJEM` : isVyber ? `❌ VÝBĚR / VÝDAJ` : `📋 ZÁZNAM`,
       color,
       fields,
       timestamp: new Date().toISOString(),
@@ -471,9 +457,6 @@ async function notifyAudit(akce, uzivatel, discordUsername, detail) {
   }
 }
 
-// Hromadný zápis do skladu (více položek najednou) — pošle JEDEN souhrnný
-// embed do příslušného kanálu, aby hromadná akce nezaplavila kanál
-// desítkami samostatných zpráv.
 async function notifyBulkSklad(sekce, typ, items, uzivatel) {
   const channelMap = {
     zbrane: process.env.CHANNEL_ZBRANE,
@@ -501,8 +484,6 @@ async function notifyBulkSklad(sekce, typ, items, uzivatel) {
   });
 }
 
-// Povýšení — detekováno na základě změny Discord role (viz server.js,
-// requireDiscordMember middleware). Posílá se do kanálu povýšení.
 async function notifyPovyseni(fromLabel, toLabel, uzivatel, discordUsername) {
   const channelId = process.env.CHANNEL_POVYSENI;
   if (!channelId) {
@@ -526,8 +507,6 @@ async function notifyPovyseni(fromLabel, toLabel, uzivatel, discordUsername) {
   });
 }
 
-// Vyznamenání / odznaky (achievements.js) — nová notifikace při udělení
-// odznaku (first_action, hundred_ops, first_month, veteran, logistics...).
 async function notifyVyznamenani(nazevOdznaku, popis, uzivatel, discordUsername) {
   const channelId = process.env.CHANNEL_VYZNAMENANI;
   if (!channelId) {
@@ -551,9 +530,6 @@ async function notifyVyznamenani(nazevOdznaku, popis, uzivatel, discordUsername)
   });
 }
 
-// Personální oddělení — nástup nového člena do organizace. (Odchod/suspendace
-// zatím nemají na webu žádnou akci, ze které by šly spustit — jakmile
-// taková funkce vznikne, stačí sem přidat obdobné volání.)
 async function notifyPersonalni(typ, jmeno, detail) {
   const channelId = process.env.CHANNEL_PERSONALNI;
   if (!channelId) {
@@ -578,9 +554,6 @@ async function notifyPersonalni(typ, jmeno, detail) {
   });
 }
 
-// ── Onboarding DM ────────────────────────────────────────────────────────
-// Krátká uvítací sekvence do soukromé zprávy novému členovi po registraci.
-// Použití: await sendOnboardingDM(discordId, icName)
 async function sendOnboardingDM(discordId, icName) {
   if (!discordId || !BOT_TOKEN()) return;
   try {
@@ -593,7 +566,7 @@ async function sendOnboardingDM(discordId, icName) {
 
     const zpravy = [
       `Vítejte v Caledonie${icName ? `, ${icName}` : ''}! Jsem Evelyn Ashcroft a starám se o administrativní chod organizace — ceník, sklad, garáž a spoustu dalšího najdete na webovém rozhraní.`,
-      `Pár tipů na začátek: aktuální ceník najdete v sekci **Ceník** na aplikaci (i jako \`/cenik\` zde). Zápisy do skladu (zbraně, weed, drogy, chemikálie) se dělají výhradně přes interní aplikaci Caledonie — tento kanál slouží jako živá kronika toho, co se v organizaci děje.`,
+      `Pár tipů na začátek: aktuální ceník najdete v sekci **Ceník** na aplikaci. Zápisy do skladu (zbraně, weed, drogy, chemikálie) se dělají výhradně přes interní aplikaci Caledonie — tento kanál slouží jako živá kronika toho, co se v organizaci děje.`,
       `Pokud si nebudete s něčím jistí, obraťte se na Senior Membera nebo výše — a přeji vám v organizaci mnoho úspěchů.`,
     ];
 
@@ -603,7 +576,7 @@ async function sendOnboardingDM(discordId, icName) {
         { content: text },
         { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
       );
-      await new Promise(r => setTimeout(r, 1200)); // krátká pauza mezi zprávami, ať to nepůsobí jako spam
+      await new Promise(r => setTimeout(r, 1200));
     }
   } catch (err) {
     console.error('[DISCORD] Onboarding DM selhalo (uživatel může mít vypnuté DM):', err.response?.data || err.message);
@@ -628,8 +601,6 @@ async function sendAnnouncement(title, content, uzivatel) {
   });
 }
 
-// Nová registrace člena — krátký zápis do interního kanálu, ať vedení vidí
-// přírůstky bez nutnosti procházet Discord OAuth log.
 async function notifyRegistrace(icName, discordUsername, discordId) {
   const channelId = process.env.CHANNEL_REGISTRACE || process.env.CHANNEL_AUDIT;
   if (!channelId) return;
@@ -647,8 +618,6 @@ async function notifyRegistrace(icName, discordUsername, discordId) {
   });
 }
 
-// Automatický týdenní souhrn Blackbooku — pravidelný přehled financí a
-// aktivity organizace, ať to vedení nemusí samo chodit dohledávat na web.
 async function notifyTydenniSouhrn({ income, expense, net, ops, inactiveCount, totalMembers }) {
   const channelId = process.env.CHANNEL_BLACKBOOK || process.env.CHANNEL_AUDIT;
   if (!channelId) return;
@@ -663,43 +632,6 @@ async function notifyTydenniSouhrn({ income, expense, net, ops, inactiveCount, t
       { name: net >= 0 ? '📈 Čistý zisk' : '📉 Čistá ztráta', value: `$${Math.round(Math.abs(net)).toLocaleString('cs-CZ')}`, inline: true },
       { name: '⚙ Operací', value: `${ops}`, inline: true },
       { name: '👥 Neaktivní 7+ dní', value: `${inactiveCount} / ${totalMembers}`, inline: true },
-    ],
-    timestamp: new Date().toISOString(),
-  });
-}
-
-// ── RESERVE FUND — týdenní povinný odvod (splatnost neděle) ────────────────
-// Po víkendu (kontrola v pondělí, viz server.js) se ověří, kdo za uplynulý
-// týden nezaplatil a nepodepsal Reserve Fund — jejich jména jdou sem.
-async function notifyReserveFundDluznici(weekKey, jmena) {
-  const channelId = process.env.CHANNEL_UCETNICTVI || process.env.CHANNEL_AUDIT;
-  if (!channelId || !jmena || !jmena.length) return;
-  await sendEmbed(channelId, {
-    title: '⚠️ RESERVE FUND — NEZAPLACENO',
-    color: 0xE8A33D,
-    author: EVELYN_AUTHOR,
-    description: `${pozdrav()}, po víkendu jsem zkontrolovala Reserve Fund za týden do ${weekKey} a níže uvedení členové jej dosud nezaplatili ani nepodepsali.`,
-    fields: [
-      { name: '👤 Dlužníci', value: jmena.join('\n').slice(0, 1000) || '—' },
-      { name: '💰 Povinná částka', value: '$5 000 / osoba', inline: true },
-    ],
-    timestamp: new Date().toISOString(),
-  });
-}
-
-// Potvrzení, že člen Reserve Fund za daný týden zaplatil a podepsal —
-// jde do stejného kanálu jako běžné příjmy, ale s vlastním razítkem.
-async function notifyReserveFundZaplaceno(weekKey, uzivatel, discordUsername) {
-  const channelId = process.env.CHANNEL_UCETNICTVI;
-  if (!channelId) return;
-  await sendEmbed(channelId, {
-    title: '🔏 RESERVE FUND PODEPSÁN',
-    color: 0x57F287,
-    author: EVELYN_AUTHOR,
-    description: `${pozdrav()}, ${uzivatel} právě uhradil/a a podepsal/a Reserve Fund za týden do ${weekKey}.`,
-    fields: [
-      { name: '👤 Člen', value: discordUsername ? `${uzivatel} (@${discordUsername})` : uzivatel, inline: true },
-      { name: '💰 Částka', value: '$5 000', inline: true },
     ],
     timestamp: new Date().toISOString(),
   });
@@ -720,7 +652,6 @@ async function getAnnouncementMessages(limit = 20) {
   }
 }
 
-// ── GALERIE ORGANIZACE — každá nahraná fotka jde i do kanálu #fotoalbum ────
 async function notifyGalerie(imageUrl, caption, uzivatel) {
   const channelId = process.env.CHANNEL_FOTOALBUM || '1521532400113553488';
   if (!channelId) return;
@@ -739,10 +670,6 @@ async function notifyGalerie(imageUrl, caption, uzivatel) {
   await sendEmbed(channelId, embed);
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// BAZAR — vnitřní tržiště organizace, viditelné pro každou hodnost.
-// Nová nabídka i uzavřený obchod se posílají do kanálu #bazar.
-// ══════════════════════════════════════════════════════════════════════
 async function notifyBazarNove(item, imageUrl) {
   const channelId = process.env.CHANNEL_BAZAR || '1524010210853916787';
   if (!channelId) return;
@@ -781,6 +708,50 @@ async function notifyBazarProdano(item, kupec) {
   });
 }
 
+// Nový zájemce o bazarovou nabídku — dřív se prodávající dozvěděl jen tak, že
+// si sám otevřel stránku. Teď dostane DM přímo od Evelyn (pokud má povolené
+// DM od členů serveru — jinak se to jen tiše nepodaří, viz dmUser()).
+async function notifyBazarZajem(item, zajemce, nabidka, sellerDiscordId) {
+  if (!sellerDiscordId) return false;
+  const castka = nabidka != null ? `$${Number(nabidka).toLocaleString('cs-CZ')}` : '—';
+  return dmUser(
+    sellerDiscordId,
+    `📬 O tvoji bazarovou nabídku **${item.nazev}** projevil/a zájem **${zajemce}** s nabídkou ${castka}. Podívej se do Bazaru na webu a vyber, komu prodáš.`
+  );
+}
+
+// ── RESERVE FUND — týdenní povinný odvod (splatnost neděle) ────────────────
+async function notifyReserveFundDluznici(weekKey, jmena) {
+  const channelId = process.env.CHANNEL_UCETNICTVI || process.env.CHANNEL_AUDIT;
+  if (!channelId || !jmena || !jmena.length) return;
+  await sendEmbed(channelId, {
+    title: '⚠️ RESERVE FUND — NEZAPLACENO',
+    color: 0xE8A33D,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, po víkendu jsem zkontrolovala Reserve Fund za týden do ${weekKey} a níže uvedení členové jej dosud nezaplatili ani nepodepsali.`,
+    fields: [
+      { name: '👤 Dlužníci', value: jmena.join('\n').slice(0, 1000) || '—' },
+      { name: '💰 Povinná částka', value: 'dle aktuálního nastavení organizace', inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
+async function notifyReserveFundZaplaceno(weekKey, uzivatel, discordUsername) {
+  const channelId = process.env.CHANNEL_UCETNICTVI;
+  if (!channelId) return;
+  await sendEmbed(channelId, {
+    title: '🔏 RESERVE FUND PODEPSÁN',
+    color: 0x57F287,
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}, ${uzivatel} právě uhradil/a a podepsal/a Reserve Fund za týden do ${weekKey}.`,
+    fields: [
+      { name: '👤 Člen', value: discordUsername ? `${uzivatel} (@${discordUsername})` : uzivatel, inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  });
+}
+
 async function isUserOnServer(discordId) {
   const guildId = process.env.GUILD_ID;
   try {
@@ -794,8 +765,6 @@ async function isUserOnServer(discordId) {
   }
 }
 
-// Vrátí pole role ID (string[]) daného člena na serveru, nebo null pokud není na serveru / nastala chyba.
-// Používá se pro určení úrovně přístupu ve webu (viz roles.js).
 async function getMemberRoles(discordId) {
   const guildId = process.env.GUILD_ID;
   try {
@@ -809,4 +778,11 @@ async function getMemberRoles(discordId) {
   }
 }
 
-module.exports = { notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena, notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace, notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement, getAnnouncementMessages, isUserOnServer, getMemberRoles, notifyGalerie, notifyBazarNove, notifyBazarProdano, notifyReserveFundDluznici, notifyReserveFundZaplaceno };
+module.exports = {
+  notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena,
+  notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace,
+  notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement,
+  getAnnouncementMessages, isUserOnServer, getMemberRoles, notifyGalerie, notifyBazarNove,
+  notifyBazarProdano, notifyBazarZajem, dmUser, sendPasswordResetDM,
+  notifyReserveFundDluznici, notifyReserveFundZaplaceno,
+};

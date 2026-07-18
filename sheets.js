@@ -60,6 +60,75 @@ async function appendRows(sheetName, rowsValues) {
   invalidateCache(sheetName);
 }
 
+// ── ZAPIS S NAVRÁCENÍM ČÍSLA ŘÁDKU ("Zpět" / undo poslední akce) ────────────
+// appendRow() nevrací nic, co by šlo použít k dodatečnému smazání konkrétního
+// řádku. Google Sheets API v odpovědi na append vrací "updatedRange" (např.
+// "Zbraně!A15:G15"), ze kterého se dá vyparsovat přesné číslo řádku — to si
+// server.js uloží jako "poslední akce daného člena" a použije v /api/sklad/undo.
+async function appendRowTracked(sheetName, values) {
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID(),
+    range: `${sheetName}!A1`,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: [values] },
+  });
+  invalidateCache(sheetName);
+  let rowIndex = null;
+  const range = res.data && res.data.updates && res.data.updates.updatedRange;
+  if (range) {
+    const m = range.match(/![A-Za-z]+(\d+):/);
+    if (m) rowIndex = parseInt(m[1], 10);
+  }
+  return { rowIndex };
+}
+
+// Mapa "název listu -> interní číselné sheetId" — potřebná pro mazání řádků
+// (batchUpdate/deleteDimension pracuje s číselným ID listu, ne s názvem).
+// Krátce cachovaná v paměti, ať se u každého undo netahá znovu z API.
+let sheetIdCacheMap = null;
+let sheetIdCacheAt = 0;
+const SHEET_ID_CACHE_TTL_MS = 10 * 60 * 1000;
+
+async function getSheetIdMap(force) {
+  if (!force && sheetIdCacheMap && (Date.now() - sheetIdCacheAt) < SHEET_ID_CACHE_TTL_MS) return sheetIdCacheMap;
+  const sheets = await getSheetsClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID(), fields: 'sheets.properties' });
+  const map = {};
+  (meta.data.sheets || []).forEach(s => { map[s.properties.title] = s.properties.sheetId; });
+  sheetIdCacheMap = map;
+  sheetIdCacheAt = Date.now();
+  return map;
+}
+
+// Smaže konkrétní řádek (1-indexováno, jak ho vrací appendRowTracked) z daného
+// listu. Používá se výhradně pro "Vrátit poslední zápis zpět" — proto se
+// vždy maže jen řádek, který appendRowTracked právě vytvořil.
+async function deleteRow(sheetName, rowIndex) {
+  if (!rowIndex) return false;
+  let idMap = await getSheetIdMap();
+  let sheetId = idMap[sheetName];
+  if (sheetId == null) {
+    idMap = await getSheetIdMap(true); // list se mohl mezitím přejmenovat/přidat — zkusit čerstvě
+    sheetId = idMap[sheetName];
+  }
+  if (sheetId == null) return false;
+  const sheets = await getSheetsClient();
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID(),
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: { sheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex },
+        },
+      }],
+    },
+  });
+  invalidateCache(sheetName);
+  return true;
+}
+
 // ── CACHE ────────────────────────────────────────────────────────────────────
 // Sklad/finance stránky (Blackbook, Statistiky, Audit, Profit centrum) dřív
 // při KAŽDÉM načtení tahaly celé listy znovu ze Sheets API. S krátkým TTL
@@ -135,4 +204,7 @@ async function getAccountingSummary() {
   return { usd, pesos };
 }
 
-module.exports = { appendRow, appendRows, getRows, getStockSummary, getRecentRows, getAccountingSummary, timestamp };
+module.exports = {
+  appendRow, appendRows, appendRowTracked, deleteRow, getSheetIdMap,
+  getRows, getStockSummary, getRecentRows, getAccountingSummary, timestamp,
+};

@@ -100,6 +100,9 @@ function renderNav(req, active) {
       </ul>
 
       <div class="nav-right" id="navRight">
+        <button class="notif-bell" id="globalSearchBtn" title="Hledat (klávesa /)" onclick="openGlobalSearch()" style="margin-right:0.2rem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
         <div class="evelyn-widget" id="evelynWidget" title="Evelyn Ashcroft — Sekretariát Caledonie">
           <img src="/evelyn.png" class="evelyn-portrait" alt="Evelyn Ashcroft" id="evelynImg" onerror="this.style.display='none';document.getElementById('evelynFallback').style.display='flex';">
           <div class="evelyn-portrait evelyn-portrait-placeholder" id="evelynFallback" style="display:none">
@@ -121,18 +124,20 @@ function renderNav(req, active) {
               </span>
               <span>Evelyn Ashcroft · Sekretariát</span>
             </div>
-            <button class="evelyn-letter-close" id="evelynCloseBtn" title="Zavřít">✕</button>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+              <button class="evelyn-letter-close" id="evelynSnoozeBtn" title="Dnes už nezobrazovat automaticky" style="font-size:0.9rem">🔕</button>
+              <button class="evelyn-letter-close" id="evelynCloseBtn" title="Zavřít">✕</button>
+            </div>
           </div>
           <div class="evelyn-letter-body" id="evelynLetterBody">
             <div class="ledger-loading">Evelyn píše zprávu…</div>
           </div>
         </div>
         <button class="ambient-btn" id="ambientBtn" title="Ambientní zvuk kanceláře">♫</button>
-        ${can('nastenska') ? `
-        <button class="notif-bell" id="notifBell" title="Oznámení" onclick="window.location='/nastenska'">
+        <button class="notif-bell" id="notifBell" title="Oznámení" onclick="window.location='${can('nastenska') ? '/nastenska' : '/bazar'}'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-badge" id="notifBadge">0</span>
-        </button>` : ''}
+        </button>
         ${req.session.realAccessLevel === 1 ? `
         <div class="view-as-switcher" style="position:relative">
           <button class="nav-shortcut-hint" id="viewAsBtn" style="cursor:pointer;${req.session.viewAsLevel?'border-color:var(--oxblood-bright);color:var(--oxblood-bright)':''}" title="View As — simulace role">
@@ -153,7 +158,7 @@ function renderNav(req, active) {
           <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
           <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#F3EEE3,#0B0F0D,#F3EEE3);border:1.5px solid #B68A4E" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
         </div>
-        <span class="nav-shortcut-hint" title="g+h Přehled${can('sklad-view')?' · g+s Sklad':''}${can('blackbook')?' · g+b Blackbook':''}${can('audit')?' · g+a Audit':''}${can('nastenska')?' · g+n Nástěnka':''} · / Hledat">g·_</span>
+        <button class="nav-shortcut-hint" id="shortcutsHelpBtn" title="Zobrazit všechny klávesové zkratky (?)" onclick="openShortcutsHelp()" style="cursor:pointer">g·_ · ?</button>
         <span class="nav-user" style="border-left:2px solid ${({1:'var(--oxblood-bright)',2:'var(--brass-bright)',3:'var(--ivory-faint)'})[accessLevel]||'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${escapeHtml(ic)}</strong></span>
         <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
@@ -163,6 +168,25 @@ function renderNav(req, active) {
     ${req.session.viewAsLevel ? `<div style="background:var(--oxblood-faint);border-bottom:1px solid var(--border-oxblood);padding:0.5rem 2rem;text-align:center;font-family:var(--font-mono);font-size:0.72rem;color:var(--oxblood-bright)">
       Náhled jako role: ${({1:'Founder/Council',2:'Senior Member',3:'Member/Associate'})[req.session.viewAsLevel]} — <a href="#" onclick="setViewAs(null);return false" style="color:var(--oxblood-bright);text-decoration:underline">ukončit náhled</a>
     </div>` : ''}
+
+    <!-- Globální vyhledávání napříč webem (klávesa "/", pokud stránka nemá vlastní audit-search pole) -->
+    <div class="modal-overlay" id="globalSearchModal">
+      <div class="modal-box" style="max-width:520px;text-align:left">
+        <div class="modal-title">Hledat v Caledonii</div>
+        <input type="text" id="globalSearchInput" placeholder="Jméno člena, SPZ, nemovitost, bazar…" style="margin-bottom:1rem">
+        <div id="globalSearchResults" style="max-height:320px;overflow-y:auto"></div>
+        <div class="modal-actions"><button class="modal-btn-cancel" style="flex:1" onclick="closeGlobalSearch()">Zavřít</button></div>
+      </div>
+    </div>
+
+    <!-- Přehled klávesových zkratek -->
+    <div class="modal-overlay" id="shortcutsModal">
+      <div class="modal-box" style="max-width:420px;text-align:left">
+        <div class="modal-title">Klávesové zkratky</div>
+        <dl class="modal-detail" id="shortcutsList"></dl>
+        <div class="modal-actions"><button class="modal-btn-cancel" style="flex:1" onclick="closeShortcutsHelp()">Zavřít</button></div>
+      </div>
+    </div>
 
     <script>
       // ── MOBILE NAV ──
@@ -214,10 +238,6 @@ function renderNav(req, active) {
       navMenu.querySelectorAll('a[href]:not([href="#"])').forEach(a => a.addEventListener('click', closeMobileNav));
 
       // ── NÁLADA — reálná denní doba, nezávislá na zvoleném tématu ──
-      // Auto téma reaguje na VŠECHNY čtyři fáze dne — svítání a soumrak dostávají
-      // tmavý noir s teplým podbarvením (mood-sunrise/mood-sunset), pergamen
-      // (light) patří jen skutečnému dni. Díky tomu je při přepnutí na "Auto"
-      // vždy vidět, že se něco změnilo, i mimo úzké polední okno.
       const MOODS = ['mood-sunrise','mood-day','mood-sunset','mood-night'];
       const MOOD_LABEL = { 'mood-sunrise':'svítání', 'mood-day':'den', 'mood-sunset':'soumrak', 'mood-night':'noc' };
       function moodFromHour(h){ if(h>=5&&h<7)return'mood-sunrise'; if(h>=7&&h<17)return'mood-day'; if(h>=17&&h<21)return'mood-sunset'; return'mood-night'; }
@@ -226,8 +246,6 @@ function renderNav(req, active) {
         MOODS.forEach(c=>document.body.classList.remove(c));
         document.body.classList.add(m);
         if (currentTheme === 'auto') {
-          // Jen "den" je pergamen — svítání, soumrak i noc zůstávají v noiru
-          // (ale s vlastním teplým/chladným podbarvením dle mood- třídy výše)
           document.body.classList.toggle('light', m === 'mood-day');
         }
       }
@@ -244,7 +262,7 @@ function renderNav(req, active) {
           const btn = document.getElementById('td-' + th);
           if (btn) btn.classList.toggle('active', th === t);
         });
-        applyMoodTick(); // pro 'auto' tady doreší light/dark dle aktuální fáze dne
+        applyMoodTick();
         if (t === 'auto' && window.showToast) {
           const m = moodFromHour(new Date().getHours());
           showToast('Auto režim aktivní — právě je ' + MOOD_LABEL[m]);
@@ -258,18 +276,21 @@ function renderNav(req, active) {
       let newCount = 0;
       const evtSource = new EventSource('/api/events');
       window.evtSource = evtSource;
-      evtSource.addEventListener('nastenska', (e) => {
-        const d = JSON.parse(e.data);
+      function bumpBellBadge(){
         newCount++;
         const badge = document.getElementById('notifBadge');
         badge.textContent = newCount;
         badge.classList.add('visible');
-        showToast('Oznámení: ' + d.title + ' — ' + d.uzivatel);
         if (window.bumpUnread) window.bumpUnread();
+      }
+      evtSource.addEventListener('nastenska', (e) => {
+        const d = JSON.parse(e.data);
+        bumpBellBadge();
+        showToast('Oznámení: ' + d.title + ' — ' + d.uzivatel);
       });
       evtSource.addEventListener('skladUpdate', (e) => {
         const d = JSON.parse(e.data);
-        const label = d.sekce === 'zbrane' ? 'Zbraně' : d.sekce === 'weed' ? 'Weed' : d.sekce === 'chemky' ? 'Chemky' : 'Drogy';
+        const label = d.sekce === 'zbrane' ? 'Zbraně' : d.sekce === 'weed' ? 'Weed' : d.sekce === 'chemky' ? 'Chemky' : d.sekce === 'undo' ? 'Vráceno zpět' : 'Drogy';
         showToast(label + ' · ' + (d.polozka || d.odruda || d.droga || d.chemikalie) + ' — ' + d.uzivatel);
       });
       evtSource.addEventListener('ucetUpdate', (e) => {
@@ -279,6 +300,18 @@ function renderNav(req, active) {
       evtSource.addEventListener('weedTimer', (e) => {
         const d = JSON.parse(e.data);
         if (d.action === 'add' && d.timer) showToast('Weed sázení · ' + d.timer.icName + ' (' + d.timer.postal + ')');
+      });
+      // Bazar a mentoring dřív do zvonku vůbec nepadaly — člověk se o nový
+      // zájem nebo nový mentorský checkpoint dozvěděl, jen když si sám
+      // otevřel tu konkrétní stránku.
+      evtSource.addEventListener('bazarUpdate', (e) => {
+        const d = JSON.parse(e.data);
+        if (d.action === 'add') { bumpBellBadge(); showToast('Bazar · nová nabídka'); }
+        else if (d.action === 'zajem') { bumpBellBadge(); showToast('Bazar · nový zájemce o nabídku'); }
+      });
+      evtSource.addEventListener('mentoringUpdate', (e) => {
+        bumpBellBadge();
+        showToast('Mentorský program · nová aktivita');
       });
 
       let _toastQueue = [];
@@ -300,14 +333,12 @@ function renderNav(req, active) {
             '<div class="toast-title">' + (isError ? 'Chyba' : 'Zaznamenáno') + '</div>' +
             '<div class="toast-msg"></div>' +
           '</div>';
-        t.querySelector('.toast-msg').textContent = msg; // textContent kvůli bezpečnosti (žádné HTML injection)
-        // Vynutit reflow, ať se transformace znovu přehraje i při rychlém opakovaném volání
+        t.querySelector('.toast-msg').textContent = msg;
         void t.offsetWidth;
         t.classList.add('show');
         clearTimeout(t._timer);
         t._timer = setTimeout(() => {
           t.classList.remove('show');
-          // Počkat na doběhnutí fade-out (0.3s v CSS), pak pustit další zprávu z fronty
           setTimeout(() => { _toastActive = false; _processToastQueue(); }, 320);
         }, 3500);
       }
@@ -404,8 +435,6 @@ function renderNav(req, active) {
           timerDone: () => { playTone(523,0.3,0.12); setTimeout(()=>playTone(659,0.3,0.12),150); },
         };
 
-        // Pečeťovací "thud" — sdíleno napříč Sklad/Garáž/Galerie/Nástěnka/Karta/Spisy,
-        // aby každé potvrzení důležité akce znělo stejně heraldicky.
         window.albionSealThud = function(){
           if(!enabled)return;
           try{
@@ -418,9 +447,6 @@ function renderNav(req, active) {
           }catch(e){}
         };
 
-        // Jemný "papírový" mikro-zvuk pro otevírání modalů/karet MIMO Albion
-        // World — dřív tam bylo úplné ticho. Generovaný filtrovaným šumem,
-        // takže nepotřebuje žádný audio soubor.
         window.albionPaper = function(){
           if(!enabled)return;
           try{
@@ -451,16 +477,9 @@ function renderNav(req, active) {
         }
       })();
 
-      // Sdílená informace o aktuální stránce — používá ambientní zvuk (jiná
-      // ambience pro Kodex/Historii) i Evelyn (kontextový brífink níže).
       const CURRENT_PAGE = '${active}' || 'home';
 
-      // ── AMBIENTNÍ ZVUK KANCELÁŘE — napříč celým webem (ne jen /albion) ──
-      // Tlačítko ♫ v navu dřív nebylo na nic napojené. Sdílí localStorage klíč
-      // s /albion, takže stav (zapnuto/vypnuto) je konzistentní na celém webu,
-      // i když se přehrávání při přechodu na jinou stránku vždy znovu nastartuje
-      // (klasický multi-page web, ne SPA). Na Kodexu/Historii hraje místo
-      // kancelářské ambience tišší "kronikářská" stopa, ať sedí k tónu textu.
+      // ── AMBIENTNÍ ZVUK KANCELÁŘE ──
       (function globalAmbient(){
         const KEY = 'albion_ambient_on';
         const btn = document.getElementById('ambientBtn');
@@ -488,7 +507,7 @@ function renderNav(req, active) {
           audioEl.src = currentAudioSrc();
           return audioEl;
         }
-        if (on) { const a = ensureAudio(); a.play().catch(() => { /* autoplay blokován do prvního kliku */ }); }
+        if (on) { const a = ensureAudio(); a.play().catch(() => {}); }
         btn.addEventListener('click', () => {
           on = !on;
           localStorage.setItem(KEY, on ? '1' : '0');
@@ -497,7 +516,6 @@ function renderNav(req, active) {
           if (on) a.play().catch(() => {});
           else a.pause();
         });
-        // Pokud autoplay selhal, spustí se při prvním kliknutí kamkoliv na stránku
         document.addEventListener('click', function once(){
           if (on && audioEl && audioEl.paused) audioEl.play().catch(() => {});
         }, { once: true });
@@ -522,7 +540,7 @@ function renderNav(req, active) {
         };
       })();
 
-      // ── SEZÓNNÍ VZHLED ── (+ malý odznak vedle loga, ať se sezónnost propíše i do brandingu)
+      // ── SEZÓNNÍ VZHLED ──
       function applySeasonalBadge(season){
         const logoText=document.querySelector('.nav-logo-text');
         if(!logoText)return;
@@ -543,21 +561,36 @@ function renderNav(req, active) {
       });
 
       // ── EVELYN ASHCROFT — sekretářka Albionu: kontextová "e-mailová" zpráva ──
-      // Místo jedné náhodné hlášky teď Evelyn posílá skutečný krátký brífink
-      // podle toho, na jaké stránce jste (nízké zásoby na Skladu, dorostlé
-      // odpočty na Weed sázení, stav pokladny na Blackbooku…) — data táhne
-      // z /api/evelyn/brief. Panel se navíc sám automaticky vysune po chvíli
-      // na každé stránce, je větší a vydrží otevřený déle.
       (function evelyn(){
         const letter=document.getElementById('evelynLetter');
         const widget=document.getElementById('evelynWidget');
         const body=document.getElementById('evelynLetterBody');
         const closeBtn=document.getElementById('evelynCloseBtn');
+        const snoozeBtn=document.getElementById('evelynSnoozeBtn');
         const ping=document.getElementById('evelynPing');
         if(!letter||!widget||!body)return;
 
         const PAGE_ID = CURRENT_PAGE;
         let shown=false, autoCloseTimer=null, briefCache=null;
+
+        // "Dnes už nezobrazovat" — dřív se dopis vysouval automaticky na
+        // KAŽDÉ stránce, což po chvíli začalo otravovat. Teď si člověk může
+        // pro zbytek dne (do půlnoci) vypnout jen to AUTOMATICKÉ vysunutí —
+        // ručně otevřít kliknutím na Evelynin portrét jde pořád.
+        const SNOOZE_KEY = 'albion_evelyn_snooze_until';
+        function isSnoozedToday(){
+          try{
+            const until = localStorage.getItem(SNOOZE_KEY);
+            if(!until) return false;
+            return new Date(until).toDateString() === new Date().toDateString();
+          }catch(e){ return false; }
+        }
+        function snoozeToday(){
+          try{ localStorage.setItem(SNOOZE_KEY, new Date().toISOString()); }catch(e){}
+          closeLetter();
+          if(window.showToast) showToast('Evelyn se dnes už automaticky neozve');
+        }
+        if(snoozeBtn) snoozeBtn.addEventListener('click',(e)=>{ e.stopPropagation(); snoozeToday(); });
 
         function esc(s){return (s==null?'':String(s)).replace(/</g,'&lt;');}
 
@@ -615,38 +648,81 @@ function renderNav(req, active) {
           if(shown&&!e.target.closest('.evelyn-widget')&&!e.target.closest('.evelyn-letter'))closeLetter();
         });
 
-        // Automatické vysunutí — na každé stránce, o něco větší panel a delší výdrž
-        setTimeout(()=>{ fetchBrief().then(()=>{ openLetter(11000); }); },1000);
+        // Automatické vysunutí — přeskočí se, pokud si to člověk pro dnešek vypnul.
+        setTimeout(()=>{
+          if(isSnoozedToday())return;
+          fetchBrief().then(()=>{ openLetter(11000); });
+        },1000);
       })();
 
-      // ── AMBIENTNÍ SOUNDTRACK KANCELÁŘE — opt-in, hraje napříč celým webem ──
-      (function ambient(){
-        const KEY='albion_ambient_on';
-        const btn=document.getElementById('ambientBtn');
-        if(!btn)return;
-        const AUDIO_BY_ENV={day:'/albion/audio/den.mp3',fog:'/albion/audio/mlha.mp3',sunrise:'/albion/audio/vychod-slunce.mp3',sunset:'/albion/audio/zapad-slunce.mp3',winter:'/albion/audio/snih.mp3',night:'/albion/audio/noc.mp3'};
-        function envFromHour(h){if(h>=5&&h<7)return'sunrise';if(h>=7&&h<17)return'day';if(h>=17&&h<21)return'sunset';return'night';}
-        let on=localStorage.getItem(KEY)==='1';
-        function render(){btn.classList.toggle('active',on);btn.textContent=on?'♪':'♫';}
-        render();
-        let audioEl=null;
-        function ensureAudio(){
-          if(audioEl)return audioEl;
-          audioEl=new Audio();audioEl.loop=true;audioEl.volume=0.22;
-          audioEl.src=AUDIO_BY_ENV[envFromHour(new Date().getHours())];
-          return audioEl;
+      // ── GLOBÁLNÍ VYHLEDÁVÁNÍ (napříč členy, vozy, nemovitostmi, bazarem) ──
+      (function globalSearch(){
+        const modal=document.getElementById('globalSearchModal');
+        const input=document.getElementById('globalSearchInput');
+        const results=document.getElementById('globalSearchResults');
+        if(!modal||!input||!results)return;
+        let debounceT=null;
+
+        function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+        const TYPE_LABEL={ 'člen':'Člen','vůz':'Vůz','nemovitost':'Nemovitost','bazar':'Bazar' };
+
+        function renderResults(list){
+          if(!list.length){ results.innerHTML='<div style="padding:1rem 0;color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.8rem;text-align:center">Nic nenalezeno</div>'; return; }
+          results.innerHTML=list.map(r=>{
+            const inner='<span style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--brass);border:1px solid var(--border-brass);padding:0.1rem 0.4rem;margin-right:0.6rem">'+(TYPE_LABEL[r.type]||r.type)+'</span>'+esc(r.label);
+            return r.href
+              ? '<a href="'+r.href+'" style="display:block;padding:0.6rem 0.2rem;border-bottom:1px solid var(--border);color:var(--ivory);text-decoration:none;font-size:0.86rem">'+inner+'</a>'
+              : '<div style="padding:0.6rem 0.2rem;border-bottom:1px solid var(--border);color:var(--ivory);font-size:0.86rem">'+inner+'</div>';
+          }).join('');
         }
-        if(on){ const a=ensureAudio(); a.play().catch(()=>{ /* autoplay může být blokováno do prvního kliku */ }); }
-        btn.addEventListener('click',()=>{
-          on=!on;localStorage.setItem(KEY,on?'1':'0');render();
-          const a=ensureAudio();
-          if(on)a.play().catch(()=>{});else a.pause();
+
+        function doSearch(q){
+          if(q.trim().length<2){ results.innerHTML=''; return; }
+          fetch('/api/search?q='+encodeURIComponent(q)).then(r=>r.json()).then(d=>{
+            if(d.ok) renderResults(d.results);
+          }).catch(()=>{});
+        }
+        input.addEventListener('input',()=>{
+          clearTimeout(debounceT);
+          const q=input.value;
+          debounceT=setTimeout(()=>doSearch(q),200);
         });
-        // Pokud autoplay selhal, spustí se při prvním kliknutí kamkoliv na stránku
-        document.addEventListener('click',function once(){ if(on&&audioEl&&audioEl.paused)audioEl.play().catch(()=>{}); },{once:true});
+
+        window.openGlobalSearch=function(){
+          modal.classList.add('open');
+          input.value='';
+          results.innerHTML='';
+          setTimeout(()=>input.focus(),50);
+        };
+        window.closeGlobalSearch=function(){ modal.classList.remove('open'); };
+        modal.addEventListener('click',(e)=>{ if(e.target===modal) closeGlobalSearch(); });
       })();
 
-      // ── PAGE TRANSITION — jemný fade při odchodu na jinou stránku webu ──
+      // ── PŘEHLED KLÁVESOVÝCH ZKRATEK ──
+      window.openShortcutsHelp=function(){
+        const list=document.getElementById('shortcutsList');
+        const rows=[
+          ['g h','Přehled (Dashboard)'],
+          ${can('sklad-view') ? "['g s','Sklad']," : ''}
+          ${can('blackbook') ? "['g b','Blackbook']," : ''}
+          ${can('profit-centrum') ? "['g p','Profit centrum']," : ''}
+          ${can('audit') ? "['g a','Audit']," : ''}
+          ${can('statistiky') ? "['g t','Statistiky']," : ''}
+          ${can('nastenska') ? "['g n','Nástěnka']," : ''}
+          ['g k','Kodex'],
+          ['g l','Historie'],
+          ['g o','Hierarchie'],
+          ['g w','Weed sázení'],
+          ['/','Hledat (v Auditu — jinde globální vyhledávání)'],
+          ['?','Tento přehled zkratek'],
+          ['Esc','Zavřít otevřené okno'],
+        ];
+        list.innerHTML=rows.map(([k,v])=>'<dt><span style="font-family:var(--font-mono);background:var(--panel3);padding:0.15rem 0.5rem;border:1px solid var(--border-brass)">'+k+'</span></dt><dd>'+v+'</dd>').join('');
+        document.getElementById('shortcutsModal').classList.add('open');
+      };
+      window.closeShortcutsHelp=function(){ document.getElementById('shortcutsModal').classList.remove('open'); };
+
+      // ── PAGE TRANSITION ──
       (function pageTransition(){
         document.addEventListener('click',(e)=>{
           const a=e.target.closest('a[href]');
@@ -677,7 +753,16 @@ function renderNav(req, active) {
             return;
           }
           if (e.key.toLowerCase()==='g') { awaitingSecond=true; clearTimeout(chordTimer); chordTimer=setTimeout(()=>{awaitingSecond=false;},900); return; }
-          if (e.key==='/') { const target=document.getElementById('audit-search'); if(target){e.preventDefault();target.focus();} }
+          if (e.key==='/') {
+            const target=document.getElementById('audit-search');
+            if(target){e.preventDefault();target.focus();}
+            else{e.preventDefault();if(window.openGlobalSearch)window.openGlobalSearch();}
+          }
+          if (e.key==='?') { e.preventDefault(); if(window.openShortcutsHelp) window.openShortcutsHelp(); }
+          if (e.key==='Escape') {
+            const gs=document.getElementById('globalSearchModal'); if(gs&&gs.classList.contains('open')&&window.closeGlobalSearch) closeGlobalSearch();
+            const sh=document.getElementById('shortcutsModal'); if(sh&&sh.classList.contains('open')&&window.closeShortcutsHelp) closeShortcutsHelp();
+          }
         });
       })();
     </script>

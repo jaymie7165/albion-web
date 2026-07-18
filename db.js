@@ -206,4 +206,14 @@ db.setCardPrivate = (id, isPrivate) => {
   return false;
 };
 
+// ── ZMĚNA / RESET HESLA ──
+// Používá se jak pro "Změnit heslo" v profilu (po ověření starého hesla),
+// tak pro "Zapomenuté heslo" a admin reset (nové dočasné heslo poslané přes Discord DM).
+db.setPasswordHash = (id, hash) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.password_hash = hash; save(users); return true; }
+  return false;
+};
+
 module.exports = db;
