@@ -8,6 +8,9 @@ function renderStatistiky(req) {
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Caledonia — Statistiky</title>
   ${baseStyles()}
+  <style>
+    .stat-card-skel{background:var(--panel2);border:1px solid var(--border-brass);padding:1.8rem 1.7rem}
+  </style>
   </head><body>
   ${renderNav(req, 'statistiky')}
   <main>
@@ -20,7 +23,9 @@ function renderStatistiky(req) {
     </div>
     <p class="folio-footnote"><strong>Individuální spisy.</strong> Každý člen má svou kartu — celkové vklady, výběry a finanční pohyby. Zelená (+) jsou vklady, červená (–) výběry.</p>
     <div id="stats-container" class="stats-grid">
-      <div class="ledger-loading">Načítám statistiky…</div>
+      <div class="stat-card-skel"><div class="skeleton skeleton-line" style="width:45%;height:1.1rem"></div><div class="skeleton skeleton-line" style="width:70%"></div><div class="skeleton skeleton-line" style="width:55%"></div><div class="skeleton skeleton-line" style="width:60%"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>
+      <div class="stat-card-skel"><div class="skeleton skeleton-line" style="width:45%;height:1.1rem"></div><div class="skeleton skeleton-line" style="width:65%"></div><div class="skeleton skeleton-line" style="width:50%"></div></div>
+      <div class="stat-card-skel"><div class="skeleton skeleton-line" style="width:45%;height:1.1rem"></div><div class="skeleton skeleton-line" style="width:75%"></div><div class="skeleton skeleton-line" style="width:60%"></div><div class="skeleton skeleton-line" style="width:35%"></div></div>
     </div>
   </main>
 

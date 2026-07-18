@@ -59,7 +59,7 @@ function renderAudit(req) {
       <div class="table-wrap">
         <table>
           <thead><tr><th>Čas</th><th>Zdroj</th><th>Sekce</th><th>Typ</th><th>Člen</th><th>Detail</th></tr></thead>
-          <tbody id="audit-body"><tr><td colspan="6" style="text-align:center;color:var(--ivory-faint);padding:2.5rem;font-family:var(--font-mono)">Načítám…</td></tr></tbody>
+          <tbody id="audit-body"></tbody>
         </table>
       </div>
     </div>
@@ -69,6 +69,10 @@ function renderAudit(req) {
     let allEvents=[],ucetSouhrn={},activeFilter='vse',searchTerm='',eliteMembers=[];
     let auditOffset=0,auditTotal=0;
     const AUDIT_LIMIT=200;
+
+    // Skeleton řádky místo holého textu "Načítám…" — vypadá o dost svižněji.
+    document.getElementById('audit-body').innerHTML =
+      '<tr><td colspan="6">'+skeletonRows(8,[1,1,1,1,1,2])+'</td></tr>';
 
     async function loadAudit(){
       const res=await fetch('/api/audit?limit='+AUDIT_LIMIT+'&offset='+auditOffset,{cache:'no-store'});

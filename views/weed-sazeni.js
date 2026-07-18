@@ -42,8 +42,16 @@ function renderWeedSazeni(req) {
     }
     .timer-card::before{content:'';position:absolute;top:0;left:0;width:12px;height:12px;border-top:1px solid var(--brass-dim);border-left:1px solid var(--brass-dim)}
     .timer-card:hover{border-color:var(--brass)}
+    .timer-card.timer-done{border-color:#6FBF52}
     .timer-bar-track{height:3px;background:var(--border);margin-top:1rem;overflow:hidden}
     .timer-bar-fill{height:100%;background:linear-gradient(90deg,var(--oxblood),var(--brass));transition:width 1s linear}
+
+    .notif-permission-row{
+      display:flex;align-items:center;justify-content:space-between;gap:0.8rem;
+      padding:0.7rem 0.9rem;margin-bottom:1.2rem;
+      background:var(--brass-faint);border:1px solid var(--border-brass);
+      font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-dim);
+    }
 
     @media(max-width:900px){
       .weed-recipe-plaques{grid-template-columns:repeat(3,1fr)}
@@ -139,6 +147,10 @@ function renderWeedSazeni(req) {
       <!-- Odpočty -->
       <div class="card">
         <div class="card-header"><span class="card-title">Odpočty růstu</span><span class="card-badge">Sdílené · všichni vidí</span></div>
+        <div class="notif-permission-row" id="notifPermRow" style="display:none">
+          <span>Chceš vědět, až kytka doroste, i když nemáš otevřenou tuhle stránku?</span>
+          <button class="quick-btn" id="notifPermBtn" onclick="requestTimerNotifications()">Povolit oznámení</button>
+        </div>
         <div class="form-row">
           <div class="form-group"><label>IC jméno</label><input type="text" id="t-icname" value="${escapeHtml(icName || '')}" placeholder="Jméno postavy"></div>
           <div class="form-group"><label>Postal</label><input type="text" id="t-postal" maxlength="4" inputmode="numeric" placeholder="1234"></div>
@@ -186,8 +198,26 @@ function renderWeedSazeni(req) {
     document.getElementById('calc-budget').addEventListener('input',()=>recalc('budget'));
     recalc('plants');
 
+    // ── OZNÁMENÍ PROHLÍŽEČE, AŽ KYTKA DOROSTE ───────────────────────────────
+    // Dřív se dorostlá kytka poznala jen podle progress baru — kdo neměl
+    // stránku otevřenou, nic nevěděl. Teď (po povolení) přehraje zvuk a
+    // ukáže systémovou notifikaci prohlížeče v okamžiku, kdy odpočet dojde.
+    function updateNotifRow(){
+      const row=document.getElementById('notifPermRow');
+      if(!('Notification' in window)){ row.style.display='none'; return; }
+      if(Notification.permission==='granted'||Notification.permission==='denied'){ row.style.display='none'; return; }
+      row.style.display='flex';
+    }
+    function requestTimerNotifications(){
+      if(!('Notification' in window))return;
+      Notification.requestPermission().then(()=>updateNotifRow());
+    }
+    window.requestTimerNotifications=requestTimerNotifications;
+    updateNotifRow();
+
     // Odpočty
     let serverOffset=0,timers=[];
+    const notifiedDoneIds=new Set();
     function fmtRemain(ms){
       if(ms<=0)return'Hotovo';
       const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);
@@ -198,14 +228,14 @@ function renderWeedSazeni(req) {
       const wrap=document.getElementById('timers-list');
       if(!timers.length){wrap.innerHTML=ledgerEmptyHTML('Žádné probíhající odpočty',true);return;}
       wrap.innerHTML=timers.map(function(t){
-        return '<div class="timer-card">'+
+        return '<div class="timer-card" data-id="'+t.id+'">'+
           '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">'+
             '<div>'+
               '<div style="font-family:var(--font-display);font-weight:600;font-style:italic;font-size:0.95rem;color:var(--ivory)">'+escT(t.icName)+' <span style="color:var(--ivory-faint);font-size:0.8rem;font-style:normal;font-family:var(--font-mono)">· Postal '+escT(t.postal)+'</span></div>'+
               '<div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.3rem">'+t.plants+' kytek · '+escT(t.createdBy||'—')+'</div>'+
             '</div>'+
             '<div style="text-align:right">'+
-              '<div class="cd-remain" data-ends="'+t.endsAt+'" style="font-family:var(--font-display);font-style:italic;font-size:1.2rem;color:var(--brass)">–</div>'+
+              '<div class="cd-remain" data-id="'+t.id+'" data-ends="'+t.endsAt+'" style="font-family:var(--font-display);font-style:italic;font-size:1.2rem;color:var(--brass)">–</div>'+
               '<button onclick="removeTimer(\\''+t.id+'\\')" style="margin-top:0.4rem;background:none;border:1px solid var(--border-brass);color:var(--ivory-faint);font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.6rem;cursor:pointer">Smazat</button>'+
             '</div>'+
           '</div>'+
@@ -220,6 +250,18 @@ function renderWeedSazeni(req) {
         const rem=parseInt(el.dataset.ends)-nowS;
         el.textContent=fmtRemain(rem);
         el.style.color=rem<=0?'#6FBF52':'var(--brass)';
+        const card=el.closest('.timer-card');
+        if(rem<=0){
+          if(card) card.classList.add('timer-done');
+          const id=el.dataset.id;
+          if(id && !notifiedDoneIds.has(id)){
+            notifiedDoneIds.add(id);
+            if(window.albionSound) window.albionSound.timerDone();
+            if('Notification' in window && Notification.permission==='granted'){
+              try{ new Notification('Weed sázení dorostlo', { body: 'Kytka je hotová a čeká na sklizeň.', icon:'/logo.png' }); }catch(e){}
+            }
+          }
+        }
       });
       document.querySelectorAll('.cd-bar').forEach(el=>{
         const start=parseInt(el.dataset.start),ends=parseInt(el.dataset.ends);

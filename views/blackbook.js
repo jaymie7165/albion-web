@@ -49,6 +49,9 @@ function renderBlackbook(req) {
     const pesos=n=>'₱'+Math.round(n||0).toLocaleString('cs-CZ');
     const esc=s=>(s==null?'':String(s)).replace(/</g,'&lt;');
 
+    // Skeleton loading — vypadá o dost svižněji než holý text "Generuji reporty…"
+    document.getElementById('bb-loading').innerHTML = skeletonRows(6,[1,3]);
+
     function bbTab(sec){
       document.querySelectorAll('.report-nav-item').forEach(b=>b.classList.toggle('active',b.dataset.sec===sec));
       document.querySelectorAll('.report-section').forEach(s=>s.classList.toggle('active',s.id==='bb-'+sec));
@@ -153,6 +156,20 @@ function renderBlackbook(req) {
       document.getElementById('bb-finance').innerHTML=h;
     }
 
+    // ── KDO JE PRÁVĚ ONLINE — odvozeno z aktivních SSE spojení ──────────────
+    async function renderOnlineWidget(){
+      try{
+        const res=await fetch('/api/online-members',{cache:'no-store'});
+        const d=await res.json();
+        if(!d.ok)return '';
+        if(!d.count) return '<div class="folio-label">Kdo je právě online</div><div style="height:1rem"></div>'+ledgerEmptyHTML('Nikdo aktuálně nemá otevřenou appku',true);
+        return '<div class="folio-label">Kdo je právě online ('+d.count+')</div><div style="height:1rem"></div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:0.5rem">'+d.members.map(m=>
+            '<span style="font-family:var(--font-mono);font-size:0.74rem;padding:0.3rem 0.7rem;background:rgba(58,125,45,0.1);border:1px solid rgba(58,125,45,0.35);color:#8FE070"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#6FBF52;margin-right:0.4rem;vertical-align:1px"></span>'+esc(m)+'</span>'
+          ).join('')+'</div>';
+      }catch(e){ return ''; }
+    }
+
     function renderAktivita(){
       const a=D.aktivita;
       let h='<div class="report-figures">'+
@@ -160,6 +177,8 @@ function renderBlackbook(req) {
         '<div class="report-figure"><div class="report-figure-label">Neaktivní (7+ dní)</div><div class="report-figure-net" style="color:var(--oxblood-bright)">'+a.inactiveCount+'</div></div>'+
         '<div class="report-figure"><div class="report-figure-label">Aktivní</div><div class="report-figure-net" style="color:#6FBF52">'+(a.total-a.inactiveCount)+'</div></div>'+
         '<div class="report-figure"></div></div>';
+      h+='<div id="bb-online-widget"><div class="ledger-loading">Zjišťuji, kdo je online…</div></div>';
+      h+='<div class="folio-rule tight"></div>';
       h+='<div class="folio-label">Členové dle aktivity</div><div style="height:1rem"></div>';
       h+=tbl([{t:'Člen'},{t:'Poslední aktivita'},{t:'Zdroj'},{t:'Web login'},{t:'Stav',r:true},{t:'Pohyby',r:true},{t:'Vklady/Výběry',r:true},{t:'Vklad SAD',r:true}],
         a.members.map(m=>[
@@ -173,6 +192,7 @@ function renderBlackbook(req) {
           money(m.ucetVkladUsd)
         ]));
       document.getElementById('bb-aktivita').innerHTML=h;
+      renderOnlineWidget().then(html=>{ const w=document.getElementById('bb-online-widget'); if(w) w.innerHTML=html; });
     }
 
     function renderSklad(){
@@ -245,12 +265,12 @@ function renderBlackbook(req) {
       document.getElementById('bb-bezpecnost').innerHTML=h;
     }
 
-    // ══════════ VII. CONTINENTAL LEDGER (#16) ══════════
+    // ══════════ VII. CONTINENTAL LEDGER ══════════
     const CAN_MANAGE_CONT = ${canManageCont};
     let contEntries = [], contLoaded = false;
 
     function contEntryHtml(e){
-      const isUs = e.smer === 'dluzime'; // true = my dlužíme (oxblood pečeť), false = dluží nám (mosazná pečeť)
+      const isUs = e.smer === 'dluzime';
       const sym = e.valuta === 'USD' ? '$' : '₱';
       const overdue = !e.settled && isContOverdue(e.splatnost);
       return '<div class="cont-entry'+(e.settled?' settled':'')+'">'+
@@ -267,9 +287,6 @@ function renderBlackbook(req) {
       '</div>';
     }
 
-    // Rozpoznává běžné české formáty splatnosti ("do 15.7.", "15. 7. 2026",
-    // "15.7.2026") a porovná s dneškem — bez toho by pole "splatnost" bylo
-    // jen text, který systém nikdy nezkontroluje.
     function isContOverdue(splatnost){
       if(!splatnost) return false;
       const s = splatnost.toString().replace(/^do\s+/i,'').trim();
@@ -284,10 +301,23 @@ function renderBlackbook(req) {
       return false;
     }
 
+    // Souhrn nahoře — dřív bylo vidět jen "seznam karet", teď hned na první
+    // pohled "kolik nám celkem dluží / kolik my dlužíme" (nevyrovnané položky).
+    function contSummaryHtml(owedToUs, owedByUs){
+      const sumBy = (arr, valuta) => arr.filter(e => !e.settled && e.valuta === valuta).reduce((s,e) => s + (e.hodnota||0), 0);
+      return '<div class="report-figures" style="margin-bottom:1.6rem">'+
+        '<div class="report-figure"><div class="report-figure-label">Dluží nám (SAD)</div><div class="report-figure-net" style="color:#6FBF52">'+money(sumBy(owedToUs,'USD'))+'</div></div>'+
+        '<div class="report-figure"><div class="report-figure-label">Dlužíme my (SAD)</div><div class="report-figure-net" style="color:var(--oxblood-bright)">'+money(sumBy(owedByUs,'USD'))+'</div></div>'+
+        '<div class="report-figure"><div class="report-figure-label">Dluží nám (Pesos)</div><div class="report-figure-net" style="color:#6FBF52">'+pesos(sumBy(owedToUs,'PESOS'))+'</div></div>'+
+        '<div class="report-figure"><div class="report-figure-label">Dlužíme my (Pesos)</div><div class="report-figure-net" style="color:var(--oxblood-bright)">'+pesos(sumBy(owedByUs,'PESOS'))+'</div></div>'+
+      '</div>';
+    }
+
     function renderContinental(){
       const owedToUs = contEntries.filter(e => e.smer === 'dluzi_nam');
       const owedByUs  = contEntries.filter(e => e.smer === 'dluzime');
       let h = '<div class="folio-footnote"><strong>Continental rejstřík.</strong> Sem se zapisují dluhy stylem starého řádu — komu, co, kolik a od kdy. Jakmile je vyrovnáno, záznam dostane pečeť a zůstává v knize jako uzavřená služba.</div>';
+      h += contSummaryHtml(owedToUs, owedByUs);
       h += '<div class="card" style="margin-bottom:1.6rem;overflow:visible">'+
         '<div class="card-header"><span class="card-title">Nový zápis do knihy</span></div>'+
         '<div class="seal-stamp" id="contCreateSeal"><span>A</span></div>'+
@@ -338,7 +368,7 @@ function renderBlackbook(req) {
         if(seal) seal.classList.add('slam');
         if(window.albionSealThud) window.albionSealThud();
         showToast('Zapsáno do Continental knihy');
-        setTimeout(loadContinental, 900); // ať pečeť doběhne, než se formulář znovu vykreslí
+        setTimeout(loadContinental, 900);
       }
       else showToast(d.error, true);
     }

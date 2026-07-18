@@ -14,12 +14,16 @@ function renderAuth(page, error, data) {
     password_mismatch: 'Hesla se neshodují.',
     password_short: 'Heslo musí mít alespoň 6 znaků.',
     exists: 'Účet již existuje.',
+    dm_failed: 'Nové heslo se nepodařilo doručit přes Discord DM — zkontroluj, že máš na serveru povolené DM od ostatních členů, a zkus to znovu, nebo kontaktuj vedení.',
   };
   const errMsg = error && errors[error]
     ? `<div class="auth-alert">${errors[error]}</div>`
     : '';
   const successReg = page === 'login'
-    ? `<script>if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Registrace proběhla úspěšně. Přihlaš se.';document.querySelector('.auth-body').prepend(a);}<\/script>`
+    ? `<script>
+        if(location.search.includes('success=registered')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Registrace proběhla úspěšně. Přihlaš se.';document.querySelector('.auth-body').prepend(a);}
+        if(location.search.includes('success=password_reset')){const a=document.createElement('div');a.className='auth-alert auth-success';a.textContent='Nové heslo bylo odesláno do tvého Discordu (DM). Přihlaš se jím a v Profilu si ho co nejdřív změň.';document.querySelector('.auth-body').prepend(a);}
+      <\/script>`
     : '';
 
   const style = `
@@ -61,7 +65,6 @@ function renderAuth(page, error, data) {
       }
       @keyframes authIn{from{opacity:0}to{opacity:1}}
 
-      /* Heraldický ambient */
       body::before{
         content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
         background:
@@ -73,7 +76,6 @@ function renderAuth(page, error, data) {
         box-shadow:inset 0 0 20vw rgba(0,0,0,0.70);
       }
 
-      /* ── LAYOUT — symetrický dvoudílný ── */
       .auth-page{
         position:relative;z-index:1;
         min-height:100vh;
@@ -82,7 +84,6 @@ function renderAuth(page, error, data) {
         align-items:center;
       }
 
-      /* ── LEVÁ ČÁST — heraldický erb + motto ── */
       .auth-herald{
         display:flex;flex-direction:column;align-items:flex-end;justify-content:center;
         padding:3rem 5vw;text-align:right;
@@ -103,12 +104,6 @@ function renderAuth(page, error, data) {
         0%,100%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}
         50%{filter:drop-shadow(0 0 40px var(--oxblood-glow))}
       }
-      .herald-crest.slam svg{animation:crestSlam 0.5s ease-out 1}
-      @keyframes crestSlam{
-        0%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}
-        30%{filter:drop-shadow(0 0 80px rgba(163,48,73,0.9))}
-        100%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}
-      }
       .herald-motto{
         font-family:var(--font-display);font-style:italic;font-weight:500;
         font-size:1.1rem;color:var(--ivory-dim);max-width:340px;line-height:1.65;
@@ -116,14 +111,12 @@ function renderAuth(page, error, data) {
       }
       .herald-motto strong{color:var(--oxblood-bright);font-style:normal;font-weight:700}
 
-      /* Vertikální dělicí čára */
       .auth-divider-line{
         width:1px;height:65vh;
         background:linear-gradient(180deg,transparent,var(--oxblood) 20%,var(--brass) 50%,var(--oxblood) 80%,transparent);
         opacity:0.6;justify-self:center;
       }
 
-      /* ── PRAVÁ ČÁST — formulář ── */
       .auth-body{
         padding:3rem 5vw;width:100%;max-width:460px;
       }
@@ -139,7 +132,6 @@ function renderAuth(page, error, data) {
       .auth-h1 .b-brass{color:var(--brass-bright)}
       .auth-subcopy{font-size:0.86rem;color:var(--ivory-faint);line-height:1.8;margin-bottom:2.2rem;max-width:360px}
 
-      /* Upozornění */
       .auth-alert{
         padding:0.85rem 1rem;
         background:rgba(110,20,35,0.10);
@@ -150,7 +142,6 @@ function renderAuth(page, error, data) {
       }
       .auth-success{background:rgba(58,125,45,0.08);border-color:rgba(58,125,45,0.28);border-left-color:#6FBF52;color:#7DC568}
 
-      /* Hlavní akční tlačítko */
       .auth-btn{
         display:block;width:100%;padding:1rem 1.5rem;
         background:transparent;
@@ -169,7 +160,6 @@ function renderAuth(page, error, data) {
       }
       .auth-btn.secondary:hover{color:var(--ivory);border-color:var(--brass);background:var(--brass-faint);box-shadow:none}
 
-      /* Sweep animace na tlačítku */
       .auth-btn::after{
         content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;
         background:linear-gradient(90deg,transparent,rgba(255,255,255,0.07),transparent);
@@ -177,7 +167,10 @@ function renderAuth(page, error, data) {
       }
       @keyframes btnSweep{0%,55%{left:-100%}100%{left:200%}}
 
-      /* Inputy */
+      .auth-link-row{text-align:center;margin-top:1rem}
+      .auth-link-row a{font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint);text-decoration:underline;text-underline-offset:3px}
+      .auth-link-row a:hover{color:var(--brass-bright)}
+
       .auth-input{
         display:block;width:100%;
         padding:0.85rem 1rem;
@@ -190,14 +183,12 @@ function renderAuth(page, error, data) {
       .auth-input:focus{border-color:var(--brass);box-shadow:0 0 0 2px var(--brass-faint)}
       .auth-label{font-family:var(--font-label);display:block;font-size:0.56rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem;font-weight:500}
 
-      /* Oddělovač */
       .auth-sep-line{
         display:flex;align-items:center;gap:1rem;margin:1.4rem 0;
         font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--ivory-faint);
       }
       .auth-sep-line::before,.auth-sep-line::after{content:'';flex:1;height:1px;background:var(--border)}
 
-      /* Status pečeť */
       .auth-seal-status{
         display:inline-flex;align-items:center;gap:0.6rem;margin-bottom:2rem;
         padding:0.45rem 0.9rem;
@@ -207,7 +198,6 @@ function renderAuth(page, error, data) {
       .auth-seal-dot{width:5px;height:5px;background:var(--oxblood);flex-shrink:0;animation:sealDotPulse 2s ease-in-out infinite}
       @keyframes sealDotPulse{0%,100%{opacity:0.5}50%{opacity:1;box-shadow:0 0 6px var(--oxblood-glow)}}
 
-      /* Discord uživatel */
       .auth-discord-chip{
         display:inline-flex;align-items:center;gap:0.7rem;
         padding:0.6rem 0.9rem;
@@ -217,7 +207,6 @@ function renderAuth(page, error, data) {
       }
       .auth-discord-chip span{color:var(--brass);font-size:0.56em;letter-spacing:0.16em;text-transform:uppercase}
 
-      /* ── BOOT SCREEN — otevření pečetěného rejstříku ── */
       .boot-screen{
         position:fixed;inset:0;z-index:999;background:var(--noir);
         display:flex;align-items:center;justify-content:center;
@@ -252,7 +241,6 @@ function renderAuth(page, error, data) {
       .boot-progress-fill{height:100%;background:linear-gradient(90deg,var(--oxblood),var(--brass));transition:width 0.2s linear;width:0}
       .boot-skip{position:absolute;bottom:24px;right:28px;font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ivory-faint);opacity:0.6}
 
-      /* ── CEREMONIE PŘIJETÍ — pečeť s vyraženým IC jménem po registraci ── */
       .reg-ceremony{
         position:fixed;inset:0;z-index:998;background:rgba(0,0,0,0.88);
         display:flex;align-items:center;justify-content:center;
@@ -277,7 +265,6 @@ function renderAuth(page, error, data) {
       .reg-ceremony-name{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.6rem;color:var(--ivory)}
       .reg-ceremony-sub{font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--brass);margin-top:0.6rem}
 
-      /* Responsivita */
       @media(max-width:900px){
         .auth-page{grid-template-columns:1fr;display:flex;flex-direction:column;padding:3rem 0 2.5rem}
         .auth-herald{align-items:center;text-align:center;padding:1.5rem 6vw 0.5rem}
@@ -288,7 +275,6 @@ function renderAuth(page, error, data) {
     </style>
   `;
 
-  // Heraldický SVG erb — shodný s logem webu
   const crestSvg = `<img src="/logo.png" alt="Caledonia" style="width:100%;height:100%;object-fit:contain;display:block;filter:drop-shadow(0 0 20px rgba(110,20,35,0.5))">`;
 
   const bootScreen = `
@@ -368,6 +354,7 @@ function renderAuth(page, error, data) {
         <a href="/auth/discord?action=login" class="auth-btn">Přihlásit se přes Discord</a>
         <div class="auth-sep-line">nebo</div>
         <a href="/register" class="auth-btn secondary">Registrovat se</a>
+        <div class="auth-link-row"><a href="/auth/discord?action=forgot">Zapomenuté heslo?</a></div>
       </div>
     </div>
     ${successReg}
@@ -470,6 +457,7 @@ function renderAuth(page, error, data) {
           <input class="auth-input" type="password" name="password" placeholder="Tvoje heslo" required autofocus>
           <button type="submit" class="auth-btn" style="margin-top:1.2rem">Vstoupit do rejstříku</button>
         </form>
+        <div class="auth-link-row"><a href="/auth/discord?action=forgot">Zapomenuté heslo?</a></div>
       </div>
     </div>
   </body></html>`;

@@ -179,8 +179,15 @@ function renderAlbion(req, data) {
     .a-focus-panel.open{transform:scale(1);opacity:1;pointer-events:all}
     .a-focus-bar{display:flex;align-items:center;justify-content:space-between;padding:0.7rem 1rem;border-bottom:1px solid rgba(182,138,78,0.25);background:#0d1210}
     .a-focus-title{font-family:'Cinzel',serif;font-size:0.75rem;letter-spacing:0.1em;color:#E0BD7F}
+    .a-focus-actions{display:flex;align-items:center;gap:0.5rem}
+    .a-focus-open{background:none;border:1px solid rgba(182,138,78,.4);color:#EDE6D4;height:28px;padding:0 0.7rem;cursor:pointer;font-size:.62rem;
+      font-family:'Cinzel',serif;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;display:inline-flex;align-items:center}
+    .a-focus-open:hover{background:rgba(182,138,78,.2);border-color:#E0BD7F}
     .a-focus-close{background:none;border:1px solid rgba(182,138,78,.4);color:#EDE6D4;width:28px;height:28px;cursor:pointer;font-size:.8rem}
     .a-focus-close:hover{background:rgba(200,90,70,.2);border-color:#E08F7F}
+    .a-focus-fallback{padding:2rem;font-family:'Space Mono',monospace;font-size:0.78rem;color:#B7AE99;text-align:center;display:none}
+    .a-focus-fallback.show{display:block}
+    .a-focus-fallback a{color:#E0BD7F}
     .a-focus-panel iframe{flex:1;border:none;width:100%;background:#0B0F0D}
     @media(max-width:900px){
       .a-menu{display:none}
@@ -276,7 +283,13 @@ function renderAlbion(req, data) {
   <div class="a-focus-panel" id="focusPanel">
     <div class="a-focus-bar">
       <span class="a-focus-title" id="focusTitle">Modul</span>
-      <button class="a-focus-close" onclick="closeFocus()">✕</button>
+      <div class="a-focus-actions">
+        <a class="a-focus-open" id="focusOpenNew" href="#" target="_top">Otevřít samostatně</a>
+        <button class="a-focus-close" onclick="closeFocus()">✕</button>
+      </div>
+    </div>
+    <div class="a-focus-fallback" id="focusFallback">
+      Stránka se nenačetla. <a href="#" id="focusFallbackLink" target="_top">Zkus ji otevřít samostatně</a>.
     </div>
     <iframe id="focusFrame" src="about:blank"></iframe>
   </div>
@@ -368,7 +381,6 @@ function renderAlbion(req, data) {
       }
     }
 
-    // ══════════════════════════ AUDIO — reálné stopy, jedna na vzhled, crossfade ══════════════════════════
     const AUDIO_BY_ENV = {
       day: '/albion/audio/den.mp3',
       fog: '/albion/audio/mlha.mp3',
@@ -437,18 +449,55 @@ function renderAlbion(req, data) {
       if (window.gsap) gsap.to(zw, { scale: 1, duration: 0.9, ease: 'power2.inOut' });
     }
 
+    // ── FOCUS PANEL — OPRAVA (viz oprávnění popsané v changelogu) ──────────
+    // Dřív closeFocus() nastavovala iframe.src = 'about:blank' teprve po
+    // 350ms zpoždění. Pokud se panel rychle zavřel a hned zase otevřel (což
+    // se v interaktivní kanceláři běžně stává), opožděný reset "about:blank"
+    // z PŘEDCHOZÍHO zavření dorazil AŽ PO otevření nové stránky a přepsal ji
+    // — panel tak vypadal jako "nefunkční" prázdný rám, ačkoliv cílová
+    // stránka (Kodex, Historie, Profil, Dashboard…) samotná byla v pořádku.
+    // Řešení: číslo timeru se hlídá a při novém otevření se vždy zruší.
+    let focusResetTimer = null;
+    let focusLoadTimer = null;
+
     function openFocus(href, title) {
+      clearTimeout(focusResetTimer);
+      clearTimeout(focusLoadTimer);
       document.getElementById('focusTitle').textContent = title;
-      document.getElementById('focusFrame').src = href;
+      document.getElementById('focusOpenNew').href = href;
+      document.getElementById('focusFallbackLink').href = href;
+      document.getElementById('focusFallback').classList.remove('show');
+      const frame = document.getElementById('focusFrame');
+      frame.style.display = 'block';
+      frame.src = 'about:blank';
+      // Krátké zpoždění zajistí skutečnou navigaci i když se otvírá znovu
+      // stejná adresa jako naposledy (jinak by prohlížeč navigaci na
+      // nezměněné src přeskočil).
+      requestAnimationFrame(() => { frame.src = href; });
       document.getElementById('focusOverlay').classList.add('open');
       document.getElementById('focusPanel').classList.add('open');
       duckAudio(true);
+      // Pokud se do pár vteřin nic nenačte (výpadek sítě apod.), nabídne se
+      // rovnou odkaz na otevření mimo iframe místo prázdné plochy.
+      focusLoadTimer = setTimeout(() => {
+        try {
+          const doc = frame.contentDocument;
+          if (!doc || !doc.body || doc.body.innerHTML.trim() === '') {
+            document.getElementById('focusFallback').classList.add('show');
+          }
+        } catch (e) { /* cross-origin apod. — necháváme být */ }
+      }, 6000);
     }
     window.openFocus = openFocus;
     function closeFocus() {
       document.getElementById('focusOverlay').classList.remove('open');
       document.getElementById('focusPanel').classList.remove('open');
-      setTimeout(() => { document.getElementById('focusFrame').src = 'about:blank'; }, 350);
+      clearTimeout(focusResetTimer);
+      clearTimeout(focusLoadTimer);
+      focusResetTimer = setTimeout(() => {
+        const frame = document.getElementById('focusFrame');
+        if (frame) frame.src = 'about:blank';
+      }, 350);
       navZoomReset();
       duckAudio(false);
     }
