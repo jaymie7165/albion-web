@@ -213,25 +213,35 @@ startPrewarm();
 
 async function getStockSummary(sheetName) {
   const rows = await getRows(sheetName);
-  if (!rows || rows.length < 2) return {};
+  if (!rows || rows.length < 1) return {};
   const summary = {};
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const typ  = (row[1] || '').toUpperCase();
+    // Přeskoč hlavičkový/popisný řádek — pozná se podle toho, že sloupec
+    // s typem pohybu není VKLAD ani VÝBĚR (na rozdíl od dřívějšího `i = 1`,
+    // který natvrdo předpokládal, že první řádek je vždy hlavička — u nově
+    // založeného listu bez hlavičky to tak ale reálná data zahazovalo).
+    if (typ !== 'VKLAD' && typ !== 'VÝBĚR') continue;
     const item = row[2] || '';
     const qty  = parseInt(row[3]) || 0;
     if (!item) continue;
     if (!summary[item]) summary[item] = 0;
     if (typ === 'VKLAD') summary[item] += qty;
-    else if (typ === 'VÝBĚR') summary[item] -= qty;
+    else summary[item] -= qty;
   }
   return summary;
 }
 
 async function getRecentRows(sheetName, count = 10) {
   const rows = await getRows(sheetName);
-  if (!rows || rows.length < 2) return [];
-  return rows.slice(1).slice(-count).reverse();
+  if (!rows || rows.length < 1) return [];
+  // Hlavičku poznáme podle prvního sloupce, který u datových řádků vždy
+  // obsahuje datum (např. "24. 7. 2026 17:12:25"); jinak žádný řádek
+  // neodřezávat, ať se nově vytvořenému listu bez hlavičky neztratí data.
+  const isHeader = rows.length > 0 && !/^\d{1,2}\.\s*\d{1,2}\.\s*\d{4}/.test(rows[0][0] || '');
+  const data = isHeader ? rows.slice(1) : rows;
+  return data.slice(-count).reverse();
 }
 
 // Umí spočítat zůstatek KTERÉHOKOLIV účetního listu (defaultně hlavní
@@ -240,12 +250,20 @@ async function getRecentRows(sheetName, count = 10) {
 // dvě evidence jakkoliv míchaly (organizace vede dva oddělené bankovní účty).
 async function getAccountingSummary(sheetName = 'Účetnictví') {
   const rows = await getRows(sheetName);
-  if (!rows || rows.length < 2) return { usd: 0, pesos: 0 };
+  if (!rows || rows.length < 1) return { usd: 0, pesos: 0 };
   let usd = 0, pesos = 0;
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const typ    = (row[1] || '').toUpperCase();
-    const castka = parseFloat((row[2] || '0').replace(',', '.')) || 0;
+    const typ = (row[1] || '').toUpperCase();
+    // Přeskoč hlavičkový řádek — pozná se podle toho, že typ pohybu není
+    // PŘÍJEM ani VÝDAJ (dřív se natvrdo přeskakoval vždy první řádek,
+    // což u nově založeného listu bez hlavičky smazalo jediný datový
+    // řádek a zůstatek vyšel 0 i po zaplacení).
+    if (typ !== 'PŘÍJEM' && typ !== 'VÝDAJ') continue;
+    // Sheets občas vrací naformátovanou hodnotu s mezerou jako oddělovačem
+    // tisíců (např. "40 000") — tu je potřeba před parseFloat odstranit.
+    const castkaRaw = (row[2] ?? '0').toString().replace(/\s/g, '').replace(',', '.');
+    const castka = parseFloat(castkaRaw) || 0;
     const valuta = (row[3] || '').toUpperCase();
     const sign = typ === 'PŘÍJEM' ? 1 : -1;
     if (valuta === 'USD')   usd   += sign * castka;

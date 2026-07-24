@@ -2519,7 +2519,14 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
     const events = [];
 
     const addRows = (rows, sekce, icon) => {
-      for (let i = 1; i < rows.length; i++) {
+      // Stejný problém jako v sheets.js: dřív se natvrdo přeskakoval první
+      // řádek jako hlavička (`i = 1`), takže nově založený list (např.
+      // "Reserve Fond" bez ruční hlavičky) přišel v Auditu o svůj jediný
+      // datový řádek. Přeskočíme jen řádek, který OPRAVDU vypadá jako
+      // hlavička — tedy sloupec s typem pohybu není žádná z platných hodnot.
+      const VALID_TYPY = new Set(['VKLAD', 'VÝBĚR', 'PŘÍJEM', 'VÝDAJ']);
+      const startIdx = rows.length > 0 && !VALID_TYPY.has((rows[0][1] || '').toString().toUpperCase()) ? 1 : 0;
+      for (let i = startIdx; i < rows.length; i++) {
         const r = rows[i];
         const hasContent = r && r.some(cell => cell && cell.toString().trim() !== '');
         if (!hasContent) continue;
