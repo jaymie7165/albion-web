@@ -1,4 +1,20 @@
-// nav.js — Albion v3 · Heraldická navigace
+// nav.js — Albion v4 · "Executive Noir" navigace
+//
+// Nová struktura (redesign 2026): nahoře jediný čistý pruh se 6 sekcemi
+// (Dashboard · Evidence · Finance · Organizace · Analytika · Nastavení),
+// vlevo se po kliku/na aktivní stránce otevře kontextový sidebar s podstránkami
+// dané sekce, vpravo obsah — stejný vzor jako Linear/Notion/Stripe Dashboard.
+//
+// DŮLEŽITÉ: renderNav(req, active) má STEJNÝ podpis jako dřív a `active`
+// hodnoty, které mu předávají jednotlivé view soubory (server.js/views/*.js),
+// se vůbec nemění — tento soubor si jen sám odvodí, do které sekce daná
+// stránka patří. Žádný jiný soubor v projektu se tedy nemusí upravovat.
+//
+// Všechny globální JS funkce a id, na které se odkazují jiné view soubory
+// (window.showToast, ledgerEmptyHTML, skeletonRows, albionSealThud,
+// albionPaper, albionSound, window.evtSource, bumpUnread/clearUnread,
+// openGlobalSearch, openShortcutsHelp, setTheme, setViewAs…) zůstávají
+// beze změny — mění se jen markup a vzhled navigace kolem nich.
 
 const { canAccess } = require('./roles');
 const { escapeHtml } = require('./utils');
@@ -7,100 +23,101 @@ function renderNav(req, active) {
   const ic = req.session.icName;
   const accessLevel = req.session.accessLevel || 3;
   const can = (pageId) => canAccess(accessLevel, pageId);
-  const skladPages = ['sklad','weed-sazeni'];
-  const majetekPages = ['garaz','nemovitosti'];
-  const blackbookPages = ['blackbook','profit-centrum'];
-  const infoPages  = ['nastenska','kodex','lore','hierarchy','leaderboard','galerie','spis','mentoring'];
-  const dataPages  = ['audit','statistiky'];
+  const isAssociate = !!req.session.isAssociate;
+
+  // ── SEKCE (top bar) + jejich podstránky (kontextový sidebar) ────────────
+  const GROUPS = [
+    {
+      id: 'dashboard', label: 'Dashboard', href: '/home',
+      pages: ['home'], links: [],
+    },
+    {
+      id: 'evidence', label: 'Evidence',
+      pages: ['sklad', 'weed-sazeni', 'garaz', 'nemovitosti', 'bazar'],
+      links: [
+        can('sklad-view') && { page: 'sklad', label: can('sklad') ? 'Sklad' : 'Sklad', sub: can('sklad') ? 'Zbraně · Weed · Drogy' : 'Reserve Fund · Ceník', href: '/sklad' },
+        { page: 'weed-sazeni', label: 'Weed sázení', sub: 'Odpočty růstu', href: '/weed-sazeni' },
+        { page: 'garaz', label: 'Garáž', sub: 'Vozový park', href: '/garaz' },
+        can('nemovitosti') && { page: 'nemovitosti', label: 'Nemovitosti', sub: 'Lokace organizace', href: '/nemovitosti' },
+        can('bazar') && { page: 'bazar', label: 'Bazar', sub: 'Vnitřní tržiště', href: '/bazar' },
+      ].filter(Boolean),
+    },
+    {
+      id: 'finance', label: 'Finance',
+      pages: ['blackbook', 'profit-centrum'],
+      links: [
+        can('blackbook') && { page: 'blackbook', label: 'Blackbook', sub: 'Reporty & analýzy', href: '/blackbook' },
+        can('profit-centrum') && { page: 'profit-centrum', label: 'Profit centrum', sub: 'Ziskovost', href: '/profit-centrum' },
+      ].filter(Boolean),
+    },
+    {
+      id: 'organizace', label: 'Organizace',
+      pages: ['nastenska', 'spis', 'mentoring', 'kodex', 'lore', 'hierarchy', 'galerie'],
+      links: [
+        can('nastenska') && { page: 'nastenska', label: 'Nástěnka', sub: 'Oznámení', href: '/nastenska' },
+        can('spis') && { page: 'spis', label: 'Osobní spisy', sub: 'Důvěrné', href: '/spis' },
+        { page: 'mentoring', label: 'Mentorský program', sub: 'Rozvoj členů', href: '/mentoring' },
+        { page: 'kodex', label: 'Kodex', sub: 'Pravidla organizace', href: '/kodex' },
+        { page: 'lore', label: 'Historie', sub: 'Kronika', href: '/lore' },
+        { page: 'hierarchy', label: 'Hierarchie', sub: 'Struktura & vztahy', href: '/hierarchy' },
+        !isAssociate && { page: 'galerie', label: 'Galerie', sub: 'Fotokronika', href: '/galerie' },
+      ].filter(Boolean),
+    },
+    {
+      id: 'analytika', label: 'Analytika',
+      pages: ['audit', 'statistiky', 'leaderboard'],
+      links: [
+        can('audit') && { page: 'audit', label: 'Audit', sub: 'Historie akcí', href: '/audit' },
+        can('statistiky') && { page: 'statistiky', label: 'Statistiky', sub: 'Přehled členů', href: '/statistiky' },
+        { page: 'leaderboard', label: 'Aktivita', sub: 'Žebříček členů', href: '/leaderboard' },
+      ].filter(Boolean),
+    },
+    {
+      id: 'nastaveni', label: 'Nastavení', href: '/profil',
+      pages: [''], links: [],
+    },
+  ].filter(g => g.href || g.links.length); // skupina bez odkazů (např. Finance pro Member) se v topbaru vůbec nezobrazí
+
+  // Do které skupiny patří aktuální stránka
+  let activeGroup = GROUPS.find(g => g.pages.includes(active));
+  const activeHref = (g) => g.href || (g.links[0] && g.links[0].href) || '#';
+
+  const topbarGroupsHtml = GROUPS.map(g => `<a href="${activeHref(g)}" class="topbar-group${g === activeGroup ? ' active' : ''}">${g.label}</a>`).join('');
+
+  const sidebarLinksHtml = (activeGroup && activeGroup.links.length)
+    ? activeGroup.links.map(l => `
+        <a href="${l.href}" class="sb-link${l.page === active ? ' active' : ''}">
+          <span class="sb-name">${l.label}</span>
+          <span class="sb-sub">${l.sub}</span>
+        </a>`).join('')
+    : '';
+
+  const mobileDrawerHtml = GROUPS.map(g => `
+    <div class="md-group-label">${g.label}</div>
+    ${g.links.length
+      ? g.links.map(l => `<a href="${l.href}" class="${l.page === active ? 'active' : ''}">${l.label}</a>`).join('')
+      : `<a href="${g.href}" class="${(g.pages||[]).includes(active) ? 'active' : ''}">${g.label}</a>`}
+  `).join('');
 
   return `
-    <nav>
-      <a href="/home" class="nav-logo">
-        <img src="/logo.png" class="nav-logo-img" alt="Caledonia">
-        <span class="nav-logo-text"><span class="b-red">C</span>ALEDONIA</span>
-      </a>
-      <a href="/albion" title="Vstoupit do CALEDONIA" style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--border-brass);color:var(--brass);flex-shrink:0;margin-left:0.6rem;text-decoration:none;transition:border-color .2s,color .2s" onmouseover="this.style.borderColor='var(--brass-bright)';this.style.color='var(--brass-bright)'" onmouseout="this.style.borderColor='var(--border-brass)';this.style.color='var(--brass)'">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
-      </a>
-      <button class="nav-burger" id="navBurger" aria-label="Menu">
-        <span></span><span></span><span></span>
-      </button>
-      <ul class="nav-menu" id="navMenu">
-        <li><a href="/home" class="${active==='home'?'active':''}">Přehled<span class="nav-desc">Rejstřík</span></a></li>
-        <li class="nav-dropdown ${majetekPages.includes(active)?'open':''}">
-          <a href="/garaz" class="nav-drop-trigger ${majetekPages.includes(active)?'active':''}">
-            Majetek
-            <span class="nav-desc">Garáž · Nemovitosti</span>
-            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
-          </a>
-          <div class="nav-dropdown-menu">
-            <a href="/garaz" class="${active==='garaz'?'active':''}">Garáž</a>
-            <a href="/nemovitosti" class="${active==='nemovitosti'?'active':''}">Nemovitosti</a>
-          </div>
-        </li>
-        <li><a href="/bazar" class="${active==='bazar'?'active':''}">Bazar<span class="nav-desc">Vnitřní tržiště</span></a></li>
+    <nav class="app-topbar">
+      <div class="topbar-left">
+        <a href="/home" class="nav-logo">
+          <img src="/logo.png" class="nav-logo-img" alt="Caledonia">
+          <span class="nav-logo-text"><span class="b-red">C</span>ALEDONIA</span>
+        </a>
+        <a href="/albion" class="topbar-portal" title="Vstoupit do CALEDONIA">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+        </a>
+        <button class="nav-burger" id="navBurger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
 
-        ${can('sklad-view') ? `
-        <li class="nav-dropdown ${skladPages.includes(active)?'open':''}">
-          <a href="/sklad" class="nav-drop-trigger ${skladPages.includes(active)?'active':''}">
-            Sklad
-            <span class="nav-desc">${can('sklad') ? 'Zbraně · Weed · Drogy' : 'Reserve Fund · Ceník'}</span>
-            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
-          </a>
-          <div class="nav-dropdown-menu">
-            <a href="/sklad" class="${active==='sklad'?'active':''}">${can('sklad') ? 'Správa skladu' : 'Reserve Fund'}</a>
-            <a href="/weed-sazeni" class="${active==='weed-sazeni'?'active':''}">Weed sázení</a>
-          </div>
-        </li>` : `
-        <li><a href="/weed-sazeni" class="${active==='weed-sazeni'?'active':''}">Weed sázení<span class="nav-desc">Odpočty růstu</span></a></li>`}
+      <div class="topbar-groups" id="topbarGroups">${topbarGroupsHtml}</div>
 
-        ${blackbookPages.some(can) ? `
-        <li class="nav-dropdown ${blackbookPages.includes(active)?'open':''}">
-          <a href="/blackbook" class="nav-drop-trigger ${blackbookPages.includes(active)?'active':''}">
-            Blackbook
-            <span class="nav-desc">Reporty &amp; analýzy</span>
-            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
-          </a>
-          <div class="nav-dropdown-menu">
-            ${can('blackbook') ? `<a href="/blackbook" class="${active==='blackbook'?'active':''}">Blackbook</a>` : ''}
-            ${can('profit-centrum') ? `<a href="/profit-centrum" class="${active==='profit-centrum'?'active':''}">Profit centrum</a>` : ''}
-          </div>
-        </li>` : ''}
-
-        ${dataPages.some(can) ? `
-        <li class="nav-dropdown ${dataPages.includes(active)?'open':''}">
-          <a href="/audit" class="nav-drop-trigger ${dataPages.includes(active)?'active':''}">
-            Záznamy
-            <span class="nav-desc">Audit · Statistiky</span>
-            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
-          </a>
-          <div class="nav-dropdown-menu">
-            ${can('audit') ? `<a href="/audit" class="${active==='audit'?'active':''}">Audit</a>` : ''}
-            ${can('statistiky') ? `<a href="/statistiky" class="${active==='statistiky'?'active':''}">Statistiky</a>` : ''}
-          </div>
-        </li>` : ''}
-
-        <li class="nav-dropdown ${infoPages.includes(active)?'open':''}">
-          <button type="button" class="nav-drop-trigger ${infoPages.includes(active)?'active':''}" aria-haspopup="true" aria-expanded="${infoPages.includes(active)?'true':'false'}">
-            Organizace
-            <span class="nav-desc">Nástěnka · Kodex · Lore</span>
-            <svg class="nav-drop-arrow" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1 1 5 5 9 1"/></svg>
-          </button>
-          <div class="nav-dropdown-menu">
-            ${can('nastenska') ? `<a href="/nastenska" class="${active==='nastenska'?'active':''}">Nástěnka</a>` : ''}
-            ${can('spis') ? `<a href="/spis" class="${active==='spis'?'active':''}">Osobní spisy</a>` : ''}
-            <a href="/mentoring" class="${active==='mentoring'?'active':''}">Mentorský program</a>
-            <a href="/kodex" class="${active==='kodex'?'active':''}">Kodex</a>
-            <a href="/lore" class="${active==='lore'?'active':''}">Historie</a>
-            <a href="/hierarchy" class="${active==='hierarchy'?'active':''}">Hierarchie</a>
-            <a href="/leaderboard" class="${active==='leaderboard'?'active':''}">Aktivita</a>
-            ${!req.session.isAssociate ? `<a href="/galerie" class="${active==='galerie'?'active':''}">Galerie</a>` : ''}
-          </div>
-        </li>
-      </ul>
-
-      <div class="nav-right" id="navRight">
-        <button class="notif-bell" id="globalSearchBtn" title="Hledat (klávesa /)" onclick="openGlobalSearch()" style="margin-right:0.2rem">
+      <div class="topbar-right" id="navRight">
+        <button class="notif-bell" id="globalSearchBtn" title="Hledat (klávesa /)" onclick="openGlobalSearch()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </button>
         <div class="evelyn-widget" id="evelynWidget" title="Evelyn Ashcroft — Sekretariát Caledonie">
@@ -140,34 +157,46 @@ function renderNav(req, active) {
         </button>
         ${req.session.realAccessLevel === 1 ? `
         <div class="view-as-switcher" style="position:relative">
-          <button class="nav-shortcut-hint" id="viewAsBtn" style="cursor:pointer;${req.session.viewAsLevel?'border-color:var(--oxblood-bright);color:var(--oxblood-bright)':''}" title="View As — simulace role">
-            ${req.session.viewAsLevel ? 'Náhled: '+({1:'Founder/Council',2:'Senior Member',3:'Member'}[req.session.viewAsLevel]) : 'View As'}
+          <button class="nav-shortcut-hint" id="viewAsBtn" style="cursor:pointer;${req.session.viewAsLevel ? 'border-color:var(--oxblood-bright);color:var(--oxblood-bright)' : ''}" title="View As — simulace role">
+            ${req.session.viewAsLevel ? 'Náhled: ' + ({ 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member' }[req.session.viewAsLevel]) : 'View As'}
           </button>
-          <div id="viewAsMenu" class="nav-dropdown-menu" style="position:absolute;top:120%;right:0;left:auto;transform:none;opacity:0;pointer-events:none">
-            <a href="#" onclick="setViewAs(null);return false">Vlastní role (Founder/Council)</a>
-            <a href="#" onclick="setViewAs(2);return false">Náhled: Senior Member</a>
-            <a href="#" onclick="setViewAs(3);return false">Náhled: Member / Associate</a>
+          <div id="viewAsMenu" class="app-sidebar" style="position:absolute;top:120%;right:0;left:auto;bottom:auto;width:220px;padding:0.6rem;opacity:0;pointer-events:none;transition:opacity .15s;box-shadow:var(--shadow)">
+            <a href="#" class="sb-link" onclick="setViewAs(null);return false"><span class="sb-name">Vlastní role</span><span class="sb-sub">Founder/Council</span></a>
+            <a href="#" class="sb-link" onclick="setViewAs(2);return false"><span class="sb-name">Náhled</span><span class="sb-sub">Senior Member</span></a>
+            <a href="#" class="sb-link" onclick="setViewAs(3);return false"><span class="sb-name">Náhled</span><span class="sb-sub">Member / Associate</span></a>
           </div>
         </div>` : ''}
-        <div class="sound-switcher" style="position:relative;margin-left:0.4rem">
+        <div class="sound-switcher" style="position:relative">
           <button class="theme-dot-btn" id="soundToggle" style="border-radius:0;width:18px;height:18px;background:none;border:1px solid var(--border-brass);color:var(--brass);font-size:0.65rem;display:flex;align-items:center;justify-content:center" title="Zvuky">♪</button>
         </div>
         <div class="theme-switcher" title="Přepnout téma">
           <span class="theme-switcher-label">Téma</span>
-          <button class="theme-dot-btn" id="td-dark"  aria-label="Tmavý noir" style="background:#0B0F0D;border:1.5px solid #B68A4E" onclick="setTheme('dark')"  title="Heraldický noir"></button>
-          <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#F3EEE3;border:1.5px solid #6E1423" onclick="setTheme('light')" title="Pergamen"></button>
-          <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#F3EEE3,#0B0F0D,#F3EEE3);border:1.5px solid #B68A4E" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
+          <button class="theme-dot-btn" id="td-dark"  aria-label="Tmavý noir" style="background:#0A0A0D;border:1.5px solid #C9A227" onclick="setTheme('dark')"  title="Executive Noir"></button>
+          <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#F4F1EA;border:1.5px solid #8E2436" onclick="setTheme('light')" title="Pergamen"></button>
+          <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#F4F1EA,#0A0A0D,#F4F1EA);border:1.5px solid #C9A227" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
         </div>
         <button class="nav-shortcut-hint" id="shortcutsHelpBtn" title="Zobrazit všechny klávesové zkratky (?)" onclick="openShortcutsHelp()" style="cursor:pointer">g·_ · ?</button>
-        <span class="nav-user" style="border-left:2px solid ${({1:'var(--oxblood-bright)',2:'var(--brass-bright)',3:'var(--ivory-faint)'})[accessLevel]||'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${escapeHtml(ic)}</strong></span>
+        <span class="nav-user" style="border-left:2px solid ${({ 1: 'var(--oxblood-bright)', 2: 'var(--brass-bright)', 3: 'var(--ivory-faint)' })[accessLevel] || 'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${escapeHtml(ic)}</strong></span>
         <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
       </div>
     </nav>
     <div class="nav-overlay" id="navOverlay"></div>
+
     ${req.session.viewAsLevel ? `<div style="background:var(--oxblood-faint);border-bottom:1px solid var(--border-oxblood);padding:0.5rem 2rem;text-align:center;font-family:var(--font-mono);font-size:0.72rem;color:var(--oxblood-bright)">
-      Náhled jako role: ${({1:'Founder/Council',2:'Senior Member',3:'Member/Associate'})[req.session.viewAsLevel]} — <a href="#" onclick="setViewAs(null);return false" style="color:var(--oxblood-bright);text-decoration:underline">ukončit náhled</a>
+      Náhled jako role: ${({ 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member/Associate' })[req.session.viewAsLevel]} — <a href="#" onclick="setViewAs(null);return false" style="color:var(--oxblood-bright);text-decoration:underline">ukončit náhled</a>
     </div>` : ''}
+
+    ${sidebarLinksHtml ? `
+    <div class="app-sidebar" id="appSidebar">
+      <div class="sb-eyebrow">${activeGroup.label}</div>
+      ${sidebarLinksHtml}
+    </div>` : ''}
+
+    <div class="mobile-drawer" id="mobileDrawer">
+      ${mobileDrawerHtml}
+      <div class="md-utility" id="mobileUtility"></div>
+    </div>
 
     <!-- Globální vyhledávání napříč webem (klávesa "/", pokud stránka nemá vlastní audit-search pole) -->
     <div class="modal-overlay" id="globalSearchModal">
@@ -189,53 +218,50 @@ function renderNav(req, active) {
     </div>
 
     <script>
-      // ── MOBILE NAV ──
-      const navBurger = document.getElementById('navBurger');
-      const navMenu   = document.getElementById('navMenu');
-      const navOverlay= document.getElementById('navOverlay');
-      const navRight  = document.getElementById('navRight');
-      const navEl     = document.querySelector('nav');
+      // ── MOBILNÍ MENU ──
+      const navBurger  = document.getElementById('navBurger');
+      const navOverlay = document.getElementById('navOverlay');
+      const mobileDrawer = document.getElementById('mobileDrawer');
+      const navRightEl = document.getElementById('navRight');
+      const mobileUtility = document.getElementById('mobileUtility');
       let navRightInMenu = false;
 
       function placeNavRight() {
-        const mobile = window.innerWidth <= 880;
-        if (mobile && !navRightInMenu) { navMenu.appendChild(navRight); navRightInMenu = true; }
-        else if (!mobile && navRightInMenu) { navEl.appendChild(navRight); navRightInMenu = false; }
+        const mobile = window.innerWidth <= 900;
+        if (mobile && !navRightInMenu) { mobileUtility.appendChild(navRightEl); navRightInMenu = true; }
+        else if (!mobile && navRightInMenu) { document.querySelector('.app-topbar').appendChild(navRightEl); navRightInMenu = false; }
       }
       placeNavRight();
 
       function closeMobileNav() {
         navBurger.classList.remove('open');
-        navMenu.classList.remove('mobile-open');
+        mobileDrawer.classList.remove('mobile-open');
         document.body.classList.remove('nav-locked');
       }
       navBurger.addEventListener('click', () => {
-        const willOpen = !navMenu.classList.contains('mobile-open');
+        const willOpen = !mobileDrawer.classList.contains('mobile-open');
         navBurger.classList.toggle('open', willOpen);
-        navMenu.classList.toggle('mobile-open', willOpen);
+        mobileDrawer.classList.toggle('mobile-open', willOpen);
         document.body.classList.toggle('nav-locked', willOpen);
-        if (!willOpen) document.querySelectorAll('.nav-dropdown').forEach(dd => dd.classList.remove('open'));
       });
       navOverlay.addEventListener('click', closeMobileNav);
-      window.addEventListener('resize', () => { placeNavRight(); if (window.innerWidth > 880) closeMobileNav(); });
+      window.addEventListener('resize', () => { placeNavRight(); if (window.innerWidth > 900) closeMobileNav(); });
+      mobileDrawer.querySelectorAll('a[href]:not([href="#"])').forEach(a => a.addEventListener('click', closeMobileNav));
 
-      document.querySelectorAll('.nav-dropdown').forEach(dd => {
-        const trigger = dd.querySelector('.nav-drop-trigger');
-        let closeTimer = null;
-        function syncExpanded(){ if (trigger.hasAttribute('aria-haspopup')) trigger.setAttribute('aria-expanded', dd.classList.contains('open') ? 'true' : 'false'); }
-        trigger.addEventListener('click', (e) => {
-          const href = trigger.getAttribute('href');
-          if (href && href !== '#') {
-            if (window.innerWidth <= 880) { e.preventDefault(); dd.classList.toggle('open'); syncExpanded(); return; }
-            return;
-          }
-          e.preventDefault(); dd.classList.toggle('open'); syncExpanded();
+      // ── VIEW AS dropdown open/close (jednoduchý hover/click) ──
+      (function(){
+        const btn = document.getElementById('viewAsBtn');
+        if (!btn) return;
+        const menu = document.getElementById('viewAsMenu');
+        btn.addEventListener('click', () => {
+          const open = menu.style.opacity === '1';
+          menu.style.opacity = open ? '0' : '1';
+          menu.style.pointerEvents = open ? 'none' : 'all';
         });
-        dd.addEventListener('mouseenter', () => { if (window.innerWidth <= 880) return; clearTimeout(closeTimer); dd.classList.add('open'); syncExpanded(); });
-        dd.addEventListener('mouseleave', () => { if (window.innerWidth <= 880) return; clearTimeout(closeTimer); closeTimer = setTimeout(() => { dd.classList.remove('open'); syncExpanded(); }, 300); });
-      });
-      document.addEventListener('click', (e) => { if (!e.target.closest('.nav-dropdown')) document.querySelectorAll('.nav-dropdown').forEach(dd => { dd.classList.remove('open'); const t=dd.querySelector('.nav-drop-trigger'); if(t&&t.hasAttribute('aria-haspopup'))t.setAttribute('aria-expanded','false'); }); });
-      navMenu.querySelectorAll('a[href]:not([href="#"])').forEach(a => a.addEventListener('click', closeMobileNav));
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.view-as-switcher')) { menu.style.opacity = '0'; menu.style.pointerEvents = 'none'; }
+        });
+      })();
 
       // ── NÁLADA — reálná denní doba, nezávislá na zvoleném tématu ──
       const MOODS = ['mood-sunrise','mood-day','mood-sunset','mood-night'];
@@ -301,9 +327,6 @@ function renderNav(req, active) {
         const d = JSON.parse(e.data);
         if (d.action === 'add' && d.timer) showToast('Weed sázení · ' + d.timer.icName + ' (' + d.timer.postal + ')');
       });
-      // Bazar a mentoring dřív do zvonku vůbec nepadaly — člověk se o nový
-      // zájem nebo nový mentorský checkpoint dozvěděl, jen když si sám
-      // otevřel tu konkrétní stránku.
       evtSource.addEventListener('bazarUpdate', (e) => {
         const d = JSON.parse(e.data);
         if (d.action === 'add') { bumpBellBadge(); showToast('Bazar · nová nabídka'); }
@@ -390,7 +413,7 @@ function renderNav(req, active) {
             ctx.drawImage(img, 0, 0, size, size);
             if (unread > 0) {
               ctx.beginPath();
-              ctx.fillStyle = '#A33049';
+              ctx.fillStyle = '#C23A50';
               ctx.arc(size-14, 14, 14, 0, 2*Math.PI);
               ctx.fill();
               ctx.fillStyle = '#fff';
@@ -521,24 +544,12 @@ function renderNav(req, active) {
         }, { once: true });
       })();
 
-      // ── VIEW AS ──
-      (function viewAsInit(){
-        const viewAsBtn=document.getElementById('viewAsBtn');
-        if(viewAsBtn){
-          const menu=document.getElementById('viewAsMenu');
-          viewAsBtn.addEventListener('click',()=>{
-            const open=menu.style.opacity==='1';
-            menu.style.opacity=open?'0':'1';
-            menu.style.pointerEvents=open?'none':'all';
-          });
-        }
-        window.setViewAs=async function(level){
-          const res=await fetch('/api/view-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level})});
-          const d=await res.json();
-          if(d.ok)location.reload();
-          else if(window.showToast)showToast(d.error,true);
-        };
-      })();
+      window.setViewAs=async function(level){
+        const res=await fetch('/api/view-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level})});
+        const d=await res.json();
+        if(d.ok)location.reload();
+        else if(window.showToast)showToast(d.error,true);
+      };
 
       // ── SEZÓNNÍ VZHLED ──
       function applySeasonalBadge(season){
@@ -573,10 +584,6 @@ function renderNav(req, active) {
         const PAGE_ID = CURRENT_PAGE;
         let shown=false, autoCloseTimer=null, briefCache=null;
 
-        // "Dnes už nezobrazovat" — dřív se dopis vysouval automaticky na
-        // KAŽDÉ stránce, což po chvíli začalo otravovat. Teď si člověk může
-        // pro zbytek dne (do půlnoci) vypnout jen to AUTOMATICKÉ vysunutí —
-        // ručně otevřít kliknutím na Evelynin portrét jde pořád.
         const SNOOZE_KEY = 'albion_evelyn_snooze_until';
         function isSnoozedToday(){
           try{
@@ -648,7 +655,6 @@ function renderNav(req, active) {
           if(shown&&!e.target.closest('.evelyn-widget')&&!e.target.closest('.evelyn-letter'))closeLetter();
         });
 
-        // Automatické vysunutí — přeskočí se, pokud si to člověk pro dnešek vypnul.
         setTimeout(()=>{
           if(isSnoozedToday())return;
           fetchBrief().then(()=>{ openLetter(11000); });
@@ -702,7 +708,7 @@ function renderNav(req, active) {
       window.openShortcutsHelp=function(){
         const list=document.getElementById('shortcutsList');
         const rows=[
-          ['g h','Přehled (Dashboard)'],
+          ['g h','Dashboard'],
           ${can('sklad-view') ? "['g s','Sklad']," : ''}
           ${can('blackbook') ? "['g b','Blackbook']," : ''}
           ${can('profit-centrum') ? "['g p','Profit centrum']," : ''}
@@ -740,7 +746,7 @@ function renderNav(req, active) {
 
       // ── KLÁVESOVÉ ZKRATKY ──
       (function(){
-        const ROUTES = { h:'/home'${can('sklad-view')?", s:'/sklad'":''}${can('blackbook')?", b:'/blackbook'":''}${can('profit-centrum')?", p:'/profit-centrum'":''}${can('audit')?", a:'/audit'":''}${can('statistiky')?", t:'/statistiky'":''}${can('nastenska')?", n:'/nastenska'":''}, k:'/kodex', l:'/lore', o:'/hierarchy', w:'/weed-sazeni' };
+        const ROUTES = { h:'/home'${can('sklad-view') ? ", s:'/sklad'" : ''}${can('blackbook') ? ", b:'/blackbook'" : ''}${can('profit-centrum') ? ", p:'/profit-centrum'" : ''}${can('audit') ? ", a:'/audit'" : ''}${can('statistiky') ? ", t:'/statistiky'" : ''}${can('nastenska') ? ", n:'/nastenska'" : ''}, k:'/kodex', l:'/lore', o:'/hierarchy', w:'/weed-sazeni' };
         let awaitingSecond = false, chordTimer = null;
         function isTyping(el) { if(!el) return false; const tag=el.tagName; return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||el.isContentEditable; }
         document.addEventListener('keydown', (e) => {

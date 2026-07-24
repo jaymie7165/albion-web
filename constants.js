@@ -47,4 +47,25 @@ WEED_PLANT.revenuePerPlant = WEED_PLANT.bagsPerPlant * WEED_PLANT.bagPrice;     
 WEED_PLANT.profitPerPlant  = WEED_PLANT.revenuePerPlant - WEED_PLANT.costPerPlant;        // 145
 WEED_PLANT.growMs          = WEED_PLANT.growHours * 60 * 60 * 1000;
 
-module.exports = { CONFIG, WEED_PLANT, GRAMU_NA_SACEK, pocetSacku };
+// ── VÝROBA — Metamfetamin (Recept 1 vaření) ───────────────────────────────
+// Server-side zrcadlo receptu z views/sklad.js (panel "Výroba"), potřebné pro
+// /api/vyroba/potvrdit — server nikdy nedůvěřuje množstvím poslaným z klienta,
+// vždy si sám ověří aktuální stav skladu chemikálií a sám dopočítá odečet.
+// rawPerBatch = suroviny reálně odebírané ze skladu na 1 várku (meziprodukty
+// vzniklé uvnitř vaření se nepočítají, protože se okamžitě spotřebují v
+// dalším kroku a nejsou to skladové položky).
+const METH_RECIPE = {
+  dávkyPerBatch: 5,
+  yieldPerBatch: 150,
+  outputItem: 'Metamfetamin',
+  rawPerBatch: {
+    'Bismut': 70,
+    'Toluen': 70,
+    'Aceton': 70,
+    'Kerosen': 35,
+    'Potravinářský kofein': 50,
+    'Pekáč': 5,
+  },
+};
+
+module.exports = { CONFIG, WEED_PLANT, METH_RECIPE, GRAMU_NA_SACEK, pocetSacku };

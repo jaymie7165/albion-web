@@ -53,21 +53,12 @@ async function sendPasswordResetDM(discordId, icName, tempPassword) {
 
 // ══════════════════════════════════════════════════════════════════════
 // OSOBNOST EVELYN ASHCROFT — sdílená filozofie s Discord botem
-// (viz utils/helpers.js a utils/registry.js v repu bota). Bot posílá
-// embedy jen na základě webhooků, ale VĚTŠINA reálného provozu (sklad,
-// účetnictví, garáž...) jde přímo odsud, z webu — a Evelyn má znít stejně
-// živě, ať zápis přijde odkudkoliv. Vizuál embedů (barvy/tituly/fields)
-// se neměnil, přibyla jen osobnostní vrstva (description + author).
 // ══════════════════════════════════════════════════════════════════════
 
 const EVELYN_AUTHOR = { name: '✦  Evelyn Ashcroft  ·  Sekretariát Caledonie' };
 
-// ── Pečeť Albionu (thumbnail) — stejný princip jako v botovi (helpers.js) ──
-// Dokud nemáte hostovaný obrázek erbu, zůstává vypnuté. Nastavte na
-// Railway ALBION_SEAL_URL a projeví se to automaticky ve všech embedech.
 const ALBION_SEAL_URL = process.env.ALBION_SEAL_URL || null;
 
-// ── Sezónní období — stejná logika jako bot ────────────────────────────
 function sezonniObdobi() {
   const dnes = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Prague' });
   const [, mesicStr, denStr] = dnes.split('-');
@@ -102,8 +93,6 @@ function nahodna(pole) {
   return pole[Math.floor(Math.random() * pole.length)];
 }
 
-// Rotující banky frází — jedna kategorie akce = víc možných formulací,
-// aby Evelyn nepůsobila jako robot opakující stále stejnou hlášku.
 const FRAZE = {
   vklad: [
     'zaznamenávám nový přírůstek do registru.',
@@ -160,6 +149,10 @@ const FRAZE = {
     'na vaši žádost jsem poslední zápis vzala zpět a smazala z knihy.',
     'poslední zápis byl na vaše přání zrušen a odstraněn z registru.',
   ],
+  vyroba: [
+    'zaznamenávám dokončenou várku ve výrobě a odečet surovin ze skladu.',
+    'výroba proběhla — suroviny jsem odečetla a hotový produkt zapsala do skladu.',
+  ],
 };
 
 const FRAZE_VYSOKA_HODNOST = {
@@ -190,9 +183,6 @@ function uvod(uzivatel, klic, accessLevel) {
   return `${pozdrav()}${jmeno}. ${fraze}`;
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// NÍZKÉ ZÁSOBY — hlídání prahů + upozornění do příslušné roomky
-// ══════════════════════════════════════════════════════════════════════
 const PRAH_NIZKE_ZASOBY = {
   zbrane: 5,
   weed:   20,
@@ -207,10 +197,10 @@ const KANAL_PODLE_SEKCE = {
   chemky: () => process.env.CHANNEL_CHEMKY,
 };
 
-const POSLEDNI_UPOZORNENI = new Map(); // klíč: "sekce:polozka" → timestamp (ms)
+const POSLEDNI_UPOZORNENI = new Map();
 const COOLDOWN_MS = 30 * 60 * 1000;
 
-const HISTORIE_ZASOB = new Map(); // "sekce:polozka" → [{ t, v }, ...]
+const HISTORIE_ZASOB = new Map();
 const HISTORIE_OKNO_MS = 7 * 24 * 60 * 60 * 1000;
 
 function zaznamenejHistorii(sekce, polozka, aktualniStav) {
@@ -427,7 +417,10 @@ async function notifyAudit(akce, uzivatel, discordUsername, detail) {
   const isZruseno = detailUpper.startsWith('ZRUŠENO');
   const color = isZruseno ? 0x99AAB5 : isVklad ? 0x57F287 : isVyber ? 0xED4245 : 0x5865F2;
 
-  const ikonySekcí = { 'Zbraně': '🔫', 'Weed': '🌿', 'Drogy': '💊', 'Chemky': '⚗️', 'Účetnictví': '💰' };
+  // Reserve Fond (samostatný účet, viz sheets.getAccountingSummary('Reserve Fond'))
+  // má vlastní ikonu, ať je v Auditu na první pohled jasně odlišený od hlavního
+  // účtu 'Účetnictví' a nepůsobí to jako duplicitní/pomíchaný záznam.
+  const ikonySekcí = { 'Zbraně': '🔫', 'Weed': '🌿', 'Drogy': '💊', 'Chemky': '⚗️', 'Účetnictví': '💰', 'Reserve Fond': '🏦' };
   const ikona = ikonySekcí[akce] || '📋';
 
   const now = new Date();
@@ -481,6 +474,25 @@ async function notifyBulkSklad(sekce, typ, items, uzivatel) {
     timestamp: new Date().toISOString(),
     author: EVELYN_AUTHOR,
     description: uvod(uzivatel, 'bulk'),
+  });
+}
+
+// Dokončená výrobní várka (odečet surovin + zápis hotového produktu) — jeden
+// souhrnný embed do kanálu chemikálií, ať to nezaplaví kanál desítkami zápisů.
+async function notifyVyroba(batches, spotrebovano, outputItem, vyrobenoQty, uzivatel, accessLevel) {
+  const channelId = process.env.CHANNEL_CHEMKY;
+  const seznam = Object.entries(spotrebovano).map(([item, qty]) => `• ${item} — ${qty} ks`).join('\n');
+  await sendEmbed(channelId, {
+    title: `⚗️ VÝROBA DOKONČENA (web) — ${batches}× várka`,
+    color: 0xC9A84C,
+    fields: [
+      { name: 'Vyrobil', value: uzivatel, inline: true },
+      { name: 'Výstup', value: `${outputItem} — ${vyrobenoQty} ks`, inline: true },
+      { name: 'Spotřebované suroviny', value: seznam || '—', inline: false },
+    ],
+    timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: uvod(uzivatel, 'vyroba', accessLevel),
   });
 }
 
@@ -708,9 +720,6 @@ async function notifyBazarProdano(item, kupec) {
   });
 }
 
-// Nový zájemce o bazarovou nabídku — dřív se prodávající dozvěděl jen tak, že
-// si sám otevřel stránku. Teď dostane DM přímo od Evelyn (pokud má povolené
-// DM od členů serveru — jinak se to jen tiše nepodaří, viz dmUser()).
 async function notifyBazarZajem(item, zajemce, nabidka, sellerDiscordId) {
   if (!sellerDiscordId) return false;
   const castka = nabidka != null ? `$${Number(nabidka).toLocaleString('cs-CZ')}` : '—';
@@ -721,6 +730,9 @@ async function notifyBazarZajem(item, zajemce, nabidka, sellerDiscordId) {
 }
 
 // ── RESERVE FUND — týdenní povinný odvod (splatnost neděle) ────────────────
+// Peníze z Reserve Fondu se od teď zapisují do SAMOSTATNÉHO účetního listu
+// 'Reserve Fond' (viz server.js), takže tahle notifikace je čistě informační
+// oznámení do Discordu — nezakládá se na tom výpočet hlavní pokladny.
 async function notifyReserveFundDluznici(weekKey, jmena) {
   const channelId = process.env.CHANNEL_UCETNICTVI || process.env.CHANNEL_AUDIT;
   if (!channelId || !jmena || !jmena.length) return;
@@ -744,7 +756,7 @@ async function notifyReserveFundZaplaceno(weekKey, uzivatel, discordUsername) {
     title: '🔏 RESERVE FUND PODEPSÁN',
     color: 0x57F287,
     author: EVELYN_AUTHOR,
-    description: `${pozdrav()}, ${uzivatel} právě uhradil/a a podepsal/a Reserve Fund za týden do ${weekKey}.`,
+    description: `${pozdrav()}, ${uzivatel} právě uhradil/a a podepsal/a Reserve Fund za týden do ${weekKey}. Částka byla připsána na samostatný účet Reserve Fondu.`,
     fields: [
       { name: '👤 Člen', value: discordUsername ? `${uzivatel} (@${discordUsername})` : uzivatel, inline: true },
     ],
@@ -780,7 +792,7 @@ async function getMemberRoles(discordId) {
 
 module.exports = {
   notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena,
-  notifyBulkSklad, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace,
+  notifyBulkSklad, notifyVyroba, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace,
   notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement,
   getAnnouncementMessages, isUserOnServer, getMemberRoles, notifyGalerie, notifyBazarNove,
   notifyBazarProdano, notifyBazarZajem, dmUser, sendPasswordResetDM,

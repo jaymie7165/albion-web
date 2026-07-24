@@ -157,7 +157,7 @@ async function getRows(sheetName, opts = {}) {
 
 // Pravidelně na pozadí obnoví cache nejpoužívanějších listů, ať i "studený"
 // request po delší nečinnosti serveru dostane data okamžitě z cache.
-const PREWARM_SHEETS = ['Zbraně', 'Weed', 'Drogy', 'Chemky', 'Účetnictví'];
+const PREWARM_SHEETS = ['Zbraně', 'Weed', 'Drogy', 'Chemky', 'Účetnictví', 'Reserve Fond'];
 function startPrewarm() {
   setInterval(() => {
     PREWARM_SHEETS.forEach(name => { getRows(name, { noCache: true }).catch(() => {}); });
@@ -188,8 +188,12 @@ async function getRecentRows(sheetName, count = 10) {
   return rows.slice(1).slice(-count).reverse();
 }
 
-async function getAccountingSummary() {
-  const rows = await getRows('Účetnictví');
+// Umí spočítat zůstatek KTERÉHOKOLIV účetního listu (defaultně hlavní
+// 'Účetnictví') — díky parametru sheetName jde stejnou funkcí spočítat i
+// zůstatek samostatného účtu Reserve Fund ('Reserve Fond'), aniž by se tyto
+// dvě evidence jakkoliv míchaly (organizace vede dva oddělené bankovní účty).
+async function getAccountingSummary(sheetName = 'Účetnictví') {
+  const rows = await getRows(sheetName);
   if (!rows || rows.length < 2) return { usd: 0, pesos: 0 };
   let usd = 0, pesos = 0;
   for (let i = 1; i < rows.length; i++) {

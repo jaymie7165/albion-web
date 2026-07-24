@@ -16,7 +16,7 @@ const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
 
-const { CONFIG, WEED_PLANT } = require('./constants');
+const { CONFIG, WEED_PLANT, METH_RECIPE } = require('./constants');
 const { makeStore } = require('./content-store');
 const { renderHome } = require('./views/home');
 const { renderDashboard } = require('./views/sklad');
@@ -375,8 +375,6 @@ app.post('/api/bazar/:id/zajem', requireAuth, (req, res) => {
   item.zajemci.push({ jmeno: req.session.icName, nabidka, at: Date.now() });
   saveBazar(list);
   broadcastSSE('bazarUpdate', { action: 'zajem' });
-  // Prodávající se dřív o novém zájemci dozvěděl jen tak, že si sám otevřel
-  // stránku — teď dostane rovnou Discord DM (pokud je má povolené).
   try {
     const seller = db.findByIcName(item.prodavajici);
     if (seller && seller.discord_id) {
@@ -626,12 +624,6 @@ const KATALOG_TO_CONFIG_KEY = { zbrane: 'zbrane', naboje: 'naboje', akce: 'akce'
 })();
 
 // ── NOVÉ / PŘEJMENOVANÉ CHEMIKÁLIE (views/sklad.js — panel Výroba a ceník) ──
-// Tyto položky nejsou součástí výchozího seznamu v constants.js ani
-// katalog.json — bez tohoto doplnění by je server u POST /api/chemky vždy
-// odmítl jako "Nepovolená chemikálie", i když je select na frontendu nabízí.
-// "Benzín" byl přejmenován na "Technický benzín" — starý název už nový kód
-// nepoužívá. Doplňujeme vše natvrdo při startu appky, ať zápis funguje
-// ihned po nasazení bez ručního zásahu přes "Spravovat položky".
 const VYROBA_EXTRA_CHEMKY = [
   'Kerosen', 'Pekáč', 'Potravinářský kofein', 'Technický benzín',
   'Genkadon', 'Amanita Genkia', 'Kapátka', 'Forma', 'Lithiová baterie', 'Semínko', 'Cukr', 'Nadrcené listy',
@@ -850,16 +842,11 @@ app.get('/api/events', requireAuth, (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
   res.write(`event: ping\ndata: ok\n\n`);
-  // Uloženo přímo na klientovi SSE spojení, ať jde snadno zjistit "kdo je
-  // právě online" (viz /api/online-members) bez potřeby další databáze.
   res.albionIcName = req.session.icName;
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
 });
 
-// Přehled aktuálně online členů — odvozeno z aktivních SSE spojení (živý
-// prohlížeč s otevřenou stránkou appky). Nejde o dokonalou evidenci
-// (více tabů = jedno jméno vícekrát ve spojeních, ale v setu se sloučí).
 app.get('/api/online-members', requireAuth, (req, res) => {
   const names = new Set();
   for (const client of sseClients) { if (client.albionIcName) names.add(client.albionIcName); }
@@ -922,8 +909,6 @@ app.get('/auth/callback', async (req, res) => {
       if (existing) return res.redirect('/login?error=already_registered');
       return res.redirect('/register/complete');
     } else if (action === 'forgot') {
-      // Zapomenuté heslo — appka nemá e-mail, tak nové dočasné heslo pošle
-      // rovnou přes Discord DM (stejný bot, který posílá i onboarding).
       const user = db.prepare('SELECT * FROM users WHERE discord_id = ?').get(discordUser.id);
       req.session.pendingDiscord = null;
       if (!user) return res.redirect('/register?error=not_registered');
@@ -963,9 +948,6 @@ app.get('/manifest.webmanifest', (req, res) => {
 
 app.get('/', requireAuth, (req, res) => res.redirect('/home'));
 
-// DŮLEŽITÉ: pokud je člen už přihlášený a omylem najede na /login nebo
-// /register (např. ze staré záložky nebo odkazu), appka ho dřív stejně
-// nutila znovu se přihlásit — teď ho rovnou pošle na /home.
 app.get('/login', (req, res) => {
   if (req.session && req.session.userId) return res.redirect('/home');
   res.send(renderAuth('login', req.query.error));
@@ -1185,9 +1167,6 @@ app.get('/api/admin/members', requireAuth, requireFounderCouncil, (req, res) => 
   res.json({ ok: true, members });
 });
 
-// Reset hesla jinému členovi — vygeneruje nové dočasné heslo a pošle mu ho
-// přes Discord DM, stejně jako "Zapomenuté heslo". Řeší situaci, kdy se
-// člen sám zamkne a nemá jinou cestu ven.
 app.post('/api/admin/reset-password/:userId', requireAuth, requireFounderCouncil, async (req, res) => {
   const targetId = parseInt(req.params.userId);
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(targetId);
@@ -1199,8 +1178,6 @@ app.post('/api/admin/reset-password/:userId', requireAuth, requireFounderCouncil
   res.json({ ok: true, sent });
 });
 
-// ── ADMIN — stav Discord kanálů (chybějící ENV proměnné byly dřív vidět jen
-// v server logu, ve webovém UI o tom vedení nemělo ponětí) ──────────────────
 app.get('/api/admin/discord-status', requireAuth, requireFounderCouncil, (req, res) => {
   const channels = {
     'Zbraně': process.env.CHANNEL_ZBRANE, 'Weed': process.env.CHANNEL_WEED, 'Drogy': process.env.CHANNEL_DROGY,
@@ -1330,7 +1307,7 @@ function renderProfil(req, user, aliases) {
 
   <script>
     let aliases = ${aliasesJson};
-    function escHtml(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function escHtml(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
     function renderAliases() {
       const list = document.getElementById('aliases-list');
@@ -1589,9 +1566,6 @@ const TYP_UCET  = ['PŘÍJEM', 'VÝDAJ'];
 const VALUTY    = ['USD', 'PESOS'];
 
 // ── "VRÁTIT POSLEDNÍ ZÁPIS ZPĚT" (undo) ─────────────────────────────────────
-// Ukládá se JEN poslední akce KAŽDÉHO člena (přepisuje se při dalším zápisu),
-// takže jde vrátit vždy jen úplně poslední věc, kterou dotyčný sám zapsal —
-// a jen do 10 minut od zápisu, ať se neguje starší historie omylem.
 const LAST_ACTION_FILE = path.join(DATA_DIR, 'last-actions.json');
 const UNDO_WINDOW_MS = 10 * 60 * 1000;
 function loadLastActions() { try { return JSON.parse(fs.readFileSync(LAST_ACTION_FILE, 'utf8')) || {}; } catch { return {}; } }
@@ -1753,6 +1727,75 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   res.json({ ok: true });
 });
 
+// ── API — VÝROBA (várky Metamfetaminu) ──────────────────────────────────────
+// Server nikdy nedůvěřuje počtu várek/surovin poslanému z klienta — vždy si
+// sám ověří AKTUÁLNÍ stav skladu chemikálií a sám dopočítá odečet i výstup,
+// stejně jako u ostatních skladových zápisů. Odečet surovin a přírůstek
+// hotového produktu (Metamfetamin) se zapíší v jednom požadavku, ať sklad
+// nikdy neskončí v mezistavu (suroviny pryč, produkt nikde).
+app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req, res) => {
+  const batches = parseInt(req.body.batches);
+  if (!Number.isInteger(batches) || batches < 1 || batches > 50) {
+    return res.json({ ok: false, error: 'Neplatný počet várek (1–50)' });
+  }
+
+  const stavChemky = await sheets.getStockSummary('Chemky').catch(() => ({}));
+  const chybi = [];
+  Object.entries(METH_RECIPE.rawPerBatch).forEach(([item, qtyPerBatch]) => {
+    const potreba = qtyPerBatch * batches;
+    const maSklad = stavChemky[item] || 0;
+    if (maSklad < potreba) chybi.push(`${item} (chybí ${potreba - maSklad} ks)`);
+  });
+  if (chybi.length) {
+    return res.json({ ok: false, error: `Na skladě nejsou potřebné suroviny: ${chybi.join(', ')}` });
+  }
+
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+
+  // Odečet surovin — jeden hromadný zápis (buď se zapíšou všechny řádky, nebo žádný)
+  const chemRows = Object.entries(METH_RECIPE.rawPerBatch).map(([item, qtyPerBatch]) =>
+    [cas, 'VÝBĚR', item, qtyPerBatch * batches, uzivatel]
+  );
+  try {
+    await sheets.appendRows('Chemky', chemRows);
+  } catch (e) {
+    console.error('[VYROBA]', e.message);
+    return res.json({ ok: false, error: 'Zápis do skladu chemikálií selhal, žádná surovina nebyla odečtena — zkus to znovu.' });
+  }
+
+  // Přírůstek hotového produktu
+  const vyrobenoQty = batches * METH_RECIPE.yieldPerBatch;
+  try {
+    await sheets.appendRow('Drogy', [cas, 'VKLAD', METH_RECIPE.outputItem, vyrobenoQty, '-', '-', uzivatel]);
+  } catch (e) {
+    console.error('[VYROBA]', e.message);
+    await discord.notifyAudit('Chemky', uzivatel, discordUser, `VÝBĚR (VÝROBA ×${batches}) — suroviny byly odečteny, ale zápis výstupu (${METH_RECIPE.outputItem}) selhal — dopiš ručně do tabulky Drogy!`).catch(() => {});
+    return res.json({ ok: false, error: 'Suroviny byly odečteny, ale zápis vyrobeného množství selhal — nahlas to vedení a dopiš ručně do tabulky Drogy.' });
+  }
+
+  const spotrebovano = {};
+  Object.entries(METH_RECIPE.rawPerBatch).forEach(([item, qtyPerBatch]) => { spotrebovano[item] = qtyPerBatch * batches; });
+  const shrnutiSurovin = Object.entries(spotrebovano).map(([item, q]) => `${item} (${q} ks)`).join(', ');
+
+  await discord.notifyAudit('Chemky', uzivatel, discordUser, `VÝBĚR (VÝROBA ×${batches} várek) — ${shrnutiSurovin}`);
+  await discord.notifyAudit('Drogy', uzivatel, discordUser, `VKLAD (VÝROBA) — ${METH_RECIPE.outputItem} (${vyrobenoQty} ks)`);
+  discord.notifyVyroba(batches, spotrebovano, METH_RECIPE.outputItem, vyrobenoQty, uzivatel, req.session.accessLevel).catch(() => {});
+
+  sheets.getStockSummary('Chemky').then(stav => {
+    Object.entries(spotrebovano).forEach(([item, qty]) => {
+      discord.checkNizkaZasoba('chemky', item, 'VÝBĚR', qty, stav[item], loadThresholds().chemky).catch(() => {});
+    });
+  }).catch(() => {});
+  checkStockMilestone('drogy', 'Drogy').catch(() => {});
+
+  broadcastSSE('skladUpdate', { sekce: 'vyroba', typ: 'VÝROBA', polozka: `${METH_RECIPE.outputItem} (×${batches} várek)`, qty: vyrobenoQty, uzivatel, cas });
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch (e) {}
+
+  res.json({ ok: true, batches, vyrobenoQty, outputItem: METH_RECIPE.outputItem, spotrebovano });
+});
+
 // ── API — SMĚNÁRNA ──
 app.post('/api/smena', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { smer, castka } = req.body;
@@ -1867,10 +1910,6 @@ app.get('/api/sklad/summary', requireAuth, async (req, res) => {
 });
 
 // ── API — CENÍK ──
-// GET je záměrně jen requireAuth (ne requireAccess('sklad')) — Ceník je na
-// stránce /sklad viditelný i pro Member/Associate (zúžený pohled má jako
-// jednu ze dvou dostupných záložek), takže by requireAccess('sklad') těmto
-// hodnostem vracelo 403 přesně tam, kde jim rozhraní ceník ukazuje.
 app.get('/api/cenik', requireAuth, (req, res) => {
   res.json({ ok: true, cenik: loadCenik() });
 });
@@ -1946,9 +1985,6 @@ app.delete('/api/sklad/katalog', requireAuth, requireAccess('sklad'), (req, res)
 });
 
 // ── API — NEJPOUŽÍVANĚJŠÍ POLOŽKY DANÉHO ČLENA (rychlé vyplnění formuláře) ──
-// Odvozeno ze stejných dat jako /api/stats — vrací TOP položky přihlášeného
-// člena v každé kategorii skladu, ať je vidí rovnou u formuláře a nemusí je
-// pokaždé znovu hledat v (dlouhém) select boxu.
 app.get('/api/sklad/moje-oblibene', requireAuth, requireAccess('sklad'), async (req, res) => {
   try {
     const [zbraneRows, weedRows, drogyRows, chemkyRows] = await Promise.all([
@@ -2022,8 +2058,6 @@ app.post('/api/weed-timers', requireAuth, (req, res) => {
   res.json({ ok: true, timer });
 });
 
-// Smazat odpočet smí jen ten, kdo ho založil, nebo vedení (Founder/Council)
-// — dřív to mohl smazat kdokoliv přihlášený, schválně nebo omylem.
 app.post('/api/weed-timers/remove', requireAuth, (req, res) => {
   const { id } = req.body;
   let timers = loadWeedTimers();
@@ -2461,12 +2495,13 @@ app.get('/api/stats', requireAuth, requireAccess('statistiky'), async (req, res)
 // ── API — AUDIT ──
 app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
   try {
-    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
+    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows, rezervaRows] = await Promise.all([
       sheets.getRows('Zbraně').catch(() => []),
       sheets.getRows('Weed').catch(() => []),
       sheets.getRows('Drogy').catch(() => []),
       sheets.getRows('Účetnictví').catch(() => []),
       sheets.getRows('Chemky').catch(() => []),
+      sheets.getRows('Reserve Fond').catch(() => []),
     ]);
 
     const allUsersAudit = db.prepare('SELECT * FROM users').all();
@@ -2514,7 +2549,7 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
           const qty = r[3] || '?';
           detail = `${r[2] || '?'} (${qty} ks)`;
           rawUzivatel = r[4] || '—';
-        } else if (sekce === 'Účetnictví') {
+        } else if (sekce === 'Účetnictví' || sekce === 'Reserve Fond') {
           const sym = (r[3]||'') === 'USD' ? 'SAD ' : '₱';
           detail = `${sym}${r[2] || '?'} | ${r[4] || '—'}`;
           rawUzivatel = r[5] || '—';
@@ -2551,7 +2586,11 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
     addRows(weedRows, 'Weed', '🌿');
     addRows(drogyRows, 'Drogy', '💊');
     addRows(chemkyRows, 'Chemky', '⚗️');
-    addRows(ucetRows, 'Účetnictví', '💱');
+    addRows(ucetRows, 'Účetnictví', '💰');
+    // Reserve Fond je od teď samostatný bankovní účet (viz /api/reserve-fund/pay)
+    // — v Auditu je vidět jako vlastní sekce, ale NEPOČÍTÁ se do souhrnu
+    // hlavního účtu (ucetSouhrn níže), aby se oba účty nijak nemíchaly.
+    addRows(rezervaRows, 'Reserve Fond', '🏦');
 
     const ucetSouhrn = {};
     for (let i = 1; i < ucetRows.length; i++) {
@@ -3430,8 +3469,6 @@ function gcOrphanedUploads() {
       if (!nemFiles.has(f)) { try { fs.unlinkSync(path.join(NEMOVITOSTI_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený nemovitosti upload:', f); } catch (e) {} }
     });
   } catch (e) {}
-  // Bazar dřív v GC chyběl úplně — smazaná nabídka nechávala fotku ležet na
-  // disku navždy. Stejný princip jako u ostatních kategorií výše.
   try {
     const bazarFiles = new Set(loadBazar().map(i => i.image && path.basename(i.image)).filter(Boolean));
     fs.readdirSync(BAZAR_UPLOADS_DIR).forEach(f => {
@@ -3443,8 +3480,12 @@ setInterval(gcOrphanedUploads, 6 * 60 * 60 * 1000);
 setTimeout(gcOrphanedUploads, 60 * 1000);
 
 // ── RESERVE FUND — konfigurovatelná výše odvodu ─────────────────────────────
-// Dřív bylo $5000 natvrdo v kódu — teď je to editovatelné z webu (stejně
-// jako prahy nízkých zásob), bez nutnosti zásahu do kódu a redeploye.
+// Peníze z Reserve Fondu se zapisují do SAMOSTATNÉHO účetního listu
+// 'Reserve Fond' (viz sheets.getAccountingSummary(sheetName)) — organizace
+// vede dva oddělené bankovní účty a Reserve Fund se do hlavní pokladny
+// ('Účetnictví', zobrazované na Dashboardu/Skladu/Blackbooku/Profit centru)
+// vůbec nezapočítává.
+const RESERVE_FUND_SHEET_NAME = 'Reserve Fond';
 const RESERVE_FUND_CONFIG_FILE = path.join(DATA_DIR, 'reserve-fund-config.json');
 const RESERVE_FUND_AMOUNT_DEFAULT = 5000;
 function loadReserveFundConfig() {
@@ -3497,7 +3538,7 @@ function loadReserveFund() {
 }
 function saveReserveFund(list) { try { writeJsonAtomic(RESERVE_FUND_FILE, list); } catch (e) { console.error('[RESERVE FUND]', e.message); } }
 
-app.get('/api/reserve-fund', requireAuth, (req, res) => {
+app.get('/api/reserve-fund', requireAuth, async (req, res) => {
   const weekKey = getReserveWeekKey();
   const list = loadReserveFund();
   const entriesThisWeek = list.filter(r => r.weekKey === weekKey);
@@ -3505,6 +3546,7 @@ app.get('/api/reserve-fund', requireAuth, (req, res) => {
   const allUsers = db.prepare('SELECT * FROM users').all();
   const members = allUsers.filter(u => u.ic_name && !u.is_associate).map(u => ({ icName: u.ic_name, paid: paidSet.has(u.ic_name) }))
     .sort((a, b) => Number(a.paid) - Number(b.paid) || a.icName.localeCompare(b.icName, 'cs'));
+  const ucetReserve = await sheets.getAccountingSummary(RESERVE_FUND_SHEET_NAME).catch(() => ({ usd: 0, pesos: 0 }));
   res.json({
     ok: true,
     weekKey,
@@ -3514,6 +3556,7 @@ app.get('/api/reserve-fund', requireAuth, (req, res) => {
     members,
     paidCount: members.filter(m => m.paid).length,
     totalCount: members.length,
+    ucetReserve,
   });
 });
 
@@ -3530,11 +3573,11 @@ app.post('/api/reserve-fund/pay', requireAuth, async (req, res) => {
   const amount = getReserveFundAmount();
   const poznamka = `Reserve Fund — týden do ${weekKey} — ${uzivatel}`;
 
-  await sheets.appendRow('Účetnictví', [cas, 'PŘÍJEM', amount, 'USD', poznamka, uzivatel]);
-  await discord.notifyUcet('PŘÍJEM', amount, 'USD', poznamka, uzivatel);
+  // Zapisuje se na SAMOSTATNÝ účet Reserve Fondu — ne do hlavního 'Účetnictví'
+  // — takže tahle částka nikdy nevstoupí do hlavní pokladny organizace.
+  await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, 'PŘÍJEM', amount, 'USD', poznamka, uzivatel]);
   await discord.notifyReserveFundZaplaceno(weekKey, uzivatel, discordUser).catch(() => {});
-  await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `PŘÍJEM — SAD ${amount} | ${poznamka}`);
-  checkPenizeMilestone().catch(() => {});
+  await discord.notifyAudit(RESERVE_FUND_SHEET_NAME, uzivatel, discordUser, `PŘÍJEM — SAD ${amount} | ${poznamka}`);
 
   const entry = {
     id: `rf_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
@@ -3543,7 +3586,6 @@ app.post('/api/reserve-fund/pay', requireAuth, async (req, res) => {
   };
   list.push(entry);
   saveReserveFund(list);
-  broadcastSSE('ucetUpdate', { typ: 'PŘÍJEM', castka: amount, valuta: 'USD', poznamka, uzivatel, cas });
   broadcastSSE('reserveFundUpdate', { weekKey, icName: uzivatel });
 
   res.json({ ok: true, entry });
