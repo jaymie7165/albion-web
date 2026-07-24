@@ -387,6 +387,10 @@ function renderDashboard(req, data) {
             <p style="font-family:var(--font-body);font-size:0.84rem;color:var(--ivory-dim);line-height:1.7;margin-bottom:1.2rem;max-width:640px">
               Každý člen musí do konce <strong style="color:var(--brass-bright)">neděle</strong> zaplatit a podepsat fixní odvod <strong style="color:var(--brass-bright)" id="rf-amount-text">$…</strong> do Reserve Fondu organizace. Kdo do pondělí nezaplatí, jde automaticky do upozornění v aplikaci.
             </p>
+            <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-bottom:1.2rem;padding:0.7rem 0.9rem;border:1px solid var(--border-brass);background:var(--brass-faint)">
+              <strong style="color:var(--brass)">Samostatný účet.</strong> Reserve Fund se eviduje na vlastním bankovním účtu organizace, odděleně od hlavního účetnictví výše — tyto peníze se do zůstatku SAD nahoře nezapočítávají.
+              &ensp;Aktuální zůstatek Reserve Fondu: <strong id="rf-account-balance" style="color:var(--brass-bright)">…</strong>
+            </div>
             ${canManage ? `
             <div style="display:flex;gap:0.5rem;align-items:flex-end;margin-bottom:1.2rem;max-width:340px">
               <div class="form-group" style="margin-bottom:0;flex:1"><label>Výše odvodu (SAD)</label><input type="number" id="rf-amount-input" min="1" max="100000"></div>
@@ -405,7 +409,7 @@ function renderDashboard(req, data) {
               <span class="panel-badge">Kurz 1:1 · účet organizace</span>
             </div>
             <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;margin-bottom:1.6rem;max-width:560px">
-              Převod mezi účtem SAD a Pesos uvnitř organizace. Směna je v kurzu <strong style="color:var(--brass-bright)">1:1</strong> — na jednom účtu se částka odečte, na druhém přičte. Zapisuje se jako výdaj + příjem do účetnictví.
+              Převod mezi účtem SAD a Pesos uvnitř organizace. Směna je v kurzu <strong style="color:var(--brass-bright)">1:1</strong> — na jednom účtu se částka odečte, na druhém přičte. Zapisuje se jako výdaj + příjem do hlavního účetnictví.
             </p>
 
             <div class="smena-rate-box">
@@ -499,7 +503,7 @@ function renderDashboard(req, data) {
               <span class="panel-badge">Recept 1 vaření</span>
             </div>
             <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
-              Postup vaření v šesti krocích. Kalkulačka dole počítá přímo z aktuálního stavu skladu chemikálií — kolik várek lze uvařit hned teď a co případně chybí nakoupit.
+              Postup vaření v šesti krocích. Kalkulačka dole počítá přímo z aktuálního stavu skladu chemikálií — kolik várek lze uvařit hned teď a co případně chybí nakoupit. Po potvrzení výroby se suroviny <strong style="color:var(--brass-bright)">rovnou odečtou ze skladu chemikálií</strong> a hotový Metamfetamin se <strong style="color:var(--brass-bright)">rovnou přičte do skladu drog</strong> — žádný ruční přepis.
             </p>
 
             <!-- Stat strip -->
@@ -547,6 +551,7 @@ function renderDashboard(req, data) {
                 </div>
                 <div id="vyroba-yield-box" style="margin-bottom:1rem"></div>
                 <div class="info-box" id="vyroba-status-box" style="display:block;margin-top:0"></div>
+                <button class="btn-submit" id="vyrobaConfirmBtn" onclick="submitVyroba()" style="margin-top:1rem">Potvrdit výrobu a odečíst suroviny</button>
               </div>
             </div>
           </div>
@@ -929,10 +934,6 @@ function renderDashboard(req, data) {
     refreshStaticSelects();
 
     // ── VÝROBA — recept na Metamfetamin ("Recept 1 vaření") ──
-    // 1 várka = 5 dávek → 150× Metamfetamin. Kroky se řetězí (výstup kroku N
-    // je vstup kroku N+1), takže spotřeba SUROVIN na 1 várku je fixní součet
-    // požadavků prvních kroků (meziprodukty typu "Směs na meth" nejsou skladové
-    // položky, spotřebovávají se okamžitě v dalším kroku).
     const METH_RECIPE = {
       dávkyPerBatch: 5,
       yieldPerBatch: 150,
@@ -944,22 +945,19 @@ function renderDashboard(req, data) {
         { label: 'Pekáč s methem', inputs: [{item:'Pekáč s Matečem',qty:5}], output: 'Pekáč s methem', outputQty: 5 },
         { label: 'Výroba', inputs: [{item:'Pekáč s methem',qty:5}], output: 'Metamfetamin', outputQty: 150 },
       ],
-      // Suroviny, které se reálně berou ze skladu (ne meziprodukty vzniklé v předchozím kroku)
+      outputItem: 'Metamfetamin',
       rawPerBatch: { 'Bismut':70, 'Toluen':70, 'Aceton':70, 'Kerosen':35, 'Potravinářský kofein':50, 'Pekáč':5 },
     };
     const VYROBA_STOCK = ${JSON.stringify(chemky || {})};
     function money(n){ return '$'+Math.round(n||0).toLocaleString('cs-CZ'); }
     function pesosF(n){ return '₱'+Math.round(n||0).toLocaleString('cs-CZ'); }
 
-    // Cena položky dle ceníku chemikálií (CHEMKY_CENY) — pokud položka nemá
-    // cenu zavedenou, počítá se jako 0 (nezkreslí to celkový součet).
     function vyrobaItemPrice(item){ return CHEMKY_CENY[item] || { cena: 0, mena: 'pesos' }; }
     function vyrobaItemCostText(item, qty){
       const p=vyrobaItemPrice(item);
       const total=p.cena*qty;
       return (p.mena==='sad'?money(total):pesosF(total));
     }
-    // Náklad na N várek, rozpočítaný podle měny (chemikálie se platí buď v pesos, nebo v SAD).
     function computeBatchCost(batches){
       let pesos=0, sad=0;
       Object.entries(METH_RECIPE.rawPerBatch).forEach(([item,qtyPerBatch])=>{
@@ -970,9 +968,6 @@ function renderDashboard(req, data) {
       return { pesos, sad };
     }
 
-    // Krok jako přehledná karta na časové ose: vstupní "chipy" → šipka →
-    // výstupní chip. Meziprodukty (výstup kroku, který je zároveň vstupem
-    // dalšího) jsou graficky odlišené od skutečných skladových surovin.
     const VYROBA_RAW_ITEMS = new Set(Object.keys(METH_RECIPE.rawPerBatch));
     function vyrobaChip(text, qty, isRaw, isFinalOutput){
       return '<span class="vyroba-chip'+(isRaw?' raw':'')+(isFinalOutput?' final':'')+'">'+qty+'× '+text+'</span>';
@@ -1015,9 +1010,7 @@ function renderDashboard(req, data) {
       }
     }
 
-    // Jedna sjednocená tabulka + kalkulačka — obojí se přepočítá společně
-    // podle počtu várek zadaných uživatelem, ať nejsou data duplicitně
-    // rozdrobená do víc samostatných seznamů.
+    let VYROBA_ALL_OK = false;
     function renderVyrobaCalc(){
       const batches=Math.max(1,parseInt(document.getElementById('vyroba-batches').value)||1);
 
@@ -1030,6 +1023,9 @@ function renderDashboard(req, data) {
         return {item,needed,have,missing,ok,pct};
       });
       const allOk=rows.every(r=>r.ok);
+      VYROBA_ALL_OK = allOk;
+      const confirmBtn=document.getElementById('vyrobaConfirmBtn');
+      if(confirmBtn) confirmBtn.disabled = !allOk;
 
       const body=document.getElementById('vyroba-materials-body');
       if(body){
@@ -1059,12 +1055,38 @@ function renderDashboard(req, data) {
         statusBox.style.background=allOk?'rgba(58,125,45,0.08)':'var(--oxblood-faint)';
         statusBox.style.color=allOk?'#8FE070':'var(--oxblood-bright)';
         statusBox.innerHTML=allOk
-          ? ('✓ Na skladě je dost surovin na '+batches+' '+(batches===1?'várku':batches<5?'várky':'várek')+' — lze uvařit hned.')
-          : '✕ Na sklad chybí suroviny uvedené v tabulce (sloupec „Stav“).';
+          ? ('✓ Na skladě je dost surovin na '+batches+' '+(batches===1?'várku':batches<5?'várky':'várek')+' — lze rovnou uvařit a odečíst ze skladu.')
+          : '✕ Na sklad chybí suroviny uvedené v tabulce (sloupec „Stav“) — výrobu nelze potvrdit.';
       }
     }
     document.getElementById('vyroba-batches') && document.getElementById('vyroba-batches').addEventListener('input',renderVyrobaCalc);
     renderVyrobaSteps();renderVyrobaStatMax();renderVyrobaCalc();
+
+    // Potvrzení výroby — server si sám znovu ověří aktuální sklad chemikálií,
+    // odečte suroviny a rovnou přičte hotový Metamfetamin do skladu drog.
+    async function submitVyroba(){
+      const batches=Math.max(1,parseInt(document.getElementById('vyroba-batches').value)||1);
+      if(!VYROBA_ALL_OK) return showToast('Na skladě nejsou potřebné suroviny na tolik várek', true);
+      const cost=computeBatchCost(batches);
+      showModal(
+        'Potvrdit výrobu',
+        'Suroviny se okamžitě odečtou ze skladu chemikálií a hotový produkt se přičte do skladu drog.',
+        [
+          ['Počet várek', batches],
+          ['Výtěžnost', (batches*METH_RECIPE.yieldPerBatch)+'× Metamfetamin'],
+          ['Náklad', pesosF(cost.pesos)+' + '+money(cost.sad)],
+          ...Object.entries(METH_RECIPE.rawPerBatch).map(([item,qty])=>['Odečte se — '+item, (qty*batches)+' ks']),
+        ],
+        async()=>{
+          const r=await post('/api/vyroba/potvrdit',{batches});
+          if(r.ok){
+            showToast('Výroba potvrzena — '+r.vyrobenoQty+'× '+r.outputItem+' přičteno do skladu');
+            refreshSkladData();
+          } else showToast(r.error,true);
+        }
+      );
+    }
+    window.submitVyroba = submitVyroba;
 
     function updateZbraneItems(){
       const kat=document.getElementById('zbrane-kat').value;
@@ -1239,7 +1261,7 @@ function renderDashboard(req, data) {
       const sym=valuta==='USD'?'$':'₱';
       showModal(
         typ==='PŘÍJEM'?'Zaznamenat příjem':'Zaznamenat výdaj',
-        'Tato transakce bude zapsána do účetnictví organizace.',
+        'Tato transakce bude zapsána do hlavního účetnictví organizace.',
         [['Typ',typ],['Částka',sym+castka],['Valuta',valuta],['Poznámka',poznamka]],
         async()=>{
           const r=await post('/api/ucet',{typ,castka,valuta,poznamka});
@@ -1262,6 +1284,8 @@ function renderDashboard(req, data) {
         const amtText=document.getElementById('rf-amount-text'); if(amtText) amtText.textContent='$'+d.amount.toLocaleString('cs-CZ');
         const badge=document.getElementById('rf-badge');
         if(badge)badge.textContent='Týden do '+new Date(d.weekKey).toLocaleDateString('cs-CZ')+' · '+d.paidCount+'/'+d.totalCount+' zaplaceno';
+        const balanceEl=document.getElementById('rf-account-balance');
+        if(balanceEl && d.ucetReserve) balanceEl.textContent='$'+Math.round(d.ucetReserve.usd||0).toLocaleString('cs-CZ')+(d.ucetReserve.pesos?' · ₱'+Math.round(d.ucetReserve.pesos).toLocaleString('cs-CZ'):'');
 
         const statusBox=document.getElementById('rf-status');
         if(d.exempt){
@@ -1284,11 +1308,11 @@ function renderDashboard(req, data) {
     async function payReserveFund(){
       showModal(
         'Reserve Fund',
-        'Zaplacením potvrzuješ a podepisuješ povinný týdenní odvod do pokladny organizace.',
-        [['Částka','$'+RF_AMOUNT.toLocaleString('cs-CZ')],['Splatnost','neděle']],
+        'Zaplacením potvrzuješ a podepisuješ povinný týdenní odvod na samostatný účet Reserve Fondu organizace.',
+        [['Částka','$'+RF_AMOUNT.toLocaleString('cs-CZ')],['Splatnost','neděle'],['Účet','Reserve Fond (odděleně od hlavní pokladny)']],
         async()=>{
           const r=await post('/api/reserve-fund/pay',{});
-          if(r.ok){showToast('Reserve Fund zaplacen a podepsán');loadReserveFund();refreshSkladData();}
+          if(r.ok){showToast('Reserve Fund zaplacen a podepsán');loadReserveFund();}
           else showToast(r.error,true);
         }
       );

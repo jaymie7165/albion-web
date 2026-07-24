@@ -1,6 +1,10 @@
-// home.js — Albion v3 · Heraldická hlavní stránka
+// home.js — Albion v4 · "Executive Noir" Dashboard
+// Nové rozvržení inspirované referenčním návrhem (čistý horní pruh stat karet,
+// aktivita + interní oznámení vedle sebe, rychlé akce, portál do Caledonia
+// World, stav trezoru). Stejný podpis renderHome(req, data) a stejné klíče
+// v `data` jako dřív — server.js se nemusí nijak měnit.
 
-const { baseStyles, ledgerEmpty } = require('../styles');
+const { ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
 const { canAccess } = require('../roles');
 const { escapeHtml } = require('../utils');
@@ -9,31 +13,28 @@ function renderHome(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky } = data;
   const icName = req.session.icName;
   const accessLevel = req.session.accessLevel || 3;
-  // Member/Associate (level 3) nevidí finance ani obsah skladu na hlavní stránce —
-  // vychází z toho, že nemají přístup ke Skladu, Auditu ani Blackbooku.
   const isRestricted = accessLevel >= 3;
 
-  const WEED_P = {"Žlutý kanabis":165,"Fialový kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
-  // Weed se eviduje přímo v SÁČCÍCH, cena je za 1 sáček — žádný přepočet.
+  const WEED_P = { "Žlutý kanabis": 165, "Fialový kanabis": 165, "Kanabis": 165, "Červený kanabis": 165, "Modrý kanabis": 165 };
 
   let totalValue = 0;
-  Object.entries(weed).forEach(([k,q]) => { if(q>0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
+  Object.entries(weed).forEach(([k, q]) => { if (q > 0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
 
-  const totalWeed   = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
-  const totalDrogy  = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
-  const totalZbrane = Object.values(zbrane).filter(q=>q>0).reduce((a,b)=>a+b,0);
-  const totalChemky = Object.values(chemky||{}).filter(q=>q>0).reduce((a,b)=>a+b,0);
+  const totalWeed = Object.values(weed).filter(q => q > 0).reduce((a, b) => a + b, 0);
+  const totalDrogy = Object.values(drogy).filter(q => q > 0).reduce((a, b) => a + b, 0);
+  const totalZbrane = Object.values(zbrane).filter(q => q > 0).reduce((a, b) => a + b, 0);
+  const totalChemky = Object.values(chemky || {}).filter(q => q > 0).reduce((a, b) => a + b, 0);
 
-  const topItems = (obj, limit=5) => Object.entries(obj)
-    .filter(([,q])=>q>0).sort((a,b)=>b[1]-a[1]).slice(0,limit)
-    .map(([item,qty]) => ({ item, qty }));
+  const topItems = (obj, limit = 5) => Object.entries(obj)
+    .filter(([, q]) => q > 0).sort((a, b) => b[1] - a[1]).slice(0, limit)
+    .map(([item, qty]) => ({ item, qty }));
 
-  const topWeed   = topItems(weed);
-  const topDrogy  = topItems(drogy);
+  const topWeed = topItems(weed);
+  const topDrogy = topItems(drogy);
   const topZbrane = topItems(zbrane);
 
   const manifestRows = (items, fallback) => items.length
-    ? items.map(({item,qty}) => `
+    ? items.map(({ item, qty }) => `
       <div class="manifest-row">
         <span class="mr-name">${item}</span>
         <span class="mr-dots"></span>
@@ -41,28 +42,28 @@ function renderHome(req, data) {
       </div>`).join('')
     : `<div class="manifest-row"><span class="mr-name" style="color:var(--ivory-faint);font-style:italic">${fallback}</span><span class="mr-dots"></span><span class="mr-val">—</span></div>`;
 
-  // Poslední zápisy
   const allRecent = [
-    ...recentZbrane.map(r => ({ sekce:'Zbraně', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[5]||'—', cas:r[0]||'' })),
-    ...recentWeed.map(r => ({ sekce:'Weed', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
-    ...recentDrogy.map(r => ({ sekce:'Drogy', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[6]||r[5]||'—', cas:r[0]||'' })),
-    ...(recentChemky||[]).map(r => ({ sekce:'Chemky', typ:r[1]||'', detail:`${r[2]||'?'} · ${r[3]||'?'} ks`, kdo:r[4]||'—', cas:r[0]||'' })),
+    ...recentZbrane.map(r => ({ sekce: 'Zbraně', typ: r[1] || '', detail: `${r[2] || '?'} · ${r[3] || '?'} ks`, kdo: r[5] || '—', cas: r[0] || '' })),
+    ...recentWeed.map(r => ({ sekce: 'Weed', typ: r[1] || '', detail: `${r[2] || '?'} · ${r[3] || '?'} ks`, kdo: r[6] || r[5] || '—', cas: r[0] || '' })),
+    ...recentDrogy.map(r => ({ sekce: 'Drogy', typ: r[1] || '', detail: `${r[2] || '?'} · ${r[3] || '?'} ks`, kdo: r[6] || r[5] || '—', cas: r[0] || '' })),
+    ...(recentChemky || []).map(r => ({ sekce: 'Chemky', typ: r[1] || '', detail: `${r[2] || '?'} · ${r[3] || '?'} ks`, kdo: r[4] || '—', cas: r[0] || '' })),
     ...recentUcet.map(r => {
-      const sym=(r[3]||'')==='USD'?'SAD ':'₱';
-      return { sekce:'Finance', typ:r[1]||'', detail:`${sym}${r[2]||'?'} — ${r[4]||'—'}`, kdo:r[5]||'—', cas:r[0]||'' };
+      const sym = (r[3] || '') === 'USD' ? 'SAD ' : '₱';
+      return { sekce: 'Finance', typ: r[1] || '', detail: `${sym}${r[2] || '?'} — ${r[4] || '—'}`, kdo: r[5] || '—', cas: r[0] || '' };
     }),
-  ].sort((a,b)=>b.cas.localeCompare(a.cas)).slice(0,6);
+  ].sort((a, b) => b.cas.localeCompare(a.cas)).slice(0, 7);
 
-  const activityHtml = allRecent.length ? allRecent.map((ev,i) => {
-    const isIn = /VKLAD|PŘÍJEM/.test((ev.typ||'').toUpperCase());
-    const sekceIcons = { 'Zbraně':'🔫', 'Weed':'🌿', 'Drogy':'💊', 'Chemky':'⚗️', 'Finance':'💰' };
-    return `<div class="stream-entry">
-      <span class="stream-num">${String(i+1).padStart(2,'0')}</span>
-      <span class="stream-icon">${sekceIcons[ev.sekce]||'·'}</span>
-      <span class="stream-typ" style="color:${isIn?'#6FBF52':'var(--oxblood-bright)'}">${ev.typ}</span>
-      <span class="stream-detail">${ev.detail}</span>
-      <span class="stream-who">${ev.kdo}</span>
-      <span class="stream-cas">${ev.cas}</span>
+  const SEKCE_ICONS = { 'Zbraně': '🔫', 'Weed': '🌿', 'Drogy': '💊', 'Chemky': '⚗️', 'Finance': '💰' };
+  const activityHtml = allRecent.length ? allRecent.map(ev => {
+    const isIn = /VKLAD|PŘÍJEM/.test((ev.typ || '').toUpperCase());
+    return `<div class="dash-activity-item">
+      <div class="dash-activity-left">
+        <div class="dash-activity-icon">${SEKCE_ICONS[ev.sekce] || '·'}</div>
+        <div>
+          <div class="dash-activity-text"><strong style="color:${isIn ? '#66D485' : 'var(--oxblood-bright)'};font-weight:600">${ev.typ}</strong> · ${ev.detail} <span style="color:var(--ivory-faint)">— ${ev.kdo}</span></div>
+        </div>
+      </div>
+      <div class="dash-activity-time">${ev.cas}</div>
     </div>`;
   }).join('') : ledgerEmpty('Rejstřík dosud beze zápisu', true);
 
@@ -71,410 +72,150 @@ function renderHome(req, data) {
   const today = new Date();
   const dateStr = today.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Heraldický erb SVG
-  const crestSvg = `<svg viewBox="0 0 160 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
-    <!-- Koruna -->
-    <path d="M56 32 L64 20 L70 32 L80 16 L90 32 L96 20 L104 32 L104 40 L56 40 Z" fill="none" stroke="var(--brass)" stroke-width="1.4" stroke-linejoin="round"/>
-    <!-- Štít -->
-    <path d="M80 50 L134 72 L134 136 Q134 186 80 206 Q26 186 26 136 L26 72 Z" fill="rgba(110,20,35,0.55)" stroke="var(--brass)" stroke-width="2"/>
-    <path d="M80 62 L120 80 L120 134 Q120 174 80 192 Q40 174 40 134 L40 80 Z" fill="rgba(110,20,35,0.35)" stroke="rgba(182,138,78,0.5)" stroke-width="1"/>
-    <!-- Lev -->
-    <g stroke="var(--brass-bright)" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round" transform="translate(80,134)">
-      <path d="M-6,-42 C2,-48 14,-46 16,-38 C18,-30 16,-22 10,-18 C18,-14 20,-6 18,4 C16,12 8,18 0,18 C-12,20 -22,12 -24,2 L-28,14 L-36,10 L-30,0 C-34,-4 -36,-10 -34,-18 C-30,-28 -20,-32 -12,-28 C-14,-34 -10,-42 -6,-42 Z"/>
-      <path d="M16,0 C22,4 26,12 24,20 C20,26 12,26 8,20"/>
-    </g>
-    <!-- Dekorativní fleur-de-lis -->
-    <g stroke="var(--brass)" stroke-width="0.9" fill="none" opacity="0.7">
-      <path d="M26 72 C20 66 16 58 20 52 C24 46 32 46 36 52"/>
-      <path d="M134 72 C140 66 144 58 140 52 C136 46 128 46 124 52"/>
-    </g>
-  </svg>`;
+  const ICONS = {
+    cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="1"/><circle cx="12" cy="12" r="3"/></svg>',
+    pesos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4h7a4 4 0 0 1 0 8H6"/><path d="M6 12v8M4 8h8M4 12h6"/></svg>',
+    weed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2C9 6 8 9 8 12a4 4 0 0 0 8 0c0-3-1-6-4-10Z"/><path d="M12 12v10"/></svg>',
+    stock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="10" width="4" height="10"/><rect x="10" y="5" width="4" height="15"/><rect x="17" y="13" width="4" height="7"/></svg>',
+    vault: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="1"/><circle cx="12" cy="12" r="3.2"/><path d="M12 9.5v0M7 4v2M17 4v2"/></svg>',
+  };
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Caledonia — Rejstřík</title>
-  ${baseStyles()}
-  <style>
-    /* ── HERO — heraldická záhlavní strana s radiálními paprsky ── */
-    .home-hero{
-      position:relative;
-      margin:-3rem -2rem 0;
-      padding:5rem 2rem 4rem;
-      text-align:center;
-      overflow:hidden;
-      display:flex;flex-direction:column;align-items:center;
-    }
-    /* Radiální paprsky z korony */
-    .home-rays{
-      position:absolute;top:0;left:50%;transform:translateX(-50%);
-      width:min(1100px,100%);height:360px;pointer-events:none;z-index:0;
-    }
-    .ray{stroke:var(--brass);stroke-width:0.8;opacity:0;stroke-dasharray:380;stroke-dashoffset:380}
-    .ray.drawn{animation:drawRay 1.4s ease-out forwards}
-    .arc-line{stroke:var(--brass);stroke-width:0.7;fill:none;opacity:0}
-    .arc-line.drawn{animation:arcReveal 1.2s ease-out forwards}
-    @keyframes drawRay{to{stroke-dashoffset:0;opacity:0.35}}
-    @keyframes arcReveal{to{opacity:0.18}}
-
-    .home-eyebrow{
-      position:relative;z-index:2;
-      font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.36em;
-      text-transform:uppercase;color:var(--brass);margin-bottom:1.4rem;
-      animation:heroFadeUp 0.7s ease-out 0.3s both;
-    }
-    .home-title{
-      position:relative;z-index:2;
-      font-family:var(--font-display);font-weight:800;
-      font-size:clamp(4rem,12vw,8rem);letter-spacing:0.04em;
-      color:var(--ivory);line-height:0.9;
-      animation:heroFadeUp 0.9s ease-out 0.5s both;
-    }
-    .home-title-rule{
-      position:relative;z-index:2;
-      width:1px;height:32px;
-      background:linear-gradient(180deg,var(--brass),transparent);
-      margin:1.6rem auto;
-      animation:heroFadeUp 0.7s ease-out 0.7s both;
-    }
-    .home-greeting{
-      position:relative;z-index:2;
-      font-family:var(--font-display);font-style:italic;font-weight:500;
-      font-size:clamp(1.1rem,2.5vw,1.5rem);color:var(--ivory-dim);
-      animation:heroFadeUp 0.7s ease-out 0.85s both;
-    }
-    .home-greeting strong{color:var(--brass-bright);font-style:normal}
-    .home-meta{
-      position:relative;z-index:2;
-      display:flex;gap:2rem;margin-top:2rem;
-      font-family:var(--font-mono);font-size:0.64rem;letter-spacing:0.06em;color:var(--ivory-faint);
-      animation:heroFadeUp 0.7s ease-out 1s both;
-    }
-    .home-meta .dot{
-      display:inline-block;width:4px;height:4px;
-      background:var(--oxblood-bright);margin-right:0.5em;vertical-align:1px;
-    }
-    .home-crest{
-      position:relative;z-index:2;
-      width:min(120px,20vw);height:auto;margin-bottom:1.6rem;
-      filter:drop-shadow(0 0 24px var(--oxblood-glow));
-      animation:heroFadeUp 0.8s ease-out 0.15s both, crestAmbient 4s ease-in-out 2s infinite;
-      transition:transform 0.15s ease-out;
-    }
-    @keyframes heroFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes crestAmbient{0%,100%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}50%{filter:drop-shadow(0 0 36px var(--oxblood-glow))}}
-    .home-crest.live-beat{animation:heroSealBeat 0.6s ease-out 1}
-    @keyframes heroSealBeat{0%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}40%{filter:drop-shadow(0 0 60px rgba(163,48,73,0.9))}100%{filter:drop-shadow(0 0 20px var(--oxblood-glow))}}
-
-    /* Fret ornament */
-    .home-fret{
-      height:10px;margin:0 -2rem 3rem;
-      background-image:
-        linear-gradient(135deg,var(--brass-dim) 25%,transparent 25.5%),
-        linear-gradient(225deg,var(--brass-dim) 25%,transparent 25.5%);
-      background-size:16px 16px;background-position:center;opacity:0.7;
-    }
-
-    /* ── TALLY PLAQUES — čtyři hlavní čísla ── */
-    .tally{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border-brass);margin-bottom:3.5rem}
-    .plaque{
-      background:var(--panel2);padding:2rem 1.6rem;text-align:center;
-      transition:background 0.25s;
-      border-top:2px solid transparent;
-      position:relative;overflow:hidden;
-    }
-    .plaque::before{content:'';position:absolute;top:0;left:0;width:12px;height:12px;border-top:1px solid var(--brass-dim);border-left:1px solid var(--brass-dim)}
-    .plaque::after{content:'';position:absolute;bottom:0;right:0;width:12px;height:12px;border-bottom:1px solid var(--brass-dim);border-right:1px solid var(--brass-dim)}
-    .plaque:hover{background:var(--panel3);border-top-color:var(--brass)}
-    .plaque-label{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--brass);margin-bottom:0.9rem}
-    .plaque-value{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:clamp(1.5rem,3vw,2.2rem);color:var(--ivory)}
-    .plaque-sub{font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.55rem;letter-spacing:0.04em}
-
-    /* ── RYCHLÉ AKCE — typografická linka, ne tlačítka ── */
-    .quick-nav{
-      display:flex;flex-wrap:wrap;gap:0 2rem;margin:0 0 3rem;
-      padding-bottom:1.4rem;border-bottom:1px solid var(--border);
-    }
-    .quick-nav a{
-      font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;
-      color:var(--ivory-faint);text-decoration:none;padding:0.35rem 0;
-      border-bottom:1px solid transparent;transition:color 0.2s,border-color 0.2s;
-    }
-    .quick-nav a::before{content:'→ ';color:var(--brass);opacity:0.7}
-    .quick-nav a:hover{color:var(--oxblood-bright);border-color:var(--oxblood-bright)}
-
-    /* ── MANIFEST — třísloupec zásobník ── */
-    .stock-manifest{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:0 3rem}
-
-    /* ── STREAM — poslední zápisy ── */
-    .stream-entry{
-      display:grid;grid-template-columns:1.8rem 1.2rem auto 1fr auto auto;
-      gap:0.9rem;align-items:baseline;
-      padding:0.75rem 0;border-bottom:1px solid var(--border);
-    }
-    .stream-entry:last-child{border-bottom:none}
-    .stream-num{font-family:var(--font-mono);color:var(--ivory-faint);font-size:0.7rem}
-    .stream-icon{font-size:0.72rem;color:var(--brass);opacity:0.7}
-    .stream-typ{font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;font-weight:600}
-    .stream-detail{font-family:var(--font-body);color:var(--ivory);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.88rem}
-    .stream-who{font-family:var(--font-mono);color:var(--ivory-dim);font-size:0.74rem;white-space:nowrap}
-    .stream-cas{font-family:var(--font-mono);color:var(--ivory-faint);font-size:0.7rem;white-space:nowrap}
-
-    /* Folio spread na home */
-    .home-spread{display:grid;grid-template-columns:1fr 240px;gap:3rem;align-items:start;margin-bottom:3rem}
-    .home-balance-big{
-      font-family:var(--font-display);font-weight:800;font-style:italic;
-      font-size:clamp(3.5rem,9vw,7rem);line-height:0.9;color:var(--ivory);
-      letter-spacing:-0.01em;
-    }
-    .home-balance-big .currency{font-size:0.3em;color:var(--brass);font-family:var(--font-label);font-style:normal;letter-spacing:0.14em;vertical-align:0.2em;margin-left:0.2em}
-    .home-balance-note{font-family:var(--font-body);font-size:0.88rem;color:var(--ivory-dim);margin-top:1rem;line-height:1.8;max-width:500px}
-    .home-balance-note strong{color:var(--brass-bright);font-weight:500}
-
-    /* Live clock */
-    .home-clock{font-family:var(--font-mono);font-size:0.9rem;color:var(--ivory-dim);letter-spacing:0.06em}
-    .home-clock-date{font-family:var(--font-label);font-size:0.56rem;color:var(--ivory-faint);letter-spacing:0.14em;text-transform:uppercase;margin-top:0.3rem}
-
-    /* ── PORTÁL DO ALBION WORLD — velké, nepřehlédnutelné pozvání ── */
-    .portal-banner{
-      position:relative;overflow:hidden;
-      display:flex;align-items:center;justify-content:space-between;gap:2rem;
-      margin:0 0 3rem;padding:2.2rem 2.6rem;
-      background:radial-gradient(ellipse 120% 140% at 0% 0%, rgba(110,20,35,0.35), var(--panel2) 65%);
-      border:1px solid var(--border-brass);
-      box-shadow:var(--shadow-card);
-      text-decoration:none;
-      transition:border-color 0.25s,transform 0.25s,box-shadow 0.25s;
-    }
-    .portal-banner::before{content:'';position:absolute;top:0;left:0;width:22px;height:22px;border-top:1px solid var(--brass-bright);border-left:1px solid var(--brass-bright)}
-    .portal-banner::after{content:'';position:absolute;bottom:0;right:0;width:22px;height:22px;border-bottom:1px solid var(--brass-bright);border-right:1px solid var(--brass-bright)}
-    .portal-banner:hover{border-color:var(--brass-bright);transform:translateY(-2px);box-shadow:0 12px 44px rgba(110,20,35,0.35)}
-    .portal-banner-glow{
-      position:absolute;top:50%;right:-40px;width:220px;height:220px;border-radius:50%;
-      background:radial-gradient(circle,rgba(224,189,127,0.35),transparent 70%);
-      transform:translateY(-50%);pointer-events:none;
-      animation:portalPulse 3.5s ease-in-out infinite;
-    }
-    @keyframes portalPulse{0%,100%{opacity:0.5;transform:translateY(-50%) scale(1)}50%{opacity:0.9;transform:translateY(-50%) scale(1.15)}}
-    .portal-banner-left{position:relative;z-index:1;display:flex;align-items:center;gap:1.4rem}
-    .portal-banner-icon{
-      flex-shrink:0;width:56px;height:56px;display:flex;align-items:center;justify-content:center;
-      border:1px solid var(--border-brass);background:var(--brass-faint);color:var(--brass-bright);
-    }
-    .portal-banner-icon svg{width:28px;height:28px}
-    .portal-banner-eyebrow{font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.26em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
-    .portal-banner-title{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.5rem;color:var(--ivory);line-height:1.1}
-    .portal-banner-sub{font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);margin-top:0.4rem;max-width:440px}
-    .portal-banner-btn{
-      position:relative;z-index:1;flex-shrink:0;
-      display:inline-flex;align-items:center;gap:0.6rem;
-      padding:0.95rem 1.6rem;
-      background:var(--oxblood);border:1px solid var(--oxblood);color:var(--ivory);
-      font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;font-weight:600;
-      box-shadow:0 0 24px var(--oxblood-glow);
-      transition:background 0.2s,box-shadow 0.2s,transform 0.2s;
-      white-space:nowrap;
-    }
-    .portal-banner-btn:hover{background:var(--oxblood-bright);box-shadow:0 0 40px var(--oxblood-glow);transform:translateX(2px)}
-    .portal-banner-btn svg{width:14px;height:14px}
-    @media(max-width:760px){
-      .portal-banner{flex-direction:column;align-items:flex-start;padding:1.8rem}
-      .portal-banner-btn{width:100%;justify-content:center}
-    }
-
-    @media(max-width:1100px){.stock-manifest{grid-template-columns:1fr 1fr;gap:1.5rem 3rem}}
-    @media(max-width:900px){
-      .home-hero{padding:4rem 1.2rem 3rem;margin:-1.5rem -1rem 0}
-      .home-fret{margin:0 -1rem 2rem}
-      .tally{grid-template-columns:repeat(2,1fr)}
-      .stock-manifest{grid-template-columns:1fr;gap:2rem}
-      .home-spread{grid-template-columns:1fr;gap:1.5rem}
-      .stream-entry{grid-template-columns:1.5rem auto 1fr;gap:0.5rem 0.7rem}
-      .stream-who,.stream-cas{grid-column:2/-1;font-size:0.68rem}
-      .stream-icon{display:none}
-    }
-    @media(max-width:640px){
-      .home-meta{flex-direction:column;gap:0.5rem;align-items:center}
-      .quick-nav{gap:0.5rem 1.2rem}
-      .tally{grid-template-columns:1fr 1fr}
-    }
-  </style>
+  ${require('../styles').baseStyles()}
   </head><body>
   ${renderNav(req, 'home')}
   <main>
 
-    <div id="weekly-banner" style="display:none;background:var(--brass-faint);border:1px solid var(--border-brass);padding:1rem 1.6rem;margin-bottom:2rem;font-family:var(--font-body);font-size:0.9rem;text-align:center"></div>
+    <div id="weekly-banner" style="display:none;background:var(--brass-faint);border:1px solid var(--border-brass);padding:1rem 1.6rem;margin-bottom:1.6rem;font-family:var(--font-body);font-size:0.9rem;text-align:center"></div>
 
-    <!-- ── HERO — záhlaví stránky ── -->
-    <div class="home-hero">
-      <!-- Radiální paprsky -->
-      <svg class="home-rays" viewBox="0 0 1100 360" preserveAspectRatio="xMidYMin meet" id="heroRays">
-        <circle class="arc-line" cx="550" cy="10" r="100"/>
-        <circle class="arc-line" cx="550" cy="10" r="170"/>
-        <circle class="arc-line" cx="550" cy="10" r="240"/>
-        <circle class="arc-line" cx="550" cy="10" r="310"/>
-        <line class="ray" x1="550" y1="10" x2="550" y2="310"/>
-        <line class="ray" x1="550" y1="10" x2="604" y2="275" style="animation-delay:.08s"/>
-        <line class="ray" x1="550" y1="10" x2="496" y2="275" style="animation-delay:.08s"/>
-        <line class="ray" x1="550" y1="10" x2="668" y2="288" style="animation-delay:.14s"/>
-        <line class="ray" x1="550" y1="10" x2="432" y2="288" style="animation-delay:.14s"/>
-        <line class="ray" x1="550" y1="10" x2="690" y2="220" style="animation-delay:.2s"/>
-        <line class="ray" x1="550" y1="10" x2="410" y2="220" style="animation-delay:.2s"/>
-        <line class="ray" x1="550" y1="10" x2="760" y2="195" style="animation-delay:.26s"/>
-        <line class="ray" x1="550" y1="10" x2="340" y2="195" style="animation-delay:.26s"/>
-        <line class="ray" x1="550" y1="10" x2="760" y2="120" style="animation-delay:.32s"/>
-        <line class="ray" x1="550" y1="10" x2="340" y2="120" style="animation-delay:.32s"/>
-        <line class="ray" x1="550" y1="10" x2="830" y2="80" style="animation-delay:.38s"/>
-        <line class="ray" x1="550" y1="10" x2="270" y2="80" style="animation-delay:.38s"/>
-      </svg>
-
-      <!-- Erb -->
-      <div class="home-crest" id="homeCrest">
-        <img src="/logo.png" alt="Caledonia" style="width:100%;height:100%;object-fit:contain;display:block;mix-blend-mode:lighten;filter:drop-shadow(0 0 28px rgba(110,20,35,0.7))">
+    <!-- ── HERO ── -->
+    <div class="dash-hero">
+      <div>
+        <div class="dash-hero-eyebrow">Los Santos · Interní rejstřík</div>
+        <div class="dash-hero-title">${greeting}, ${escapeHtml(icName)}</div>
+        <div class="dash-hero-sub">Vítej zpět v operačním centru Caledonie.</div>
       </div>
-
-      <div class="home-eyebrow">Los Santos · Interní rejstřík</div>
-      <h1 class="home-title">CALEDONIA</h1>
-      <div class="home-title-rule"></div>
-      <p class="home-greeting">${greeting}, <strong>${escapeHtml(icName)}</strong></p>
-      <div class="home-meta">
-        <span><span class="dot"></span>Otevřeno · ${dateStr}</span>
-        <span id="live-clock-hero">--:--:--</span>
+      <div class="dash-hero-time">
+        <div class="dash-hero-clock" id="live-clock-hero">--:--:--</div>
+        <div class="dash-hero-date">${dateStr}</div>
       </div>
     </div>
 
-    <!-- Fret ornament -->
-    <div class="home-fret"></div>
-
     <!-- ── PORTÁL DO ALBION WORLD ── -->
-    <a href="/albion" class="portal-banner">
-      <div class="portal-banner-glow"></div>
-      <div class="portal-banner-left">
-        <div class="portal-banner-icon">
+    <a href="/albion" class="dash-portal">
+      <div class="dash-portal-left">
+        <div class="dash-portal-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
         </div>
         <div>
-          <div class="portal-banner-eyebrow">Immersivní zážitek</div>
-          <div class="portal-banner-title">Vstup do Caledonia World</div>
-          <div class="portal-banner-sub">Interaktivní kancelář organizace — projdi kanceláří, otevři jednotlivé sekce přímo z prostoru a nech na sebe Evelyn dýchnout atmosférou.</div>
+          <div class="dash-portal-eyebrow">Immersivní zážitek</div>
+          <div class="dash-portal-title">Vstup do Caledonia World</div>
+          <div class="dash-portal-sub">Interaktivní kancelář organizace — projdi prostorem a otevři jednotlivé sekce přímo odsud.</div>
         </div>
       </div>
-      <span class="portal-banner-btn">
+      <span class="dash-portal-btn">
         Vstoupit
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </span>
     </a>
 
-    <!-- ── TALLY PLAQUES — čtyři dominantní čísla ── -->
     ${isRestricted ? `
-    <div class="tally" style="grid-template-columns:1fr">
-      <div class="plaque">
-        <div class="plaque-label">Vítej v Caledonii</div>
-        <div class="plaque-value" style="font-size:1.1rem">Finance a sklad jsou viditelné jen od hodnosti Senior Member výš</div>
-        <div class="plaque-sub">obrať se na Council nebo Foundera ohledně přístupu</div>
-      </div>
-    </div>` : `
-    <div class="tally">
-      <div class="plaque">
-        <div class="plaque-label">Zůstatek · SAD</div>
-        <div class="plaque-value">$${ucet.usd.toLocaleString('cs-CZ')}</div>
-        <div class="plaque-sub">hotovost organizace</div>
-      </div>
-      <div class="plaque">
-        <div class="plaque-label">Hodnota weedu</div>
-        <div class="plaque-value">$${totalValue.toLocaleString('cs-CZ')}</div>
-        <div class="plaque-sub">dle prodejní ceny</div>
-      </div>
-      <div class="plaque">
-        <div class="plaque-label">Pesos</div>
-        <div class="plaque-value">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
-        <div class="plaque-sub">sekundární účet</div>
-      </div>
-      <div class="plaque">
-        <div class="plaque-label">Zásoby celkem</div>
-        <div class="plaque-value">${(totalWeed+totalDrogy+totalZbrane+totalChemky).toLocaleString('cs-CZ')}</div>
-        <div class="plaque-sub">ks ve skladu</div>
-      </div>
-    </div>`}
-
-    <!-- ── RYCHLÉ AKCE ── -->
-    <nav class="quick-nav">
-      ${canAccess(accessLevel,'sklad') ? '<a href="/sklad">Správa skladu</a>' : ''}
-      ${canAccess(accessLevel,'audit') ? '<a href="/audit">Audit zápisů</a>' : ''}
-      ${canAccess(accessLevel,'blackbook') ? '<a href="/blackbook">Blackbook</a>' : ''}
-      ${canAccess(accessLevel,'nastenska') ? '<a href="/nastenska">Nástěnka</a>' : ''}
-      ${canAccess(accessLevel,'statistiky') ? '<a href="/statistiky">Statistiky</a>' : ''}
-      <a href="/garaz">Garáž</a>
-      <a href="/lore">Historie rodu</a>
-    </nav>
-
-    ${isRestricted ? `
+    <div class="dash-widget">
+      <div class="dash-widget-title">Přístup</div>
+      <p style="font-family:var(--font-body);font-size:0.9rem;color:var(--ivory-dim);line-height:1.8">Finance a sklad jsou viditelné jen od hodnosti Senior Member výš. Pokud potřebuješ přístup, obrať se na Council nebo Foundera.</p>
+    </div>
     <div class="folio-rule"></div>
-    <div class="marginalia" style="border-left:none;max-width:260px;margin:0 auto;text-align:center">
-      <div class="home-clock" id="live-clock" style="text-align:center">--:--:--</div>
-      <div class="home-clock-date" id="live-date" style="text-align:center"></div>
+    <div class="marginalia" style="border-left:none;max-width:260px;margin:1.5rem auto 0;text-align:center">
+      <div class="dash-hero-clock" id="live-clock" style="text-align:center;font-size:1rem">--:--:--</div>
+      <div class="dash-hero-date" style="text-align:center;margin-top:0.3rem">${dateStr}</div>
     </div>
     ` : `
-    <!-- ── HLAVNÍ ČÍSLO + MARGINALIA ── -->
-    <div class="home-spread">
-      <div>
-        <div class="folio-label" style="margin-bottom:1.2rem">Hotovostní zůstatek organizace</div>
-        <div class="home-balance-big">
-          $${ucet.usd.toLocaleString('cs-CZ')}<span class="currency">SAD</span>
-        </div>
-        <p class="home-balance-note">
-          Vedle USD vede frakce i účet v <strong>₱${ucet.pesos.toLocaleString('cs-CZ')} pesos</strong>.
-          Odhadovaná tržní hodnota weedu ve skladu činí <strong>$${totalValue.toLocaleString('cs-CZ')}</strong>.
-        </p>
+    <!-- ── STAT ŘÁDEK ── -->
+    <div class="dash-stat-grid">
+      <div class="dash-stat-card">
+        <div class="dash-stat-icon">${ICONS.cash}</div>
+        <div class="dash-stat-label">Zůstatek · SAD</div>
+        <div class="dash-stat-value" id="tally-usd">$${ucet.usd.toLocaleString('cs-CZ')}</div>
+        <div class="dash-stat-sub">hotovost organizace</div>
       </div>
-      <div class="marginalia">
-        <div class="m-line"><span>Weed</span><span class="m-val">${totalWeed} ks</span></div>
-        <div class="m-line"><span>Drogy</span><span class="m-val">${totalDrogy} ks</span></div>
-        <div class="m-line"><span>Zbraně</span><span class="m-val">${totalZbrane} ks</span></div>
-        <div class="m-line"><span>Chemikálie</span><span class="m-val">${totalChemky} ks</span></div>
-        <div class="m-line"><span>Odrůd weedu</span><span class="m-val">${Object.keys(weed).filter(k=>weed[k]>0).length}</span></div>
-        <div class="m-line"><span>Typů drog</span><span class="m-val">${Object.keys(drogy).filter(k=>drogy[k]>0).length}</span></div>
-        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)">
-          <div class="home-clock" id="live-clock">--:--:--</div>
-          <div class="home-clock-date" id="live-date"></div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-icon">${ICONS.pesos}</div>
+        <div class="dash-stat-label">Pesos</div>
+        <div class="dash-stat-value" id="tally-pesos">₱${ucet.pesos.toLocaleString('cs-CZ')}</div>
+        <div class="dash-stat-sub">sekundární účet</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-icon">${ICONS.weed}</div>
+        <div class="dash-stat-label">Hodnota weedu</div>
+        <div class="dash-stat-value" id="tally-weed-value">$${totalValue.toLocaleString('cs-CZ')}</div>
+        <div class="dash-stat-sub">dle prodejní ceny</div>
+      </div>
+      <div class="dash-stat-card">
+        <div class="dash-stat-icon">${ICONS.stock}</div>
+        <div class="dash-stat-label">Zásoby celkem</div>
+        <div class="dash-stat-value">${(totalWeed + totalDrogy + totalZbrane + totalChemky).toLocaleString('cs-CZ')}</div>
+        <div class="dash-stat-sub">ks ve skladu</div>
+      </div>
+    </div>
+
+    <!-- ── AKTIVITA + OZNÁMENÍ ── -->
+    <div class="dash-grid-2">
+      <div class="dash-widget">
+        <div class="dash-widget-title"><span>Poslední zápisy do rejstříku</span></div>
+        <div id="activity-stream">${activityHtml}</div>
+      </div>
+      <div>
+        <div class="dash-notice-card" style="margin-bottom:1.2rem">
+          <div class="dash-notice-eyebrow">Rychlý přehled</div>
+          <div class="dash-notice-title">Stav skladu</div>
+          <div class="dash-notice-text">
+            Weed <strong style="color:var(--brass-bright)">${totalWeed} ks</strong> · Drogy <strong style="color:var(--brass-bright)">${totalDrogy} ks</strong><br>
+            Zbraně <strong style="color:var(--brass-bright)">${totalZbrane} ks</strong> · Chemikálie <strong style="color:var(--brass-bright)">${totalChemky} ks</strong>
+          </div>
+          ${canAccess(accessLevel, 'sklad-view') ? '<a href="/sklad" class="dash-notice-btn">Otevřít sklad →</a>' : ''}
+        </div>
+        <div class="dash-vault-card">
+          <div class="dash-widget-title" style="margin-bottom:0.4rem">Stav trezoru</div>
+          <div class="dash-vault-value">$${ucet.usd.toLocaleString('cs-CZ')}</div>
+          <div class="dash-vault-track"><div class="dash-vault-fill" style="width:${Math.min(100, Math.round((ucet.usd / 60000) * 100))}%"></div></div>
+          <div class="dash-vault-caption"><span>Odhad. hodnota weedu</span><span>$${totalValue.toLocaleString('cs-CZ')}</span></div>
         </div>
       </div>
     </div>
 
-    <div class="folio-rule"></div>
+    <!-- ── RYCHLÉ AKCE ── -->
+    <div class="dash-widget" style="margin-bottom:1.4rem">
+      <div class="dash-widget-title">Rychlé akce</div>
+      <div class="dash-quick-grid">
+        ${canAccess(accessLevel, 'sklad') ? `<a href="/sklad" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="10" width="4" height="10"/><rect x="10" y="5" width="4" height="15"/><rect x="17" y="13" width="4" height="7"/></svg>Sklad</a>` : ''}
+        <a href="/garaz" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13l2-6h14l2 6"/><rect x="2" y="13" width="20" height="6" rx="1"/><circle cx="7" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>Garáž</a>
+        ${canAccess(accessLevel, 'blackbook') ? `<a href="/blackbook" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3Z"/><path d="M4 4v13a3 3 0 0 0 3 3"/></svg>Blackbook</a>` : ''}
+        ${canAccess(accessLevel, 'audit') ? `<a href="/audit" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Audit</a>` : ''}
+        <a href="/bazar" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8l1.5-4h13L20 8"/><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>Bazar</a>
+      </div>
+    </div>
+
+    <div class="folio-rule tight"></div>
 
     <!-- ── MANIFEST SKLADU ── -->
     <div class="folio-label">Stav skladu</div>
-    <div style="height:1.8rem"></div>
-    <div class="stock-manifest">
+    <div style="height:1.6rem"></div>
+    <div class="manifest-grid" style="margin-bottom:2rem">
       <div class="manifest-col">
-        <div class="manifest-col-head">
-          <span class="manifest-col-title">Weed</span>
-          <span class="manifest-col-count">${totalWeed} ks</span>
-        </div>
+        <div class="manifest-col-head"><span class="manifest-col-title">Weed</span><span class="manifest-col-count">${totalWeed} ks</span></div>
         ${manifestRows(topWeed, 'Sklad prázdný')}
       </div>
       <div class="manifest-col">
-        <div class="manifest-col-head">
-          <span class="manifest-col-title">Drogy</span>
-          <span class="manifest-col-count">${totalDrogy} ks</span>
-        </div>
+        <div class="manifest-col-head"><span class="manifest-col-title">Drogy</span><span class="manifest-col-count">${totalDrogy} ks</span></div>
         ${manifestRows(topDrogy, 'Sklad prázdný')}
       </div>
       <div class="manifest-col">
-        <div class="manifest-col-head">
-          <span class="manifest-col-title">Zbraně</span>
-          <span class="manifest-col-count">${totalZbrane} ks</span>
-        </div>
+        <div class="manifest-col-head"><span class="manifest-col-title">Zbraně</span><span class="manifest-col-count">${totalZbrane} ks</span></div>
         ${manifestRows(topZbrane, 'Sklad prázdný')}
       </div>
     </div>
-
-    <div class="folio-rule"></div>
-
-    <!-- ── POSLEDNÍ ZÁPISY ── -->
-    <div class="folio-label">Poslední zápisy do rejstříku</div>
-    <div style="height:1.8rem"></div>
-    <div id="activity-stream">${activityHtml}</div>
     `}
 
   </main>
@@ -494,37 +235,22 @@ function renderHome(req, data) {
   <div class="toast" id="toast"></div>
 
   <script>
-    // Spustit animaci paprsků po načtení
-    setTimeout(() => {
-      document.querySelectorAll('.home-rays .ray,.home-rays .arc-line').forEach(el => el.classList.add('drawn'));
-    }, 200);
-
     // Live hodiny
     (function clock(){
       const c=document.getElementById('live-clock');
       const ch=document.getElementById('live-clock-hero');
-      const d=document.getElementById('live-date');
       function tick(){
         const n=new Date();
         const t=n.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
         if(c) c.textContent=t;
         if(ch) ch.textContent=t;
-        if(d) d.textContent=n.toLocaleDateString('cs-CZ',{weekday:'long'});
       }
       tick();setInterval(tick,1000);
     })();
 
     // SSE — živé aktualizace
     const evtHome = new EventSource('/api/events');
-    function bumpLive(msg) {
-      showToast(msg);
-      const crest = document.getElementById('homeCrest');
-      if (crest) {
-        crest.classList.remove('live-beat');
-        void crest.offsetWidth;
-        crest.classList.add('live-beat');
-      }
-    }
+    function bumpLive(msg) { showToast(msg); }
     const RESTRICTED_HOME = ${isRestricted ? 'true' : 'false'};
     evtHome.addEventListener('skladUpdate', (e) => {
       if (RESTRICTED_HOME) return;
@@ -538,23 +264,10 @@ function renderHome(req, data) {
       bumpLive('Finance · ' + d.typ + ' — ' + (d.valuta==='USD'?'SAD ':'₱') + d.castka);
     });
     evtHome.addEventListener('nastenska', (e) => {
-      if (RESTRICTED_HOME) return; // Member/Associate nemá přístup k Nástěnce
+      if (RESTRICTED_HOME) return;
       const d = JSON.parse(e.data);
       bumpLive('Oznámení: ' + d.title);
     });
-
-    // ── PARALLAX HERO ──
-    (function parallax(){
-      const hero=document.querySelector('.home-hero');
-      const crest=document.getElementById('homeCrest');
-      if(!hero||!crest)return;
-      hero.addEventListener('mousemove',(e)=>{
-        const r=hero.getBoundingClientRect();
-        const x=(e.clientX-r.left)/r.width-0.5, y=(e.clientY-r.top)/r.height-0.5;
-        crest.style.transform='translate3d('+(x*10)+'px,'+(y*10)+'px,0)';
-      });
-      hero.addEventListener('mouseleave',()=>{crest.style.transform='translate3d(0,0,0)';});
-    })();
 
     // ── TÝDENNÍ SOUHRN ──
     ${!isRestricted ? `
@@ -589,8 +302,7 @@ function renderHome(req, data) {
       if(d.ok && !d.seen){onbRender();document.getElementById('onboardModal').classList.add('open');}
     }).catch(()=>{});
 
-    // ── GRATULACE PŘI POVÝŠENÍ ──
-    // ── PŘÍSAHA (#6) — povýšení se stvrzuje krátkou ceremonií, ne jen kliknutím ──
+    // ── PŘÍSAHA PŘI POVÝŠENÍ ──
     const OATH_TEXT = 'PŘÍSAHÁM';
     fetch('/api/me/promotions/pending').then(r=>r.json()).then(d=>{
       if(d.ok && d.pending){
