@@ -32,14 +32,56 @@ function timestamp() {
   return new Date().toLocaleString('cs-CZ', { timeZone: 'Europe/Prague' });
 }
 
-async function appendRow(sheetName, values) {
+// Vrátí true, pokud je chyba od Sheets API typu "list s tímhle názvem
+// neexistuje" (typicky "Unable to parse range: <List>!A1" nebo
+// "Requested entity was not found" na batchGet/values.get).
+function isMissingSheetError(err) {
+  const msg = err && (err.errors?.[0]?.message || err.message || '');
+  return /Unable to parse range/i.test(msg) || /Requested entity was not found/i.test(msg);
+}
+
+// Vytvoří v tabulce nový list (tab) daného jména, pokud tam ještě není.
+// Bezpečné volat opakovaně — pokud list mezitím vytvořil někdo jiný,
+// Google vrátí chybu "already exists", kterou tiše ignorujeme.
+async function ensureSheetExists(sheetName) {
   const sheets = await getSheetsClient();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID(),
-    range: `${sheetName}!A1`,
-    valueInputOption: 'USER_ENTERED',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: { values: [values] },
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SHEET_ID(),
+      requestBody: {
+        requests: [{ addSheet: { properties: { title: sheetName } } }],
+      },
+    });
+  } catch (err) {
+    const msg = err && (err.errors?.[0]?.message || err.message || '');
+    if (!/already exists/i.test(msg)) throw err;
+  }
+  await getSheetIdMap(true); // refresh cache s novým listem
+}
+
+// Obecný wrapper: zavolá fn(), a pokud spadne na chybějícím listu,
+// list si sama vytvoří a operaci jednou zopakuje.
+async function withSheetSelfHeal(sheetName, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (!isMissingSheetError(err)) throw err;
+    console.warn(`[SHEETS] List "${sheetName}" neexistuje, vytvářím a opakuji zápis...`);
+    await ensureSheetExists(sheetName);
+    return await fn();
+  }
+}
+
+async function appendRow(sheetName, values) {
+  await withSheetSelfHeal(sheetName, async () => {
+    const sheets = await getSheetsClient();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID(),
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [values] },
+    });
   });
   invalidateCache(sheetName);
 }
@@ -49,13 +91,15 @@ async function appendRow(sheetName, values) {
 // takže selhání uprostřed nemůže zanechat částečný zápis (viz bulk sklad).
 async function appendRows(sheetName, rowsValues) {
   if (!rowsValues || !rowsValues.length) return;
-  const sheets = await getSheetsClient();
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID(),
-    range: `${sheetName}!A1`,
-    valueInputOption: 'USER_ENTERED',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: { values: rowsValues },
+  await withSheetSelfHeal(sheetName, async () => {
+    const sheets = await getSheetsClient();
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID(),
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: rowsValues },
+    });
   });
   invalidateCache(sheetName);
 }
@@ -66,13 +110,15 @@ async function appendRows(sheetName, rowsValues) {
 // "Zbraně!A15:G15"), ze kterého se dá vyparsovat přesné číslo řádku — to si
 // server.js uloží jako "poslední akce daného člena" a použije v /api/sklad/undo.
 async function appendRowTracked(sheetName, values) {
-  const sheets = await getSheetsClient();
-  const res = await sheets.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID(),
-    range: `${sheetName}!A1`,
-    valueInputOption: 'USER_ENTERED',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: { values: [values] },
+  const res = await withSheetSelfHeal(sheetName, async () => {
+    const sheets = await getSheetsClient();
+    return sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID(),
+      range: `${sheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [values] },
+    });
   });
   invalidateCache(sheetName);
   let rowIndex = null;

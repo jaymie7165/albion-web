@@ -3573,9 +3573,16 @@ app.post('/api/reserve-fund/pay', requireAuth, async (req, res) => {
   const amount = getReserveFundAmount();
   const poznamka = `Reserve Fund — týden do ${weekKey} — ${uzivatel}`;
 
-  // Zapisuje se na SAMOSTATNÝ účet Reserve Fondu — ne do hlavního 'Účetnictví'
-  // — takže tahle částka nikdy nevstoupí do hlavní pokladny organizace.
-  await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, 'PŘÍJEM', amount, 'USD', poznamka, uzivatel]);
+  try {
+    // Zapisuje se na SAMOSTATNÝ účet Reserve Fondu — ne do hlavního 'Účetnictví'
+    // — takže tahle částka nikdy nevstoupí do hlavní pokladny organizace.
+    // sheets.appendRow si list 'Reserve Fond' sám vytvoří, pokud v tabulce chybí.
+    await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, 'PŘÍJEM', amount, 'USD', poznamka, uzivatel]);
+  } catch (e) {
+    console.error('[RESERVE FUND] Zápis do Sheets selhal:', e.message);
+    return res.status(502).json({ ok: false, error: 'Zápis do účetní tabulky se nepovedl, zkus to prosím znovu.' });
+  }
+
   await discord.notifyReserveFundZaplaceno(weekKey, uzivatel, discordUser).catch(() => {});
   await discord.notifyAudit(RESERVE_FUND_SHEET_NAME, uzivatel, discordUser, `PŘÍJEM — SAD ${amount} | ${poznamka}`);
 
@@ -3653,5 +3660,17 @@ setInterval(() => {
   } catch (e) {}
 }, 5 * 60 * 1000);
 
+
+// ── GLOBÁLNÍ POJISTKA ────────────────────────────────────────────────────────
+// Node 18+ defaultně ukončí celý proces při jakékoliv nezachycené promise
+// rejection (přesně tohle shodilo server u /api/reserve-fund/pay). Tady se
+// taková chyba jen zaloguje a server běží dál — jednotlivý neošetřený bug
+// v jednom requestu tak už nikdy nesundá web pro všechny ostatní uživatele.
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason && reason.stack || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err && err.stack || err);
+});
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));
