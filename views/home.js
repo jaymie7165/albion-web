@@ -1,8 +1,12 @@
-// home.js — Albion v4 · "Executive Noir" Dashboard
-// Nové rozvržení inspirované referenčním návrhem (čistý horní pruh stat karet,
-// aktivita + interní oznámení vedle sebe, rychlé akce, portál do Caledonia
-// World, stav trezoru). Stejný podpis renderHome(req, data) a stejné klíče
-// v `data` jako dřív — server.js se nemusí nijak měnit.
+// views/home.js — Albion v5 · "Crimson & Cream" Dashboard
+// Oproti v4 přibyl widget "Rychlý zápis" (Weed/Drogy/Chemky/Účetnictví —
+// čtyři sekce, které se používají denně) přímo na Dashboardu, ať pro
+// nejběžnější zápisy není potřeba chodit na /sklad a hledat správný tab.
+// Portál do Caledonia World byl na přání odstraněn z Home (appku nikdo
+// neotevíral) — routa /albion a její kód v projektu zůstávají beze změny,
+// jen sem už nevede odkaz.
+// Stejný podpis renderHome(req, data) a stejné klíče v `data` jako dřív —
+// server.js se nemusí nijak měnit.
 
 const { ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
@@ -14,8 +18,9 @@ function renderHome(req, data) {
   const icName = req.session.icName;
   const accessLevel = req.session.accessLevel || 3;
   const isRestricted = accessLevel >= 3;
+  const canSklad = canAccess(accessLevel, 'sklad');
 
-  const WEED_P = { "Žlutý kanabis": 165, "Fialový kanabis": 165, "Kanabis": 165, "Červený kanabis": 165, "Modrý kanabis": 165 };
+  const WEED_P = { "Žlutý kanabis": 165, "Zelený kanabis": 165, "Kanabis": 165, "Červený kanabis": 165, "Modrý kanabis": 165 };
 
   let totalValue = 0;
   Object.entries(weed).forEach(([k, q]) => { if (q > 0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
@@ -60,7 +65,7 @@ function renderHome(req, data) {
       <div class="dash-activity-left">
         <div class="dash-activity-icon">${SEKCE_ICONS[ev.sekce] || '·'}</div>
         <div>
-          <div class="dash-activity-text"><strong style="color:${isIn ? '#66D485' : 'var(--oxblood-bright)'};font-weight:600">${ev.typ}</strong> · ${ev.detail} <span style="color:var(--ivory-faint)">— ${ev.kdo}</span></div>
+          <div class="dash-activity-text"><strong style="color:${isIn ? '#7BD69B' : 'var(--oxblood-bright)'};font-weight:600">${ev.typ}</strong> · ${ev.detail} <span style="color:var(--ivory-faint)">— ${ev.kdo}</span></div>
         </div>
       </div>
       <div class="dash-activity-time">${ev.cas}</div>
@@ -103,23 +108,39 @@ function renderHome(req, data) {
       </div>
     </div>
 
-    <!-- ── PORTÁL DO ALBION WORLD ── -->
-    <a href="/albion" class="dash-portal">
-      <div class="dash-portal-left">
-        <div class="dash-portal-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
-        </div>
-        <div>
-          <div class="dash-portal-eyebrow">Immersivní zážitek</div>
-          <div class="dash-portal-title">Vstup do Caledonia World</div>
-          <div class="dash-portal-sub">Interaktivní kancelář organizace — projdi prostorem a otevři jednotlivé sekce přímo odsud.</div>
+    ${(!isRestricted && canSklad) ? `
+    <!-- ── RYCHLÝ ZÁPIS — denní sekce (Weed/Drogy/Chemky/Účetnictví) bez chození na /sklad ── -->
+    <div class="quick-entry" id="quickEntryCard">
+      <div class="dash-widget-title"><span>Rychlý zápis</span><span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);text-transform:none;letter-spacing:0.02em">denní sklad &amp; finance</span></div>
+      <div class="quick-entry-tabs" id="qeTabs">
+        <button class="qe-tab active" data-tab="weed" onclick="qeTab('weed')">Weed</button>
+        <button class="qe-tab" data-tab="drogy" onclick="qeTab('drogy')">Drogy</button>
+        <button class="qe-tab" data-tab="chemky" onclick="qeTab('chemky')">Chemky</button>
+        <button class="qe-tab" data-tab="ucet" onclick="qeTab('ucet')">Účetnictví</button>
+      </div>
+
+      <div class="qe-typetoggle" id="qeTypeToggle"></div>
+
+      <div id="qePanelSklad">
+        <div class="qe-row">
+          <div class="form-group"><label id="qeItemLabel">Odrůda</label><select id="qeItem"></select></div>
+          <div class="form-group"><label>Množství</label><input type="number" id="qeQty" min="1" max="500" value="1"></div>
+          <button class="qe-submit" id="qeSubmitBtn" onclick="qeSubmitSklad()">Zapsat</button>
         </div>
       </div>
-      <span class="dash-portal-btn">
-        Vstoupit
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      </span>
-    </a>
+
+      <div id="qePanelUcet" style="display:none">
+        <div class="qe-row" style="grid-template-columns:110px 1fr 1fr auto">
+          <div class="form-group"><label>Valuta</label><select id="qeValuta"><option value="USD">SAD</option><option value="PESOS">Pesos</option></select></div>
+          <div class="form-group"><label>Částka</label><input type="number" id="qeCastka" min="1" placeholder="1000"></div>
+          <div class="form-group"><label>Poznámka</label><input type="text" id="qePoznamka" placeholder="Prodej zboží, plat…"></div>
+          <button class="qe-submit" id="qeSubmitUcetBtn" onclick="qeSubmitUcet()">Zapsat</button>
+        </div>
+      </div>
+
+      <div class="qe-hint" id="qeHint"></div>
+    </div>
+    ` : ''}
 
     ${isRestricted ? `
     <div class="dash-widget">
@@ -162,7 +183,7 @@ function renderHome(req, data) {
 
     <!-- ── AKTIVITA + OZNÁMENÍ ── -->
     <div class="dash-grid-2">
-      <div class="dash-widget">
+      <div class="dash-widget" id="activityWidget">
         <div class="dash-widget-title"><span>Poslední zápisy do rejstříku</span></div>
         <div id="activity-stream">${activityHtml}</div>
       </div>
@@ -171,16 +192,16 @@ function renderHome(req, data) {
           <div class="dash-notice-eyebrow">Rychlý přehled</div>
           <div class="dash-notice-title">Stav skladu</div>
           <div class="dash-notice-text">
-            Weed <strong style="color:var(--brass-bright)">${totalWeed} ks</strong> · Drogy <strong style="color:var(--brass-bright)">${totalDrogy} ks</strong><br>
-            Zbraně <strong style="color:var(--brass-bright)">${totalZbrane} ks</strong> · Chemikálie <strong style="color:var(--brass-bright)">${totalChemky} ks</strong>
+            Weed <strong style="color:var(--brass-bright)" id="qs-weed">${totalWeed} ks</strong> · Drogy <strong style="color:var(--brass-bright)" id="qs-drogy">${totalDrogy} ks</strong><br>
+            Zbraně <strong style="color:var(--brass-bright)">${totalZbrane} ks</strong> · Chemikálie <strong style="color:var(--brass-bright)" id="qs-chemky">${totalChemky} ks</strong>
           </div>
           ${canAccess(accessLevel, 'sklad-view') ? '<a href="/sklad" class="dash-notice-btn">Otevřít sklad →</a>' : ''}
         </div>
         <div class="dash-vault-card">
           <div class="dash-widget-title" style="margin-bottom:0.4rem">Stav trezoru</div>
-          <div class="dash-vault-value">$${ucet.usd.toLocaleString('cs-CZ')}</div>
-          <div class="dash-vault-track"><div class="dash-vault-fill" style="width:${Math.min(100, Math.round((ucet.usd / 60000) * 100))}%"></div></div>
-          <div class="dash-vault-caption"><span>Odhad. hodnota weedu</span><span>$${totalValue.toLocaleString('cs-CZ')}</span></div>
+          <div class="dash-vault-value" id="qs-usd-big">$${ucet.usd.toLocaleString('cs-CZ')}</div>
+          <div class="dash-vault-track"><div class="dash-vault-fill" id="qs-vault-fill" style="width:${Math.min(100, Math.round((ucet.usd / 60000) * 100))}%"></div></div>
+          <div class="dash-vault-caption"><span>Odhad. hodnota weedu</span><span id="qs-weed-value">$${totalValue.toLocaleString('cs-CZ')}</span></div>
         </div>
       </div>
     </div>
@@ -246,6 +267,109 @@ function renderHome(req, data) {
         if(ch) ch.textContent=t;
       }
       tick();setInterval(tick,1000);
+    })();
+
+    // ── RYCHLÝ ZÁPIS ──────────────────────────────────────────────────────
+    (function quickEntry(){
+      const card = document.getElementById('quickEntryCard');
+      if (!card) return;
+
+      const WEED_ITEMS = ["Žlutý kanabis","Zelený kanabis","Kanabis","Červený kanabis","Modrý kanabis"];
+      const DROGY_ITEMS = ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"];
+      const CHEMKY_ITEMS = ["Aceton","Peroxid vodíku","Potravinářský kofein","Propylenglykol","Toluen","Technický benzín","Bismut","Kyselina fosforečná","Kerosen","Pekáč","Genkadon","Amanita Genkia","Kapátka","Forma","Lithiová baterie","Semínko","Cukr","Nadrcené listy"];
+      const LABELS = { weed: 'Odrůda', drogy: 'Droga', chemky: 'Chemikálie' };
+      const ENDPOINTS = { weed: '/api/weed', drogy: '/api/drogy', chemky: '/api/chemky' };
+      const ITEMS = { weed: WEED_ITEMS, drogy: DROGY_ITEMS, chemky: CHEMKY_ITEMS };
+
+      let qeCurrentTab = 'weed';
+      let qeTyp = 'VKLAD';
+
+      function renderTypeToggle(){
+        const wrap = document.getElementById('qeTypeToggle');
+        if (qeCurrentTab === 'ucet') {
+          wrap.innerHTML =
+            '<button class="qe-type-btn on-in" id="qeTypePrijem" onclick="qeSetUcetTyp(\\'PŘÍJEM\\')">Příjem</button>' +
+            '<button class="qe-type-btn" id="qeTypeVydaj" onclick="qeSetUcetTyp(\\'VÝDAJ\\')">Výdaj</button>';
+          window._qeUcetTyp = 'PŘÍJEM';
+        } else {
+          wrap.innerHTML =
+            '<button class="qe-type-btn on-in" id="qeTypeVklad" onclick="qeSetTyp(\\'VKLAD\\')">Uložit</button>' +
+            '<button class="qe-type-btn" id="qeTypeVyber" onclick="qeSetTyp(\\'VÝBĚR\\')">Vybrat</button>';
+          qeTyp = 'VKLAD';
+        }
+      }
+
+      window.qeSetTyp = function(t){
+        qeTyp = t;
+        document.getElementById('qeTypeVklad').className = 'qe-type-btn' + (t==='VKLAD' ? ' on-in' : '');
+        document.getElementById('qeTypeVyber').className = 'qe-type-btn' + (t==='VÝBĚR' ? ' on-out' : '');
+      };
+      window.qeSetUcetTyp = function(t){
+        window._qeUcetTyp = t;
+        document.getElementById('qeTypePrijem').className = 'qe-type-btn' + (t==='PŘÍJEM' ? ' on-in' : '');
+        document.getElementById('qeTypeVydaj').className = 'qe-type-btn' + (t==='VÝDAJ' ? ' on-out' : '');
+      };
+
+      window.qeTab = function(tab){
+        qeCurrentTab = tab;
+        document.querySelectorAll('.qe-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        const isUcet = tab === 'ucet';
+        document.getElementById('qePanelSklad').style.display = isUcet ? 'none' : 'block';
+        document.getElementById('qePanelUcet').style.display = isUcet ? 'block' : 'none';
+        if (!isUcet) {
+          document.getElementById('qeItemLabel').textContent = LABELS[tab];
+          document.getElementById('qeItem').innerHTML = ITEMS[tab].map(i => '<option>'+i+'</option>').join('');
+        }
+        renderTypeToggle();
+        document.getElementById('qeHint').textContent = '';
+      };
+
+      window.qeSubmitSklad = async function(){
+        const btn = document.getElementById('qeSubmitBtn');
+        const qty = parseInt(document.getElementById('qeQty').value);
+        if (!Number.isInteger(qty) || qty < 1 || qty > 500) { showToast('Množství musí být 1–500', true); return; }
+        const item = document.getElementById('qeItem').value;
+        const payload = { typ: qeTyp, mnozstvi: qty };
+        if (qeCurrentTab === 'weed') payload.odruda = item;
+        else if (qeCurrentTab === 'drogy') payload.droga = item;
+        else payload.chemikalie = item;
+        btn.disabled = true;
+        try {
+          const res = await fetch(ENDPOINTS[qeCurrentTab], { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const d = await res.json();
+          if (d.ok) {
+            if (window.albionSealThud) window.albionSealThud();
+            if (window.rewardFlash) window.rewardFlash(card);
+            showToast(qeTyp + ' — ' + item + ' (' + qty + ' ks) zapsáno');
+            document.getElementById('qeHint').textContent = 'Naposledy zapsáno: ' + item + ' · ' + qty + ' ks';
+          } else showToast(d.error, true);
+        } catch (e) { showToast('Zápis se nepodařil', true); }
+        btn.disabled = false;
+      };
+
+      window.qeSubmitUcet = async function(){
+        const btn = document.getElementById('qeSubmitUcetBtn');
+        const castka = document.getElementById('qeCastka').value;
+        const poznamka = document.getElementById('qePoznamka').value.trim();
+        if (!castka || parseFloat(castka) <= 0) { showToast('Vyplň platnou částku', true); return; }
+        if (!poznamka) { showToast('Poznámka je povinná', true); return; }
+        const valuta = document.getElementById('qeValuta').value;
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/ucet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ typ: window._qeUcetTyp, castka, valuta, poznamka }) });
+          const d = await res.json();
+          if (d.ok) {
+            if (window.albionSealThud) window.albionSealThud();
+            if (window.rewardFlash) window.rewardFlash(card);
+            showToast('Zaznamenáno — ' + (valuta === 'USD' ? 'SAD ' : '₱') + castka);
+            document.getElementById('qeCastka').value = '';
+            document.getElementById('qePoznamka').value = '';
+          } else showToast(d.error, true);
+        } catch (e) { showToast('Zápis se nepodařil', true); }
+        btn.disabled = false;
+      };
+
+      qeTab('weed');
     })();
 
     // SSE — živé aktualizace

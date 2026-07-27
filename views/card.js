@@ -1,4 +1,6 @@
-// card.js — Albion v3 · Trading karta člena
+// views/card.js — Albion v5 · Trading karta člena · "Crimson & Cream"
+// Beze změny logiky — jen barvy v canvas exportu (stažitelný/kopírovatelný
+// obrázek karty) přepnuté na stejnou paletu jako zbytek webu (styles.js).
 
 const { baseStyles } = require('../styles');
 const { renderNav } = require('../nav');
@@ -31,8 +33,8 @@ function renderCard(req, icName) {
       const c=CARD;
       const photo=c.ic_photo||c.avatar_url||'/logo.png';
       // Rarity/foil dle hodnosti — sběratelská karta má vypadat jinak pro
-      // Founder/Council (zlatá fólie) než pro Senior Member (stříbrná) nebo
-      // řadového člena (obyčejná, bez fólie).
+      // Founder/Council (zlatá/krémová fólie) než pro Senior Member (stříbrná)
+      // nebo řadového člena (obyčejná, bez fólie).
       const rankStr=(c.rank||'');
       const foilClass = rankStr.includes('Founder') ? ' card-foil-gold' : (rankStr.includes('Senior') ? ' card-foil-silver' : '');
       const foilShine = rankStr.includes('Founder') ? '<div class="tc-foil-shine"></div>' : (rankStr.includes('Senior') ? '<div class="tc-foil-shine silver"></div>' : '');
@@ -66,7 +68,7 @@ function renderCard(req, icName) {
       enableTilt(document.getElementById('tradingCardEl'));
     }
 
-    // 3D tilt-hover (#12) — jemný náklon karty podle pozice kurzoru
+    // 3D tilt-hover — jemný náklon karty podle pozice kurzoru
     function enableTilt(el){
       if(!el)return;
       const MAX=9;
@@ -93,38 +95,38 @@ function renderCard(req, icName) {
       const ctx=canvas.getContext('2d');
       ctx.scale(SCALE,SCALE); // od teď kreslíme v "logických" souřadnicích 440×660, canvas je ale ostrý ve vysokém rozlišení
 
-      ctx.fillStyle='#10150F';ctx.fillRect(0,0,W,H);
+      ctx.fillStyle='#150F10';ctx.fillRect(0,0,W,H);
       const rankStrExp=(c.rank||'');
       const isGoldExp=rankStrExp.includes('Founder');
       const isSilverExp=rankStrExp.includes('Senior');
-      ctx.strokeStyle=isGoldExp?'#E0BD7F':(isSilverExp?'#B7AE99':'#B68A4E');
+      ctx.strokeStyle=isGoldExp?'#FFDEAD':(isSilverExp?'#C9BEAF':'#C9A671');
       ctx.lineWidth=2;ctx.strokeRect(1,1,W-2,H-2);
 
       const grad=ctx.createLinearGradient(0,0,W,170);
-      grad.addColorStop(0,'#6E1423');grad.addColorStop(1,'#4A0D18');
+      grad.addColorStop(0,'#7A0E24');grad.addColorStop(1,'#300711');
       ctx.fillStyle=grad;ctx.fillRect(0,0,W,180);
 
       // Rohové akcenty (stejný heraldický detail jako zbytek webu)
-      ctx.strokeStyle='#E0BD7F';ctx.lineWidth=1.4;
+      ctx.strokeStyle='#FFDEAD';ctx.lineWidth=1.4;
       ctx.beginPath();ctx.moveTo(14,28);ctx.lineTo(14,14);ctx.lineTo(28,14);ctx.stroke();
       ctx.beginPath();ctx.moveTo(W-28,H-14);ctx.lineTo(W-14,H-14);ctx.lineTo(W-14,H-28);ctx.stroke();
 
-      // Foil/rarity přechod — stejná logika jako živý náhled (#10): zlatá
+      // Foil/rarity přechod — stejná logika jako živý náhled: krémová
       // fólie pro Founder/Council, stříbrná pro Senior Member, žádná pro
       // řadového člena. Diagonální pásy napříč celou kartou.
       if(isGoldExp||isSilverExp){
         const shine=ctx.createLinearGradient(0,0,W,H);
-        const c1=isGoldExp?'rgba(224,189,127,0)':'rgba(183,174,153,0)';
-        const c2=isGoldExp?'rgba(224,189,127,0.35)':'rgba(183,174,153,0.30)';
+        const c1=isGoldExp?'rgba(255,222,173,0)':'rgba(201,190,175,0)';
+        const c2=isGoldExp?'rgba(255,222,173,0.35)':'rgba(201,190,175,0.30)';
         const c3=isGoldExp?'rgba(255,255,255,0.30)':'rgba(255,255,255,0.22)';
         shine.addColorStop(0,c1);shine.addColorStop(0.45,c2);shine.addColorStop(0.5,c3);shine.addColorStop(0.55,c2);shine.addColorStop(1,c1);
         ctx.fillStyle=shine;ctx.fillRect(0,0,W,H);
       }
 
       function drawPhotoAndText(){
-        ctx.font='700 26px Georgia';ctx.fillStyle='#EDE6D4';ctx.textAlign='center';
+        ctx.font='700 26px Georgia';ctx.fillStyle='#F6EEE4';ctx.textAlign='center';
         ctx.fillText(c.ic_name,W/2,232);
-        ctx.font='14px monospace';ctx.fillStyle='#B7AE99';
+        ctx.font='14px monospace';ctx.fillStyle='#C9BBAD';
         ctx.fillText('@'+(c.discord_username||'—')+' · '+c.rank,W/2,254);
 
         let y=305;
@@ -139,14 +141,14 @@ function renderCard(req, icName) {
           ['Povýšení', c.promotions.length+'×'],
         ];
         rows.forEach(([label,val])=>{
-          ctx.font='12.5px monospace';ctx.fillStyle='#7E7868';ctx.fillText(label,32,y);
-          ctx.font='13.5px monospace';ctx.fillStyle='#EDE6D4';ctx.textAlign='right';ctx.fillText(val,W-32,y);
+          ctx.font='12.5px monospace';ctx.fillStyle='#8C7C6E';ctx.fillText(label,32,y);
+          ctx.font='13.5px monospace';ctx.fillStyle='#F6EEE4';ctx.textAlign='right';ctx.fillText(val,W-32,y);
           ctx.textAlign='left';
           y+=37;
         });
 
-        ctx.font='600 9px "Cinzel",Georgia';ctx.fillStyle='#7E7868';ctx.textAlign='center';
-        ctx.fillText('A L B I O N',W/2,H-24);
+        ctx.font='600 9px "Cinzel",Georgia';ctx.fillStyle='#8C7C6E';ctx.textAlign='center';
+        ctx.fillText('C A L E D O N I A',W/2,H-24);
 
         finish();
       }
@@ -179,7 +181,7 @@ function renderCard(req, icName) {
         ctx.save();ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.clip();
         ctx.drawImage(img,sx,sy,side,side,CX-R,CY-R,R*2,R*2);
         ctx.restore();
-        ctx.strokeStyle='#E0BD7F';ctx.lineWidth=3.5;ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.stroke();
+        ctx.strokeStyle='#FFDEAD';ctx.lineWidth=3.5;ctx.beginPath();ctx.arc(CX,CY,R,0,Math.PI*2);ctx.stroke();
         drawPhotoAndText();
       };
       img.onerror=()=>drawPhotoAndText();

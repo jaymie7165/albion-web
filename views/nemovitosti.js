@@ -1,9 +1,6 @@
-// nemovitosti.js — Albion v4 · Nemovitosti (podsložka Majetku)
-// Realitní evidence organizace — fotky, postal, cena, popis. Lokace lze
-// označit jako viditelnou pro všechny, nebo jen pro vedení (Senior Member
-// a výš) — server /api/nemovitosti podle toho filtruje odpověď, takže
-// řadový člen o skryté lokaci vůbec neví. Karta jde stáhnout jako obrázek
-// (canvas) pro jasné a rychlé sdílení na Discordu.
+// views/nemovitosti.js — Albion v5 · Nemovitosti · "Crimson & Cream"
+// Beze změny logiky — jen barvy ve stažitelné kartě (canvas export) přepnuté
+// na stejnou paletu jako zbytek webu (styles.js).
 
 const { baseStyles } = require('../styles');
 const { renderNav } = require('../nav');
@@ -24,8 +21,8 @@ function renderNemovitosti(req) {
     .nem-photo{width:100%;aspect-ratio:16/10;background:var(--panel3);position:relative;overflow:hidden;flex-shrink:0}
     .nem-photo img{width:100%;height:100%;object-fit:cover;display:block}
     .nem-photo-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ivory-faint);font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.12em;text-transform:uppercase}
-    .nem-photo-count{position:absolute;bottom:0.6rem;right:0.6rem;background:rgba(0,0,0,0.65);color:var(--ivory);font-family:var(--font-mono);font-size:0.66rem;padding:0.15rem 0.5rem;border:1px solid rgba(182,138,78,0.4)}
-    .nem-postal{position:absolute;left:0.8rem;bottom:0.8rem;background:#EDE6D4;color:#15110C;font-family:var(--font-label);font-weight:700;font-size:0.78rem;letter-spacing:0.08em;padding:0.28rem 0.7rem;border:2px solid #15110C;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
+    .nem-photo-count{position:absolute;bottom:0.6rem;right:0.6rem;background:rgba(0,0,0,0.65);color:var(--ivory);font-family:var(--font-mono);font-size:0.66rem;padding:0.15rem 0.5rem;border:1px solid rgba(255,222,173,0.4)}
+    .nem-postal{position:absolute;left:0.8rem;bottom:0.8rem;background:#F6EEE4;color:#15110C;font-family:var(--font-label);font-weight:700;font-size:0.78rem;letter-spacing:0.08em;padding:0.28rem 0.7rem;border:2px solid #15110C;box-shadow:0 4px 16px rgba(0,0,0,0.5)}
     .nem-vedeni-tag{position:absolute;top:0.6rem;left:0.6rem;background:var(--oxblood);color:var(--ivory);font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.2rem 0.55rem;z-index:3}
     .nem-body{padding:1.2rem 1.3rem 1.3rem;display:flex;flex-direction:column;gap:0.55rem;flex:1}
     .nem-name{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:1.08rem;color:var(--ivory)}
@@ -287,8 +284,8 @@ function renderNemovitosti(req) {
       const canvas = document.createElement('canvas'); canvas.width=W*SCALE; canvas.height=H*SCALE;
       const ctx = canvas.getContext('2d'); ctx.scale(SCALE,SCALE);
 
-      ctx.fillStyle = '#10150F'; ctx.fillRect(0,0,W,H);
-      ctx.strokeStyle = '#B68A4E'; ctx.lineWidth = 2; ctx.strokeRect(1,1,W-2,H-2);
+      ctx.fillStyle = '#150F10'; ctx.fillRect(0,0,W,H);
+      ctx.strokeStyle = '#C9A671'; ctx.lineWidth = 2; ctx.strokeRect(1,1,W-2,H-2);
 
       const photoArea = { x:16, y:16, w:W-32, h:300 };
       const imgs = (it.images||[]).slice(0,4);
@@ -307,29 +304,29 @@ function renderNemovitosti(req) {
           ctx.restore();
         });
       } else {
-        ctx.fillStyle='#181F17'; ctx.fillRect(photoArea.x,photoArea.y,photoArea.w,photoArea.h);
-        ctx.font='12px monospace'; ctx.fillStyle='#7E7868'; ctx.textAlign='center';
+        ctx.fillStyle='#1B1314'; ctx.fillRect(photoArea.x,photoArea.y,photoArea.w,photoArea.h);
+        ctx.font='12px monospace'; ctx.fillStyle='#8C7C6E'; ctx.textAlign='center';
         ctx.fillText('Bez fotky', W/2, photoArea.y+photoArea.h/2);
       }
-      ctx.strokeStyle='#B68A4E'; ctx.lineWidth=1; ctx.strokeRect(photoArea.x,photoArea.y,photoArea.w,photoArea.h);
+      ctx.strokeStyle='#C9A671'; ctx.lineWidth=1; ctx.strokeRect(photoArea.x,photoArea.y,photoArea.w,photoArea.h);
 
       let y = photoArea.y + photoArea.h + 42;
       ctx.textAlign='left';
-      ctx.font='700 24px Georgia'; ctx.fillStyle='#EDE6D4';
+      ctx.font='700 24px Georgia'; ctx.fillStyle='#F6EEE4';
       ctx.fillText(it.nazev, 24, y);
       y += 30;
-      ctx.font='700 18px Georgia'; ctx.fillStyle='#E0BD7F';
+      ctx.font='700 18px Georgia'; ctx.fillStyle='#FFDEAD';
       ctx.fillText('$'+Math.round(it.cena).toLocaleString('en-US').replace(/,/g,' '), 24, y);
       y += 34;
 
-      ctx.font='11px monospace'; ctx.fillStyle='#7E7868';
+      ctx.font='11px monospace'; ctx.fillStyle='#8C7C6E';
       ctx.fillText('POSTAL', 24, y); y+=18;
-      ctx.font='16px monospace'; ctx.fillStyle='#EDE6D4';
+      ctx.font='16px monospace'; ctx.fillStyle='#F6EEE4';
       ctx.fillText(it.postal, 24, y); y+=32;
 
       if(it.popis){
-        ctx.font='11px monospace'; ctx.fillStyle='#7E7868'; ctx.fillText('POPIS', 24, y); y+=18;
-        ctx.font='13px Georgia'; ctx.fillStyle='#B7AE99';
+        ctx.font='11px monospace'; ctx.fillStyle='#8C7C6E'; ctx.fillText('POPIS', 24, y); y+=18;
+        ctx.font='13px Georgia'; ctx.fillStyle='#C9BBAD';
         const words = it.popis.split(' ');
         let line=''; const maxW=W-48;
         words.forEach(function(w){
@@ -340,7 +337,7 @@ function renderNemovitosti(req) {
         if(line){ ctx.fillText(line, 24, y); y+=18; }
       }
 
-      ctx.font='600 10px Georgia'; ctx.fillStyle='#7E7868'; ctx.textAlign='center';
+      ctx.font='600 10px Georgia'; ctx.fillStyle='#8C7C6E'; ctx.textAlign='center';
       ctx.fillText('CALEDONIA — NEMOVITOSTI', W/2, H-20);
 
       if(window.albionSealThud) window.albionSealThud();
