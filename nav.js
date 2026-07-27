@@ -1,9 +1,10 @@
-// nav.js — Albion v4 · "Executive Noir" navigace
+// nav.js — Albion v5 · "Crimson & Cream" navigace
 //
-// Nová struktura (redesign 2026): nahoře jediný čistý pruh se 6 sekcemi
-// (Dashboard · Evidence · Finance · Organizace · Analytika · Nastavení),
-// vlevo se po kliku/na aktivní stránce otevře kontextový sidebar s podstránkami
-// dané sekce, vpravo obsah — stejný vzor jako Linear/Notion/Stripe Dashboard.
+// Struktura beze změny oproti v4 (nahoře jediný pruh se sekcemi, vlevo
+// kontextový sidebar). JEDINÁ funkční změna oproti v4: skupina "Nastavení"
+// v topbaru byla odstraněna — mířila na stejnou URL (/profil) jako tlačítko
+// "Profil" vpravo v topbaru, takže to byly dva odkazy na to samé místo.
+// Teď existuje jen jeden jasný vstup do Profilu (vpravo, viz topbar-right).
 //
 // DŮLEŽITÉ: renderNav(req, active) má STEJNÝ podpis jako dřív a `active`
 // hodnoty, které mu předávají jednotlivé view soubory (server.js/views/*.js),
@@ -72,10 +73,9 @@ function renderNav(req, active) {
         { page: 'leaderboard', label: 'Aktivita', sub: 'Žebříček členů', href: '/leaderboard' },
       ].filter(Boolean),
     },
-    {
-      id: 'nastaveni', label: 'Nastavení', href: '/profil',
-      pages: [''], links: [],
-    },
+    // Skupina "Nastavení" byla odstraněna — mířila na stejnou URL (/profil)
+    // jako tlačítko "Profil" v topbar-right. Profil (a pro Founder/Council
+    // i sekce Organizace) je teď dostupný výhradně přes to jedno tlačítko.
   ].filter(g => g.href || g.links.length); // skupina bez odkazů (např. Finance pro Member) se v topbaru vůbec nezobrazí
 
   // Do které skupiny patří aktuální stránka
@@ -171,13 +171,13 @@ function renderNav(req, active) {
         </div>
         <div class="theme-switcher" title="Přepnout téma">
           <span class="theme-switcher-label">Téma</span>
-          <button class="theme-dot-btn" id="td-dark"  aria-label="Tmavý noir" style="background:#0A0A0D;border:1.5px solid #C9A227" onclick="setTheme('dark')"  title="Executive Noir"></button>
-          <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#F4F1EA;border:1.5px solid #8E2436" onclick="setTheme('light')" title="Pergamen"></button>
-          <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#F4F1EA,#0A0A0D,#F4F1EA);border:1.5px solid #C9A227" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
+          <button class="theme-dot-btn" id="td-dark"  aria-label="Tmavý noir" style="background:#0B0607;border:1.5px solid #FFDEAD" onclick="setTheme('dark')"  title="Crimson Noir"></button>
+          <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#FBF3E4;border:1.5px solid #DC143C" onclick="setTheme('light')" title="Krémový pergamen"></button>
+          <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#FBF3E4,#0B0607,#FBF3E4);border:1.5px solid #FFDEAD" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
         </div>
         <button class="nav-shortcut-hint" id="shortcutsHelpBtn" title="Zobrazit všechny klávesové zkratky (?)" onclick="openShortcutsHelp()" style="cursor:pointer">g·_ · ?</button>
         <span class="nav-user" style="border-left:2px solid ${({ 1: 'var(--oxblood-bright)', 2: 'var(--brass-bright)', 3: 'var(--ivory-faint)' })[accessLevel] || 'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${escapeHtml(ic)}</strong></span>
-        <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil & aliasy">Profil</a>
+        <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil, heslo, aliasy${req.session.realAccessLevel === 1 ? ' & správa organizace' : ''}">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
       </div>
     </nav>
@@ -399,6 +399,17 @@ function renderNav(req, active) {
         return html;
       };
 
+      // ── REWARD FEEDBACK — krátký puls/pop po úspěšném zápisu ──
+      // Používá se ze sklad.js i home.js (rychlý zápis) po úspěšném POSTu,
+      // ať zápis dat působí jako malý moment odměny, ne jen tichý formulář.
+      window.rewardFlash = function(el){
+        if (!el) return;
+        el.classList.remove('reward-flash','reward-pop');
+        void el.offsetWidth;
+        el.classList.add('reward-flash','reward-pop');
+        setTimeout(() => el.classList.remove('reward-flash','reward-pop'), 950);
+      };
+
       // ── CHYTRÝ FAVICON ──
       (function favicon(){
         let unread = 0;
@@ -413,7 +424,7 @@ function renderNav(req, active) {
             ctx.drawImage(img, 0, 0, size, size);
             if (unread > 0) {
               ctx.beginPath();
-              ctx.fillStyle = '#C23A50';
+              ctx.fillStyle = '#DC143C';
               ctx.arc(size-14, 14, 14, 0, 2*Math.PI);
               ctx.fill();
               ctx.fillStyle = '#fff';

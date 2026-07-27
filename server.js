@@ -1211,6 +1211,13 @@ function renderProfil(req, user, aliases) {
     </div>
     <p class="folio-footnote"><strong>Discord aliasy.</strong> Pokud Discord bot zapisuje do tabulky jiné jméno než tvoje IC jméno (např. <code style="background:var(--panel3);padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85em">j_jakuub</code>), přidej ho sem. Systém pak všechny záznamy pod tímto jménem přiřadí k tvému profilu.</p>
 
+    ${isFounderCouncil ? `
+    <div class="report-nav" style="margin-bottom:1.8rem">
+      <button class="report-nav-item active" id="ptab-btn-profil" onclick="profilTab('profil')">Profil</button>
+      <button class="report-nav-item" id="ptab-btn-organizace" onclick="profilTab('organizace')">Organizace</button>
+    </div>` : ''}
+
+    <div class="profil-tab-panel active" id="ptab-profil">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
 
       <div class="card">
@@ -1252,14 +1259,6 @@ function renderProfil(req, user, aliases) {
         <a href="/api/me/export" class="btn-submit" style="display:block;text-align:center;text-decoration:none;margin-top:0.6rem;background:transparent;border:1px solid var(--border-brass);color:var(--ivory-dim)">Stáhnout má data (JSON)</a>
       </div>
 
-      ${isFounderCouncil ? `
-      <div class="card">
-        <div class="card-header"><span class="card-title">Sezónní vzhled</span><span class="card-badge">Founder/Council</span></div>
-        <select id="season-select" onchange="setSeason(this.value)">
-          <option value="none">Žádný</option><option value="vanoce">Vánoce</option><option value="halloween">Halloween</option><option value="novy-rok">Nový rok</option>
-        </select>
-      </div>` : ''}
-
       <div class="card" style="grid-column:1/-1">
         <div class="card-header"><span class="card-title">Trading karta — IC údaje</span><span class="card-badge">Viditelné na kartě</span></div>
         <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1.2rem;line-height:1.7">Tyto údaje se zobrazí na tvé trading kartě. Fotku vlož přes <strong style="color:var(--brass-bright)">Ctrl+V</strong> (screenshot) nebo klikni a vyber soubor.</p>
@@ -1284,18 +1283,7 @@ function renderProfil(req, user, aliases) {
         </div>
       </div>
 
-      ${isFounderCouncil ? `
-      <div class="card" style="grid-column:1/-1">
-        <div class="card-header"><span class="card-title">Správa členů</span><span class="card-badge">Founder/Council</span></div>
-        <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1rem;line-height:1.7">Pokud se člen zamkne (zapomenuté heslo a nemůže / nechce použít Discord OAuth), můžeš mu tady vystavit nové dočasné heslo — pošle se mu přes Discord DM.</p>
-        <div id="admin-members-list"><div class="ledger-loading">Načítám členy…</div></div>
-        <div class="folio-rule tight"></div>
-        <div class="panel-list-label" style="font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.8rem">Stav Discord notifikací</div>
-        <div id="admin-discord-status"><div class="ledger-loading">Kontroluji…</div></div>
-      </div>` : ''}
-
     </div>
-
 
     <div style="margin-top:2rem;padding:1rem 1.4rem;background:var(--panel2);border:1px solid var(--border);font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)">
       <strong style="color:var(--brass)">Tvůj profil:</strong>
@@ -1303,9 +1291,37 @@ function renderProfil(req, user, aliases) {
       &nbsp;·&nbsp; Discord: <strong style="color:var(--ivory)">${escapeHtml(user.discord_username||'—')}</strong>
       &nbsp;·&nbsp; ID: <strong style="color:var(--ivory)">${escapeHtml(user.discord_id||'—')}</strong>
     </div>
+    </div><!-- /ptab-profil -->
+
+    ${isFounderCouncil ? `
+    <div class="profil-tab-panel" id="ptab-organizace">
+      <p class="folio-footnote"><strong>Organizace.</strong> Tahle záložka je viditelná jen pro Founder/Council — sezónní vzhled webu, správa hesel členů a stav Discord notifikací.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Sezónní vzhled</span><span class="card-badge">Founder/Council</span></div>
+          <select id="season-select" onchange="setSeason(this.value)">
+            <option value="none">Žádný</option><option value="vanoce">Vánoce</option><option value="halloween">Halloween</option><option value="novy-rok">Nový rok</option>
+          </select>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header"><span class="card-title">Správa členů</span><span class="card-badge">Founder/Council</span></div>
+          <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1rem;line-height:1.7">Pokud se člen zamkne (zapomenuté heslo a nemůže / nechce použít Discord OAuth), můžeš mu tady vystavit nové dočasné heslo — pošle se mu přes Discord DM.</p>
+          <div id="admin-members-list"><div class="ledger-loading">Načítám členy…</div></div>
+          <div class="folio-rule tight"></div>
+          <div class="panel-list-label" style="font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.8rem">Stav Discord notifikací</div>
+          <div id="admin-discord-status"><div class="ledger-loading">Kontroluji…</div></div>
+        </div>
+      </div>
+    </div>` : ''}
   </main>
 
   <script>
+    function profilTab(id){
+      document.querySelectorAll('.profil-tab-panel').forEach(function(p){ p.classList.toggle('active', p.id==='ptab-'+id); });
+      document.querySelectorAll('.report-nav-item').forEach(function(b){ b.classList.toggle('active', b.id==='ptab-btn-'+id); });
+    }
+    window.profilTab = profilTab;
+
     let aliases = ${aliasesJson};
     function escHtml(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
