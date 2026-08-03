@@ -171,6 +171,16 @@ function renderHome(req, data) {
     </div>
 
     <div class="dash-widget" style="margin-bottom:1.4rem">
+      <div class="dash-widget-title"><span>Vklad hotovosti (kufr auta)</span></div>
+      <div class="dash-notice-text" style="margin-bottom:0.8rem">Peníze nech v kufru auta. Jakmile je tam vložíš, nahlas to tady — vedení tak bude mít potvrzení, že jsi peníze opravdu vložil/a.</div>
+      <div class="qe-row" style="grid-template-columns:1fr auto">
+        <div class="form-group"><label>Částka (SAD)</label><input type="number" id="kufrCastka" min="1" placeholder="1000"></div>
+        <button class="qe-submit" id="kufrVkladBtn" onclick="kufrVklad()">Nahlásit vklad</button>
+      </div>
+      <div class="qe-hint" id="kufrVkladHint"></div>
+    </div>
+
+    <div class="dash-widget" style="margin-bottom:1.4rem">
       <div class="dash-widget-title">Rychlý přístup</div>
       <div class="dash-quick-grid">
         <a href="/kodex" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>Kodex</a>
@@ -495,6 +505,24 @@ function renderHome(req, data) {
           hint.textContent = 'Naposledy vzato: ' + qty + ' ks';
         } else showToast(d.error, true);
       } catch (e) { showToast('Zápis se nepodařil', true); }
+      btn.disabled = false;
+    };
+    window.kufrVklad = async function(){
+      const btn = document.getElementById('kufrVkladBtn');
+      const hint = document.getElementById('kufrVkladHint');
+      const castka = document.getElementById('kufrCastka').value;
+      if (!castka || parseFloat(castka) <= 0) { showToast('Vyplň platnou částku', true); return; }
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/kufr/vklad', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ castka }) });
+        const d = await res.json();
+        if (d.ok) {
+          if (window.albionSealThud) window.albionSealThud();
+          showToast('Vklad nahlášen — SAD ' + castka);
+          hint.textContent = 'Naposledy nahlášeno: SAD ' + castka;
+          document.getElementById('kufrCastka').value = '';
+        } else showToast(d.error, true);
+      } catch (e) { showToast('Nahlášení se nepodařilo', true); }
       btn.disabled = false;
     };
     (function memberDash(){
