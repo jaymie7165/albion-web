@@ -162,6 +162,15 @@ function renderHome(req, data) {
     </div>
 
     <div class="dash-widget" style="margin-bottom:1.4rem">
+      <div class="dash-widget-title"><span>Žlutý kanabis</span></div>
+      <div class="qe-row" style="grid-template-columns:1fr auto">
+        <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="1"></div>
+        <button class="qe-submit" id="yellowTakeBtn" onclick="yellowTake()">Vzít žlutý weed</button>
+      </div>
+      <div class="qe-hint" id="yellowTakeHint"></div>
+    </div>
+
+    <div class="dash-widget" style="margin-bottom:1.4rem">
       <div class="dash-widget-title">Rychlý přístup</div>
       <div class="dash-quick-grid">
         <a href="/kodex" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>Kodex</a>
@@ -471,6 +480,23 @@ function renderHome(req, data) {
 
     // ── MEMBER DASHBOARD — citát dne, profil, weed timery ──
     ${isRestricted ? `
+    window.yellowTake = async function(){
+      const btn = document.getElementById('yellowTakeBtn');
+      const hint = document.getElementById('yellowTakeHint');
+      const qty = parseInt(document.getElementById('yellowTakeQty').value);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 500) { showToast('Množství musí být 1–500', true); return; }
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/weed/yellow-take', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mnozstvi: qty }) });
+        const d = await res.json();
+        if (d.ok) {
+          if (window.albionSealThud) window.albionSealThud();
+          showToast('Žlutý kanabis — VÝBĚR (' + qty + ' ks) zapsáno');
+          hint.textContent = 'Naposledy vzato: ' + qty + ' ks';
+        } else showToast(d.error, true);
+      } catch (e) { showToast('Zápis se nepodařil', true); }
+      btn.disabled = false;
+    };
     (function memberDash(){
       const QUOTES = [
         '„Nechtějí být známí tím, jak hlasitě o sobě dávají vědět, ale tím, čeho dokážou dosáhnout."',
