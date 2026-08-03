@@ -14,7 +14,7 @@
 // Všechny globální JS funkce a id, na které se odkazují jiné view soubory
 // (window.showToast, ledgerEmptyHTML, skeletonRows, albionSealThud,
 // albionPaper, albionSound, window.evtSource, bumpUnread/clearUnread,
-// openGlobalSearch, openShortcutsHelp, setTheme, setViewAs…) zůstávají
+// openGlobalSearch, setTheme, setViewAs…) zůstávají
 // beze změny — mění se jen markup a vzhled navigace kolem nich.
 
 const { canAccess } = require('./roles');
@@ -175,7 +175,6 @@ function renderNav(req, active) {
           <button class="theme-dot-btn" id="td-light" aria-label="Světlý pergamen" style="background:#FBF3E4;border:1.5px solid #DC143C" onclick="setTheme('light')" title="Krémový pergamen"></button>
           <button class="theme-dot-btn" id="td-auto" aria-label="Automaticky dle denní doby" style="background:conic-gradient(from 180deg,#FBF3E4,#0B0607,#FBF3E4);border:1.5px solid #FFDEAD" onclick="setTheme('auto')" title="Auto — dle reálné denní doby"></button>
         </div>
-        <button class="nav-shortcut-hint" id="shortcutsHelpBtn" title="Zobrazit všechny klávesové zkratky (?)" onclick="openShortcutsHelp()" style="cursor:pointer">g·_ · ?</button>
         <span class="nav-user" style="border-left:2px solid ${({ 1: 'var(--oxblood-bright)', 2: 'var(--brass-bright)', 3: 'var(--ivory-faint)' })[accessLevel] || 'var(--ivory-faint)'};padding-left:0.6rem">člen &nbsp;<strong>${escapeHtml(ic)}</strong></span>
         <a href="/profil" class="nav-logout" style="border-color:var(--border-brass);color:var(--ivory-faint)" title="Profil, heslo, aliasy${req.session.realAccessLevel === 1 ? ' & správa organizace' : ''}">Profil</a>
         <a href="/logout" class="nav-logout">Odejít</a>
@@ -205,15 +204,6 @@ function renderNav(req, active) {
         <input type="text" id="globalSearchInput" placeholder="Jméno člena, SPZ, nemovitost, bazar…" style="margin-bottom:1rem">
         <div id="globalSearchResults" style="max-height:320px;overflow-y:auto"></div>
         <div class="modal-actions"><button class="modal-btn-cancel" style="flex:1" onclick="closeGlobalSearch()">Zavřít</button></div>
-      </div>
-    </div>
-
-    <!-- Přehled klávesových zkratek -->
-    <div class="modal-overlay" id="shortcutsModal">
-      <div class="modal-box" style="max-width:420px;text-align:left">
-        <div class="modal-title">Klávesové zkratky</div>
-        <dl class="modal-detail" id="shortcutsList"></dl>
-        <div class="modal-actions"><button class="modal-btn-cancel" style="flex:1" onclick="closeShortcutsHelp()">Zavřít</button></div>
       </div>
     </div>
 
@@ -715,30 +705,6 @@ function renderNav(req, active) {
         modal.addEventListener('click',(e)=>{ if(e.target===modal) closeGlobalSearch(); });
       })();
 
-      // ── PŘEHLED KLÁVESOVÝCH ZKRATEK ──
-      window.openShortcutsHelp=function(){
-        const list=document.getElementById('shortcutsList');
-        const rows=[
-          ['g h','Dashboard'],
-          ${can('sklad-view') ? "['g s','Sklad']," : ''}
-          ${can('blackbook') ? "['g b','Blackbook']," : ''}
-          ${can('profit-centrum') ? "['g p','Profit centrum']," : ''}
-          ${can('audit') ? "['g a','Audit']," : ''}
-          ${can('statistiky') ? "['g t','Statistiky']," : ''}
-          ${can('nastenska') ? "['g n','Nástěnka']," : ''}
-          ['g k','Kodex'],
-          ['g l','Historie'],
-          ['g o','Hierarchie'],
-          ['g w','Weed sázení'],
-          ['/','Hledat (v Auditu — jinde globální vyhledávání)'],
-          ['?','Tento přehled zkratek'],
-          ['Esc','Zavřít otevřené okno'],
-        ];
-        list.innerHTML=rows.map(([k,v])=>'<dt><span style="font-family:var(--font-mono);background:var(--panel3);padding:0.15rem 0.5rem;border:1px solid var(--border-brass)">'+k+'</span></dt><dd>'+v+'</dd>').join('');
-        document.getElementById('shortcutsModal').classList.add('open');
-      };
-      window.closeShortcutsHelp=function(){ document.getElementById('shortcutsModal').classList.remove('open'); };
-
       // ── PAGE TRANSITION ──
       (function pageTransition(){
         document.addEventListener('click',(e)=>{
@@ -752,34 +718,6 @@ function renderNav(req, active) {
           e.preventDefault();
           document.body.classList.add('page-leaving');
           setTimeout(()=>{location.href=url.href;},180);
-        });
-      })();
-
-      // ── KLÁVESOVÉ ZKRATKY ──
-      (function(){
-        const ROUTES = { h:'/home'${can('sklad-view') ? ", s:'/sklad'" : ''}${can('blackbook') ? ", b:'/blackbook'" : ''}${can('profit-centrum') ? ", p:'/profit-centrum'" : ''}${can('audit') ? ", a:'/audit'" : ''}${can('statistiky') ? ", t:'/statistiky'" : ''}${can('nastenska') ? ", n:'/nastenska'" : ''}, k:'/kodex', l:'/lore', o:'/hierarchy', w:'/weed-sazeni' };
-        let awaitingSecond = false, chordTimer = null;
-        function isTyping(el) { if(!el) return false; const tag=el.tagName; return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||el.isContentEditable; }
-        document.addEventListener('keydown', (e) => {
-          if (e.metaKey||e.ctrlKey||e.altKey) return;
-          if (isTyping(e.target)) { if(e.key==='Escape') e.target.blur(); return; }
-          if (awaitingSecond) {
-            awaitingSecond=false; clearTimeout(chordTimer);
-            const dest=ROUTES[e.key.toLowerCase()];
-            if(dest){e.preventDefault();window.location.href=dest;}
-            return;
-          }
-          if (e.key.toLowerCase()==='g') { awaitingSecond=true; clearTimeout(chordTimer); chordTimer=setTimeout(()=>{awaitingSecond=false;},900); return; }
-          if (e.key==='/') {
-            const target=document.getElementById('audit-search');
-            if(target){e.preventDefault();target.focus();}
-            else{e.preventDefault();if(window.openGlobalSearch)window.openGlobalSearch();}
-          }
-          if (e.key==='?') { e.preventDefault(); if(window.openShortcutsHelp) window.openShortcutsHelp(); }
-          if (e.key==='Escape') {
-            const gs=document.getElementById('globalSearchModal'); if(gs&&gs.classList.contains('open')&&window.closeGlobalSearch) closeGlobalSearch();
-            const sh=document.getElementById('shortcutsModal'); if(sh&&sh.classList.contains('open')&&window.closeShortcutsHelp) closeShortcutsHelp();
-          }
         });
       })();
     </script>

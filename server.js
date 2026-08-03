@@ -16,7 +16,7 @@ const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
 
-const { CONFIG, WEED_PLANT, METH_RECIPE } = require('./constants');
+const { CONFIG, WEED_PLANT, METH_RECIPE, CHEMKY_CENY } = require('./constants');
 const { makeStore } = require('./content-store');
 const { renderHome } = require('./views/home');
 const { renderDashboard } = require('./views/sklad');
@@ -1719,7 +1719,7 @@ app.post('/api/ucet', requireAuth, requireAccess('sklad'), async (req, res) => {
 });
 
 app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) => {
-  const { typ, chemikalie, mnozstvi } = req.body;
+  const { typ, chemikalie, mnozstvi, cenaZdroj, cenaVlastni, cenaVlastniMena } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
   const chemikalieTrim = (chemikalie || '').toString().trim();
@@ -1727,6 +1727,30 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   if (!inEnum(typUp, TYP_SKLAD))                        return res.json({ ok: false, error: 'Neplatný typ pohybu (VKLAD nebo VÝBĚR)' });
   if (!inList(chemikalieTrim, CONFIG.chemkyTypy))        return res.json({ ok: false, error: 'Nepovolená chemikálie' });
   if (!isQty(qty))                                       return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
+
+  // ── VOLITELNÝ ODEČET Z ÚČTU PŘI NÁKUPU (VKLADU) ─────────────────────────
+  // Člen si při vkladu může vybrat, jestli se má za nakoupenou chemikálii
+  // rovnou strhnout částka z hlavního účtu — buď dle "ceny z varny" (server
+  // si částku dopočítá SÁM z CHEMKY_CENY, klientovu matematiku nikdy
+  // nepřebírá), nebo "vlastní cenou" (člen zadá reálně zaplacenou částku,
+  // stejně jako u běžného ručního výdaje v Účetnictví). Bez volby (cenaZdroj
+  // chybí/'zadna', nebo typ VÝBĚR) se chová přesně jako dřív — žádný zápis
+  // do Účetnictví.
+  let ucetZapis = null;
+  const zdroj = (cenaZdroj || '').toString();
+  if (typUp === 'VKLAD' && (zdroj === 'vyrobni' || zdroj === 'vlastni')) {
+    if (zdroj === 'vyrobni') {
+      const cenik = CHEMKY_CENY[chemikalieTrim];
+      if (!cenik) return res.json({ ok: false, error: 'Pro tuto chemikálii není v ceníku z varny žádná cena — zvol vlastní cenu.' });
+      ucetZapis = { castka: Math.round(cenik.cena * qty * 100) / 100, valuta: cenik.mena === 'sad' ? 'USD' : 'PESOS', popis: 'cena z varny' };
+    } else {
+      const castkaVlastni = parseFloat(cenaVlastni);
+      if (!isAmount(castkaVlastni)) return res.json({ ok: false, error: 'Vyplň platnou vlastní cenu nákupu' });
+      const valutaVlastni = (cenaVlastniMena || '').toString().toUpperCase();
+      if (!inEnum(valutaVlastni, VALUTY)) return res.json({ ok: false, error: 'Neplatná měna vlastní ceny' });
+      ucetZapis = { castka: castkaVlastni, valuta: valutaVlastni, popis: 'vlastní cena' };
+    }
+  }
 
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
@@ -1740,6 +1764,22 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   broadcastSSE('skladUpdate', { sekce: 'chemky', typ: typUp, chemikalie: chemikalieTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
+
+  if (ucetZapis) {
+    const poznamka = `Nákup chemikálie — ${chemikalieTrim} (${qty} ks) [${ucetZapis.popis}]`;
+    try {
+      await sheets.appendRow('Účetnictví', [cas, 'VÝDAJ', ucetZapis.castka, ucetZapis.valuta, poznamka, uzivatel]);
+      await discord.notifyUcet('VÝDAJ', ucetZapis.castka, ucetZapis.valuta, poznamka, uzivatel);
+      checkPenizeMilestone().catch(() => {});
+      await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `VÝDAJ — ${ucetZapis.valuta === 'USD' ? 'SAD ' : '₱'}${ucetZapis.castka} | ${poznamka}`);
+      broadcastSSE('ucetUpdate', { typ: 'VÝDAJ', castka: ucetZapis.castka, valuta: ucetZapis.valuta, poznamka, uzivatel, cas });
+    } catch (e) {
+      console.error('[CHEMKY NÁKUP — ÚČETNICTVÍ]', e.message);
+      return res.json({ ok: true, ucetChyba: 'Chemikálie byla zapsána do skladu, ale odečet z účtu se nepodařil — dopiš ho prosím ručně do Účetnictví.' });
+    }
+    return res.json({ ok: true, ucetZapis: { castka: ucetZapis.castka, valuta: ucetZapis.valuta } });
+  }
+
   res.json({ ok: true });
 });
 

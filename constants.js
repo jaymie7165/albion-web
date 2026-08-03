@@ -26,6 +26,35 @@ const CONFIG = {
   // v Profit centru a hodnoty dřív uložené zde neodpovídaly realitě.
 };
 
+// ── CENÍK CHEMIKÁLIÍ ("cena z varny") ─────────────────────────────────────
+// Server-autoritativní zrcadlo ceníku, který má sklad.js i na frontendu (pro
+// živý náhled ceny při psaní množství). Používá se v /api/chemky, když člen
+// při VKLADU zvolí "cena z varny" — server si sám dopočítá částku podle
+// TÉTO tabulky (nikdy nedůvěřuje částce spočítané na klientovi), zapíše ji
+// jako VÝDAJ do Účetnictví a poznámkou odkáže na nákup dané chemikálie.
+// mena: 'pesos' nebo 'sad' — podle toho, ve které měně se položka reálně
+// nakupuje na varně.
+const CHEMKY_CENY = {
+  'Aceton':               { cena: 60,  mena: 'pesos' },
+  'Peroxid vodíku':       { cena: 40,  mena: 'pesos' },
+  'Bismut':               { cena: 55,  mena: 'pesos' },
+  'Kyselina fosforečná':  { cena: 75,  mena: 'pesos' },
+  'Potravinářský kofein': { cena: 80,  mena: 'pesos' },
+  'Propylenglykol':       { cena: 40,  mena: 'pesos' },
+  'Toluen':               { cena: 55,  mena: 'pesos' },
+  'Technický benzín':     { cena: 80,  mena: 'pesos' },
+  'Kerosen':              { cena: 120, mena: 'pesos' },
+  'Genkadon':             { cena: 130, mena: 'pesos' },
+  'Amanita Genkia':       { cena: 50,  mena: 'pesos' },
+  'Kapátka':              { cena: 1,   mena: 'sad' },
+  'Forma':                { cena: 50,  mena: 'sad' },
+  'Pekáč':                { cena: 16,  mena: 'sad' },
+  'Lithiová baterie':     { cena: 200, mena: 'sad' },
+  'Semínko':              { cena: 5,   mena: 'sad' },
+  'Cukr':                 { cena: 50,  mena: 'sad' },
+  'Nadrcené listy':       { cena: 1,   mena: 'sad' },
+};
+
 // ── WEED SÁZENÍ — recept a ceny na jednu kytku ────────────────────────────────
 // Každá položka: kolik kusů je potřeba na 1 kytku a kolik to celkem stojí.
 const WEED_PLANT = {
@@ -68,4 +97,4 @@ const METH_RECIPE = {
   },
 };
 
-module.exports = { CONFIG, WEED_PLANT, METH_RECIPE, GRAMU_NA_SACEK, pocetSacku };
+module.exports = { CONFIG, WEED_PLANT, METH_RECIPE, CHEMKY_CENY, GRAMU_NA_SACEK, pocetSacku };

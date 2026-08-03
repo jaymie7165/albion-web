@@ -86,3 +86,62 @@ sidebar beze změny.
   paletu automaticky přes `styles.js`, funkčně beze změny.
 - Automatizované testy / živé spuštění proti Discordu a Google Sheets —
   ověřeno jen staticky (`node --check`).
+
+---
+
+# Dávka 2 — oprava zpětné vazby a druhé kolo úprav
+
+## 7) nav.js — klávesové zkratky úplně odebrány
+Odstraněno: tlačítko "g·_ · ?" v topbaru, modal s přehledem zkratek,
+`openShortcutsHelp`/`closeShortcutsHelp`, celá chordová navigace (`g` + `h`/
+`s`/`b`/…), globální `/` pro focus vyhledávání a `?` pro nápovědu. Globální
+vyhledávání zůstává dostupné jen kliknutím na ikonu lupy v topbaru — funkčně
+beze změny, jen bez klávesové zkratky.
+
+## 8) Chemikálie — volba ceny nákupu při vkladu (server.js, constants.js, views/sklad.js)
+Nové: **`constants.js`** má `CHEMKY_CENY` (server-autoritativní ceník za
+kus, měna pesos/SAD — zrcadlí to, co dřív existovalo jen na frontendu ve
+`sklad.js`). `POST /api/chemky` nově přijímá při `typ:'VKLAD'` volitelně
+`cenaZdroj` (`'vyrobni'` | `'vlastni'` | `'zadna'`):
+- **`vyrobni`** — server si sám (nedůvěřuje klientovi) dopočítá částku ×
+  množství z `CHEMKY_CENY` a zapíše ji jako `VÝDAJ` do `Účetnictví`
+  (poznámka `Nákup chemikálie — <položka> (<qty> ks) [cena z varny]`).
+- **`vlastni`** — přijme částku + měnu zadanou uživatelem (stejná důvěra
+  jako u běžného ručního výdaje) a zapíše stejně jako výše.
+- **`zadna`** / bez pole — beze změny oproti původnímu chování (jen zápis
+  do skladu, žádný dopad na účet). Existující volání (např. rychlý zápis na
+  Home) tak dál fungují bez úprav.
+
+`views/sklad.js` — panel Chemikálie má při zvoleném VKLADU nový přepínač
+**Cena z varny / Vlastní cena / Bez záznamu** s živým náhledem částky
+(počítáno stejnou tabulkou jako dřív ve Výrobě) a — u vlastní ceny — polem
+na částku + měnu. Potvrzovací modal i toast po odeslání ukazují, kolik (a
+zda) se z účtu strhlo.
+
+*Pozn.: Rychlý zápis na Home (`views/home.js`) tuhle volbu záměrně nemá —
+zůstává jednoduchý a bez ceny, jak byl navržený. Cenu za nákup nastavíš na
+plné stránce Skladu.*
+
+## 9) Home — živé propisování aktivity a čísel (oprava)
+Dřív SSE eventy (`skladUpdate`, `ucetUpdate`) na Home jen vyvolaly toast —
+seznam "Poslední zápisy do rejstříku" ani horní čísla (zůstatek, hodnota
+weedu, stav skladu) se bez ručního refreshe stránky neaktualizovaly. Teď:
+- Nový záznam se rovnou **předsune do seznamu aktivity** (s krátkým
+  `rewardFlash` pulzem) a seznam se ořeže na posledních 7 položek.
+- Po každé události se přes `/api/sklad/summary` přetáhnou čerstvá čísla a
+  přepíšou se `tally-usd`, `tally-pesos`, `tally-weed-value`, `qs-weed`,
+  `qs-drogy`, `qs-chemky`, `qs-usd-big`, `qs-weed-value` i výplň ukazatele
+  trezoru — bez reloadu stránky.
+
+## 10) Home — bohatší dashboard pro Member/Associate
+Dřív viděl řadový člen na Home jen hodiny a jednu větu o omezeném přístupu.
+Teď (beze změny přístupových práv — pořád nevidí finance ani sklad):
+- **Citát dne** (stejná rotace citátů jako na `/lore`, jen inline).
+- **Tvůj profil** — hodnost a počet odznaků (`/api/me/session`,
+  `/api/me/achievements`).
+- **Weed sázení** — kolik kytek je právě dorostlých / kolik roste
+  (`/api/weed-timers`), s odkazem na plnou stránku.
+- **Rychlý přístup** — dlaždice na Kodex, Historii, Hierarchii, Garáž,
+  Bazar, Mentoring, Aktivitu (leaderboard) a Trading kartu/Profil — všechno
+  jsou stránky, na které Member/Associate stejně už měl přístup, jen dřív
+  nebyly z Home nijak vidět.
