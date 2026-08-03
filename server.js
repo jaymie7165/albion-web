@@ -3687,6 +3687,40 @@ app.post('/api/reserve-fund/pay', requireAuth, async (req, res) => {
   res.json({ ok: true, entry });
 });
 
+// ── KUFR AUTA — nahlášení vkladu hotovosti (SAD) ──────────────────────────────
+// Členi (level 3) nemají přístup na hlavní účet ('sklad' vyžaduje level <= 2) —
+// peníze proto fyzicky nechávají v kufru auta a tady jen NAHLÁSÍ, že je tam
+// vložili, ať má vedení potvrzení, že to opravdu udělal dotyčný člověk.
+// Zapisuje se do SAMOSTATNÉHO listu 'Kufr' — nikdy ne do hlavní 'Účetnictví',
+// takže se tím peníze na hlavní účet nepřipíšou samy od sebe. Senior Member
+// a výš mají přímý přístup na hlavní účet (/api/ucet) a peníze z kufru na
+// něj zapisují ručně, až je fyzicky vyzvednou.
+const KUFR_SHEET_NAME = 'Kufr';
+
+app.post('/api/kufr/vklad', requireAuth, async (req, res) => {
+  const { castka } = req.body;
+  const amount = parseFloat(castka);
+  if (!isAmount(amount)) return res.json({ ok: false, error: 'Neplatná částka (max 1 000 000)' });
+
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+  const poznamka = `Vklad do kufru auta — nahlásil/a ${uzivatel}`;
+
+  try {
+    // sheets.appendRow si list 'Kufr' sám vytvoří, pokud v tabulce chybí.
+    await sheets.appendRow(KUFR_SHEET_NAME, [cas, 'VKLAD', amount, 'USD', poznamka, uzivatel]);
+  } catch (e) {
+    console.error('[KUFR] Zápis do Sheets selhal:', e.message);
+    return res.status(502).json({ ok: false, error: 'Zápis se nepovedl, zkus to prosím znovu.' });
+  }
+
+  await discord.notifyAudit(KUFR_SHEET_NAME, uzivatel, discordUser, `VKLAD (kufr auta) — SAD ${amount}`);
+  broadcastSSE('kufrUpdate', { castka: amount, uzivatel, cas });
+
+  res.json({ ok: true });
+});
+
 const RESERVE_FUND_ALERT_FILE = path.join(DATA_DIR, 'reserve-fund-alert-sent.json');
 function loadLastReserveAlertWeek() { try { return JSON.parse(fs.readFileSync(RESERVE_FUND_ALERT_FILE, 'utf8')).week || null; } catch { return null; } }
 function saveLastReserveAlertWeek(week) { try { writeJsonAtomic(RESERVE_FUND_ALERT_FILE, { week }); } catch (e) {} }
