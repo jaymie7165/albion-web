@@ -647,6 +647,19 @@ function renderDashboard(req, data) {
                   <div class="form-group select-wrap"><label>Chemikálie</label><select id="chemky-chemikalie" class="select-expandable"><option>Aceton</option><option>Peroxid vodíku</option><option>Potravinářský kofein</option><option>Propylenglykol</option><option>Toluen</option><option>Technický benzín</option><option>Bismut</option><option>Kyselina fosforečná</option><option>Kerosen</option><option>Pekáč</option><option>Genkadon</option><option>Amanita Genkia</option><option>Kapátka</option><option>Forma</option><option>Lithiová baterie</option><option>Semínko</option><option>Cukr</option><option>Nadrcené listy</option></select><span class="select-count-badge">18</span></div>
                   <div class="form-group"><label>Množství (max 500)</label><input type="number" id="chemky-mnozstvi" min="1" max="500" value="1"></div>
                 </div>
+                <div id="chemky-cena-wrap">
+                  <div class="typ-toggle" style="margin-bottom:0.6rem">
+                    <button class="typ-btn active-vklad" id="chemky-cena-vyrobni" onclick="setChemkyCenaZdroj('vyrobni')">Cena z varny</button>
+                    <button class="typ-btn" id="chemky-cena-vlastni" onclick="setChemkyCenaZdroj('vlastni')">Vlastní cena</button>
+                    <button class="typ-btn" id="chemky-cena-zadna" onclick="setChemkyCenaZdroj('zadna')">Bez záznamu</button>
+                  </div>
+                  <input type="hidden" id="chemky-cena-zdroj" value="vyrobni">
+                  <div class="info-box" id="chemky-cena-preview" style="display:block"></div>
+                  <div class="form-row" id="chemky-cena-vlastni-row" style="display:none;margin-top:0.6rem">
+                    <div class="form-group"><label>Zaplaceno</label><input type="number" id="chemky-cena-vlastni-castka" min="0" placeholder="1000"></div>
+                    <div class="form-group"><label>Měna</label><select id="chemky-cena-vlastni-mena"><option value="PESOS">Pesos</option><option value="USD">SAD</option></select></div>
+                  </div>
+                </div>
                 <button class="btn-submit" onclick="submitChemky()">Potvrdit akci</button>
               </div>
             </div>
@@ -1236,6 +1249,10 @@ function renderDashboard(req, data) {
       btn.parentElement.querySelectorAll('.typ-btn').forEach(b=>b.className='typ-btn');
       btn.className='typ-btn '+(typ==='VKLAD'||typ==='PŘÍJEM'?'active-vklad':'active-vyber');
       if(prefix==='zbrane')document.getElementById('zbrane-ucel-wrap').style.display=typ==='VÝBĚR'?'flex':'none';
+      if(prefix==='chemky'){
+        const wrap=document.getElementById('chemky-cena-wrap');
+        if(wrap) wrap.style.display=typ==='VKLAD'?'block':'none';
+      }
     }
 
     async function post(url,data){
@@ -1393,18 +1410,73 @@ function renderDashboard(req, data) {
     (window.evtSource||new EventSource('/api/events')).addEventListener('reserveFundUpdate',()=>setTimeout(loadReserveFund,400));
     (window.evtSource||new EventSource('/api/events')).addEventListener('reserveFundConfigUpdate',()=>setTimeout(loadReserveFund,200));
 
+    // ── CHEMKY — CENA NÁKUPU (z varny / vlastní / bez záznamu) ──────────────
+    let chemkyCenaZdroj = 'vyrobni';
+    function setChemkyCenaZdroj(z){
+      chemkyCenaZdroj = z;
+      document.getElementById('chemky-cena-vyrobni').className = 'typ-btn' + (z==='vyrobni' ? ' active-vklad' : '');
+      document.getElementById('chemky-cena-vlastni').className = 'typ-btn' + (z==='vlastni' ? ' active-vklad' : '');
+      document.getElementById('chemky-cena-zadna').className = 'typ-btn' + (z==='zadna' ? ' active-vyber' : '');
+      document.getElementById('chemky-cena-vlastni-row').style.display = z==='vlastni' ? 'grid' : 'none';
+      updateChemkyCenaPreview();
+    }
+    window.setChemkyCenaZdroj = setChemkyCenaZdroj;
+    function updateChemkyCenaPreview(){
+      const box=document.getElementById('chemky-cena-preview');
+      if(!box)return;
+      const item=document.getElementById('chemky-chemikalie').value;
+      const qty=parseInt(document.getElementById('chemky-mnozstvi').value)||0;
+      if(chemkyCenaZdroj==='zadna'){ box.textContent='Bez odečtu z účtu — do skladu se zapíše jen množství.'; return; }
+      if(chemkyCenaZdroj==='vlastni'){ box.textContent='Zaplacená částka se rovnou zapíše jako výdaj do Účetnictví.'; return; }
+      const p=CHEMKY_CENY[item];
+      if(!p){ box.textContent='Pro tuto položku není v ceníku z varny cena — zvol vlastní cenu.'; return; }
+      const total=p.cena*qty;
+      const sym=p.mena==='sad'?'$':'₱';
+      box.textContent=qty+'× '+item+' × '+p.cena+' '+sym+'/ks = '+sym+total+' — odečte se z účtu jako výdaj.';
+    }
+    document.getElementById('chemky-chemikalie').addEventListener('change',updateChemkyCenaPreview);
+    document.getElementById('chemky-mnozstvi').addEventListener('input',updateChemkyCenaPreview);
+    setChemkyCenaZdroj('vyrobni');
+
     async function submitChemky(){
       if(!qtyValid('chemky-mnozstvi'))return showToast('Množství musí být 1–500 ks',true);
       const typ=document.getElementById('chemky-typ').value;
       const chemikalie=document.getElementById('chemky-chemikalie').value;
       const mnozstvi=document.getElementById('chemky-mnozstvi').value;
+
+      const payload={typ,chemikalie,mnozstvi};
+      const detaily=[['Typ',typ],['Chemikálie',chemikalie],['Množství',mnozstvi+' ks']];
+
+      if(typ==='VKLAD'){
+        payload.cenaZdroj=chemkyCenaZdroj;
+        if(chemkyCenaZdroj==='vyrobni'){
+          const p=CHEMKY_CENY[chemikalie];
+          if(!p) return showToast('Pro tuto položku není v ceníku z varny cena — zvol vlastní cenu',true);
+          detaily.push(['Odečte se z účtu', (p.mena==='sad'?'$':'₱')+(p.cena*parseInt(mnozstvi))+' (cena z varny)']);
+        } else if(chemkyCenaZdroj==='vlastni'){
+          const castka=document.getElementById('chemky-cena-vlastni-castka').value;
+          const mena=document.getElementById('chemky-cena-vlastni-mena').value;
+          if(!castka||parseFloat(castka)<=0) return showToast('Vyplň zaplacenou částku',true);
+          payload.cenaVlastni=castka;
+          payload.cenaVlastniMena=mena;
+          detaily.push(['Odečte se z účtu', (mena==='USD'?'$':'₱')+castka+' (vlastní cena)']);
+        } else {
+          detaily.push(['Odečet z účtu', 'žádný']);
+        }
+      }
+
       showModal(
         typ==='VKLAD'?'Vložit chemikálii':'Vybrat chemikálii',
         'Potvrzením zapečetíš zápis do rejstříku.',
-        [['Typ',typ],['Chemikálie',chemikalie],['Množství',mnozstvi+' ks']],
+        detaily,
         async()=>{
-          const r=await post('/api/chemky',{typ,chemikalie,mnozstvi});
-          if(r.ok){showToast('Chemikálie uložena');showUndoBar(typ+' — '+chemikalie+' ('+mnozstvi+' ks)');flashActivePanel();refreshSkladData();}
+          const r=await post('/api/chemky',payload);
+          if(r.ok){
+            showToast(r.ucetZapis ? ('Chemikálie uložena — z účtu odečteno '+(r.ucetZapis.valuta==='USD'?'$':'₱')+r.ucetZapis.castka) : 'Chemikálie uložena');
+            if(r.ucetChyba) showToast(r.ucetChyba,true);
+            showUndoBar(typ+' — '+chemikalie+' ('+mnozstvi+' ks)');
+            flashActivePanel();refreshSkladData();
+          }
           else showToast(r.error,true);
         }
       );

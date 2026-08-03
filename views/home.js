@@ -143,14 +143,37 @@ function renderHome(req, data) {
     ` : ''}
 
     ${isRestricted ? `
-    <div class="dash-widget">
-      <div class="dash-widget-title">Přístup</div>
-      <p style="font-family:var(--font-body);font-size:0.9rem;color:var(--ivory-dim);line-height:1.8">Finance a sklad jsou viditelné jen od hodnosti Senior Member výš. Pokud potřebuješ přístup, obrať se na Council nebo Foundera.</p>
+    <div class="dash-notice-card" id="memberQuoteCard" style="margin-bottom:1.4rem">
+      <div class="dash-notice-eyebrow">Citát dne</div>
+      <div class="dash-notice-title" id="memberQuoteText" style="font-style:italic">„…"</div>
+      <div class="dash-notice-text" style="margin-bottom:0">Caledonia — organizace postavená na ambicích, loajalitě a důvěře.</div>
     </div>
-    <div class="folio-rule"></div>
-    <div class="marginalia" style="border-left:none;max-width:260px;margin:1.5rem auto 0;text-align:center">
-      <div class="dash-hero-clock" id="live-clock" style="text-align:center;font-size:1rem">--:--:--</div>
-      <div class="dash-hero-date" style="text-align:center;margin-top:0.3rem">${dateStr}</div>
+
+    <div class="dash-grid-2">
+      <div class="dash-widget">
+        <div class="dash-widget-title"><span>Tvůj profil</span></div>
+        <div id="memberProfileBox"><div class="ledger-loading">Načítám…</div></div>
+      </div>
+      <div class="dash-widget">
+        <div class="dash-widget-title"><span>Weed sázení</span></div>
+        <div id="memberWeedBox"><div class="ledger-loading">Načítám…</div></div>
+        <a href="/weed-sazeni" class="dash-notice-btn" style="margin-top:1rem">Otevřít weed sázení →</a>
+      </div>
+    </div>
+
+    <div class="dash-widget" style="margin-bottom:1.4rem">
+      <div class="dash-widget-title">Rychlý přístup</div>
+      <div class="dash-quick-grid">
+        <a href="/kodex" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>Kodex</a>
+        <a href="/lore" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v4M16 3v4M4 9h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z"/></svg>Historie</a>
+        <a href="/hierarchy" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V12M5 19v-2a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="19" r="2"/></svg>Hierarchie</a>
+        <a href="/garaz" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13l2-6h14l2 6"/><rect x="2" y="13" width="20" height="6" rx="1"/><circle cx="7" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>Garáž</a>
+        <a href="/bazar" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8l1.5-4h13L20 8"/><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>Bazar</a>
+        <a href="/mentoring" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="7" r="3"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5c1.7.4 3 2 3 3.9 0 1.9-1.3 3.5-3 3.9M22 20c0-3-2.2-5.4-5-6"/></svg>Mentoring</a>
+        <a href="/leaderboard" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0Z"/><path d="M7 6H4v1a4 4 0 0 0 4 4M17 6h3v1a4 4 0 0 1-4 4"/></svg>Aktivita</a>
+        <a href="/karta" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M13 10h6M13 14h4"/></svg>Trading karta</a>
+        <a href="/profil" class="dash-quick-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-4 3.2-6.5 7-6.5s7 2.5 7 6.5"/></svg>Profil</a>
+      </div>
     </div>
     ` : `
     <!-- ── STAT ŘÁDEK ── -->
@@ -376,22 +399,118 @@ function renderHome(req, data) {
     const evtHome = new EventSource('/api/events');
     function bumpLive(msg) { showToast(msg); }
     const RESTRICTED_HOME = ${isRestricted ? 'true' : 'false'};
+    const SEKCE_ICONS_HOME = { 'Zbraně': '🔫', 'Weed': '🌿', 'Drogy': '💊', 'Chemky': '⚗️', 'Finance': '💰' };
+
+    function prependActivity(sekce, typ, detail, kdo, cas){
+      const stream = document.getElementById('activity-stream');
+      if (!stream) return;
+      const isIn = /VKLAD|PŘÍJEM/.test((typ||'').toUpperCase());
+      const row = document.createElement('div');
+      row.className = 'dash-activity-item';
+      row.innerHTML =
+        '<div class="dash-activity-left">' +
+          '<div class="dash-activity-icon">' + (SEKCE_ICONS_HOME[sekce] || '·') + '</div>' +
+          '<div><div class="dash-activity-text"><strong style="color:' + (isIn ? '#7BD69B' : 'var(--oxblood-bright)') + ';font-weight:600">' + typ + '</strong> · ' + detail + ' <span style="color:var(--ivory-faint)">— ' + kdo + '</span></div></div>' +
+        '</div>' +
+        '<div class="dash-activity-time">' + cas + '</div>';
+      const emptyState = stream.querySelector('.ledger-empty');
+      if (emptyState) stream.innerHTML = '';
+      stream.prepend(row);
+      if (window.rewardFlash) window.rewardFlash(row);
+      while (stream.children.length > 7) stream.lastElementChild.remove();
+    }
+
+    async function refreshHomeStats(){
+      try {
+        const res = await fetch('/api/sklad/summary', { cache: 'no-store' });
+        const d = await res.json();
+        if (!d.ok) return;
+        const WEED_P = { "Žlutý kanabis": 165, "Zelený kanabis": 165, "Kanabis": 165, "Červený kanabis": 165, "Modrý kanabis": 165 };
+        let totalValue = 0; Object.entries(d.weed).forEach(([k, q]) => { if (q > 0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
+        const totalWeed = Object.values(d.weed).filter(q => q > 0).reduce((a, b) => a + b, 0);
+        const totalDrogy = Object.values(d.drogy).filter(q => q > 0).reduce((a, b) => a + b, 0);
+        const totalChemky = Object.values(d.chemky || {}).filter(q => q > 0).reduce((a, b) => a + b, 0);
+        const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+        set('tally-usd', '$' + d.ucet.usd.toLocaleString('cs-CZ'));
+        set('tally-pesos', '₱' + d.ucet.pesos.toLocaleString('cs-CZ'));
+        set('tally-weed-value', '$' + totalValue.toLocaleString('cs-CZ'));
+        set('qs-weed', totalWeed + ' ks');
+        set('qs-drogy', totalDrogy + ' ks');
+        set('qs-chemky', totalChemky + ' ks');
+        set('qs-usd-big', '$' + d.ucet.usd.toLocaleString('cs-CZ'));
+        set('qs-weed-value', '$' + totalValue.toLocaleString('cs-CZ'));
+        const fill = document.getElementById('qs-vault-fill');
+        if (fill) fill.style.width = Math.min(100, Math.round((d.ucet.usd / 60000) * 100)) + '%';
+      } catch (e) {}
+    }
+
     evtHome.addEventListener('skladUpdate', (e) => {
       if (RESTRICTED_HOME) return;
       const d = JSON.parse(e.data);
-      const label = d.sekce==='zbrane'?'Zbraně':d.sekce==='weed'?'Weed':'Drogy';
-      bumpLive(label + ' · ' + d.typ + ' — ' + (d.polozka||d.odruda||d.droga) + ' (' + d.qty + ' ks)');
+      const sekceLabel = d.sekce==='zbrane'?'Zbraně':d.sekce==='weed'?'Weed':d.sekce==='chemky'?'Chemky':d.sekce==='undo'?null:'Drogy';
+      const item = d.polozka||d.odruda||d.droga||d.chemikalie||'';
+      if (sekceLabel) {
+        bumpLive(sekceLabel + ' · ' + d.typ + ' — ' + item + ' (' + d.qty + ' ks)');
+        prependActivity(sekceLabel, d.typ, item + ' · ' + d.qty + ' ks', d.uzivatel, d.cas);
+      }
+      refreshHomeStats();
     });
     evtHome.addEventListener('ucetUpdate', (e) => {
       if (RESTRICTED_HOME) return;
       const d = JSON.parse(e.data);
       bumpLive('Finance · ' + d.typ + ' — ' + (d.valuta==='USD'?'SAD ':'₱') + d.castka);
+      const sym = d.valuta === 'USD' ? 'SAD ' : '₱';
+      prependActivity('Finance', d.typ, sym + d.castka + ' — ' + (d.poznamka || '—'), d.uzivatel, d.cas);
+      refreshHomeStats();
     });
     evtHome.addEventListener('nastenska', (e) => {
       if (RESTRICTED_HOME) return;
       const d = JSON.parse(e.data);
       bumpLive('Oznámení: ' + d.title);
     });
+
+    // ── MEMBER DASHBOARD — citát dne, profil, weed timery ──
+    ${isRestricted ? `
+    (function memberDash(){
+      const QUOTES = [
+        '„Nechtějí být známí tím, jak hlasitě o sobě dávají vědět, ale tím, čeho dokážou dosáhnout."',
+        '„Důvěra se nedává. Důvěra se vydobývá, čin po činu."',
+        '„Caledonia nestaví na strachu. Staví na slovu, které platí."',
+        '„Kdo nemá ambice, nemá v Caledonii místo."',
+      ];
+      const day = Math.floor(Date.now() / 86400000);
+      const q = document.getElementById('memberQuoteText');
+      if (q) q.textContent = QUOTES[day % QUOTES.length];
+
+      const RANK_LABEL = { 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member/Associate' };
+      Promise.all([
+        fetch('/api/me/session').then(r=>r.json()).catch(()=>null),
+        fetch('/api/me/achievements').then(r=>r.json()).catch(()=>null),
+      ]).then(([session, ach]) => {
+        const box = document.getElementById('memberProfileBox');
+        if (!box) return;
+        if (!session || !session.ok) { box.innerHTML = '<div style="color:var(--ivory-faint)">Nelze načíst profil</div>'; return; }
+        const earnedCount = (ach && ach.ok) ? ach.earned.length : 0;
+        box.innerHTML =
+          '<div class="manifest-row"><span class="mr-name">Hodnost</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--brass-bright)">' + (RANK_LABEL[session.accessLevel] || '—') + '</span></div>' +
+          '<div class="manifest-row"><span class="mr-name">Odznaky</span><span class="mr-dots"></span><span class="mr-val">' + earnedCount + '×</span></div>';
+      }).catch(() => {});
+
+      fetch('/api/weed-timers').then(r=>r.json()).then(d => {
+        const box = document.getElementById('memberWeedBox');
+        if (!box || !d.ok) return;
+        const now = d.now || Date.now();
+        const ready = (d.timers || []).filter(t => t.endsAt <= now).length;
+        const growing = (d.timers || []).length - ready;
+        box.innerHTML =
+          '<div class="manifest-row"><span class="mr-name">Dorostlé kytky</span><span class="mr-dots"></span><span class="mr-val" style="color:' + (ready ? '#7BD69B' : 'var(--ivory-faint)') + '">' + ready + '</span></div>' +
+          '<div class="manifest-row"><span class="mr-name">Právě rostou</span><span class="mr-dots"></span><span class="mr-val">' + growing + '</span></div>';
+      }).catch(() => {
+        const box = document.getElementById('memberWeedBox');
+        if (box) box.innerHTML = '<div style="color:var(--ivory-faint)">Nelze načíst</div>';
+      });
+    })();
+    ` : ''}
 
     // ── TÝDENNÍ SOUHRN ──
     ${!isRestricted ? `
