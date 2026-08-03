@@ -1670,6 +1670,32 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   res.json({ ok: true, celkVyroba: ceny.vyroba * qty, celkProdej: ceny.prodej * qty });
 });
 
+// Zvláštní, úmyslně omezená routa: členi (level 3) nemají obecný přístup ke skladu
+// ('sklad' vyžaduje level <= 2), ale smí si sami vzít žlutý kanabis. Typ pohybu i
+// odrůda jsou napevno dané (jen VÝBĚR žlutého), takže se tím nijak neotvírá zbytek skladu.
+app.post('/api/weed/yellow-take', requireAuth, async (req, res) => {
+  const { mnozstvi } = req.body;
+  const qty = parseInt(mnozstvi);
+  const typUp = 'VÝBĚR';
+  const odruda_trim = 'Žlutý kanabis';
+
+  if (!isQty(qty)) return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
+
+  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 165 };
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+  const { rowIndex } = await sheets.appendRowTracked('Weed', [cas, typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel]);
+  recordLastAction(uzivatel, 'Weed', rowIndex, `${typUp} — ${odruda_trim} (${qty} sáčků)`);
+  await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel, req.session.accessLevel);
+  sheets.getStockSummary('Weed').then(stav => discord.checkNizkaZasoba('weed', odruda_trim, typUp, qty, stav[odruda_trim], loadThresholds().weed)).catch(() => {});
+  checkStockMilestone('weed', 'Weed').catch(() => {});
+  await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
+  broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+  res.json({ ok: true });
+});
+
 app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { typ, droga, mnozstvi } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
