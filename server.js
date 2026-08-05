@@ -12,6 +12,28 @@ const sheets  = require('./sheets');
 const { escapeHtml, writeJsonAtomic, buildNameMap, normalizeName } = require('./utils');
 const { ACHIEVEMENTS } = require('./achievements');
 
+// ── NEVYŘÍZENÉ AKCE MEMBERŮ — žlutý weed / vklady do kufru ──────────────────
+// Když member odebere žlutý weed nebo nahlásí vklad do kufru, vedení potřebuje
+// vědět, kdo to ještě "nevypořádal" (nezaplatil / peníze fyzicky nevyzvednuty).
+// Tabulka drží jednoduchý seznam s příznakem vyrizeno 0/1, který si vedení
+// samo přepíná tlačítkem "Spárovat" na stránce /sklad → panel "Nevyřízené".
+db.prepare(`CREATE TABLE IF NOT EXISTS nevyrizene_akce (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  typ TEXT NOT NULL,
+  uzivatel TEXT NOT NULL,
+  popis TEXT NOT NULL,
+  cas TEXT NOT NULL,
+  vyrizeno INTEGER NOT NULL DEFAULT 0,
+  vyrizil TEXT,
+  vyrizeno_cas TEXT
+)`).run();
+function flagNevyrizeno(typ, uzivatel, popis, cas) {
+  try {
+    db.prepare('INSERT INTO nevyrizene_akce (typ, uzivatel, popis, cas, vyrizeno) VALUES (?, ?, ?, ?, 0)')
+      .run(typ, uzivatel, popis, cas);
+  } catch (e) { console.error('[NEVYRIZENE]', e.message); }
+}
+
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
@@ -1692,6 +1714,7 @@ app.post('/api/weed/yellow-take', requireAuth, async (req, res) => {
   checkStockMilestone('weed', 'Weed').catch(() => {});
   await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
   broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
+  flagNevyrizeno('Žlutý weed', uzivatel, `${qty} sáčků`, cas);
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   res.json({ ok: true });
 });
@@ -3717,8 +3740,33 @@ app.post('/api/kufr/vklad', requireAuth, async (req, res) => {
 
   await discord.notifyAudit(KUFR_SHEET_NAME, uzivatel, discordUser, `VKLAD (kufr auta) — SAD ${amount}`);
   broadcastSSE('kufrUpdate', { castka: amount, uzivatel, cas });
+  flagNevyrizeno('Vklad (kufr)', uzivatel, `SAD ${amount}`, cas);
 
   res.json({ ok: true });
+});
+
+// GET — seznam nevyřízených (a naposledy vyřízených) akcí pro vedení.
+app.get('/api/nevyrizene', requireAuth, requireAccess('sklad'), (req, res) => {
+  try {
+    const nevyrizene = db.prepare('SELECT * FROM nevyrizene_akce WHERE vyrizeno = 0 ORDER BY id DESC LIMIT 200').all();
+    const vyrizene = db.prepare('SELECT * FROM nevyrizene_akce WHERE vyrizeno = 1 ORDER BY id DESC LIMIT 50').all();
+    res.json({ ok: true, nevyrizene, vyrizene });
+  } catch (e) {
+    console.error('[NEVYRIZENE]', e.message);
+    res.status(500).json({ ok: false, error: 'Načtení se nepodařilo' });
+  }
+});
+
+// POST — přepnutí stavu (spárovat / vrátit zpět). requireAccess('sklad') = jen Senior Member a výš.
+app.post('/api/nevyrizene/vyresit', requireAuth, requireAccess('sklad'), (req, res) => {
+  const id = parseInt(req.body.id);
+  if (!Number.isInteger(id)) return res.json({ ok: false, error: 'Neplatné ID' });
+  const row = db.prepare('SELECT * FROM nevyrizene_akce WHERE id = ?').get(id);
+  if (!row) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  const novyStav = row.vyrizeno ? 0 : 1;
+  db.prepare('UPDATE nevyrizene_akce SET vyrizeno = ?, vyrizil = ?, vyrizeno_cas = ? WHERE id = ?')
+    .run(novyStav, novyStav ? req.session.icName : null, novyStav ? sheets.timestamp() : null, id);
+  res.json({ ok: true, vyrizeno: !!novyStav });
 });
 
 const RESERVE_FUND_ALERT_FILE = path.join(DATA_DIR, 'reserve-fund-alert-sent.json');
