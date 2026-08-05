@@ -76,6 +76,7 @@ function renderDashboard(req, data) {
     { id: 'vyroba', label: 'Výroba',     sub: 'Substance',   icon: '⚒' },
     { id: 'smena',  label: 'Směnárna',   sub: 'SAD ⇄ Pesos', icon: '⇄' },
     { id: 'cenik',  label: 'Ceník',      sub: 'Referenční ceny', icon: '$' },
+    { id: 'nevyrizene', label: 'Nevyřízené', sub: 'Weed & kufr od membérů', icon: '⚑' },
   ];
   const memberOnly = (req.session.accessLevel || 3) >= 3;
   let sekceMeta = memberOnly
@@ -387,7 +388,7 @@ function renderDashboard(req, data) {
             </div>
           </div>`).join('')}
         <div class="sklad-sidebar-more-toggle" id="skladMoreToggle" onclick="skladToggleMore()">
-          <span>Více — Zbraně, Výroba, Směnárna, Ceník</span>
+          <span>Více — Zbraně, Výroba, Směnárna, Ceník, Nevyřízené</span>
           <span class="more-arrow">▾</span>
         </div>
         <div class="sklad-sidebar-secondary" id="skladSecondary">
@@ -749,6 +750,26 @@ function renderDashboard(req, data) {
           </div>
         </div>
 
+        <!-- Nevyřízené -->
+        <div class="sklad-panel" id="panel-nevyrizene">
+          <div class="panel-card">
+            <div class="panel-head">
+              <span class="panel-title">Nevyřízené akce</span>
+              <span class="panel-badge">Žlutý weed &amp; vklady do kufru od membérů</span>
+            </div>
+            <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
+              Sem se automaticky přidá záznam pokaždé, když si member vezme žlutý weed nebo nahlásí vklad do kufru auta. Jakmile je to s daným člověkem vyřešené (zaplatil / peníze byly reálně vyzvednuty), klikni na <strong style="color:var(--brass-bright)">Spárovat</strong> — záznam zůstane v historii, jen se označí jako vyřízený.
+            </p>
+            <div class="panel-list-label" style="margin-bottom:0.9rem">Nevyřízené (<span id="nevyrizene-count">—</span>)</div>
+            <div id="nevyrizene-list"><div class="ledger-loading">Načítám…</div></div>
+
+            <div class="folio-rule"></div>
+
+            <div class="panel-list-label" style="margin-bottom:0.9rem">Naposledy vyřízené</div>
+            <div id="vyrizene-list"></div>
+          </div>
+        </div>
+
       </div>
     </div>
   </main>
@@ -850,6 +871,7 @@ function renderDashboard(req, data) {
       document.querySelectorAll('.sklad-sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.panel===id));
       document.querySelectorAll('.sklad-panel').forEach(el=>el.classList.toggle('active',el.id==='panel-'+id));
       try{localStorage.setItem('albion_sklad_tab',id);}catch(e){}
+      if(id==='nevyrizene' && window.loadNevyrizene) window.loadNevyrizene();
     }
     function skladToggleMore(){
       const sec=document.getElementById('skladSecondary');
@@ -863,7 +885,7 @@ function renderDashboard(req, data) {
     (function restoreTab(){
       try{
         const secOpen=localStorage.getItem('albion_sklad_more_open')==='1';
-        const SECONDARY_IDS=['zbrane','vyroba','smena','cenik'];
+        const SECONDARY_IDS=['zbrane','vyroba','smena','cenik','nevyrizene'];
         const saved=localStorage.getItem('albion_sklad_tab');
         if(secOpen || (saved && SECONDARY_IDS.includes(saved))) skladToggleMore();
         if(saved&&document.getElementById('panel-'+saved))skladTab(saved);
@@ -1205,6 +1227,44 @@ function renderDashboard(req, data) {
       });
     }
     window.switchVyrobaRecept = switchVyrobaRecept;
+
+    // ── NEVYŘÍZENÉ — žlutý weed / vklady do kufru od membérů, čekající na spárování ──
+    function nevyrizeneRow(row){
+      return '<div class="sklad-row" data-nevyrizene-id="'+row.id+'">'+
+        '<span style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">'+
+          '<span class="badge '+(row.vyrizeno?'vklad':'vyber')+'">'+(row.vyrizeno?'Vyřízeno':'Čeká')+'</span>'+
+          '<strong style="color:var(--ivory)">'+row.typ+'</strong>'+
+          '<span style="color:var(--ivory-dim)">'+row.uzivatel+'</span>'+
+          '<em style="color:var(--ivory-faint);font-style:normal;font-size:0.82em">'+row.popis+' · '+row.cas+(row.vyrizeno&&row.vyrizil?' · spároval '+row.vyrizil:'')+'</em>'+
+        '</span>'+
+        '<button class="quick-btn" onclick="toggleNevyrizene('+row.id+')">'+(row.vyrizeno?'Vrátit mezi nevyřízené':'Spárovat')+'</button>'+
+      '</div>';
+    }
+    async function loadNevyrizene(){
+      const listEl=document.getElementById('nevyrizene-list');
+      const vyrEl=document.getElementById('vyrizene-list');
+      const countEl=document.getElementById('nevyrizene-count');
+      if(!listEl)return;
+      try{
+        const res=await fetch('/api/nevyrizene');
+        const d=await res.json();
+        if(!d.ok){listEl.innerHTML='<div class="info-box" style="display:block">Načtení se nepodařilo.</div>';return;}
+        countEl.textContent=d.nevyrizene.length;
+        listEl.innerHTML=d.nevyrizene.length?d.nevyrizene.map(nevyrizeneRow).join(''):'<div class="ledger-loading">Žádné nevyřízené akce</div>';
+        if(vyrEl)vyrEl.innerHTML=d.vyrizene.length?d.vyrizene.map(nevyrizeneRow).join(''):'<div class="ledger-loading">Zatím nic</div>';
+      }catch(e){listEl.innerHTML='<div class="info-box" style="display:block">Načtení se nepodařilo.</div>';}
+    }
+    async function toggleNevyrizene(id){
+      try{
+        const res=await fetch('/api/nevyrizene/vyresit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+        const d=await res.json();
+        if(d.ok){showToast(d.vyrizeno?'Spárováno':'Vráceno mezi nevyřízené');loadNevyrizene();}
+        else showToast(d.error,true);
+      }catch(e){showToast('Nepodařilo se, zkus to znovu',true);}
+    }
+    window.loadNevyrizene=loadNevyrizene;
+    window.toggleNevyrizene=toggleNevyrizene;
+    if(document.getElementById('panel-nevyrizene')&&document.getElementById('panel-nevyrizene').classList.contains('active'))loadNevyrizene();
 
     // Potvrzení výroby — server si sám znovu ověří aktuální sklad chemikálií,
     // odečte suroviny a rovnou přičte hotový Metamfetamin do skladu drog.
