@@ -12,28 +12,6 @@ const sheets  = require('./sheets');
 const { escapeHtml, writeJsonAtomic, buildNameMap, normalizeName } = require('./utils');
 const { ACHIEVEMENTS } = require('./achievements');
 
-// ── NEVYŘÍZENÉ AKCE MEMBERŮ — žlutý weed / vklady do kufru ──────────────────
-// Když member odebere žlutý weed nebo nahlásí vklad do kufru, vedení potřebuje
-// vědět, kdo to ještě "nevypořádal" (nezaplatil / peníze fyzicky nevyzvednuty).
-// Tabulka drží jednoduchý seznam s příznakem vyrizeno 0/1, který si vedení
-// samo přepíná tlačítkem "Spárovat" na stránce /sklad → panel "Nevyřízené".
-db.prepare(`CREATE TABLE IF NOT EXISTS nevyrizene_akce (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  typ TEXT NOT NULL,
-  uzivatel TEXT NOT NULL,
-  popis TEXT NOT NULL,
-  cas TEXT NOT NULL,
-  vyrizeno INTEGER NOT NULL DEFAULT 0,
-  vyrizil TEXT,
-  vyrizeno_cas TEXT
-)`).run();
-function flagNevyrizeno(typ, uzivatel, popis, cas) {
-  try {
-    db.prepare('INSERT INTO nevyrizene_akce (typ, uzivatel, popis, cas, vyrizeno) VALUES (?, ?, ?, ?, 0)')
-      .run(typ, uzivatel, popis, cas);
-  } catch (e) { console.error('[NEVYRIZENE]', e.message); }
-}
-
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
@@ -78,6 +56,24 @@ console.log(`[STORAGE] Trvalá data se ukládají do: ${DATA_DIR}${process.env.R
 
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 if (!fs.existsSync(SESSIONS_DIR)) { try { fs.mkdirSync(SESSIONS_DIR, { recursive: true }); } catch (e) { console.error('[SESSIONS]', e.message); } }
+
+// ── NEVYŘÍZENÉ AKCE MEMBERŮ — žlutý weed / vklady do kufru ──────────────────
+// db.js je jen jednoduchý JSON shim nad users.json (žádné reálné SQL), takže
+// tohle je vlastní malé JSON úložiště ve stejném stylu — ukládá se do
+// TRVALÉHO Railway Volume (DATA_DIR), aby seznam přežil redeploy.
+const NEVYRIZENE_FILE = path.join(DATA_DIR, 'nevyrizene-akce.json');
+function loadNevyrizeneAkce() {
+  try { return JSON.parse(fs.readFileSync(NEVYRIZENE_FILE, 'utf8')); } catch { return []; }
+}
+function saveNevyrizeneAkce(list) { writeJsonAtomic(NEVYRIZENE_FILE, list); }
+function flagNevyrizeno(typ, uzivatel, popis, cas) {
+  try {
+    const list = loadNevyrizeneAkce();
+    const nextId = list.reduce((max, r) => Math.max(max, r.id || 0), 0) + 1;
+    list.unshift({ id: nextId, typ, uzivatel, popis, cas, vyrizeno: false, vyrizil: null, vyrizeno_cas: null });
+    saveNevyrizeneAkce(list);
+  } catch (e) { console.error('[NEVYRIZENE]', e.message); }
+}
 const FileStore = require('session-file-store')(session);
 
 if (!process.env.SESSION_SECRET) {
@@ -3748,8 +3744,9 @@ app.post('/api/kufr/vklad', requireAuth, async (req, res) => {
 // GET — seznam nevyřízených (a naposledy vyřízených) akcí pro vedení.
 app.get('/api/nevyrizene', requireAuth, requireAccess('sklad'), (req, res) => {
   try {
-    const nevyrizene = db.prepare('SELECT * FROM nevyrizene_akce WHERE vyrizeno = 0 ORDER BY id DESC LIMIT 200').all();
-    const vyrizene = db.prepare('SELECT * FROM nevyrizene_akce WHERE vyrizeno = 1 ORDER BY id DESC LIMIT 50').all();
+    const list = loadNevyrizeneAkce();
+    const nevyrizene = list.filter(r => !r.vyrizeno);
+    const vyrizene = list.filter(r => r.vyrizeno).slice(0, 50);
     res.json({ ok: true, nevyrizene, vyrizene });
   } catch (e) {
     console.error('[NEVYRIZENE]', e.message);
@@ -3761,12 +3758,14 @@ app.get('/api/nevyrizene', requireAuth, requireAccess('sklad'), (req, res) => {
 app.post('/api/nevyrizene/vyresit', requireAuth, requireAccess('sklad'), (req, res) => {
   const id = parseInt(req.body.id);
   if (!Number.isInteger(id)) return res.json({ ok: false, error: 'Neplatné ID' });
-  const row = db.prepare('SELECT * FROM nevyrizene_akce WHERE id = ?').get(id);
+  const list = loadNevyrizeneAkce();
+  const row = list.find(r => r.id === id);
   if (!row) return res.json({ ok: false, error: 'Záznam nenalezen' });
-  const novyStav = row.vyrizeno ? 0 : 1;
-  db.prepare('UPDATE nevyrizene_akce SET vyrizeno = ?, vyrizil = ?, vyrizeno_cas = ? WHERE id = ?')
-    .run(novyStav, novyStav ? req.session.icName : null, novyStav ? sheets.timestamp() : null, id);
-  res.json({ ok: true, vyrizeno: !!novyStav });
+  row.vyrizeno = !row.vyrizeno;
+  row.vyrizil = row.vyrizeno ? req.session.icName : null;
+  row.vyrizeno_cas = row.vyrizeno ? sheets.timestamp() : null;
+  saveNevyrizeneAkce(list);
+  res.json({ ok: true, vyrizeno: row.vyrizeno });
 });
 
 const RESERVE_FUND_ALERT_FILE = path.join(DATA_DIR, 'reserve-fund-alert-sent.json');
