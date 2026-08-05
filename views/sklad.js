@@ -239,6 +239,19 @@ function renderDashboard(req, data) {
       .vyroba-step-card::before,.vyroba-step-card.final::before{left:-1.25rem}
     }
 
+    /* ── VÝROBA — záložky receptů (Metamfetamin / Benzodiazepin / Joy) ── */
+    .recept-tabs{display:flex;gap:0.5rem;margin-bottom:1.4rem;flex-wrap:wrap}
+    .recept-tab{
+      font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
+      padding:0.6rem 1.1rem;background:var(--panel3);border:1px solid var(--border);color:var(--ivory-dim);
+      cursor:pointer;transition:all 0.2s;
+    }
+    .recept-tab:hover{border-color:var(--border-brass);color:var(--ivory)}
+    .recept-tab.active{border-color:var(--border-oxblood);background:var(--oxblood-faint);color:var(--ivory);font-weight:700}
+    .vyroba-recept-content{display:none}
+    .vyroba-recept-content.active{display:block}
+    .vyroba-recept-list{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.4rem}
+
     /* ── SMĚNÁRNA ── */
     .smena-rate-box{
       display:flex;align-items:center;justify-content:center;gap:1.2rem;
@@ -542,6 +555,13 @@ function renderDashboard(req, data) {
         <!-- Výroba -->
         <div class="sklad-panel" id="panel-vyroba">
           <div class="panel-card">
+            <div class="recept-tabs">
+              <button class="recept-tab active" id="recept-tab-meth" onclick="switchVyrobaRecept('meth')">Metamfetamin</button>
+              <button class="recept-tab" id="recept-tab-benzo" onclick="switchVyrobaRecept('benzo')">Benzodiazepin</button>
+              <button class="recept-tab" id="recept-tab-joy" onclick="switchVyrobaRecept('joy')">Joy</button>
+            </div>
+
+            <div class="vyroba-recept-content active" id="vyroba-recept-meth">
             <div class="panel-head">
               <span class="panel-title">Výroba — Metamfetamin</span>
               <span class="panel-badge">Recept 1 vaření</span>
@@ -596,6 +616,42 @@ function renderDashboard(req, data) {
                 <div id="vyroba-yield-box" style="margin-bottom:1rem"></div>
                 <div class="info-box" id="vyroba-status-box" style="display:block;margin-top:0"></div>
                 <button class="btn-submit" id="vyrobaConfirmBtn" onclick="submitVyroba()" style="margin-top:1rem">Potvrdit výrobu a odečíst suroviny</button>
+              </div>
+            </div>
+            </div>
+
+            <div class="vyroba-recept-content" id="vyroba-recept-benzo">
+              <div class="panel-head">
+                <span class="panel-title">Výroba — Benzodiazepin</span>
+                <span class="panel-badge">Recept — zatím bez skladu</span>
+              </div>
+              <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
+                Recept zatím <strong style="color:var(--brass-bright)">není propojený se skladem</strong> — je tu jen jako přehled surovin na jednu várku. Kalkulačka, automatický odečet ze skladu a přičtení hotového produktu se doplní později.
+              </p>
+              <div class="folio-label" style="margin-bottom:1rem">Suroviny na 1 várku</div>
+              <div class="vyroba-recept-list">
+                <span class="vyroba-chip raw">50× Léky na bolest</span>
+                <span class="vyroba-chip raw">10× Pekáč</span>
+              </div>
+            </div>
+
+            <div class="vyroba-recept-content" id="vyroba-recept-joy">
+              <div class="panel-head">
+                <span class="panel-title">Výroba — Joy</span>
+                <span class="panel-badge">Recept — zatím bez skladu</span>
+              </div>
+              <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
+                Recept zatím <strong style="color:var(--brass-bright)">není propojený se skladem</strong> — je tu jen jako přehled surovin na jednu várku. Suroviny se berou ze tří různých skladů (Drogy, Weed, Chemikálie), takže propojení kalkulačky a automatického odečtu přijde později až jako samostatný krok.
+              </p>
+              <div class="folio-label" style="margin-bottom:1rem">Suroviny na 1 várku</div>
+              <div class="vyroba-recept-list">
+                <span class="vyroba-chip raw">40× Metamfetamin</span>
+                <span class="vyroba-chip raw">15× Kokain</span>
+                <span class="vyroba-chip raw">30× Kapky</span>
+                <span class="vyroba-chip raw">50× Extáze</span>
+                <span class="vyroba-chip raw">100× Kanabis</span>
+                <span class="vyroba-chip raw">30× Cukr</span>
+                <span class="vyroba-chip raw">5× Pekáč</span>
               </div>
             </div>
           </div>
@@ -1136,6 +1192,19 @@ function renderDashboard(req, data) {
     }
     document.getElementById('vyroba-batches') && document.getElementById('vyroba-batches').addEventListener('input',renderVyrobaCalc);
     renderVyrobaSteps();renderVyrobaStatMax();renderVyrobaCalc();
+
+    // ── VÝROBA — přepínání záložek receptů (Metamfetamin / Benzodiazepin / Joy) ──
+    // Benzodiazepin a Joy zatím nejsou propojené se skladem — jen zobrazují
+    // seznam surovin, žádná kalkulačka ani odečet ze skladu.
+    function switchVyrobaRecept(recept){
+      ['meth','benzo','joy'].forEach(r=>{
+        const tab=document.getElementById('recept-tab-'+r);
+        const content=document.getElementById('vyroba-recept-'+r);
+        if(tab)tab.classList.toggle('active',r===recept);
+        if(content)content.classList.toggle('active',r===recept);
+      });
+    }
+    window.switchVyrobaRecept = switchVyrobaRecept;
 
     // Potvrzení výroby — server si sám znovu ověří aktuální sklad chemikálií,
     // odečte suroviny a rovnou přičte hotový Metamfetamin do skladu drog.
