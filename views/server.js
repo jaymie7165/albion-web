@@ -16,7 +16,7 @@ const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
 const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
 
-const { CONFIG, WEED_PLANT, METH_RECIPE } = require('./constants');
+const { CONFIG, WEED_PLANT, METH_RECIPE, CHEMKY_CENY } = require('./constants');
 const { makeStore } = require('./content-store');
 const { renderHome } = require('./views/home');
 const { renderDashboard } = require('./views/sklad');
@@ -56,6 +56,24 @@ console.log(`[STORAGE] Trvalá data se ukládají do: ${DATA_DIR}${process.env.R
 
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 if (!fs.existsSync(SESSIONS_DIR)) { try { fs.mkdirSync(SESSIONS_DIR, { recursive: true }); } catch (e) { console.error('[SESSIONS]', e.message); } }
+
+// ── NEVYŘÍZENÉ AKCE MEMBERŮ — žlutý weed / vklady do kufru ──────────────────
+// db.js je jen jednoduchý JSON shim nad users.json (žádné reálné SQL), takže
+// tohle je vlastní malé JSON úložiště ve stejném stylu — ukládá se do
+// TRVALÉHO Railway Volume (DATA_DIR), aby seznam přežil redeploy.
+const NEVYRIZENE_FILE = path.join(DATA_DIR, 'nevyrizene-akce.json');
+function loadNevyrizeneAkce() {
+  try { return JSON.parse(fs.readFileSync(NEVYRIZENE_FILE, 'utf8')); } catch { return []; }
+}
+function saveNevyrizeneAkce(list) { writeJsonAtomic(NEVYRIZENE_FILE, list); }
+function flagNevyrizeno(typ, uzivatel, popis, cas) {
+  try {
+    const list = loadNevyrizeneAkce();
+    const nextId = list.reduce((max, r) => Math.max(max, r.id || 0), 0) + 1;
+    list.unshift({ id: nextId, typ, uzivatel, popis, cas, vyrizeno: false, vyrizil: null, vyrizeno_cas: null });
+    saveNevyrizeneAkce(list);
+  } catch (e) { console.error('[NEVYRIZENE]', e.message); }
+}
 const FileStore = require('session-file-store')(session);
 
 if (!process.env.SESSION_SECRET) {
@@ -1211,6 +1229,13 @@ function renderProfil(req, user, aliases) {
     </div>
     <p class="folio-footnote"><strong>Discord aliasy.</strong> Pokud Discord bot zapisuje do tabulky jiné jméno než tvoje IC jméno (např. <code style="background:var(--panel3);padding:0.1rem 0.4rem;font-family:var(--font-mono);font-size:0.85em">j_jakuub</code>), přidej ho sem. Systém pak všechny záznamy pod tímto jménem přiřadí k tvému profilu.</p>
 
+    ${isFounderCouncil ? `
+    <div class="report-nav" style="margin-bottom:1.8rem">
+      <button class="report-nav-item active" id="ptab-btn-profil" onclick="profilTab('profil')">Profil</button>
+      <button class="report-nav-item" id="ptab-btn-organizace" onclick="profilTab('organizace')">Organizace</button>
+    </div>` : ''}
+
+    <div class="profil-tab-panel active" id="ptab-profil">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
 
       <div class="card">
@@ -1252,14 +1277,6 @@ function renderProfil(req, user, aliases) {
         <a href="/api/me/export" class="btn-submit" style="display:block;text-align:center;text-decoration:none;margin-top:0.6rem;background:transparent;border:1px solid var(--border-brass);color:var(--ivory-dim)">Stáhnout má data (JSON)</a>
       </div>
 
-      ${isFounderCouncil ? `
-      <div class="card">
-        <div class="card-header"><span class="card-title">Sezónní vzhled</span><span class="card-badge">Founder/Council</span></div>
-        <select id="season-select" onchange="setSeason(this.value)">
-          <option value="none">Žádný</option><option value="vanoce">Vánoce</option><option value="halloween">Halloween</option><option value="novy-rok">Nový rok</option>
-        </select>
-      </div>` : ''}
-
       <div class="card" style="grid-column:1/-1">
         <div class="card-header"><span class="card-title">Trading karta — IC údaje</span><span class="card-badge">Viditelné na kartě</span></div>
         <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1.2rem;line-height:1.7">Tyto údaje se zobrazí na tvé trading kartě. Fotku vlož přes <strong style="color:var(--brass-bright)">Ctrl+V</strong> (screenshot) nebo klikni a vyber soubor.</p>
@@ -1284,18 +1301,7 @@ function renderProfil(req, user, aliases) {
         </div>
       </div>
 
-      ${isFounderCouncil ? `
-      <div class="card" style="grid-column:1/-1">
-        <div class="card-header"><span class="card-title">Správa členů</span><span class="card-badge">Founder/Council</span></div>
-        <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1rem;line-height:1.7">Pokud se člen zamkne (zapomenuté heslo a nemůže / nechce použít Discord OAuth), můžeš mu tady vystavit nové dočasné heslo — pošle se mu přes Discord DM.</p>
-        <div id="admin-members-list"><div class="ledger-loading">Načítám členy…</div></div>
-        <div class="folio-rule tight"></div>
-        <div class="panel-list-label" style="font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.8rem">Stav Discord notifikací</div>
-        <div id="admin-discord-status"><div class="ledger-loading">Kontroluji…</div></div>
-      </div>` : ''}
-
     </div>
-
 
     <div style="margin-top:2rem;padding:1rem 1.4rem;background:var(--panel2);border:1px solid var(--border);font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)">
       <strong style="color:var(--brass)">Tvůj profil:</strong>
@@ -1303,9 +1309,37 @@ function renderProfil(req, user, aliases) {
       &nbsp;·&nbsp; Discord: <strong style="color:var(--ivory)">${escapeHtml(user.discord_username||'—')}</strong>
       &nbsp;·&nbsp; ID: <strong style="color:var(--ivory)">${escapeHtml(user.discord_id||'—')}</strong>
     </div>
+    </div><!-- /ptab-profil -->
+
+    ${isFounderCouncil ? `
+    <div class="profil-tab-panel" id="ptab-organizace">
+      <p class="folio-footnote"><strong>Organizace.</strong> Tahle záložka je viditelná jen pro Founder/Council — sezónní vzhled webu, správa hesel členů a stav Discord notifikací.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Sezónní vzhled</span><span class="card-badge">Founder/Council</span></div>
+          <select id="season-select" onchange="setSeason(this.value)">
+            <option value="none">Žádný</option><option value="vanoce">Vánoce</option><option value="halloween">Halloween</option><option value="novy-rok">Nový rok</option>
+          </select>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header"><span class="card-title">Správa členů</span><span class="card-badge">Founder/Council</span></div>
+          <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1rem;line-height:1.7">Pokud se člen zamkne (zapomenuté heslo a nemůže / nechce použít Discord OAuth), můžeš mu tady vystavit nové dočasné heslo — pošle se mu přes Discord DM.</p>
+          <div id="admin-members-list"><div class="ledger-loading">Načítám členy…</div></div>
+          <div class="folio-rule tight"></div>
+          <div class="panel-list-label" style="font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.8rem">Stav Discord notifikací</div>
+          <div id="admin-discord-status"><div class="ledger-loading">Kontroluji…</div></div>
+        </div>
+      </div>
+    </div>` : ''}
   </main>
 
   <script>
+    function profilTab(id){
+      document.querySelectorAll('.profil-tab-panel').forEach(function(p){ p.classList.toggle('active', p.id==='ptab-'+id); });
+      document.querySelectorAll('.report-nav-item').forEach(function(b){ b.classList.toggle('active', b.id==='ptab-btn-'+id); });
+    }
+    window.profilTab = profilTab;
+
     let aliases = ${aliasesJson};
     function escHtml(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
@@ -1654,6 +1688,33 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   res.json({ ok: true, celkVyroba: ceny.vyroba * qty, celkProdej: ceny.prodej * qty });
 });
 
+// Zvláštní, úmyslně omezená routa: členi (level 3) nemají obecný přístup ke skladu
+// ('sklad' vyžaduje level <= 2), ale smí si sami vzít žlutý kanabis. Typ pohybu i
+// odrůda jsou napevno dané (jen VÝBĚR žlutého), takže se tím nijak neotvírá zbytek skladu.
+app.post('/api/weed/yellow-take', requireAuth, async (req, res) => {
+  const { mnozstvi } = req.body;
+  const qty = parseInt(mnozstvi);
+  const typUp = 'VÝBĚR';
+  const odruda_trim = 'Žlutý kanabis';
+
+  if (!isQty(qty)) return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
+
+  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 165 };
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+  const { rowIndex } = await sheets.appendRowTracked('Weed', [cas, typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel]);
+  recordLastAction(uzivatel, 'Weed', rowIndex, `${typUp} — ${odruda_trim} (${qty} sáčků)`);
+  await discord.notifyWeed(typUp, odruda_trim, qty, ceny.vyroba, ceny.prodej, uzivatel, req.session.accessLevel);
+  sheets.getStockSummary('Weed').then(stav => discord.checkNizkaZasoba('weed', odruda_trim, typUp, qty, stav[odruda_trim], loadThresholds().weed)).catch(() => {});
+  checkStockMilestone('weed', 'Weed').catch(() => {});
+  await discord.notifyAudit('Weed', uzivatel, discordUser, `${typUp} — ${odruda_trim} (${qty} ks) | Výroba: ~$${ceny.vyroba * qty} | Prodej: $${ceny.prodej * qty}`);
+  broadcastSSE('skladUpdate', { sekce: 'weed', typ: typUp, odruda: odruda_trim, qty, uzivatel, cas });
+  flagNevyrizeno('Žlutý weed', uzivatel, `${qty} sáčků`, cas);
+  try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
+  res.json({ ok: true });
+});
+
 app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => {
   const { typ, droga, mnozstvi } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
@@ -1703,7 +1764,7 @@ app.post('/api/ucet', requireAuth, requireAccess('sklad'), async (req, res) => {
 });
 
 app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) => {
-  const { typ, chemikalie, mnozstvi } = req.body;
+  const { typ, chemikalie, mnozstvi, cenaZdroj, cenaVlastni, cenaVlastniMena } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
   const chemikalieTrim = (chemikalie || '').toString().trim();
@@ -1711,6 +1772,30 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   if (!inEnum(typUp, TYP_SKLAD))                        return res.json({ ok: false, error: 'Neplatný typ pohybu (VKLAD nebo VÝBĚR)' });
   if (!inList(chemikalieTrim, CONFIG.chemkyTypy))        return res.json({ ok: false, error: 'Nepovolená chemikálie' });
   if (!isQty(qty))                                       return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
+
+  // ── VOLITELNÝ ODEČET Z ÚČTU PŘI NÁKUPU (VKLADU) ─────────────────────────
+  // Člen si při vkladu může vybrat, jestli se má za nakoupenou chemikálii
+  // rovnou strhnout částka z hlavního účtu — buď dle "ceny z varny" (server
+  // si částku dopočítá SÁM z CHEMKY_CENY, klientovu matematiku nikdy
+  // nepřebírá), nebo "vlastní cenou" (člen zadá reálně zaplacenou částku,
+  // stejně jako u běžného ručního výdaje v Účetnictví). Bez volby (cenaZdroj
+  // chybí/'zadna', nebo typ VÝBĚR) se chová přesně jako dřív — žádný zápis
+  // do Účetnictví.
+  let ucetZapis = null;
+  const zdroj = (cenaZdroj || '').toString();
+  if (typUp === 'VKLAD' && (zdroj === 'vyrobni' || zdroj === 'vlastni')) {
+    if (zdroj === 'vyrobni') {
+      const cenik = CHEMKY_CENY[chemikalieTrim];
+      if (!cenik) return res.json({ ok: false, error: 'Pro tuto chemikálii není v ceníku z varny žádná cena — zvol vlastní cenu.' });
+      ucetZapis = { castka: Math.round(cenik.cena * qty * 100) / 100, valuta: cenik.mena === 'sad' ? 'USD' : 'PESOS', popis: 'cena z varny' };
+    } else {
+      const castkaVlastni = parseFloat(cenaVlastni);
+      if (!isAmount(castkaVlastni)) return res.json({ ok: false, error: 'Vyplň platnou vlastní cenu nákupu' });
+      const valutaVlastni = (cenaVlastniMena || '').toString().toUpperCase();
+      if (!inEnum(valutaVlastni, VALUTY)) return res.json({ ok: false, error: 'Neplatná měna vlastní ceny' });
+      ucetZapis = { castka: castkaVlastni, valuta: valutaVlastni, popis: 'vlastní cena' };
+    }
+  }
 
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
@@ -1724,10 +1809,31 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
   broadcastSSE('skladUpdate', { sekce: 'chemky', typ: typUp, chemikalie: chemikalieTrim, qty, uzivatel, cas });
   try { const cnt = db.incrementActionCount(req.session.userId); require('./achievements').checkActionAchievements(req.session.userId, cnt); } catch(e){}
   if (typUp === 'VKLAD') { try { const dcnt = db.incrementDepositCount(req.session.userId); require('./achievements').checkDepositAchievements(req.session.userId, dcnt); } catch(e){} }
+
+  if (ucetZapis) {
+    const poznamka = `Nákup chemikálie — ${chemikalieTrim} (${qty} ks) [${ucetZapis.popis}]`;
+    try {
+      await sheets.appendRow('Účetnictví', [cas, 'VÝDAJ', ucetZapis.castka, ucetZapis.valuta, poznamka, uzivatel]);
+      await discord.notifyUcet('VÝDAJ', ucetZapis.castka, ucetZapis.valuta, poznamka, uzivatel);
+      checkPenizeMilestone().catch(() => {});
+      await discord.notifyAudit('Účetnictví', uzivatel, discordUser, `VÝDAJ — ${ucetZapis.valuta === 'USD' ? 'SAD ' : '₱'}${ucetZapis.castka} | ${poznamka}`);
+      broadcastSSE('ucetUpdate', { typ: 'VÝDAJ', castka: ucetZapis.castka, valuta: ucetZapis.valuta, poznamka, uzivatel, cas });
+    } catch (e) {
+      console.error('[CHEMKY NÁKUP — ÚČETNICTVÍ]', e.message);
+      return res.json({ ok: true, ucetChyba: 'Chemikálie byla zapsána do skladu, ale odečet z účtu se nepodařil — dopiš ho prosím ručně do Účetnictví.' });
+    }
+    return res.json({ ok: true, ucetZapis: { castka: ucetZapis.castka, valuta: ucetZapis.valuta } });
+  }
+
   res.json({ ok: true });
 });
 
 // ── API — VÝROBA (várky Metamfetaminu) ──────────────────────────────────────
+// Server nikdy nedůvěřuje počtu várek/surovin poslanému z klienta — vždy si
+// sám ověří AKTUÁLNÍ stav skladu chemikálií a sám dopočítá odečet i výstup,
+// stejně jako u ostatních skladových zápisů. Odečet surovin a přírůstek
+// hotového produktu (Metamfetamin) se zapíší v jednom požadavku, ať sklad
+// nikdy neskončí v mezistavu (suroviny pryč, produkt nikde).
 app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req, res) => {
   const batches = parseInt(req.body.batches);
   if (!Number.isInteger(batches) || batches < 1 || batches > 50) {
@@ -1749,6 +1855,7 @@ app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
 
+  // Odečet surovin — jeden hromadný zápis (buď se zapíšou všechny řádky, nebo žádný)
   const chemRows = Object.entries(METH_RECIPE.rawPerBatch).map(([item, qtyPerBatch]) =>
     [cas, 'VÝBĚR', item, qtyPerBatch * batches, uzivatel]
   );
@@ -1759,6 +1866,7 @@ app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req
     return res.json({ ok: false, error: 'Zápis do skladu chemikálií selhal, žádná surovina nebyla odečtena — zkus to znovu.' });
   }
 
+  // Přírůstek hotového produktu
   const vyrobenoQty = batches * METH_RECIPE.yieldPerBatch;
   try {
     await sheets.appendRow('Drogy', [cas, 'VKLAD', METH_RECIPE.outputItem, vyrobenoQty, '-', '-', uzivatel]);
@@ -2512,7 +2620,14 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
     const events = [];
 
     const addRows = (rows, sekce, icon) => {
-      for (let i = 1; i < rows.length; i++) {
+      // Stejný problém jako v sheets.js: dřív se natvrdo přeskakoval první
+      // řádek jako hlavička (`i = 1`), takže nově založený list (např.
+      // "Reserve Fond" bez ruční hlavičky) přišel v Auditu o svůj jediný
+      // datový řádek. Přeskočíme jen řádek, který OPRAVDU vypadá jako
+      // hlavička — tedy sloupec s typem pohybu není žádná z platných hodnot.
+      const VALID_TYPY = new Set(['VKLAD', 'VÝBĚR', 'PŘÍJEM', 'VÝDAJ']);
+      const startIdx = rows.length > 0 && !VALID_TYPY.has((rows[0][1] || '').toString().toUpperCase()) ? 1 : 0;
+      for (let i = startIdx; i < rows.length; i++) {
         const r = rows[i];
         const hasContent = r && r.some(cell => cell && cell.toString().trim() !== '');
         if (!hasContent) continue;
@@ -2580,6 +2695,9 @@ app.get('/api/audit', requireAuth, requireAccess('audit'), async (req, res) => {
     addRows(drogyRows, 'Drogy', '💊');
     addRows(chemkyRows, 'Chemky', '⚗️');
     addRows(ucetRows, 'Účetnictví', '💰');
+    // Reserve Fond je od teď samostatný bankovní účet (viz /api/reserve-fund/pay)
+    // — v Auditu je vidět jako vlastní sekce, ale NEPOČÍTÁ se do souhrnu
+    // hlavního účtu (ucetSouhrn níže), aby se oba účty nijak nemíchaly.
     addRows(rezervaRows, 'Reserve Fond', '🏦');
 
     const ucetSouhrn = {};
@@ -3470,6 +3588,11 @@ setInterval(gcOrphanedUploads, 6 * 60 * 60 * 1000);
 setTimeout(gcOrphanedUploads, 60 * 1000);
 
 // ── RESERVE FUND — konfigurovatelná výše odvodu ─────────────────────────────
+// Peníze z Reserve Fondu se zapisují do SAMOSTATNÉHO účetního listu
+// 'Reserve Fond' (viz sheets.getAccountingSummary(sheetName)) — organizace
+// vede dva oddělené bankovní účty a Reserve Fund se do hlavní pokladny
+// ('Účetnictví', zobrazované na Dashboardu/Skladu/Blackbooku/Profit centru)
+// vůbec nezapočítává.
 const RESERVE_FUND_SHEET_NAME = 'Reserve Fond';
 const RESERVE_FUND_CONFIG_FILE = path.join(DATA_DIR, 'reserve-fund-config.json');
 const RESERVE_FUND_AMOUNT_DEFAULT = 5000;
@@ -3558,7 +3681,16 @@ app.post('/api/reserve-fund/pay', requireAuth, async (req, res) => {
   const amount = getReserveFundAmount();
   const poznamka = `Reserve Fund — týden do ${weekKey} — ${uzivatel}`;
 
-  await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, 'PŘÍJEM', amount, 'USD', poznamka, uzivatel]);
+  try {
+    // Zapisuje se na SAMOSTATNÝ účet Reserve Fondu — ne do hlavního 'Účetnictví'
+    // — takže tahle částka nikdy nevstoupí do hlavní pokladny organizace.
+    // sheets.appendRow si list 'Reserve Fond' sám vytvoří, pokud v tabulce chybí.
+    await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, 'PŘÍJEM', amount, 'USD', poznamka, uzivatel]);
+  } catch (e) {
+    console.error('[RESERVE FUND] Zápis do Sheets selhal:', e.message);
+    return res.status(502).json({ ok: false, error: 'Zápis do účetní tabulky se nepovedl, zkus to prosím znovu.' });
+  }
+
   await discord.notifyReserveFundZaplaceno(weekKey, uzivatel, discordUser).catch(() => {});
   await discord.notifyAudit(RESERVE_FUND_SHEET_NAME, uzivatel, discordUser, `PŘÍJEM — SAD ${amount} | ${poznamka}`);
 
@@ -3574,39 +3706,66 @@ app.post('/api/reserve-fund/pay', requireAuth, async (req, res) => {
   res.json({ ok: true, entry });
 });
 
-// ── RESERVE FUND — ruční výdaj/příjem (jen Founder/Council) ────────────────
-// Umožňuje z Reserve Fondu vybrat peníze (např. na výplatu, nákup) nebo je
-// naopak ručně doplnit — nezávisle na týdenních platbách členů. Zapisuje se
-// na SAMOSTATNÝ účet 'Reserve Fond', stejně jako týdenní platby výše —
-// hlavní pokladny ('Účetnictví') se to nedotýká.
-app.post('/api/reserve-fund/transaction', requireAuth, requireAccess('audit'), async (req, res) => {
-  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Manipulovat s Reserve Fondem smí jen Founder/Council' });
+// ── KUFR AUTA — nahlášení vkladu hotovosti (SAD) ──────────────────────────────
+// Členi (level 3) nemají přístup na hlavní účet ('sklad' vyžaduje level <= 2) —
+// peníze proto fyzicky nechávají v kufru auta a tady jen NAHLÁSÍ, že je tam
+// vložili, ať má vedení potvrzení, že to opravdu udělal dotyčný člověk.
+// Zapisuje se do SAMOSTATNÉHO listu 'Kufr' — nikdy ne do hlavní 'Účetnictví',
+// takže se tím peníze na hlavní účet nepřipíšou samy od sebe. Senior Member
+// a výš mají přímý přístup na hlavní účet (/api/ucet) a peníze z kufru na
+// něj zapisují ručně, až je fyzicky vyzvednou.
+const KUFR_SHEET_NAME = 'Kufr';
 
-  const { typ, castka, poznamka } = req.body;
-  const typUp = (typ || '').toString().toUpperCase();
+app.post('/api/kufr/vklad', requireAuth, async (req, res) => {
+  const { castka } = req.body;
   const amount = parseFloat(castka);
-  const poznamkaSafe = sanitizeText(poznamka, 300);
-
-  if (!inEnum(typUp, TYP_UCET)) return res.json({ ok: false, error: 'Neplatný typ pohybu (PŘÍJEM nebo VÝDAJ)' });
-  if (!isAmount(amount, 1_000_000)) return res.json({ ok: false, error: 'Neplatná částka (max 1 000 000)' });
-  if (!poznamkaSafe) return res.json({ ok: false, error: 'Poznámka je povinná (max 300 znaků)' });
-
-  if (typUp === 'VÝDAJ') {
-    const stav = await sheets.getAccountingSummary(RESERVE_FUND_SHEET_NAME).catch(() => ({ usd: 0 }));
-    if (amount > (stav.usd || 0)) {
-      return res.json({ ok: false, error: `Na Reserve Fondu je jen $${Math.round(stav.usd || 0).toLocaleString('cs-CZ')} — nelze vybrat víc.` });
-    }
-  }
+  if (!isAmount(amount)) return res.json({ ok: false, error: 'Neplatná částka (max 1 000 000)' });
 
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
+  const poznamka = `Vklad do kufru auta — nahlásil/a ${uzivatel}`;
 
-  await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, typUp, amount, 'USD', poznamkaSafe, uzivatel]);
-  await discord.notifyAudit(RESERVE_FUND_SHEET_NAME, uzivatel, discordUser, `${typUp} — SAD ${amount} | ${poznamkaSafe}`);
-  broadcastSSE('reserveFundUpdate', { weekKey: getReserveWeekKey(), icName: uzivatel, manual: true });
+  try {
+    // sheets.appendRow si list 'Kufr' sám vytvoří, pokud v tabulce chybí.
+    await sheets.appendRow(KUFR_SHEET_NAME, [cas, 'VKLAD', amount, 'USD', poznamka, uzivatel]);
+  } catch (e) {
+    console.error('[KUFR] Zápis do Sheets selhal:', e.message);
+    return res.status(502).json({ ok: false, error: 'Zápis se nepovedl, zkus to prosím znovu.' });
+  }
+
+  await discord.notifyAudit(KUFR_SHEET_NAME, uzivatel, discordUser, `VKLAD (kufr auta) — SAD ${amount}`);
+  broadcastSSE('kufrUpdate', { castka: amount, uzivatel, cas });
+  flagNevyrizeno('Vklad (kufr)', uzivatel, `SAD ${amount}`, cas);
 
   res.json({ ok: true });
+});
+
+// GET — seznam nevyřízených (a naposledy vyřízených) akcí pro vedení.
+app.get('/api/nevyrizene', requireAuth, requireAccess('sklad'), (req, res) => {
+  try {
+    const list = loadNevyrizeneAkce();
+    const nevyrizene = list.filter(r => !r.vyrizeno);
+    const vyrizene = list.filter(r => r.vyrizeno).slice(0, 50);
+    res.json({ ok: true, nevyrizene, vyrizene });
+  } catch (e) {
+    console.error('[NEVYRIZENE]', e.message);
+    res.status(500).json({ ok: false, error: 'Načtení se nepodařilo' });
+  }
+});
+
+// POST — přepnutí stavu (spárovat / vrátit zpět). requireAccess('sklad') = jen Senior Member a výš.
+app.post('/api/nevyrizene/vyresit', requireAuth, requireAccess('sklad'), (req, res) => {
+  const id = parseInt(req.body.id);
+  if (!Number.isInteger(id)) return res.json({ ok: false, error: 'Neplatné ID' });
+  const list = loadNevyrizeneAkce();
+  const row = list.find(r => r.id === id);
+  if (!row) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  row.vyrizeno = !row.vyrizeno;
+  row.vyrizil = row.vyrizeno ? req.session.icName : null;
+  row.vyrizeno_cas = row.vyrizeno ? sheets.timestamp() : null;
+  saveNevyrizeneAkce(list);
+  res.json({ ok: true, vyrizeno: row.vyrizeno });
 });
 
 const RESERVE_FUND_ALERT_FILE = path.join(DATA_DIR, 'reserve-fund-alert-sent.json');
@@ -3671,5 +3830,17 @@ setInterval(() => {
   } catch (e) {}
 }, 5 * 60 * 1000);
 
+
+// ── GLOBÁLNÍ POJISTKA ────────────────────────────────────────────────────────
+// Node 18+ defaultně ukončí celý proces při jakékoliv nezachycené promise
+// rejection (přesně tohle shodilo server u /api/reserve-fund/pay). Tady se
+// taková chyba jen zaloguje a server běží dál — jednotlivý neošetřený bug
+// v jednom requestu tak už nikdy nesundá web pro všechny ostatní uživatele.
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason && reason.stack || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err && err.stack || err);
+});
 
 app.listen(PORT, () => console.log(`🌐 Albion web běží na http://localhost:${PORT}`));

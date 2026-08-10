@@ -1,4 +1,10 @@
-// sklad.js — Albion v4 · Heraldický sklad, přehledný tab-layout
+// views/sklad.js — Albion v5 · "Crimson & Cream" sklad, přehledný tab-layout
+//
+// Oproti v4: sidebar je rozdělený na HLAVNÍ taby (Účetnictví/Reserve Fund,
+// Weed, Drogy, Chemky — denní použití) a VEDLEJŠÍ taby schované pod
+// "Více ▾" (Zbraně, Výroba, Směnárna, Ceník — občasné použití). Po každém
+// úspěšném zápisu se navíc krátce "zablikne" aktivní panel (rewardFlash
+// z nav.js) — malý pocit odměny místo tichého formuláře.
 
 const { baseStyles, ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
@@ -38,10 +44,10 @@ function renderDashboard(req, data) {
       const symbol = valuta === 'USD' ? 'SAD ' : '₱';
       return `<div class="sklad-row">
         <span style="display:flex;align-items:center;gap:0.6rem">
-          <span style="width:4px;height:4px;background:${isIn?'#6FBF52':'var(--oxblood-bright)'};flex-shrink:0"></span>
+          <span style="width:4px;height:4px;background:${isIn?'#7BD69B':'var(--oxblood-bright)'};flex-shrink:0"></span>
           ${pozn||'—'}
         </span>
-        <span style="color:${isIn?'#6FBF52':'var(--oxblood-bright)'}">
+        <span style="color:${isIn?'#7BD69B':'var(--oxblood-bright)'}">
           ${symbol}${castka} <em style="color:var(--ivory-faint);font-style:normal;font-size:0.8em">${valuta.replace('USD','SAD')}</em>
         </span>
       </div>`;
@@ -58,20 +64,24 @@ function renderDashboard(req, data) {
   const totalWeedSacky = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalDrogySacky = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
 
-  const sekceMetaVse = [
+  // ── ROZDĚLENÍ TABŮ: HLAVNÍ (denní použití) vs VEDLEJŠÍ (schované pod "Více") ──
+  const sekceMetaPrimary = [
     { id: 'ucet',   label: 'Účetnictví', sub: 'Finance',     icon: '◉' },
-    { id: 'smena',  label: 'Směnárna',   sub: 'SAD ⇄ Pesos', icon: '⇄' },
-    { id: 'zbrane', label: 'Zbraně',     sub: 'Sklad',       icon: '⚔' },
     { id: 'weed',   label: 'Weed',       sub: 'Sklad',       icon: '◈' },
-    { id: 'vyroba', label: 'Výroba',     sub: 'Substance',      icon: '⚒' },
     { id: 'drogy',  label: 'Drogy',      sub: 'Sklad',       icon: '◆' },
     { id: 'chemky', label: 'Chemikálie', sub: 'Sklad',       icon: '⬡' },
+  ];
+  const sekceMetaSecondary = [
+    { id: 'zbrane', label: 'Zbraně',     sub: 'Sklad',       icon: '⚔' },
+    { id: 'vyroba', label: 'Výroba',     sub: 'Substance',   icon: '⚒' },
+    { id: 'smena',  label: 'Směnárna',   sub: 'SAD ⇄ Pesos', icon: '⇄' },
     { id: 'cenik',  label: 'Ceník',      sub: 'Referenční ceny', icon: '$' },
+    { id: 'nevyrizene', label: 'Nevyřízené', sub: 'Weed & kufr od membérů', icon: '⚑' },
   ];
   const memberOnly = (req.session.accessLevel || 3) >= 3;
-  const sekceMeta = memberOnly
-    ? sekceMetaVse.filter(s => s.id === 'ucet' || s.id === 'cenik').map(s => s.id === 'ucet' ? { ...s, label: 'Reserve Fund', sub: 'Povinný odvod' } : s)
-    : sekceMetaVse;
+  let sekceMeta = memberOnly
+    ? [{ id:'ucet', label:'Reserve Fund', sub:'Povinný odvod', icon:'◉' }, { id:'cenik', label:'Ceník', sub:'Referenční ceny', icon:'$' }]
+    : null; // null = použij plné primary/secondary rozdělení níže
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -138,12 +148,25 @@ function renderDashboard(req, data) {
     .sklad-sidebar-item.active .sklad-sidebar-label{color:var(--brass-bright)}
     .sklad-sidebar-sub{font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.15rem;letter-spacing:0.03em}
 
+    .sklad-sidebar-more-toggle{
+      display:flex;align-items:center;justify-content:space-between;gap:0.5rem;
+      padding:0.75rem 1.2rem;cursor:pointer;background:var(--panel3);
+      font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;
+      color:var(--ivory-faint);transition:color 0.15s,background 0.15s;
+    }
+    .sklad-sidebar-more-toggle:hover{color:var(--brass-bright);background:var(--brass-faint)}
+    .sklad-sidebar-more-toggle .more-arrow{transition:transform 0.2s;font-size:0.7rem}
+    .sklad-sidebar-more-toggle.open .more-arrow{transform:rotate(180deg)}
+    .sklad-sidebar-secondary{display:none}
+    .sklad-sidebar-secondary.open{display:block}
+
     .sklad-panel{display:none;animation:fadeReveal 0.3s ease-out 1}
     .sklad-panel.active{display:block}
 
     .panel-card{
       background:var(--panel2);border:1px solid var(--border-brass);
       padding:2rem 2.2rem;box-shadow:var(--shadow-card);position:relative;
+      transition:box-shadow 0.2s;
     }
     .panel-card::before{content:'';position:absolute;top:0;left:0;width:18px;height:18px;border-top:1px solid var(--brass-dim);border-left:1px solid var(--brass-dim)}
     .panel-card::after{content:'';position:absolute;bottom:0;right:0;width:18px;height:18px;border-bottom:1px solid var(--brass-dim);border-right:1px solid var(--brass-dim)}
@@ -195,7 +218,7 @@ function renderDashboard(req, data) {
       width:8px;height:8px;background:var(--oxblood);border:1px solid var(--brass);
       transform:rotate(45deg);
     }
-    .vyroba-step-card.final{border-color:var(--border-oxblood);background:radial-gradient(ellipse 90% 100% at 0% 0%, rgba(110,20,35,0.14) 0%, var(--panel3) 65%)}
+    .vyroba-step-card.final{border-color:var(--border-oxblood);background:radial-gradient(ellipse 90% 100% at 0% 0%, rgba(220,20,60,0.14) 0%, var(--panel3) 65%)}
     .vyroba-step-card.final::before{width:12px;height:12px;left:-1.83rem;top:1.3rem;background:var(--oxblood-bright);border:2px solid var(--brass);box-shadow:0 0 10px var(--oxblood-glow)}
     .vyroba-step-meta{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
     .vyroba-step-label{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:1.02rem;color:var(--ivory);margin-bottom:0.6rem}
@@ -216,6 +239,19 @@ function renderDashboard(req, data) {
       .vyroba-timeline{padding-left:1.7rem}
       .vyroba-step-card::before,.vyroba-step-card.final::before{left:-1.25rem}
     }
+
+    /* ── VÝROBA — záložky receptů (Metamfetamin / Benzodiazepin / Joy) ── */
+    .recept-tabs{display:flex;gap:0.5rem;margin-bottom:1.4rem;flex-wrap:wrap}
+    .recept-tab{
+      font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
+      padding:0.6rem 1.1rem;background:var(--panel3);border:1px solid var(--border);color:var(--ivory-dim);
+      cursor:pointer;transition:all 0.2s;
+    }
+    .recept-tab:hover{border-color:var(--border-brass);color:var(--ivory)}
+    .recept-tab.active{border-color:var(--border-oxblood);background:var(--oxblood-faint);color:var(--ivory);font-weight:700}
+    .vyroba-recept-content{display:none}
+    .vyroba-recept-content.active{display:block}
+    .vyroba-recept-list{display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.4rem}
 
     /* ── SMĚNÁRNA ── */
     .smena-rate-box{
@@ -255,7 +291,7 @@ function renderDashboard(req, data) {
     }
     .cenik-label-input:focus,.cenik-cena-input:focus{outline:none;border-color:var(--brass)}
     .cenik-row-del{background:transparent;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);width:28px;height:28px;cursor:pointer;font-size:0.75rem}
-    .cenik-row-del:hover{background:var(--oxblood-faint,rgba(110,20,35,0.15))}
+    .cenik-row-del:hover{background:var(--oxblood-faint,rgba(220,20,60,0.15))}
 
     /* ── UNDO BAR ── */
     #undoBar{
@@ -269,10 +305,9 @@ function renderDashboard(req, data) {
     @media(max-width:980px){
       .sklad-shell{grid-template-columns:1fr}
       .sklad-sidebar{
-        position:static;display:grid;grid-template-columns:repeat(3,1fr);
+        position:static;display:block;
       }
-      .sklad-sidebar-item{flex-direction:column;text-align:center;gap:0.4rem;padding:0.9rem 0.6rem;border-left:none;border-bottom:1px solid var(--border)}
-      .sklad-sidebar-item.active{border-left:none;border-bottom:2px solid var(--oxblood)}
+      .sklad-sidebar-item{padding:0.9rem 1rem}
       .tally-strip{grid-template-columns:repeat(3,1fr)}
       .sklad-opener{flex-direction:column;align-items:flex-start;gap:0.8rem}
       .panel-card{padding:1.5rem 1.3rem}
@@ -308,7 +343,7 @@ function renderDashboard(req, data) {
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Weed</div>
-        <div class="tally-cell-val" id="tally-weed" style="color:#7A9A4A">${totalWeedSacky} sáčků</div>
+        <div class="tally-cell-val" id="tally-weed" style="color:#8AAE5E">${totalWeedSacky} sáčků</div>
       </div>
       <div class="tally-cell">
         <div class="tally-cell-label">Drogy</div>
@@ -326,7 +361,7 @@ function renderDashboard(req, data) {
 
     <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-dim);margin:-1.4rem 0 2rem;padding:0.8rem 1.1rem;border:1px solid var(--border-brass);background:var(--brass-faint)">
       <strong style="color:var(--brass-bright)">Jednotky skladu:</strong> Weed a drogy se do skladu zapisují přímo v <strong>sáčcích</strong> — ceny (výroba/prodej) jsou stanovené za 1 sáček.
-      &ensp;·&ensp; Weed: <strong style="color:#7A9A4A" id="unit-summary-weed">${totalWeedSacky} sáčků</strong>
+      &ensp;·&ensp; Weed: <strong style="color:#8AAE5E" id="unit-summary-weed">${totalWeedSacky} sáčků</strong>
       &ensp;·&ensp; Drogy: <strong style="color:var(--oxblood-bright)" id="unit-summary-drogy">${totalDrogySacky} sáčků</strong>
     </div>
     ` : ''}
@@ -336,7 +371,15 @@ function renderDashboard(req, data) {
 
       <!-- Sidebar -->
       <div class="sklad-sidebar" id="skladSidebar">
-        ${sekceMeta.map((s, i) => `
+        ${sekceMeta ? sekceMeta.map((s, i) => `
+          <div class="sklad-sidebar-item${i===0?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
+            <div class="sklad-sidebar-icon">${s.icon}</div>
+            <div class="sklad-sidebar-text">
+              <div class="sklad-sidebar-label">${s.label}</div>
+              <div class="sklad-sidebar-sub">${s.sub}</div>
+            </div>
+          </div>`).join('') : `
+        ${sekceMetaPrimary.map((s, i) => `
           <div class="sklad-sidebar-item${i===0?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
             <div class="sklad-sidebar-icon">${s.icon}</div>
             <div class="sklad-sidebar-text">
@@ -344,6 +387,21 @@ function renderDashboard(req, data) {
               <div class="sklad-sidebar-sub">${s.sub}</div>
             </div>
           </div>`).join('')}
+        <div class="sklad-sidebar-more-toggle" id="skladMoreToggle" onclick="skladToggleMore()">
+          <span>Více — Zbraně, Výroba, Směnárna, Ceník, Nevyřízené</span>
+          <span class="more-arrow">▾</span>
+        </div>
+        <div class="sklad-sidebar-secondary" id="skladSecondary">
+          ${sekceMetaSecondary.map((s) => `
+          <div class="sklad-sidebar-item" data-panel="${s.id}" onclick="skladTab('${s.id}')">
+            <div class="sklad-sidebar-icon">${s.icon}</div>
+            <div class="sklad-sidebar-text">
+              <div class="sklad-sidebar-label">${s.label}</div>
+              <div class="sklad-sidebar-sub">${s.sub}</div>
+            </div>
+          </div>`).join('')}
+        </div>
+        `}
       </div>
 
       <!-- Panely -->
@@ -395,21 +453,6 @@ function renderDashboard(req, data) {
             <div style="display:flex;gap:0.5rem;align-items:flex-end;margin-bottom:1.2rem;max-width:340px">
               <div class="form-group" style="margin-bottom:0;flex:1"><label>Výše odvodu (SAD)</label><input type="number" id="rf-amount-input" min="1" max="100000"></div>
               <button class="btn-submit" style="margin-top:0;width:auto;padding:0.75rem 1.1rem" onclick="saveReserveFundAmount()">Uložit</button>
-            </div>` : ''}
-            ${canManage ? `
-            <div style="margin:1.2rem 0;padding:1.2rem;border:1px solid var(--border-brass);background:var(--brass-faint)">
-              <div class="panel-list-label" style="margin-bottom:0.8rem">Ruční pohyb na Reserve Fondu</div>
-              <p style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-bottom:0.8rem;line-height:1.6">Použij pro výběr peněz z Reserve Fondu (např. výplata, nákup) nebo pro ruční doplnění — nezávisle na týdenních platbách členů.</p>
-              <div class="typ-toggle">
-                <button class="typ-btn active-vklad" id="rf-tx-typ-prijem" onclick="setRfTxTyp('PŘÍJEM')">Příjem</button>
-                <button class="typ-btn" id="rf-tx-typ-vydaj" onclick="setRfTxTyp('VÝDAJ')">Výdaj</button>
-              </div>
-              <input type="hidden" id="rf-tx-typ" value="PŘÍJEM">
-              <div class="form-row">
-                <div class="form-group"><label>Částka (SAD)</label><input type="number" id="rf-tx-castka" min="1"></div>
-                <div class="form-group"><label>Poznámka</label><input type="text" id="rf-tx-poznamka" placeholder="Výplata, nákup…"></div>
-              </div>
-              <button class="btn-submit" style="margin-top:0" onclick="submitRfTransaction()">Potvrdit pohyb</button>
             </div>` : ''}
             <div id="rf-status" style="margin-bottom:1rem"></div>
             <div id="rf-list"></div>
@@ -513,6 +556,13 @@ function renderDashboard(req, data) {
         <!-- Výroba -->
         <div class="sklad-panel" id="panel-vyroba">
           <div class="panel-card">
+            <div class="recept-tabs">
+              <button class="recept-tab active" id="recept-tab-meth" onclick="switchVyrobaRecept('meth')">Metamfetamin</button>
+              <button class="recept-tab" id="recept-tab-benzo" onclick="switchVyrobaRecept('benzo')">Benzodiazepin</button>
+              <button class="recept-tab" id="recept-tab-joy" onclick="switchVyrobaRecept('joy')">Joy</button>
+            </div>
+
+            <div class="vyroba-recept-content active" id="vyroba-recept-meth">
             <div class="panel-head">
               <span class="panel-title">Výroba — Metamfetamin</span>
               <span class="panel-badge">Recept 1 vaření</span>
@@ -536,9 +586,9 @@ function renderDashboard(req, data) {
                 <div class="vyroba-stat-label">Náklad / várka</div>
                 <div class="vyroba-stat-val" style="color:var(--oxblood-bright);font-size:1.15rem">—</div>
               </div>
-              <div class="vyroba-stat" id="vyroba-stat-max" style="border-top-color:#6FBF52">
+              <div class="vyroba-stat" id="vyroba-stat-max" style="border-top-color:#7BD69B">
                 <div class="vyroba-stat-label">Uvaříš hned teď</div>
-                <div class="vyroba-stat-val" style="color:#6FBF52">—</div>
+                <div class="vyroba-stat-val" style="color:#7BD69B">—</div>
                 <div class="vyroba-stat-sub">várek dle skladu</div>
               </div>
             </div>
@@ -567,6 +617,42 @@ function renderDashboard(req, data) {
                 <div id="vyroba-yield-box" style="margin-bottom:1rem"></div>
                 <div class="info-box" id="vyroba-status-box" style="display:block;margin-top:0"></div>
                 <button class="btn-submit" id="vyrobaConfirmBtn" onclick="submitVyroba()" style="margin-top:1rem">Potvrdit výrobu a odečíst suroviny</button>
+              </div>
+            </div>
+            </div>
+
+            <div class="vyroba-recept-content" id="vyroba-recept-benzo">
+              <div class="panel-head">
+                <span class="panel-title">Výroba — Benzodiazepin</span>
+                <span class="panel-badge">Recept — zatím bez skladu</span>
+              </div>
+              <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
+                Recept zatím <strong style="color:var(--brass-bright)">není propojený se skladem</strong> — je tu jen jako přehled surovin na jednu várku. Kalkulačka, automatický odečet ze skladu a přičtení hotového produktu se doplní později.
+              </p>
+              <div class="folio-label" style="margin-bottom:1rem">Suroviny na 1 várku</div>
+              <div class="vyroba-recept-list">
+                <span class="vyroba-chip raw">50× Léky na bolest</span>
+                <span class="vyroba-chip raw">10× Pekáč</span>
+              </div>
+            </div>
+
+            <div class="vyroba-recept-content" id="vyroba-recept-joy">
+              <div class="panel-head">
+                <span class="panel-title">Výroba — Joy</span>
+                <span class="panel-badge">Recept — zatím bez skladu</span>
+              </div>
+              <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
+                Recept zatím <strong style="color:var(--brass-bright)">není propojený se skladem</strong> — je tu jen jako přehled surovin na jednu várku. Suroviny se berou ze tří různých skladů (Drogy, Weed, Chemikálie), takže propojení kalkulačky a automatického odečtu přijde později až jako samostatný krok.
+              </p>
+              <div class="folio-label" style="margin-bottom:1rem">Suroviny na 1 várku</div>
+              <div class="vyroba-recept-list">
+                <span class="vyroba-chip raw">40× Metamfetamin</span>
+                <span class="vyroba-chip raw">15× Kokain</span>
+                <span class="vyroba-chip raw">30× Kapky</span>
+                <span class="vyroba-chip raw">50× Extáze</span>
+                <span class="vyroba-chip raw">100× Kanabis</span>
+                <span class="vyroba-chip raw">30× Cukr</span>
+                <span class="vyroba-chip raw">5× Pekáč</span>
               </div>
             </div>
           </div>
@@ -618,6 +704,19 @@ function renderDashboard(req, data) {
                   <div class="form-group select-wrap"><label>Chemikálie</label><select id="chemky-chemikalie" class="select-expandable"><option>Aceton</option><option>Peroxid vodíku</option><option>Potravinářský kofein</option><option>Propylenglykol</option><option>Toluen</option><option>Technický benzín</option><option>Bismut</option><option>Kyselina fosforečná</option><option>Kerosen</option><option>Pekáč</option><option>Genkadon</option><option>Amanita Genkia</option><option>Kapátka</option><option>Forma</option><option>Lithiová baterie</option><option>Semínko</option><option>Cukr</option><option>Nadrcené listy</option></select><span class="select-count-badge">18</span></div>
                   <div class="form-group"><label>Množství (max 500)</label><input type="number" id="chemky-mnozstvi" min="1" max="500" value="1"></div>
                 </div>
+                <div id="chemky-cena-wrap">
+                  <div class="typ-toggle" style="margin-bottom:0.6rem">
+                    <button class="typ-btn active-vklad" id="chemky-cena-vyrobni" onclick="setChemkyCenaZdroj('vyrobni')">Cena z varny</button>
+                    <button class="typ-btn" id="chemky-cena-vlastni" onclick="setChemkyCenaZdroj('vlastni')">Vlastní cena</button>
+                    <button class="typ-btn" id="chemky-cena-zadna" onclick="setChemkyCenaZdroj('zadna')">Bez záznamu</button>
+                  </div>
+                  <input type="hidden" id="chemky-cena-zdroj" value="vyrobni">
+                  <div class="info-box" id="chemky-cena-preview" style="display:block"></div>
+                  <div class="form-row" id="chemky-cena-vlastni-row" style="display:none;margin-top:0.6rem">
+                    <div class="form-group"><label>Zaplaceno</label><input type="number" id="chemky-cena-vlastni-castka" min="0" placeholder="1000"></div>
+                    <div class="form-group"><label>Měna</label><select id="chemky-cena-vlastni-mena"><option value="PESOS">Pesos</option><option value="USD">SAD</option></select></div>
+                  </div>
+                </div>
                 <button class="btn-submit" onclick="submitChemky()">Potvrdit akci</button>
               </div>
             </div>
@@ -648,6 +747,26 @@ function renderDashboard(req, data) {
                   </div>
                 </div>`).join('')}
             </div>
+          </div>
+        </div>
+
+        <!-- Nevyřízené -->
+        <div class="sklad-panel" id="panel-nevyrizene">
+          <div class="panel-card">
+            <div class="panel-head">
+              <span class="panel-title">Nevyřízené akce</span>
+              <span class="panel-badge">Žlutý weed &amp; vklady do kufru od membérů</span>
+            </div>
+            <p style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.8;max-width:720px;margin-bottom:1.4rem">
+              Sem se automaticky přidá záznam pokaždé, když si member vezme žlutý weed nebo nahlásí vklad do kufru auta. Jakmile je to s daným člověkem vyřešené (zaplatil / peníze byly reálně vyzvednuty), klikni na <strong style="color:var(--brass-bright)">Spárovat</strong> — záznam zůstane v historii, jen se označí jako vyřízený.
+            </p>
+            <div class="panel-list-label" style="margin-bottom:0.9rem">Nevyřízené (<span id="nevyrizene-count">—</span>)</div>
+            <div id="nevyrizene-list"><div class="ledger-loading">Načítám…</div></div>
+
+            <div class="folio-rule"></div>
+
+            <div class="panel-list-label" style="margin-bottom:0.9rem">Naposledy vyřízené</div>
+            <div id="vyrizene-list"></div>
           </div>
         </div>
 
@@ -733,6 +852,12 @@ function renderDashboard(req, data) {
   <script>
     const ME_IC_NAME = ${JSON.stringify(icName)};
 
+    // Reward flash na aktivně otevřeném panelu (nebo panel-card v modalu, pokud existuje)
+    function flashActivePanel(){
+      const panel = document.querySelector('.sklad-panel.active .panel-card');
+      if (panel && window.rewardFlash) window.rewardFlash(panel);
+    }
+
     // Hodiny
     function updateClock(){
       const now=new Date();
@@ -746,10 +871,23 @@ function renderDashboard(req, data) {
       document.querySelectorAll('.sklad-sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.panel===id));
       document.querySelectorAll('.sklad-panel').forEach(el=>el.classList.toggle('active',el.id==='panel-'+id));
       try{localStorage.setItem('albion_sklad_tab',id);}catch(e){}
+      if(id==='nevyrizene' && window.loadNevyrizene) window.loadNevyrizene();
+    }
+    function skladToggleMore(){
+      const sec=document.getElementById('skladSecondary');
+      const toggle=document.getElementById('skladMoreToggle');
+      if(!sec||!toggle)return;
+      const willOpen=!sec.classList.contains('open');
+      sec.classList.toggle('open',willOpen);
+      toggle.classList.toggle('open',willOpen);
+      try{localStorage.setItem('albion_sklad_more_open',willOpen?'1':'0');}catch(e){}
     }
     (function restoreTab(){
       try{
+        const secOpen=localStorage.getItem('albion_sklad_more_open')==='1';
+        const SECONDARY_IDS=['zbrane','vyroba','smena','cenik','nevyrizene'];
         const saved=localStorage.getItem('albion_sklad_tab');
+        if(secOpen || (saved && SECONDARY_IDS.includes(saved))) skladToggleMore();
         if(saved&&document.getElementById('panel-'+saved))skladTab(saved);
       }catch(e){}
     })();
@@ -827,8 +965,8 @@ function renderDashboard(req, data) {
           if(!d.recentUcet.length) ucetList.innerHTML=ledgerEmptyHTML('Žádné záznamy', true);
           else ucetList.innerHTML=d.recentUcet.map(function(r){
             const isIn=r[1]==='PŘÍJEM', symbol=r[3]==='USD'?'SAD ':'₱';
-            return '<div class="sklad-row"><span style="display:flex;align-items:center;gap:0.6rem"><span style="width:4px;height:4px;background:'+(isIn?'#6FBF52':'var(--oxblood-bright)')+';flex-shrink:0"></span>'+(r[4]||'—')+'</span>'+
-              '<span style="color:'+(isIn?'#6FBF52':'var(--oxblood-bright)')+'">'+symbol+r[2]+' <em style="color:var(--ivory-faint);font-style:normal;font-size:0.8em">'+r[3].replace('USD','SAD')+'</em></span></div>';
+            return '<div class="sklad-row"><span style="display:flex;align-items:center;gap:0.6rem"><span style="width:4px;height:4px;background:'+(isIn?'#7BD69B':'var(--oxblood-bright)')+';flex-shrink:0"></span>'+(r[4]||'—')+'</span>'+
+              '<span style="color:'+(isIn?'#7BD69B':'var(--oxblood-bright)')+'">'+symbol+r[2]+' <em style="color:var(--ivory-faint);font-style:normal;font-size:0.8em">'+r[3].replace('USD','SAD')+'</em></span></div>';
           }).join('');
         }
         const usdEl=document.getElementById('tally-usd'); if(usdEl) usdEl.textContent='$'+d.ucet.usd.toLocaleString('cs-CZ');
@@ -1050,7 +1188,7 @@ function renderDashboard(req, data) {
             '<td style="text-align:right;color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.78rem">'+vyrobaItemCostText(r.item,1)+' / ks</td>'+
             '<td style="text-align:right">'+r.needed+' ks</td>'+
             '<td style="text-align:right">'+r.have+' ks</td>'+
-            '<td><div class="mini-stock-bar-wrap" style="width:90px"><div class="mini-stock-bar-fill" style="width:'+r.pct+'%;background:'+(r.ok?'linear-gradient(90deg,#3A7D2D,#6FBF52)':'linear-gradient(90deg,var(--oxblood),var(--oxblood-bright))')+'"></div></div></td>'+
+            '<td><div class="mini-stock-bar-wrap" style="width:90px"><div class="mini-stock-bar-fill" style="width:'+r.pct+'%;background:'+(r.ok?'linear-gradient(90deg,#3A7D2D,#7BD69B)':'linear-gradient(90deg,var(--oxblood),var(--oxblood-bright))')+'"></div></div></td>'+
             '<td>'+(r.ok?'<span class="badge vklad">OK</span>':'<span class="badge vyber">chybí '+r.missing+'</span>')+'</td>'+
           '</tr>'
         ).join('');
@@ -1068,7 +1206,7 @@ function renderDashboard(req, data) {
       if(statusBox){
         statusBox.style.borderColor=allOk?'rgba(58,125,45,0.4)':'var(--border-oxblood)';
         statusBox.style.background=allOk?'rgba(58,125,45,0.08)':'var(--oxblood-faint)';
-        statusBox.style.color=allOk?'#8FE070':'var(--oxblood-bright)';
+        statusBox.style.color=allOk?'#8FE0A0':'var(--oxblood-bright)';
         statusBox.innerHTML=allOk
           ? ('✓ Na skladě je dost surovin na '+batches+' '+(batches===1?'várku':batches<5?'várky':'várek')+' — lze rovnou uvařit a odečíst ze skladu.')
           : '✕ Na sklad chybí suroviny uvedené v tabulce (sloupec „Stav“) — výrobu nelze potvrdit.';
@@ -1076,6 +1214,57 @@ function renderDashboard(req, data) {
     }
     document.getElementById('vyroba-batches') && document.getElementById('vyroba-batches').addEventListener('input',renderVyrobaCalc);
     renderVyrobaSteps();renderVyrobaStatMax();renderVyrobaCalc();
+
+    // ── VÝROBA — přepínání záložek receptů (Metamfetamin / Benzodiazepin / Joy) ──
+    // Benzodiazepin a Joy zatím nejsou propojené se skladem — jen zobrazují
+    // seznam surovin, žádná kalkulačka ani odečet ze skladu.
+    function switchVyrobaRecept(recept){
+      ['meth','benzo','joy'].forEach(r=>{
+        const tab=document.getElementById('recept-tab-'+r);
+        const content=document.getElementById('vyroba-recept-'+r);
+        if(tab)tab.classList.toggle('active',r===recept);
+        if(content)content.classList.toggle('active',r===recept);
+      });
+    }
+    window.switchVyrobaRecept = switchVyrobaRecept;
+
+    // ── NEVYŘÍZENÉ — žlutý weed / vklady do kufru od membérů, čekající na spárování ──
+    function nevyrizeneRow(row){
+      return '<div class="sklad-row" data-nevyrizene-id="'+row.id+'">'+
+        '<span style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">'+
+          '<span class="badge '+(row.vyrizeno?'vklad':'vyber')+'">'+(row.vyrizeno?'Vyřízeno':'Čeká')+'</span>'+
+          '<strong style="color:var(--ivory)">'+row.typ+'</strong>'+
+          '<span style="color:var(--ivory-dim)">'+row.uzivatel+'</span>'+
+          '<em style="color:var(--ivory-faint);font-style:normal;font-size:0.82em">'+row.popis+' · '+row.cas+(row.vyrizeno&&row.vyrizil?' · spároval '+row.vyrizil:'')+'</em>'+
+        '</span>'+
+        '<button class="quick-btn" onclick="toggleNevyrizene('+row.id+')">'+(row.vyrizeno?'Vrátit mezi nevyřízené':'Spárovat')+'</button>'+
+      '</div>';
+    }
+    async function loadNevyrizene(){
+      const listEl=document.getElementById('nevyrizene-list');
+      const vyrEl=document.getElementById('vyrizene-list');
+      const countEl=document.getElementById('nevyrizene-count');
+      if(!listEl)return;
+      try{
+        const res=await fetch('/api/nevyrizene');
+        const d=await res.json();
+        if(!d.ok){listEl.innerHTML='<div class="info-box" style="display:block">Načtení se nepodařilo.</div>';return;}
+        countEl.textContent=d.nevyrizene.length;
+        listEl.innerHTML=d.nevyrizene.length?d.nevyrizene.map(nevyrizeneRow).join(''):'<div class="ledger-loading">Žádné nevyřízené akce</div>';
+        if(vyrEl)vyrEl.innerHTML=d.vyrizene.length?d.vyrizene.map(nevyrizeneRow).join(''):'<div class="ledger-loading">Zatím nic</div>';
+      }catch(e){listEl.innerHTML='<div class="info-box" style="display:block">Načtení se nepodařilo.</div>';}
+    }
+    async function toggleNevyrizene(id){
+      try{
+        const res=await fetch('/api/nevyrizene/vyresit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+        const d=await res.json();
+        if(d.ok){showToast(d.vyrizeno?'Spárováno':'Vráceno mezi nevyřízené');loadNevyrizene();}
+        else showToast(d.error,true);
+      }catch(e){showToast('Nepodařilo se, zkus to znovu',true);}
+    }
+    window.loadNevyrizene=loadNevyrizene;
+    window.toggleNevyrizene=toggleNevyrizene;
+    if(document.getElementById('panel-nevyrizene')&&document.getElementById('panel-nevyrizene').classList.contains('active'))loadNevyrizene();
 
     // Potvrzení výroby — server si sám znovu ověří aktuální sklad chemikálií,
     // odečte suroviny a rovnou přičte hotový Metamfetamin do skladu drog.
@@ -1096,6 +1285,7 @@ function renderDashboard(req, data) {
           const r=await post('/api/vyroba/potvrdit',{batches});
           if(r.ok){
             showToast('Výroba potvrzena — '+r.vyrobenoQty+'× '+r.outputItem+' přičteno do skladu');
+            flashActivePanel();
             refreshSkladData();
           } else showToast(r.error,true);
         }
@@ -1179,7 +1369,7 @@ function renderDashboard(req, data) {
       btn.disabled=true;btn.textContent='Odesílám…';
       const r=await post('/api/sklad/bulk',{sekce:bulkSekce,typ:bulkTyp,items});
       btn.disabled=false;btn.textContent='Potvrdit zápis';
-      if(r.ok){showToast('Hromadný zápis uložen ('+r.count+' položek)');closeBulkModal();refreshSkladData();}
+      if(r.ok){showToast('Hromadný zápis uložen ('+r.count+' položek)');closeBulkModal();flashActivePanel();refreshSkladData();}
       else showToast(r.error,true);
     }
 
@@ -1188,6 +1378,10 @@ function renderDashboard(req, data) {
       btn.parentElement.querySelectorAll('.typ-btn').forEach(b=>b.className='typ-btn');
       btn.className='typ-btn '+(typ==='VKLAD'||typ==='PŘÍJEM'?'active-vklad':'active-vyber');
       if(prefix==='zbrane')document.getElementById('zbrane-ucel-wrap').style.display=typ==='VÝBĚR'?'flex':'none';
+      if(prefix==='chemky'){
+        const wrap=document.getElementById('chemky-cena-wrap');
+        if(wrap) wrap.style.display=typ==='VKLAD'?'block':'none';
+      }
     }
 
     async function post(url,data){
@@ -1213,7 +1407,7 @@ function renderDashboard(req, data) {
         [['Typ',typ],['Položka',polozka],['Množství',mnozstvi+' ks'],['Kategorie',kategorie],...(ucel?[['Účel',ucel]]:[])],
         async()=>{
           const r=await post('/api/zbrane',{typ,polozka,mnozstvi,kategorie,ucel});
-          if(r.ok){showToast('Zápis uložen');showUndoBar(typ+' — '+polozka+' ('+mnozstvi+' ks)');refreshSkladData();}
+          if(r.ok){showToast('Zápis uložen');showUndoBar(typ+' — '+polozka+' ('+mnozstvi+' ks)');flashActivePanel();refreshSkladData();}
           else showToast(r.error,true);
         }
       );
@@ -1244,7 +1438,7 @@ function renderDashboard(req, data) {
         [['Typ',typ],['Odrůda',odruda],['Množství',mnozstvi+' sáčků'],['Výroba','~$'+(c.vyroba*qty)],['Prodej','$'+(c.prodej*qty)]],
         async()=>{
           const r=await post('/api/weed',{typ,odruda,mnozstvi});
-          if(r.ok){showToast('Weed uložen — Výroba: ~$'+r.celkVyroba+' · Prodej: $'+r.celkProdej);showUndoBar(typ+' — '+odruda+' ('+mnozstvi+' sáčků)');refreshSkladData();}
+          if(r.ok){showToast('Weed uložen — Výroba: ~$'+r.celkVyroba+' · Prodej: $'+r.celkProdej);showUndoBar(typ+' — '+odruda+' ('+mnozstvi+' sáčků)');flashActivePanel();refreshSkladData();}
           else showToast(r.error,true);
         }
       );
@@ -1261,7 +1455,7 @@ function renderDashboard(req, data) {
         [['Typ',typ],['Droga',droga],['Množství',mnozstvi+' sáčků']],
         async()=>{
           const r=await post('/api/drogy',{typ,droga,mnozstvi});
-          if(r.ok){showToast('Drogy uloženy');showUndoBar(typ+' — '+droga+' ('+mnozstvi+' sáčků)');refreshSkladData();}
+          if(r.ok){showToast('Drogy uloženy');showUndoBar(typ+' — '+droga+' ('+mnozstvi+' sáčků)');flashActivePanel();refreshSkladData();}
           else showToast(r.error,true);
         }
       );
@@ -1280,7 +1474,7 @@ function renderDashboard(req, data) {
         [['Typ',typ],['Částka',sym+castka],['Valuta',valuta],['Poznámka',poznamka]],
         async()=>{
           const r=await post('/api/ucet',{typ,castka,valuta,poznamka});
-          if(r.ok){showToast('Transakce zaznamenána');document.getElementById('ucet-castka').value='';document.getElementById('ucet-poznamka').value='';refreshSkladData();}
+          if(r.ok){showToast('Transakce zaznamenána');document.getElementById('ucet-castka').value='';document.getElementById('ucet-poznamka').value='';flashActivePanel();refreshSkladData();}
           else showToast(r.error,true);
         }
       );
@@ -1306,7 +1500,7 @@ function renderDashboard(req, data) {
         if(d.exempt){
           statusBox.innerHTML='<div class="info-box" style="display:block;border-color:var(--border-brass);background:var(--brass-faint);color:var(--ivory-dim)">Jako Associate máš z Reserve Fondu zatím výjimku — povinnost platit začíná od hodnosti Member.</div>';
         } else if(d.paidByMe){
-          statusBox.innerHTML='<div class="info-box" style="display:block;border-color:rgba(58,125,45,0.4);background:rgba(58,125,45,0.08);color:#8FE070">✓ Tento týden máš Reserve Fund zaplacený a podepsaný.</div>';
+          statusBox.innerHTML='<div class="info-box" style="display:block;border-color:rgba(58,125,45,0.4);background:rgba(58,125,45,0.08);color:#8FE0A0">✓ Tento týden máš Reserve Fund zaplacený a podepsaný.</div>';
         } else {
           statusBox.innerHTML='<button class="btn-submit" style="margin-top:0" onclick="payReserveFund()">Zaplatit a podepsat $'+d.amount.toLocaleString('cs-CZ')+'</button>';
         }
@@ -1316,7 +1510,7 @@ function renderDashboard(req, data) {
         list.innerHTML='<div class="panel-list-label" style="margin-top:1.2rem">Stav členů — tento týden</div>'+
           d.members.map(m=>
             '<div class="manifest-row"><span class="mr-name">'+escRf(m.icName)+'</span><span class="mr-dots"></span>'+
-            '<span class="mr-val" style="color:'+(m.paid?'#6FBF52':'var(--oxblood-bright)')+'">'+(m.paid?'✓ zaplaceno':'✕ nezaplaceno')+'</span></div>'
+            '<span class="mr-val" style="color:'+(m.paid?'#7BD69B':'var(--oxblood-bright)')+'">'+(m.paid?'✓ zaplaceno':'✕ nezaplaceno')+'</span></div>'
           ).join('');
       }catch(e){}
     }
@@ -1327,7 +1521,7 @@ function renderDashboard(req, data) {
         [['Částka','$'+RF_AMOUNT.toLocaleString('cs-CZ')],['Splatnost','neděle'],['Účet','Reserve Fond (odděleně od hlavní pokladny)']],
         async()=>{
           const r=await post('/api/reserve-fund/pay',{});
-          if(r.ok){showToast('Reserve Fund zaplacen a podepsán');loadReserveFund();}
+          if(r.ok){showToast('Reserve Fund zaplacen a podepsán');flashActivePanel();loadReserveFund();}
           else showToast(r.error,true);
         }
       );
@@ -1341,57 +1535,77 @@ function renderDashboard(req, data) {
       else showToast(d.error,true);
     }
     window.saveReserveFundAmount=saveReserveFundAmount;
-
-    // ── RESERVE FUND — ruční výdaj/příjem (jen Founder/Council) ─────────────
-    let rfTxTyp='PŘÍJEM';
-    function setRfTxTyp(t){
-      rfTxTyp=t;
-      const p=document.getElementById('rf-tx-typ-prijem'), v=document.getElementById('rf-tx-typ-vydaj');
-      if(p) p.className='typ-btn'+(t==='PŘÍJEM'?' active-vklad':'');
-      if(v) v.className='typ-btn'+(t==='VÝDAJ'?' active-vyber':'');
-      const el=document.getElementById('rf-tx-typ'); if(el) el.value=t;
-    }
-    window.setRfTxTyp=setRfTxTyp;
-    async function submitRfTransaction(){
-      const typEl=document.getElementById('rf-tx-typ');
-      const typ=typEl?typEl.value:'PŘÍJEM';
-      const castka=document.getElementById('rf-tx-castka').value;
-      const poznamka=document.getElementById('rf-tx-poznamka').value.trim();
-      if(!castka||parseFloat(castka)<=0) return showToast('Vyplň platnou částku',true);
-      if(!poznamka) return showToast('Vyplň poznámku',true);
-      showModal(
-        typ==='PŘÍJEM'?'Ruční příjem do Reserve Fondu':'Výběr z Reserve Fondu',
-        'Zapíše se na samostatný účet Reserve Fondu — hlavní pokladny se to nedotkne.',
-        [['Typ',typ],['Částka','$'+castka],['Poznámka',poznamka]],
-        async()=>{
-          const r=await post('/api/reserve-fund/transaction',{typ,castka,poznamka});
-          if(r.ok){
-            showToast('Pohyb na Reserve Fondu zaznamenán');
-            document.getElementById('rf-tx-castka').value='';
-            document.getElementById('rf-tx-poznamka').value='';
-            loadReserveFund();
-          } else showToast(r.error,true);
-        }
-      );
-    }
-    window.submitRfTransaction=submitRfTransaction;
-
     loadReserveFund();
     (window.evtSource||new EventSource('/api/events')).addEventListener('reserveFundUpdate',()=>setTimeout(loadReserveFund,400));
     (window.evtSource||new EventSource('/api/events')).addEventListener('reserveFundConfigUpdate',()=>setTimeout(loadReserveFund,200));
+
+    // ── CHEMKY — CENA NÁKUPU (z varny / vlastní / bez záznamu) ──────────────
+    let chemkyCenaZdroj = 'vyrobni';
+    function setChemkyCenaZdroj(z){
+      chemkyCenaZdroj = z;
+      document.getElementById('chemky-cena-vyrobni').className = 'typ-btn' + (z==='vyrobni' ? ' active-vklad' : '');
+      document.getElementById('chemky-cena-vlastni').className = 'typ-btn' + (z==='vlastni' ? ' active-vklad' : '');
+      document.getElementById('chemky-cena-zadna').className = 'typ-btn' + (z==='zadna' ? ' active-vyber' : '');
+      document.getElementById('chemky-cena-vlastni-row').style.display = z==='vlastni' ? 'grid' : 'none';
+      updateChemkyCenaPreview();
+    }
+    window.setChemkyCenaZdroj = setChemkyCenaZdroj;
+    function updateChemkyCenaPreview(){
+      const box=document.getElementById('chemky-cena-preview');
+      if(!box)return;
+      const item=document.getElementById('chemky-chemikalie').value;
+      const qty=parseInt(document.getElementById('chemky-mnozstvi').value)||0;
+      if(chemkyCenaZdroj==='zadna'){ box.textContent='Bez odečtu z účtu — do skladu se zapíše jen množství.'; return; }
+      if(chemkyCenaZdroj==='vlastni'){ box.textContent='Zaplacená částka se rovnou zapíše jako výdaj do Účetnictví.'; return; }
+      const p=CHEMKY_CENY[item];
+      if(!p){ box.textContent='Pro tuto položku není v ceníku z varny cena — zvol vlastní cenu.'; return; }
+      const total=p.cena*qty;
+      const sym=p.mena==='sad'?'$':'₱';
+      box.textContent=qty+'× '+item+' × '+p.cena+' '+sym+'/ks = '+sym+total+' — odečte se z účtu jako výdaj.';
+    }
+    document.getElementById('chemky-chemikalie').addEventListener('change',updateChemkyCenaPreview);
+    document.getElementById('chemky-mnozstvi').addEventListener('input',updateChemkyCenaPreview);
+    setChemkyCenaZdroj('vyrobni');
 
     async function submitChemky(){
       if(!qtyValid('chemky-mnozstvi'))return showToast('Množství musí být 1–500 ks',true);
       const typ=document.getElementById('chemky-typ').value;
       const chemikalie=document.getElementById('chemky-chemikalie').value;
       const mnozstvi=document.getElementById('chemky-mnozstvi').value;
+
+      const payload={typ,chemikalie,mnozstvi};
+      const detaily=[['Typ',typ],['Chemikálie',chemikalie],['Množství',mnozstvi+' ks']];
+
+      if(typ==='VKLAD'){
+        payload.cenaZdroj=chemkyCenaZdroj;
+        if(chemkyCenaZdroj==='vyrobni'){
+          const p=CHEMKY_CENY[chemikalie];
+          if(!p) return showToast('Pro tuto položku není v ceníku z varny cena — zvol vlastní cenu',true);
+          detaily.push(['Odečte se z účtu', (p.mena==='sad'?'$':'₱')+(p.cena*parseInt(mnozstvi))+' (cena z varny)']);
+        } else if(chemkyCenaZdroj==='vlastni'){
+          const castka=document.getElementById('chemky-cena-vlastni-castka').value;
+          const mena=document.getElementById('chemky-cena-vlastni-mena').value;
+          if(!castka||parseFloat(castka)<=0) return showToast('Vyplň zaplacenou částku',true);
+          payload.cenaVlastni=castka;
+          payload.cenaVlastniMena=mena;
+          detaily.push(['Odečte se z účtu', (mena==='USD'?'$':'₱')+castka+' (vlastní cena)']);
+        } else {
+          detaily.push(['Odečet z účtu', 'žádný']);
+        }
+      }
+
       showModal(
         typ==='VKLAD'?'Vložit chemikálii':'Vybrat chemikálii',
         'Potvrzením zapečetíš zápis do rejstříku.',
-        [['Typ',typ],['Chemikálie',chemikalie],['Množství',mnozstvi+' ks']],
+        detaily,
         async()=>{
-          const r=await post('/api/chemky',{typ,chemikalie,mnozstvi});
-          if(r.ok){showToast('Chemikálie uložena');showUndoBar(typ+' — '+chemikalie+' ('+mnozstvi+' ks)');refreshSkladData();}
+          const r=await post('/api/chemky',payload);
+          if(r.ok){
+            showToast(r.ucetZapis ? ('Chemikálie uložena — z účtu odečteno '+(r.ucetZapis.valuta==='USD'?'$':'₱')+r.ucetZapis.castka) : 'Chemikálie uložena');
+            if(r.ucetChyba) showToast(r.ucetChyba,true);
+            showUndoBar(typ+' — '+chemikalie+' ('+mnozstvi+' ks)');
+            flashActivePanel();refreshSkladData();
+          }
           else showToast(r.error,true);
         }
       );
@@ -1440,7 +1654,7 @@ function renderDashboard(req, data) {
         [['Směr',zText+' → '+naText],['Směněno',symFrom+castka],['Obdrženo',symTo+castka],['Kurz','1:1']],
         async()=>{
           const r=await post('/api/smena',{smer:smenaSmer,castka});
-          if(r.ok){showToast('Směna provedena — '+symFrom+castka+' → '+symTo+castka);document.getElementById('smena-castka').value='';refreshSkladData();}
+          if(r.ok){showToast('Směna provedena — '+symFrom+castka+' → '+symTo+castka);document.getElementById('smena-castka').value='';flashActivePanel();refreshSkladData();}
           else showToast(r.error,true);
         }
       );
@@ -1472,7 +1686,7 @@ function renderDashboard(req, data) {
       });
       const res=await fetch('/api/cenik',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories})});
       const data=await res.json();
-      if(data.ok)showToast('Ceník uložen');else showToast(data.error||'Chyba',true);
+      if(data.ok){showToast('Ceník uložen');flashActivePanel();}else showToast(data.error||'Chyba',true);
     }
     window.saveCenik=saveCenik;
 
