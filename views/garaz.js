@@ -1,8 +1,8 @@
 // garaz.js — Albion v3 · Heraldická garáž
-
+ 
 const { baseStyles, ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
-
+ 
 function renderGaraz(req) {
   const canManage = req.session.accessLevel === 1; // jen Founder/Council smí mazat/upravovat vozy
   return `<!DOCTYPE html><html lang="cs"><head>
@@ -11,7 +11,7 @@ function renderGaraz(req) {
   ${baseStyles()}
   <style>
     .garage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1.6rem}
-
+ 
     .car-card{
       background:var(--panel2);border:1px solid var(--border);
       overflow:hidden;transition:border-color 0.2s,transform 0.2s;
@@ -20,7 +20,7 @@ function renderGaraz(req) {
     .car-card::before{content:'';position:absolute;top:0;left:0;width:14px;height:14px;border-top:1px solid var(--brass-dim);border-left:1px solid var(--brass-dim);z-index:2}
     .car-card::after{content:'';position:absolute;bottom:0;right:0;width:14px;height:14px;border-bottom:1px solid var(--brass-dim);border-right:1px solid var(--brass-dim);z-index:2}
     .car-card:hover{border-color:var(--border-brass);transform:translateY(-3px)}
-
+ 
     .car-photo{
       width:100%;aspect-ratio:16/10;background:var(--panel3);
       position:relative;overflow:hidden;flex-shrink:0;
@@ -33,7 +33,7 @@ function renderGaraz(req) {
       letter-spacing:0.12em;text-transform:uppercase;
     }
     .car-photo-empty svg{width:28px;height:28px;opacity:0.3}
-
+ 
     /* SPZ štítek — heraldický styl (vždy světlý štítek + tmavý text, nezávisle na tématu) */
     .car-plate{
       position:absolute;left:0.8rem;bottom:0.8rem;
@@ -43,7 +43,7 @@ function renderGaraz(req) {
       border:2px solid #15110C;
       box-shadow:0 4px 16px rgba(0,0,0,0.5);
     }
-
+ 
     .car-body{padding:1.3rem 1.4rem 1.4rem;display:flex;flex-direction:column;gap:0.6rem;flex:1}
     .car-name{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:1.1rem;color:var(--ivory);line-height:1.2}
     .car-price{font-family:var(--font-display);font-size:0.95rem;color:var(--brass);font-weight:700;font-style:italic}
@@ -61,7 +61,7 @@ function renderGaraz(req) {
     }
     .car-action-btn:hover{border-color:var(--brass);color:var(--brass-bright)}
     .car-action-btn.danger:hover{border-color:var(--oxblood-bright);color:var(--oxblood-bright)}
-
+ 
     /* Upload zone */
     .upload-zone{
       border:1px solid var(--border-brass);
@@ -84,7 +84,7 @@ function renderGaraz(req) {
     }
     .upload-zone.has-image .upload-clear{display:flex}
     .upload-zone.has-image .upload-zone-text,.upload-zone.has-image svg{display:none}
-
+ 
     @media(max-width:640px){.garage-grid{grid-template-columns:1fr}}
   </style>
   </head><body>
@@ -102,17 +102,17 @@ function renderGaraz(req) {
       </button>
     </div>
     <p class="folio-footnote"><strong>Vozový park.</strong> Každý záznam nese SPZ, model, cenu v San Andreas Dollars (PDM), kdo vůz pořídil a k čemu slouží. Záznamy vidí všichni členové.</p>
-
+ 
     <div id="garage-loading" class="ledger-loading">Načítám vozový park…</div>
     <div id="garage-grid" class="garage-grid"></div>
   </main>
-
+ 
   <!-- Modal -->
   <div class="modal-overlay" id="carModal">
     <div class="modal-box" id="carModalBox" style="max-width:500px">
       <div class="modal-title" id="carModalTitle">Přidat vůz</div>
       <div class="modal-subtitle">Vyplň údaje. Fotku vlož přes Ctrl+V nebo nahraj ze souboru.</div>
-
+ 
       <div class="form-group" style="margin-bottom:1rem">
         <label>Fotka vozu</label>
         <div class="upload-zone" id="uploadZone" tabindex="0">
@@ -123,7 +123,7 @@ function renderGaraz(req) {
         </div>
         <input type="file" id="carImageFile" accept="image/*" style="display:none">
       </div>
-
+ 
       <div class="form-row">
         <div class="form-group"><label>SPZ</label><input type="text" id="car-spz" placeholder="ABC 123" maxlength="12"></div>
         <div class="form-group"><label>Cena (SAD)</label><input type="number" id="car-cena" min="0" placeholder="250000"></div>
@@ -131,7 +131,7 @@ function renderGaraz(req) {
       <div class="form-group" style="margin-bottom:0.85rem"><label>Model / název vozu</label><input type="text" id="car-nazev" placeholder="Obey Tailgater…"></div>
       <div class="form-group" style="margin-bottom:0.85rem"><label>Kdo vůz koupil</label><input type="text" id="car-kupil" placeholder="IC jméno"></div>
       <div class="form-group" style="margin-bottom:0.5rem"><label>K čemu slouží</label><textarea id="car-ucel" placeholder="Krátký popis…" rows="3"></textarea></div>
-
+ 
       <div class="modal-actions">
         <button class="modal-btn-cancel" onclick="closeCarModal()">Zrušit</button>
         <button class="modal-btn-confirm" id="carModalConfirmBtn" onclick="submitCar()">Uložit vůz</button>
@@ -139,7 +139,7 @@ function renderGaraz(req) {
     </div>
   </div>
   <div class="toast" id="toast"></div>
-
+ 
   <script>
     var _garageHandlers={};
     window.openCarModal=function(){_garageHandlers.open&&_garageHandlers.open();};
@@ -148,13 +148,13 @@ function renderGaraz(req) {
     window.deleteCar=function(id){_garageHandlers.del&&_garageHandlers.del(id);};
     window.submitCar=function(){_garageHandlers.submit&&_garageHandlers.submit();};
     window.clearCarImage=function(e){_garageHandlers.clearImg&&_garageHandlers.clearImg(e);};
-
+ 
     document.addEventListener('DOMContentLoaded',function(){
       const CAN_MANAGE=${canManage};
       let CARS=[],editingCarId=null,pendingImageData=null;
       function esc(s){return(s==null?'':String(s)).replace(/</g,'&lt;');}
       function money(n){return '$'+Math.round(n||0).toLocaleString('cs-CZ');}
-
+ 
       function carCardHtml(car){
         const photo=car.image
           ?'<img src="'+esc(car.image)+'" alt="'+esc(car.nazev)+'" loading="lazy">'
@@ -175,13 +175,13 @@ function renderGaraz(req) {
           '</div>'+
         '</div>';
       }
-
+ 
       function renderGarage(){
         const grid=document.getElementById('garage-grid');
         if(!CARS.length){grid.innerHTML=ledgerEmptyHTML('Garáž je prázdná — žádný vůz nebyl dosud zapsán');return;}
         grid.innerHTML=CARS.map(carCardHtml).join('');
       }
-
+ 
       // 3D tilt-hover (#12) — delegovaný listener, funguje i pro nově vykreslené karty
       (function tiltDelegate(){
         const MAX=7;
@@ -205,7 +205,7 @@ function renderGaraz(req) {
           card.style.setProperty('--rx','0deg');card.style.setProperty('--ry','0deg');card.style.setProperty('--tz','0px');
         });
       })();
-
+ 
       async function loadGarage(){
         try{
           const res=await fetch('/api/garage',{cache:'no-store'});
@@ -214,7 +214,7 @@ function renderGaraz(req) {
           CARS=data.cars||[];renderGarage();
         }catch(e){document.getElementById('garage-loading').textContent='Chyba načtení: '+e.message;}
       }
-
+ 
       function resetCarForm(){
         ['car-spz','car-cena','car-nazev','car-kupil','car-ucel'].forEach(id=>document.getElementById(id).value='');
         pendingImageData=null;setUploadPreview(null);editingCarId=null;
@@ -242,7 +242,7 @@ function renderGaraz(req) {
         const data=await res.json();
         if(data.ok){showToast('Vůz odstraněn');loadGarage();}else showToast(data.error||'Chyba',true);
       }
-
+ 
       function setUploadPreview(src){
         const zone=document.getElementById('uploadZone');
         const img=document.getElementById('uploadPreview');
@@ -254,11 +254,11 @@ function renderGaraz(req) {
         if(!file||!file.type||!file.type.startsWith('image/'))return;
         const reader=new FileReader();reader.onload=()=>cb(reader.result);reader.readAsDataURL(file);
       }
-
+ 
       _garageHandlers.open=openCarModal;_garageHandlers.close=closeCarModal;
       _garageHandlers.edit=editCar;_garageHandlers.del=deleteCar;
       _garageHandlers.submit=submitCar;_garageHandlers.clearImg=clearCarImage;
-
+ 
       const uploadZone=document.getElementById('uploadZone');
       const carImageFile=document.getElementById('carImageFile');
       uploadZone.addEventListener('click',(e)=>{if(document.getElementById('carModal').classList.contains('open'))carImageFile.click();});
@@ -269,7 +269,7 @@ function renderGaraz(req) {
       function handlePaste(e){const items=e.clipboardData&&e.clipboardData.items;if(!items)return;for(const item of items){if(item.type&&item.type.startsWith('image/')){const f=item.getAsFile();fileToDataUrl(f,(d)=>{pendingImageData=d;setUploadPreview(d);});e.preventDefault();break;}}}
       uploadZone.addEventListener('paste',handlePaste);
       document.addEventListener('paste',(e)=>{if(document.getElementById('carModal').classList.contains('open'))handlePaste(e);});
-
+ 
       async function submitCar(){
         const spz=document.getElementById('car-spz').value.trim();
         const cena=document.getElementById('car-cena').value;
@@ -293,15 +293,16 @@ function renderGaraz(req) {
         }catch(e){showToast('Chyba sítě: '+e.message,true);}
         btn.disabled=false;btn.textContent=editingCarId?'Uložit změny':'Uložit vůz';
       }
-
+ 
       document.getElementById('carModal').addEventListener('click',(e)=>{if(e.target===e.currentTarget)closeCarModal();});
       document.addEventListener('keydown',(e)=>{if(e.key==='Escape'&&document.getElementById('carModal').classList.contains('open'))closeCarModal();});
-
+ 
       loadGarage();
       (window.evtSource||new EventSource('/api/events')).addEventListener('garageUpdate',()=>setTimeout(loadGarage,400));
     });
   </script>
   </body></html>`;
 }
-
+ 
 module.exports = { renderGaraz };
+ 
