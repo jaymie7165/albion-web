@@ -1,4 +1,4 @@
-// kodex.js — Albion v3
+// views/kodex.js — CALEDONIA · Kodex (redesign, obsah beze změny)
 
 const { baseStyles } = require('../styles');
 const { renderNav } = require('../nav');
@@ -23,53 +23,27 @@ function renderKodex(req) {
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'kodex')}
-  <div class="ink-progress-track"><div class="ink-progress-fill" id="inkProgress"></div></div>
   <main>
     <div class="page-header">
-      <div>
-        <div class="page-label">Organizace Caledonia</div>
-        <h1 class="page-title">Kodex</h1>
-        <p class="page-sub">Principy a zásady, které definují každého člena Caledonie</p>
-      </div>
+      <div><div class="page-label">Organizace Caledonia</div><h1 class="page-title">Kodex</h1><p class="page-sub">Principy a zásady, které definují každého člena Caledonie</p></div>
     </div>
-    <p class="folio-footnote"><strong>Závazný řád organizace.</strong> Kodex Caledonie je souborem deseti základních principů, které jsou závazné pro každého člena bez výjimky. Porušení kodexu může vést k disciplinárnímu řízení nebo vyloučení.</p>
+    <p class="folio-footnote"><strong>Závazný řád organizace.</strong> Deset základních principů, závazných pro každého člena bez výjimky.</p>
 
-    <div class="lore-grid">
-      <div class="chapters">
-        ${articles.map((a, i) => `
-          <div class="chapter">
-            <div class="chapter-meta">Článek ${a.num}</div>
-            <div class="chapter-title">${a.title}</div>
-            <div class="chapter-text${i === 0 ? ' with-dropcap' : ''}">${a.text}</div>
+    <div style="display:grid;grid-template-columns:1fr 220px;gap:2.4rem;align-items:start">
+      <div>
+        ${articles.map(a => `
+          <div style="padding:1.6rem 0;border-bottom:1px solid var(--border)">
+            <div style="font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.24em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem">Článek ${a.num}</div>
+            <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--ivory);margin-bottom:0.7rem">${a.title}</div>
+            <div style="font-family:var(--font-body);font-size:0.86rem;line-height:1.85;color:var(--ivory-dim);font-weight:300">${a.text}</div>
           </div>`).join('')}
       </div>
-      <div class="sidebar">
-        <div class="sidebar-title">Obsah kodexu</div>
-        ${articles.map(a => `
-          <div class="toc-item">
-            <span class="toc-num">${a.num}</span>
-            <span>${a.title}</span>
-          </div>`).join('')}
-        <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);font-family:var(--font-display);font-style:italic;font-size:0.95rem;color:var(--ivory-faint);line-height:1.9">
-          Kodex Caledonie je závazný pro každého člena bez výjimky.
-        </div>
+      <div>
+        <div class="folio-label" style="margin-bottom:1rem">Obsah</div>
+        ${articles.map(a => `<div style="display:flex;gap:0.7rem;padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.78rem;color:var(--ivory-dim)"><span style="font-family:var(--font-label);color:var(--brass);font-weight:600;min-width:1.4rem">${a.num}</span><span>${a.title}</span></div>`).join('')}
       </div>
     </div>
   </main>
-  <script>
-    (function inkFill(){
-      const bar=document.getElementById('inkProgress');
-      if(!bar)return;
-      function tick(){
-        const h=document.documentElement;
-        const scrolled=h.scrollTop||document.body.scrollTop;
-        const max=(h.scrollHeight||document.body.scrollHeight)-h.clientHeight;
-        bar.style.width=(max>0?Math.min(100,(scrolled/max)*100):0)+'%';
-      }
-      document.addEventListener('scroll',tick,{passive:true});
-      tick();
-    })();
-  </script>
   </body></html>`;
 }
 
