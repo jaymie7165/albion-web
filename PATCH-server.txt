@@ -1,0 +1,268 @@
+PATCH — server.js
+══════════════════════════════════════════════════════════════════════
+Vše níže je ADDITIVNÍ — nic z existujícího server.js se neodstraňuje ani
+nepřepisuje, jen se přidávají nové bloky na vyznačená místa. Čísla u
+nadpisů odpovídají bodům ze zadání (1–6).
+══════════════════════════════════════════════════════════════════════
+
+
+── (require na začátek souboru, vedle ostatních requirů) ──────────────
+const { ACHIEVEMENTS, CATEGORY_LABELS, grant: grantAchievement } = require('./achievements');
+// (require('./achievements') už dnes existuje jen jako { ACHIEVEMENTS } —
+// nahraď ho tímhle rozšířeným importem)
+
+
+══════════════════════════════════════════════════════════════════════
+1) ROZCESTNÍK — /prehled
+══════════════════════════════════════════════════════════════════════
+Přidej k ostatním app.get() routám (klidně hned vedle /home):
+
+const { renderPrehled } = require('./views/prehled');
+app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
+
+
+══════════════════════════════════════════════════════════════════════
+2) HIERARCHIE & LORE — editace (jen Founder/Council, bez záznamu autora)
+══════════════════════════════════════════════════════════════════════
+Server už DNES má vše potřebné — `/api/content/:key` (GET pro každého
+přihlášeného, POST chráněný `requireAccess('audit')`) a `kodexStore` /
+`loreStore` / `hierStore` z content-store.js. requireAccess('audit') = jen
+level 1 (Founder/Council), takže právo editace už sedí přesně na zadání.
+
+JEDINÁ změna: dnešní hierarchy.js a lore.js views ta data vůbec nečtou
+(mají hardcoded pole). Nahraď je verzemi z tohoto balíčku (views/hierarchy.js,
+views/lore.js) — ty si obsah natáhnou z GET /api/content/hierarchy a
+GET /api/content/lore, s fallbackem na dnešní výchozí texty, pokud store
+je prázdný (první спuštění). Editace se objeví jen pro Founder/Council
+(`req.session.accessLevel === 1`), přesně jako dnes žádná historie/autor
+se nezaznamenává — POST tělo je jen `{ data: [...] }` bez metadat.
+
+
+══════════════════════════════════════════════════════════════════════
+3) OZNÁMENÍ S KATEGORIEMI
+══════════════════════════════════════════════════════════════════════
+V POST /api/nastenska najdi řádek:
+
+  await discord.sendAnnouncement(title || 'Oznámení', content, uzivatel);
+
+nahraď za:
+
+  const category = ['dulezite','personalni','provozni','ostatni'].includes(req.body.category) ? req.body.category : 'ostatni';
+  await discord.sendAnnouncement(title || 'Oznámení', content, uzivatel, category);
+
+A pošli kategorii i do SSE broadcastu na dalším řádku:
+
+  broadcastSSE('nastenska', { title: title || 'Oznámení', content, uzivatel, category, timestamp: new Date().toISOString() });
+
+Totéž v naplánovaných oznámeních (setInterval blok výše, kde se volá
+`discord.sendAnnouncement(a.title || 'Oznámení', a.content, a.uzivatel)`)
+— přidej `a.category` jako 4. argument a ulož `category` i při vytváření
+naplánovaného oznámení (`list.push({ id: ..., title, content, uzivatel,
+category, publishAt: ts })`).
+
+Nová views/nastenska.js (v balíčku) přidává select pro kategorii ve
+formuláři a barevný cat-pill (viz styles.js `.cat-pill`) u každé zprávy.
+
+
+══════════════════════════════════════════════════════════════════════
+4) RESERVE FUND — VKLAD NAVÍC + VÝBĚR (jen Founder/Council)
+══════════════════════════════════════════════════════════════════════
+Přidej za stávající `app.post('/api/reserve-fund/pay', ...)`:
+
+// Dobrovolný vklad JAKÉKOLIV částky nad rámec povinného odvodu — kdokoliv
+// přihlášený, nemění stav "zaplaceno za týden" (to řeší jen /pay).
+app.post('/api/reserve-fund/deposit', requireAuth, async (req, res) => {
+  const amount = parseFloat(req.body.amount);
+  if (!isAmount(amount, 1_000_000)) return res.json({ ok: false, error: 'Neplatná částka' });
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+  const poznamka = `Dobrovolný vklad do Reserve Fondu — ${uzivatel}`;
+  try {
+    await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, 'PŘÍJEM', amount, 'USD', poznamka, uzivatel]);
+  } catch (e) {
+    console.error('[RESERVE FUND DEPOSIT]', e.message);
+    return res.status(502).json({ ok: false, error: 'Zápis se nepodařil, zkus to znovu.' });
+  }
+  await discord.notifyAudit(RESERVE_FUND_SHEET_NAME, uzivatel, discordUser, `PŘÍJEM — SAD ${amount} | ${poznamka}`);
+  broadcastSSE('reserveFundUpdate', { weekKey: getReserveWeekKey(), icName: uzivatel });
+  res.json({ ok: true });
+});
+
+// Výběr z Reserve Fondu — POUZE Founder/Council (level 1), bez schvalovacího
+// procesu (dle zadání). Zapisuje se jako VÝDAJ na SAMOSTATNÝ účet 'Reserve
+// Fond' — hlavní pokladna (Účetnictví) se tím nemění.
+app.post('/api/reserve-fund/withdraw', requireAuth, async (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Výběr z Reserve Fondu smí provádět jen Founder/Council' });
+  const amount = parseFloat(req.body.amount);
+  const poznamkaVstup = sanitizeText(req.body.poznamka, 300);
+  if (!isAmount(amount, 1_000_000)) return res.json({ ok: false, error: 'Neplatná částka' });
+  if (!poznamkaVstup) return res.json({ ok: false, error: 'Vyplň důvod výběru' });
+  const cas = sheets.timestamp();
+  const uzivatel = req.session.icName;
+  const discordUser = req.session.discordUsername;
+  const poznamka = `Výběr z Reserve Fondu — ${poznamkaVstup}`;
+  try {
+    await sheets.appendRow(RESERVE_FUND_SHEET_NAME, [cas, 'VÝDAJ', amount, 'USD', poznamka, uzivatel]);
+  } catch (e) {
+    console.error('[RESERVE FUND WITHDRAW]', e.message);
+    return res.status(502).json({ ok: false, error: 'Zápis se nepodařil, zkus to znovu.' });
+  }
+  await discord.notifyAudit(RESERVE_FUND_SHEET_NAME, uzivatel, discordUser, `VÝDAJ — SAD ${amount} | ${poznamka}`);
+  broadcastSSE('reserveFundUpdate', { weekKey: getReserveWeekKey(), icName: uzivatel });
+  res.json({ ok: true });
+});
+
+(Umísti tento blok AŽ ZA definici `RESERVE_FUND_SHEET_NAME` a `getReserveWeekKey`,
+tedy stejně jako ostatní Reserve Fund routy dnes.)
+
+
+══════════════════════════════════════════════════════════════════════
+5a) RUČNÍ VYZNAMENÁNÍ (jen Founder/Council) + rozšíření katalogu
+══════════════════════════════════════════════════════════════════════
+Přidej novou sekci (např. za blok ADMIN — správa členů):
+
+app.get('/api/achievements/catalog', requireAuth, (req, res) => {
+  res.json({ ok: true, catalog: ACHIEVEMENTS, categories: CATEGORY_LABELS });
+});
+
+app.get('/api/achievements/mine', requireAuth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  res.json({ ok: true, earned: user?.achievements || [], catalog: ACHIEVEMENTS, categories: CATEGORY_LABELS });
+});
+
+// Přehled pro stránku /vyznamenani — všichni členové + jejich odznaky
+app.get('/api/achievements/all', requireAuth, (req, res) => {
+  const users = db.prepare('SELECT * FROM users').all()
+    .map(u => ({ ic_name: u.ic_name, achievements: u.achievements || [] }))
+    .filter(u => u.ic_name);
+  res.json({ ok: true, members: users, catalog: ACHIEVEMENTS, categories: CATEGORY_LABELS });
+});
+
+app.post('/api/admin/achievements/grant', requireAuth, requireFounderCouncil, (req, res) => {
+  const { userId, key } = req.body;
+  if (!ACHIEVEMENTS[key]) return res.json({ ok: false, error: 'Neznámý odznak' });
+  const target = db.prepare('SELECT * FROM users WHERE id = ?').get(parseInt(userId));
+  if (!target) return res.json({ ok: false, error: 'Člen nenalezen' });
+  const granted = grantAchievement(parseInt(userId), key, req.session.icName);
+  if (!granted) return res.json({ ok: false, error: 'Člen už tento odznak má' });
+  broadcastSSE('achievementUpdate', { label: ACHIEVEMENTS[key].label, uzivatel: target.ic_name });
+  res.json({ ok: true });
+});
+
+(`requireFounderCouncil` už v souboru existuje — definovaná u ADMIN sekce.
+Pokud je definovaná POD tímto blokem, přesuň definici výš, nebo tenhle blok
+dej pod ni.)
+
+
+══════════════════════════════════════════════════════════════════════
+5b) BUGFIX — "First Month" se ukazoval při každém loginu
+══════════════════════════════════════════════════════════════════════
+V POST /login/password najdi řádek:
+
+  try { require('./achievements').checkTenureAchievements(user.id, user.created_at); } catch (e) {}
+
+nahraď za (kontroluje se jen JEDNOU za den na uživatele, ne při každém loginu):
+
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    if (user.achievements_checked_at !== today) {
+      require('./achievements').checkTenureAchievements(user.id, user.created_at);
+      db.setAchievementsCheckedAt(user.id, today);
+    }
+  } catch (e) {}
+
+A do db.js přidej vedle ostatních setterů:
+
+db.setAchievementsCheckedAt = (id, dateStr) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.achievements_checked_at = dateStr; save(users); return true; }
+  return false;
+};
+
+(Skutečná příčina bugu: grant() sám o sobě duplicity správně odmítal, ale
+checkTenureAchievements se volala při ÚPLNĚ KAŽDÉM přihlášení a dělala
+zbytečný "days >= 30" přepočet i zápis-pokus pořád dokola — u pomalejšího
+Discord API to působilo dojmem, že se odznak "uděluje znovu". Throttle na
+1×/den to řeší.)
+
+
+══════════════════════════════════════════════════════════════════════
+6) CALEDONIA INDEX — reálný vzorec + 24h historie
+══════════════════════════════════════════════════════════════════════
+Přidej (kdekoliv u ostatních JSON úložišť v DATA_DIR):
+
+const INDEX_HISTORY_FILE = path.join(DATA_DIR, 'index-history.json');
+function loadIndexHistory() { try { return JSON.parse(fs.readFileSync(INDEX_HISTORY_FILE, 'utf8')) || []; } catch { return []; } }
+function saveIndexHistory(list) { try { writeJsonAtomic(INDEX_HISTORY_FILE, list); } catch (e) {} }
+
+async function computeCaledoniaIndex() {
+  // (a) zdraví pokladny — poměr aktuálního zůstatku k klouzavému maximu
+  //     posledních 90 dní zaznamenaných v historii (fallback: 30000 SAD)
+  const ucet = await sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 }));
+  const history = loadIndexHistory();
+  const maxSeenUsd = Math.max(30000, ...history.map(h => h.usd || 0), ucet.usd);
+  const pokladnaScore = Math.min(100, (ucet.usd / maxSeenUsd) * 100);
+
+  // (b) aktivita členů za 7 dní / celkový počet členů
+  const allUsers = db.prepare('SELECT * FROM users').all();
+  const now = Date.now(), WEEK = 7 * 86400000;
+  const activniPocet = allUsers.filter(u => u.last_login_at && (now - new Date(u.last_login_at).getTime()) < WEEK).length;
+  const aktivitaScore = allUsers.length ? Math.min(100, (activniPocet / allUsers.length) * 100) : 0;
+
+  // (c) trend skladu — hodnota weedu + drog dnes vs. průměr historie
+  const [weed, drogy] = await Promise.all([
+    sheets.getStockSummary('Weed').catch(() => ({})),
+    sheets.getStockSummary('Drogy').catch(() => ({})),
+  ]);
+  const skladCelkem = Object.values(weed).reduce((s, v) => s + Math.max(0, v), 0) + Object.values(drogy).reduce((s, v) => s + Math.max(0, v), 0);
+  const avgSklad = history.length ? history.reduce((s, h) => s + (h.sklad || 0), 0) / history.length : skladCelkem || 1;
+  const skladScore = avgSklad > 0 ? Math.min(100, (skladCelkem / avgSklad) * 60) : 50;
+
+  const index = Math.round(pokladnaScore * 0.45 + aktivitaScore * 0.35 + skladScore * 0.20);
+
+  // ulož bod historie (max 1 záznam / hodinu, ať soubor neroste do nekonečna)
+  const last = history[history.length - 1];
+  if (!last || (now - last.t) > 55 * 60 * 1000) {
+    history.push({ t: now, index, usd: ucet.usd, sklad: skladCelkem });
+    saveIndexHistory(history.filter(h => now - h.t <= 30 * 86400000)); // 30 dní okno
+  }
+
+  const point24hAgo = history.find(h => now - h.t >= 23.5 * 3600000 && now - h.t <= 24.5 * 3600000);
+  const deltaPct = point24hAgo ? Math.round(((index - point24hAgo.index) / Math.max(1, point24hAgo.index)) * 1000) / 10 : 0;
+
+  return {
+    index, deltaPct,
+    health: index >= 70 ? 'STABLE' : index >= 40 ? 'WATCH' : 'CRITICAL',
+    pokladnaUsd: ucet.usd, pokladnaPesos: ucet.pesos,
+    activniPocet, celkemClenu: allUsers.length,
+    skladCelkem,
+  };
+}
+
+app.get('/api/caledonia-index', requireAuth, async (req, res) => {
+  try { res.json({ ok: true, ...(await computeCaledoniaIndex()) }); }
+  catch (e) { res.json({ ok: false, error: e.message }); }
+});
+
+
+══════════════════════════════════════════════════════════════════════
+Doplňkové drobnosti
+══════════════════════════════════════════════════════════════════════
+• Historie člena (bod 16, "History" v member menu) — jednoduchá routa,
+  reuse existující /api/me/export logiky ale jako JSON pro UI místo stažení:
+
+app.get('/api/me/history', requireAuth, async (req, res) => {
+  req.url = '/api/me/export'; // reuse — jednodušší: zavolej stejnou funkci přímo
+});
+  Praktičtěji: zkopíruj tělo handleru z `/api/me/export`, jen na konci
+  místo `res.setHeader('Content-Disposition', ...)` a res.send(JSON.stringify)
+  udělej `res.json({ ok:true, ...data })`. Nová views/audit-me.js (v balíčku)
+  na to renderuje timeline stejným stylem jako Dashboard "Recent Activity".
+
+app.get('/audit-me', requireAuth, (req, res) => res.send(require('./views/audit-me').renderAuditMe(req)));
+
+• Vyznamenání stránka:
+
+app.get('/vyznamenani', requireAuth, (req, res) => res.send(require('./views/vyznamenani').renderVyznamenani(req)));

@@ -1,0 +1,62 @@
+PATCH — views/sklad.js (Reserve Fund panel)
+══════════════════════════════════════════════════════════════════════
+Additive UI for point 4 (Reserve Fund — dobrovolný vklad libovolné částky +
+výběr jen pro Founder/Council). Nemění nic z existující logiky odvodu
+("Zaplatit a podepsat"), jen přidává dva nové bloky POD `<div id="rf-list">`
+v panelu Reserve Fund (uvnitř `panel-ucet`).
+══════════════════════════════════════════════════════════════════════
+
+1) V HTML části panelu Reserve Fund (za `<div id="rf-list"></div>`) přidej:
+
+<div class="folio-rule tight"></div>
+<div class="panel-list-label">Dobrovolný vklad</div>
+<div style="display:flex;gap:0.6rem;align-items:flex-end;max-width:420px;margin-bottom:1.4rem">
+  <div class="form-group" style="margin-bottom:0;flex:1"><label>Částka (SAD)</label><input type="number" id="rf-deposit-amount" min="1"></div>
+  <button class="btn-submit" style="margin-top:0;width:auto;padding:0.75rem 1.1rem" onclick="rfDeposit()">Vložit</button>
+</div>
+
+${req.session.accessLevel === 1 ? `
+<div class="folio-rule tight"></div>
+<div class="panel-list-label" style="color:var(--oxblood-bright)">Výběr z fondu — Founder/Council</div>
+<div style="display:flex;gap:0.6rem;align-items:flex-end;max-width:560px;margin-bottom:0.6rem;flex-wrap:wrap">
+  <div class="form-group" style="margin-bottom:0;flex:0 0 160px"><label>Částka (SAD)</label><input type="number" id="rf-withdraw-amount" min="1"></div>
+  <div class="form-group" style="margin-bottom:0;flex:1;min-width:200px"><label>Důvod</label><input type="text" id="rf-withdraw-reason" placeholder="Na co se peníze použijí…"></div>
+  <button class="btn-submit" style="margin-top:0;width:auto;padding:0.75rem 1.1rem;border-color:var(--oxblood-bright)" onclick="rfWithdraw()">Vybrat</button>
+</div>` : ''}
+
+(Vlož tohle jako template literal uvnitř renderDashboard() stejným
+způsobem, jako je dnes `${canManage ? ... : ''}` použité jinde v souboru —
+`req.session.accessLevel` je v scope funkce.)
+
+
+2) Do <script> sekce (kdekoliv u ostatních Reserve Fund funkcí, poblíž
+   `payReserveFund` / `loadReserveFund`) přidej:
+
+async function rfDeposit(){
+  const amount = document.getElementById('rf-deposit-amount').value;
+  if(!amount || parseFloat(amount) <= 0) return showToast('Vyplň platnou částku', true);
+  const r = await post('/api/reserve-fund/deposit', { amount });
+  if(r.ok){ showToast('Vklad do Reserve Fondu zaznamenán'); document.getElementById('rf-deposit-amount').value=''; flashActivePanel(); loadReserveFund(); }
+  else showToast(r.error, true);
+}
+window.rfDeposit = rfDeposit;
+
+async function rfWithdraw(){
+  const amount = document.getElementById('rf-withdraw-amount').value;
+  const poznamka = document.getElementById('rf-withdraw-reason').value.trim();
+  if(!amount || parseFloat(amount) <= 0) return showToast('Vyplň platnou částku', true);
+  if(!poznamka) return showToast('Vyplň důvod výběru', true);
+  showModal(
+    'Výběr z Reserve Fondu',
+    'Potvrzením vybereš tuto částku ze samostatného účtu Reserve Fondu.',
+    [['Částka', '$'+amount], ['Důvod', poznamka]],
+    async () => {
+      const r = await post('/api/reserve-fund/withdraw', { amount, poznamka });
+      if(r.ok){ showToast('Výběr zaznamenán'); document.getElementById('rf-withdraw-amount').value=''; document.getElementById('rf-withdraw-reason').value=''; flashActivePanel(); loadReserveFund(); }
+      else showToast(r.error, true);
+    }
+  );
+}
+window.rfWithdraw = rfWithdraw;
+
+(`post()` a `showModal()` už v souboru existují — žádné další závislosti.)

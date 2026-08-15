@@ -1,0 +1,74 @@
+PATCH — discord.js
+══════════════════════════════════════════════════════════════════════
+Add these to your existing discord.js (the version with notifyReserveFundZaplaceno /
+notifyBazarZajem / dmUser already in it). Two changes: (1) new function
+notifyVyznamenaniRucne for manual awards, clearly marked as "from leadership"
+and visually distinct from the automatic one; (2) sendAnnouncement gets a
+`category` param with color-coded embed (Důležité/Personální/Provozní/Ostatní).
+══════════════════════════════════════════════════════════════════════
+
+1) ADD this new function anywhere near notifyVyznamenani():
+
+async function notifyVyznamenaniRucne(nazevOdznaku, popis, uzivatel, discordUsername, udelil) {
+  const channelId = process.env.CHANNEL_VYZNAMENANI;
+  if (!channelId) {
+    console.error('[DISCORD] CHANNEL_VYZNAMENANI není nastaven v .env, ruční vyznamenání se nezapsalo.');
+    return;
+  }
+  const fields = [
+    { name: '👤 Jméno', value: uzivatel || '—', inline: true },
+    { name: '🏅 Odznak', value: nazevOdznaku, inline: true },
+    { name: '✒️ Udělil', value: udelil || 'Vedení', inline: true },
+  ];
+  if (discordUsername) fields.push({ name: '🔗 Discord', value: `@${discordUsername}`, inline: true });
+  if (popis) fields.push({ name: '📝 Popis', value: popis, inline: false });
+
+  await sendEmbed(channelId, {
+    title: '🏵️ RUČNÍ VYZNAMENÁNÍ — ROZHODNUTÍ VEDENÍ',
+    color: 0xB3172F, // crimson accent — odlišuje ruční udělení od automatického (0xC9A84C)
+    fields,
+    timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}. Vedení organizace se rozhodlo osobně ocenit tento výkon — zaznamenávám s náležitou pečlivostí.`,
+    footer: { text: 'Toto vyznamenání bylo uděleno ručně Founder/Council — nejde o automatický systém.' },
+  });
+}
+
+// nezapomeň přidat notifyVyznamenaniRucne i do module.exports na konci souboru.
+
+
+2) NAHRAĎ funkci sendAnnouncement() touto verzí (přidává kategorie s barevným
+   pruhem — Důležité/Personální/Provozní/Ostatní):
+
+const ANNOUNCEMENT_CATEGORIES = {
+  dulezite:   { label: 'DŮLEŽITÉ',   color: 0xB3172F, icon: '🔴' },
+  personalni: { label: 'PERSONÁLNÍ', color: 0xCBA45C, icon: '🟡' },
+  provozni:   { label: 'PROVOZNÍ',   color: 0x6FA8C9, icon: '🔵' },
+  ostatni:    { label: 'OSTATNÍ',    color: 0x8C7C6E, icon: '⚪' },
+};
+
+async function sendAnnouncement(title, content, uzivatel, category) {
+  const channelId = process.env.CHANNEL_OZNAMENI;
+  if (!channelId) return;
+  const cat = ANNOUNCEMENT_CATEGORIES[category] || ANNOUNCEMENT_CATEGORIES.ostatni;
+  const FRAZE_OZNAMENI = [
+    'ráda bych předala následující oznámení organizaci.',
+    'na žádost vedení zveřejňuji toto sdělení.',
+    'níže naleznete aktuální oznámení pro všechny členy.',
+  ];
+  await sendEmbed(channelId, {
+    title: `${cat.icon} ${cat.label} · ${title}`,
+    description: `*${nahodna(FRAZE_OZNAMENI)}*\n\n${content}`,
+    color: cat.color,
+    author: EVELYN_AUTHOR,
+    footer: { text: `Zveřejnil: ${uzivatel}` },
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// module.exports zůstává stejný název sendAnnouncement — voláno stejně jako
+// dřív, jen s novým 4. parametrem `category` (volitelný, default 'ostatni').
+// server.js POST /api/nastenska musí předávat category dál (viz PATCH — server.js).
+
+
+3) V module.exports přidej `notifyVyznamenaniRucne,` do seznamu exportů.

@@ -1,0 +1,100 @@
+PATCH — views/sklad.js (zjednodušení navigace, žádná změna JS logiky)
+══════════════════════════════════════════════════════════════════════
+Cíl: nahradit dnešní dvouúrovňový sidebar (hlavní taby + skrytý "Více ▾"
+s vedlejšími taby) JEDNÍM klidným horizontálním tab-řádkem nahoře panelu
+(stejný vizuální jazyk jako Blackbook/Profit centrum — `.report-nav` /
+`.report-nav-item`), a odstranit rohové "ornament" pseudo-elementy z
+`.panel-card`. Všechny JS funkce (submitZbrane, submitWeed, submitVyroba,
+katalog, bulk modal, chemky cena, undo bar…) zůstávají BEZE ZMĚNY — mění se
+jen jak se mezi panely přepíná a jak vypadá karta okolo.
+══════════════════════════════════════════════════════════════════════
+
+1) V <style> bloku smaž tato pravidla (nahrazují se generickými
+   `.report-nav`/`.report-nav-item` ze sdíleného styles.js — ty už
+   existují, nic dalšího přidávat netřeba):
+
+   .sklad-shell, .sklad-sidebar, .sklad-sidebar-item, .sklad-sidebar-icon,
+   .sklad-sidebar-text, .sklad-sidebar-label, .sklad-sidebar-sub,
+   .sklad-sidebar-more-toggle, .sklad-sidebar-secondary
+
+   A z `.panel-card` smaž oba pseudo-elementy:
+   .panel-card::before{...}
+   .panel-card::after{...}
+   (zbytek `.panel-card` pravidla — background/border/padding/box-shadow —
+   nech beze změny.)
+
+
+2) HTML — nahraď CELÝ blok `<!-- TAB SHELL -->` (od `<div class="sklad-shell">`
+   po jeho uzavírací `</div>` PŘED `</main>`, tedy sidebar + panely) tímto:
+
+<div class="report-nav" id="skladTabBar" style="margin-bottom:1.8rem">
+  ${sekceMeta
+    ? sekceMeta.map((s, i) => `<button class="report-nav-item${i===0?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">${s.label}</button>`).join('')
+    : [...sekceMetaPrimary, ...sekceMetaSecondary].map((s, i) => `<button class="report-nav-item${i===0?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">${s.label}</button>`).join('')}
+</div>
+
+<div>
+  <!-- Účetnictví -->
+  <div class="sklad-panel active" id="panel-ucet"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Směnárna -->
+  <div class="sklad-panel" id="panel-smena"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Zbraně -->
+  <div class="sklad-panel" id="panel-zbrane"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Weed -->
+  <div class="sklad-panel" id="panel-weed"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Výroba -->
+  <div class="sklad-panel" id="panel-vyroba"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Drogy -->
+  <div class="sklad-panel" id="panel-drogy"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Chemky -->
+  <div class="sklad-panel" id="panel-chemky"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Ceník -->
+  <div class="sklad-panel" id="panel-cenik"> ... PONECHAT BEZE ZMĚNY ... </div>
+  <!-- Nevyřízené -->
+  <div class="sklad-panel" id="panel-nevyrizene"> ... PONECHAT BEZE ZMĚNY ... </div>
+</div>
+
+  Jinými slovy: SMAŽ jen vnější `<div class="sklad-sidebar" id="skladSidebar">
+  ... </div>` blok (celý sidebar s položkami a "Více ▾" tlačítkem) a nahraď
+  ho výše uvedeným `.report-nav` tab-řádkem. Samotné panely (`sklad-panel`,
+  jejich ID a veškerý obsah uvnitř) NECH přesně tak, jak jsou dnes.
+
+
+3) JS — najdi funkci `skladTab(id)` a nahraď ji touto verzí (jen mění
+   selektor tříd, chování je identické):
+
+function skladTab(id){
+  document.querySelectorAll('.report-nav-item').forEach(el=>el.classList.toggle('active',el.dataset.panel===id));
+  document.querySelectorAll('.sklad-panel').forEach(el=>el.classList.toggle('active',el.id==='panel-'+id));
+  try{localStorage.setItem('albion_sklad_tab',id);}catch(e){}
+  if(id==='nevyrizene' && window.loadNevyrizene) window.loadNevyrizene();
+}
+
+   A SMAŽ celou funkci `skladToggleMore()` a její volání v `restoreTab()`
+   IIFE (ten `(function restoreTab(){...})()` blok) — nahraď ho jednodušší
+   verzí bez "Více" logiky:
+
+(function restoreTab(){
+  try{
+    const saved=localStorage.getItem('albion_sklad_tab');
+    if(saved && document.getElementById('panel-'+saved)) skladTab(saved);
+  }catch(e){}
+})();
+
+
+4) Tally strip (`.tally-strip`) a `.sklad-opener` nech beze změny — obojí
+   už dnes používá jen sdílené CSS proměnné (--panel2, --brass, --oxblood…),
+   takže s novým styles.js automaticky zdědí novou paletu a zapadne do
+   klidnějšího vzhledu bez dalších úprav.
+
+
+5) Přidej ještě patch pro Reserve Fund (dobrovolný vklad + výběr pro
+   Founder/Council) — viz samostatný soubor PATCH-sklad-reservefund.txt
+   v tomto balíčku. Vlož ho do panelu `panel-ucet` stejným způsobem, jak
+   je tam popsáno.
+
+══════════════════════════════════════════════════════════════════════
+Výsledek: stejná funkčnost (žádné tlačítko, formulář ani API volání se
+neztrácí), ale místo dvouúrovňového menu s "Více ▾" je nahoře jeden klidný
+řádek tabů — přesně v duchu "méně komponent, víc prostoru".
+══════════════════════════════════════════════════════════════════════
