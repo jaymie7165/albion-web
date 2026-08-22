@@ -9,13 +9,13 @@ const { renderNav } = require('../nav');
 function renderAuditMe(req) {
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Caledonia — History</title>
+  <title>Caledonia — Moje aktivita</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, 'history')}
   <main>
     <div class="page-header">
-      <div><div class="page-label">Caledonia</div><h1 class="page-title">History</h1><p class="page-sub">Tvoje vlastní aktivita v systému</p></div>
+      <div><div class="page-label">Caledonia</div><h1 class="page-title">Moje aktivita</h1><p class="page-sub">Tvoje vlastní aktivita v systému</p></div>
     </div>
     <div class="dash-widget">
       <div class="dash-widget-title"><span>Všechny záznamy</span></div>
