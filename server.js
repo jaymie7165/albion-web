@@ -563,7 +563,7 @@ const CENIK_DEFAULT = {
       id: 'sazeni', label: 'Sázení',
       rows: [
         { label: 'Jedna kytka (bez květináče, nůžek a sáčků)', cena: '505$' },
-        { label: 'Pytlík na prodej (firemní účet)', cena: '165$' },
+        { label: 'Pytlík na prodej (firemní účet)', cena: '150$' },
         { label: 'Hnojivo', cena: '25$' },
         { label: 'Konev s vodou', cena: '20$' },
         { label: 'Kvalitní hnojivo', cena: '50$ (x4 — 200$)' },
@@ -572,6 +572,12 @@ const CENIK_DEFAULT = {
         { label: 'Nůžky', cena: '20$' },
         { label: 'Sáček', cena: '2$' },
         { label: 'Semínko', cena: '80$' },
+      ],
+    },
+    {
+      id: 'vyroba', label: 'Výroba — doporučené prodejní ceny',
+      rows: [
+        { label: 'Metamfetamin — sáček', cena: '1100$' },
       ],
     },
     {
@@ -1672,7 +1678,7 @@ app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
   if (!inList(odruda_trim, CONFIG.weedOdrudy)) return res.json({ ok: false, error: 'Nepovolená odrůda' });
   if (!isQty(qty))                             return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
 
-  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 165 };
+  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 150 };
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
@@ -1699,7 +1705,7 @@ app.post('/api/weed/yellow-take', requireAuth, async (req, res) => {
 
   if (!isQty(qty)) return res.json({ ok: false, error: 'Neplatné množství (max 500 ks)' });
 
-  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 165 };
+  const ceny = CONFIG.weedCeny[odruda_trim] || { vyroba: 100, prodej: 150 };
   const cas = sheets.timestamp();
   const uzivatel = req.session.icName;
   const discordUser = req.session.discordUsername;
@@ -1840,6 +1846,19 @@ app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req
     return res.json({ ok: false, error: 'Neplatný počet várek (1–50)' });
   }
 
+  // Skutečné vyrobené množství teď zapisuje sám člen (dřív se natvrdo
+  // počítalo jako batches × METH_RECIPE.yieldPerBatch = fixních 150 ks na
+  // várku) — reálný výtěžek z vaření kolísá. Pole je povinné a server si
+  // ho ověří stejně přísně jako počet várek; pokud klient množství vůbec
+  // nepošle (starší verze frontendu), spadne to na starý výchozí výpočet
+  // jako záchrannou síť, ať se nic nerozbije.
+  let vyrobenoQty = req.body.vyrobenoQty === undefined ? undefined : parseInt(req.body.vyrobenoQty);
+  if (vyrobenoQty === undefined) {
+    vyrobenoQty = batches * METH_RECIPE.yieldPerBatch;
+  } else if (!Number.isInteger(vyrobenoQty) || vyrobenoQty < 1 || vyrobenoQty > batches * 1000) {
+    return res.json({ ok: false, error: `Neplatné vyrobené množství — zadej počet kusů, které z ${batches} ${batches === 1 ? 'várky' : 'várek'} skutečně vzniklo.` });
+  }
+
   const stavChemky = await sheets.getStockSummary('Chemky').catch(() => ({}));
   const chybi = [];
   Object.entries(METH_RECIPE.rawPerBatch).forEach(([item, qtyPerBatch]) => {
@@ -1866,8 +1885,8 @@ app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req
     return res.json({ ok: false, error: 'Zápis do skladu chemikálií selhal, žádná surovina nebyla odečtena — zkus to znovu.' });
   }
 
-  // Přírůstek hotového produktu
-  const vyrobenoQty = batches * METH_RECIPE.yieldPerBatch;
+  // Přírůstek hotového produktu — vyrobenoQty už je ověřené výše (buď
+  // ručně zadané členem, nebo záchranný fallback ze starého receptu).
   try {
     await sheets.appendRow('Drogy', [cas, 'VKLAD', METH_RECIPE.outputItem, vyrobenoQty, '-', '-', uzivatel]);
   } catch (e) {
@@ -1965,7 +1984,7 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
 
   const rows = validated.map(v => {
     if (sekce === 'zbrane') return [cas, typUp, v.polozka, v.qty, v.kategorie || '?', uzivatel, v.ucel || '-'];
-    if (sekce === 'weed') { const ceny = CONFIG.weedCeny[v.polozka] || { vyroba: 100, prodej: 165 }; return [cas, typUp, v.polozka, v.qty, ceny.vyroba, ceny.prodej, uzivatel]; }
+    if (sekce === 'weed') { const ceny = CONFIG.weedCeny[v.polozka] || { vyroba: 100, prodej: 150 }; return [cas, typUp, v.polozka, v.qty, ceny.vyroba, ceny.prodej, uzivatel]; }
     if (sekce === 'drogy') return [cas, typUp, v.polozka, v.qty, '-', '-', uzivatel];
     if (sekce === 'chemky') return [cas, typUp, v.polozka, v.qty, uzivatel];
     return null;
@@ -3073,7 +3092,7 @@ app.get('/api/blackbook', requireAuth, requireAccess('blackbook'), async (req, r
       return 0;
     };
 
-    const WEED_SELL = 165;
+    const WEED_SELL = 150;
     const DROGY_P = {}; Object.entries(CONFIG.drogyCeny || {}).forEach(([k,v]) => DROGY_P[k] = v.prodej);
     const ZBRANE_P = {}; Object.entries(CONFIG.zbraneCeny || {}).forEach(([k,v]) => ZBRANE_P[k] = v.prodej);
 
@@ -3372,7 +3391,7 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
       return 0;
     };
 
-    const WEED_SELL = 165;
+    const WEED_SELL = 150;
     const DROGY_P = {}; Object.entries(CONFIG.drogyCeny || {}).forEach(([k,v]) => DROGY_P[k] = v.prodej);
     const isVklad = (t) => t === 'VKLAD' || t === 'PŘÍJEM';
     const now = Date.now();

@@ -14,11 +14,11 @@ const CONFIG = {
   akce:   ["Malá C4","Velká C4","Přístupová karta","Pokročilá zvláštní karta","EMP zařízení","Řezací laser","Cable Cutter","Zvláštní karta"],
   weedOdrudy: ["Žlutý kanabis","Zelený kanabis","Kanabis","Červený kanabis","Modrý kanabis"],
   weedCeny: {
-    "Žlutý kanabis":  { vyroba: 100, prodej: 165 },
-    "Zelený kanabis": { vyroba: 100, prodej: 165 },
-    "Kanabis":        { vyroba: 100, prodej: 165 },
-    "Červený kanabis":{ vyroba: 100, prodej: 165 },
-    "Modrý kanabis":  { vyroba: 100, prodej: 165 },
+    "Žlutý kanabis":  { vyroba: 100, prodej: 150 },
+    "Zelený kanabis": { vyroba: 100, prodej: 150 },
+    "Kanabis":        { vyroba: 100, prodej: 150 },
+    "Červený kanabis":{ vyroba: 100, prodej: 150 },
+    "Modrý kanabis":  { vyroba: 100, prodej: 150 },
   },
   drogyTypy: ["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"],
   chemkyTypy: ["Aceton","Peroxid vodíku","Kofein","Propylenglykol","Toluen","Benzín","Bismut","Kyselina fosforečná"],
@@ -67,13 +67,13 @@ const WEED_PLANT = {
     { key: 'vyzivovaVoda',    name: 'Výživová voda',    qty: 4, unit: 40 },
   ],
   bagsPerPlant: 4,    // z 1 kytky vznikají 4 sáčky
-  bagPrice:     165,  // prodejní hodnota 1 sáčku — zdraženo ze 150$ na 165$
+  bagPrice:     150,  // prodejní hodnota 1 sáčku — sníženo ze 165$ na 150$
   growHours:    20,   // doba růstu jedné kytky
 };
 WEED_PLANT.items.forEach(it => { it.cost = it.qty * it.unit; });                          // cena za danou položku na 1 kytku
 WEED_PLANT.costPerPlant    = WEED_PLANT.items.reduce((a, it) => a + it.cost, 0);          // 455
-WEED_PLANT.revenuePerPlant = WEED_PLANT.bagsPerPlant * WEED_PLANT.bagPrice;               // 600
-WEED_PLANT.profitPerPlant  = WEED_PLANT.revenuePerPlant - WEED_PLANT.costPerPlant;        // 145
+WEED_PLANT.revenuePerPlant = WEED_PLANT.bagsPerPlant * WEED_PLANT.bagPrice;               // 4 × 150 = 600
+WEED_PLANT.profitPerPlant  = WEED_PLANT.revenuePerPlant - WEED_PLANT.costPerPlant;        // dopočteno automaticky (600 - 455 = 145)
 WEED_PLANT.growMs          = WEED_PLANT.growHours * 60 * 60 * 1000;
 
 // ── VÝROBA — Metamfetamin (Recept 1 vaření) ───────────────────────────────
@@ -85,6 +85,11 @@ WEED_PLANT.growMs          = WEED_PLANT.growHours * 60 * 60 * 1000;
 // dalším kroku a nejsou to skladové položky).
 const METH_RECIPE = {
   dávkyPerBatch: 5,
+  // yieldPerBatch = jen VÝCHOZÍ/ZÁCHRANNÁ hodnota. Skutečný výtěžek teď
+  // zapisuje sám člen při potvrzení várky (viz /api/vyroba/potvrdit v
+  // server.js — pole `vyrobenoQty`), protože reálný výtěžek z vaření
+  // kolísá a fixních 150 ks/várku neodpovídalo realitě. Tahle hodnota se
+  // použije jen jako fallback, pokud klient množství nepošle vůbec.
   yieldPerBatch: 150,
   outputItem: 'Metamfetamin',
   rawPerBatch: {
