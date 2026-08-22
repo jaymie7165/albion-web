@@ -1,14 +1,14 @@
-// views/home.js — CALEDONIA PRIVATE NETWORK · Dashboard v6
+// views/home.js — CALEDONIA PRIVATE NETWORK · Dashboard v6 (CZ)
 //
-// Staff (level 1-2) dashboard: Caledonia Index (real formula via
-// /api/caledonia-index), Live Pulse (heartbeat tied to that same data),
-// minimalist finance stats, Daily Briefing, Recent Activity as a quiet
-// timeline, Quick Access tiles. Member/Associate dashboard keeps its own
-// distinct layout (per approved mock): rank/operations/loyalty header,
-// "Your Operation" cultivation card (mapped to weed timers), balances,
-// Quick Access grid (Garage/Properties/Weed/Weed Timer/Deposit/Reserve
-// Fund), Recent Activity. Same renderHome(req, data) signature as before —
-// server.js needs no changes to call this.
+// Staff (level 1-2) dashboard: Caledonia Index (reálný vzorec přes
+// /api/caledonia-index), Live Pulse (tep vázaný na stejná data),
+// minimalistické finanční statistiky, Denní hlášení, Nedávná aktivita jako
+// tichá časová osa, dlaždice Rychlého přístupu. Member/Associate dashboard
+// má svůj vlastní layout (dle schváleného mocku): hlavička
+// hodnost/operace/loajalita, karta "Tvoje operace" (napojená na weed
+// timery), zůstatky, mřížka Rychlého přístupu (Garáž/Nemovitosti/Weed/Weed
+// Timer/Vklad/Reserve Fund), Nedávná aktivita. Stejná signatura
+// renderHome(req, data) jako dřív — server.js nepotřebuje žádnou změnu.
 
 const { ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
@@ -54,10 +54,10 @@ function renderHome(req, data) {
   }).join('') : `<div style="padding:1.4rem 0">${ledgerEmpty('Rejstřík dosud beze zápisu', true)}</div>`;
 
   const greetingHour = new Date().getHours();
-  const greeting = greetingHour < 12 ? 'Good morning' : greetingHour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = greetingHour < 12 ? 'Dobré ráno' : greetingHour < 18 ? 'Dobré odpoledne' : 'Dobrý večer';
   const firstName = (icName || '').split(' ')[0] || icName;
   const today = new Date();
-  const dateStr = today.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+  const dateStr = today.toLocaleDateString('cs-CZ', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -111,7 +111,7 @@ function renderHome(req, data) {
 
     <div class="dash-top-row">
       <div>
-        <div class="dash-greet-eyebrow">${isRestricted ? 'Member Dashboard' : 'Caledonia Private Network'}</div>
+        <div class="dash-greet-eyebrow">${isRestricted ? 'Nástěnka člena' : 'Organizace Caledonia'}</div>
         <div class="dash-greet-title">${greeting},<br>${escapeHtml(firstName)}<span class="dot">.</span></div>
         <div class="dash-rank-row">${RANK_LABEL[accessLevel]}<span class="dash-rank-rule"></span></div>
       </div>
@@ -150,7 +150,7 @@ function renderHome(req, data) {
     const RESTRICTED_HOME = ${isRestricted ? 'true' : 'false'};
     ${!isRestricted ? staffDashboardScript() : memberDashboardScript()}
 
-    // ── ONBOARDING (unchanged behaviour) ──
+    // ── ONBOARDING (beze změny chování) ──
     const ONB_STEPS = [
       '<strong style="color:var(--brass-bright)">Krátká historie.</strong><br>Caledonia vznikla krátce po příchodu Christophera Sinclaira do Los Santos. <a href="/lore" style="color:var(--brass)">Číst kroniku →</a>',
       '<strong style="color:var(--brass-bright)">Kodex.</strong><br>Deset principů závazných pro každého člena. <a href="/kodex" style="color:var(--brass)">Přečíst kodex →</a>',
@@ -171,55 +171,55 @@ function renderHome(req, data) {
     ${!isRestricted ? `fetch('/api/weekly-summary').then(r=>r.json()).then(d=>{
       if(!d.ok)return;
       const el=document.getElementById('weekly-banner');
-      const netTxt=(d.net>=0?'earned':'lost')+' $'+Math.abs(Math.round(d.net)).toLocaleString('en-US');
-      el.innerHTML='<strong style="color:var(--brass-bright)">This week Caledonia</strong> '+netTxt+' across '+d.ops+' financial operations.';
+      const netTxt=(d.net>=0?'vydělala':'prodělala')+' $'+Math.abs(Math.round(d.net)).toLocaleString('cs-CZ');
+      el.innerHTML='<strong style="color:var(--brass-bright)">Tento týden Caledonia</strong> '+netTxt+' napříč '+d.ops+' finančními operacemi.';
       el.style.display='block';
     }).catch(()=>{});` : ''}
   </script>
   </body></html>`;
 
-  // ── STAFF DASHBOARD MARKUP ────────────────────────────────────────────
+  // ── ZNAČENÍ STAFF DASHBOARDU ────────────────────────────────────────────
   function renderStaffDashboard() {
     return `
     <div class="dash-top-grid">
       <div class="index-card">
-        <div class="index-eyebrow">Caledonia Index</div>
+        <div class="index-eyebrow">Index Caledonie</div>
         <div class="index-value"><span id="idx-value">—</span><span class="index-delta" id="idx-delta"></span></div>
-        <div class="index-health">Operational Health<strong id="idx-health">—</strong></div>
+        <div class="index-health">Provozní stav<strong id="idx-health">—</strong></div>
       </div>
       <div class="pulse-card">
-        <div class="pulse-title"><span class="pulse-dot"></span>Live Pulse</div>
+        <div class="pulse-title"><span class="pulse-dot"></span>Živý puls</div>
         <svg class="pulse-svg" viewBox="0 0 400 60" preserveAspectRatio="none" style="width:100%;height:52px"><path id="pulse-path" d="M0 30 L400 30"/></svg>
         <div class="pulse-stats">
-          <div><div class="pulse-stat-num" id="pulse-ops">—</div><div class="pulse-stat-label">Members Active</div></div>
-          <div><div class="pulse-stat-num" id="pulse-members">—</div><div class="pulse-stat-label">Total Members</div></div>
-          <div><div class="pulse-stat-num" id="pulse-moved">—</div><div class="pulse-stat-label">Reserve $ Today</div></div>
-          <div><div class="pulse-stat-num" id="pulse-tx">—</div><div class="pulse-stat-label">Stock Units</div></div>
+          <div><div class="pulse-stat-num" id="pulse-ops">—</div><div class="pulse-stat-label">Aktivní členové</div></div>
+          <div><div class="pulse-stat-num" id="pulse-members">—</div><div class="pulse-stat-label">Celkem členů</div></div>
+          <div><div class="pulse-stat-num" id="pulse-moved">—</div><div class="pulse-stat-label">Reserve $ dnes</div></div>
+          <div><div class="pulse-stat-num" id="pulse-tx">—</div><div class="pulse-stat-label">Skladové jednotky</div></div>
         </div>
       </div>
     </div>
 
     <div class="finance-strip">
-      <div class="finance-tile"><div class="finance-tile-label">Cash Reserve</div><div class="finance-tile-val" id="tally-usd">$${ucet.usd.toLocaleString('en-US')}</div><div class="finance-tile-sub">SAD</div></div>
-      <div class="finance-tile"><div class="finance-tile-label">Secondary Reserve</div><div class="finance-tile-val" id="tally-pesos">₱${ucet.pesos.toLocaleString('en-US')}</div><div class="finance-tile-sub">Pesos</div></div>
-      <div class="finance-tile"><div class="finance-tile-label">Inventory</div><div class="finance-tile-val" id="qs-stock">${(totalWeed + totalDrogy + totalZbrane + totalChemky).toLocaleString('en-US')}</div><div class="finance-tile-sub">units in stock</div></div>
-      <div class="finance-tile"><div class="finance-tile-label">Est. Weed Value</div><div class="finance-tile-val" id="tally-weed-value">$${totalValue.toLocaleString('en-US')}</div><div class="finance-tile-sub">at sale price</div></div>
+      <div class="finance-tile"><div class="finance-tile-label">Hotovostní rezerva</div><div class="finance-tile-val" id="tally-usd">$${ucet.usd.toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">SAD</div></div>
+      <div class="finance-tile"><div class="finance-tile-label">Vedlejší rezerva</div><div class="finance-tile-val" id="tally-pesos">₱${ucet.pesos.toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">Pesos</div></div>
+      <div class="finance-tile"><div class="finance-tile-label">Sklad</div><div class="finance-tile-val" id="qs-stock">${(totalWeed + totalDrogy + totalZbrane + totalChemky).toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">kusů na skladě</div></div>
+      <div class="finance-tile"><div class="finance-tile-label">Odhad hodnoty weedu</div><div class="finance-tile-val" id="tally-weed-value">$${totalValue.toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">v prodejní ceně</div></div>
     </div>
 
     <div class="dash-lower-grid">
       <div>
         <div class="dash-widget">
-          <div class="dash-widget-title"><span>Recent Activity</span></div>
+          <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
           <div class="quiet-timeline" id="activity-stream">${timelineHtml}</div>
         </div>
-        <div class="quote-strip"><span>"Discipline. Loyalty. Results."</span><span class="sig">— Caledonia</span></div>
+        <div class="quote-strip"><span>"Kázeň. Loajalita. Výsledky."</span><span class="sig">— Caledonia</span></div>
       </div>
       <div>
         <div class="briefing-card" style="margin-bottom:1.2rem">
-          <div class="briefing-eyebrow">Daily Briefing</div>
+          <div class="briefing-eyebrow">Denní hlášení</div>
           <div class="briefing-title" id="briefing-title">${greeting}, ${escapeHtml(firstName)}.</div>
-          <div class="briefing-text" id="briefing-text">Loading operational summary…</div>
-          <a href="/blackbook" class="briefing-link">View full briefing →</a>
+          <div class="briefing-text" id="briefing-text">Načítám provozní souhrn…</div>
+          <a href="/blackbook" class="briefing-link">Zobrazit celé hlášení →</a>
         </div>
         <div class="quick-tile-grid">
           ${canAccess(accessLevel, 'sklad') ? `<a href="/sklad" class="quick-tile">${svgIcon('sklad')}<div><div class="quick-tile-label">Sklad</div><div class="quick-tile-sub">Evidence</div></div></a>` : ''}
@@ -261,8 +261,8 @@ function renderHome(req, data) {
         document.getElementById('idx-health').textContent=d.health;
         document.getElementById('pulse-ops').textContent=d.activniPocet;
         document.getElementById('pulse-members').textContent=d.celkemClenu;
-        document.getElementById('pulse-moved').textContent='$'+Math.round(d.pokladnaUsd).toLocaleString('en-US');
-        document.getElementById('pulse-tx').textContent=d.skladCelkem.toLocaleString('en-US');
+        document.getElementById('pulse-moved').textContent='$'+Math.round(d.pokladnaUsd).toLocaleString('cs-CZ');
+        document.getElementById('pulse-tx').textContent=d.skladCelkem.toLocaleString('cs-CZ');
         drawPulse(d.index);
       }catch(e){}
     }
@@ -284,8 +284,8 @@ function renderHome(req, data) {
         const res=await fetch('/api/weekly-summary');
         const d=await res.json();
         const el=document.getElementById('briefing-text');
-        if(d.ok) el.textContent='Caledonia recorded '+d.ops+' financial movements this week, net '+(d.net>=0?'+':'')+'$'+Math.round(d.net).toLocaleString('en-US')+'.';
-        else el.textContent='No financial data available yet.';
+        if(d.ok) el.textContent='Caledonia zaznamenala '+d.ops+' finančních pohybů tento týden, čistě '+(d.net>=0?'+':'')+'$'+Math.round(d.net).toLocaleString('cs-CZ')+'.';
+        else el.textContent='Zatím nejsou dostupná žádná finanční data.';
       }catch(e){}
     }
     loadBriefing();
@@ -320,67 +320,67 @@ function renderHome(req, data) {
     `;
   }
 
-  // ── MEMBER DASHBOARD MARKUP (per approved mock) ────────────────────────
+  // ── ZNAČENÍ MEMBER DASHBOARDU (dle schváleného mocku) ────────────────────
   function renderMemberDashboard() {
     return `
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.6rem;align-items:start" id="memberGrid">
       <div>
         <div style="display:flex;gap:2rem;margin-bottom:1.6rem;flex-wrap:wrap">
-          <div><div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Rank</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-rank">—</div></div>
-          <div><div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Loyalty</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-badges">—</div></div>
+          <div><div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Hodnost</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-rank">—</div></div>
+          <div><div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Loajalita</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-badges">—</div></div>
         </div>
 
         <div class="op-card" style="margin-bottom:1.6rem">
-          <div class="op-card-label">Cultivation</div>
-          <div class="op-card-title" id="op-title">Loading operation…</div>
+          <div class="op-card-label">Pěstování</div>
+          <div class="op-card-title" id="op-title">Načítám operaci…</div>
           <div class="op-track"><div class="op-fill" id="op-fill" style="width:0%"></div></div>
           <div class="op-meta-row"><span id="op-progress">—</span><span id="op-next">—</span></div>
         </div>
 
         <div class="balance-strip">
-          <div class="balance-tile"><div class="balance-label">Weed Stock</div><div class="balance-val" id="member-weed">${totalWeed}</div></div>
-          <div class="balance-tile"><div class="balance-label">Ready</div><div class="balance-val" id="member-ready" style="color:#7CC79A">—</div></div>
-          <div class="balance-tile"><div class="balance-label">Growing</div><div class="balance-val" id="member-growing">—</div></div>
+          <div class="balance-tile"><div class="balance-label">Zásoba weedu</div><div class="balance-val" id="member-weed">${totalWeed}</div></div>
+          <div class="balance-tile"><div class="balance-label">Připraveno</div><div class="balance-val" id="member-ready" style="color:#7CC79A">—</div></div>
+          <div class="balance-tile"><div class="balance-label">Roste</div><div class="balance-val" id="member-growing">—</div></div>
         </div>
 
         <div class="dash-widget" id="deposit" style="margin-bottom:1.4rem">
-          <div class="dash-widget-title">Deposit — Vehicle Trunk Cash</div>
-          <div style="font-family:var(--font-body);font-size:0.8rem;color:var(--ivory-dim);margin-bottom:0.9rem;font-weight:300">Leave cash in the trunk, then report it here so leadership has confirmation.</div>
+          <div class="dash-widget-title">Vklad — hotovost v kufru vozu</div>
+          <div style="font-family:var(--font-body);font-size:0.8rem;color:var(--ivory-dim);margin-bottom:0.9rem;font-weight:300">Nech hotovost v kufru a nahlas to tady, ať má vedení potvrzení.</div>
           <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem">
-            <div class="form-group"><label>Amount (SAD)</label><input type="number" id="kufrCastka" min="1" placeholder="1000"></div>
-            <button class="btn-submit" id="kufrVkladBtn" onclick="kufrVklad()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Report</button>
+            <div class="form-group"><label>Částka (SAD)</label><input type="number" id="kufrCastka" min="1" placeholder="1000"></div>
+            <button class="btn-submit" id="kufrVkladBtn" onclick="kufrVklad()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Nahlásit</button>
           </div>
           <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="kufrVkladHint"></div>
         </div>
 
         <div class="dash-widget">
-          <div class="dash-widget-title">Yellow Cannabis — Quick Take</div>
+          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr</div>
           <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem">
-            <div class="form-group"><label>Quantity (bags)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="1"></div>
-            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Take</button>
+            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="1"></div>
+            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Vzít</button>
           </div>
           <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="yellowTakeHint"></div>
         </div>
       </div>
 
       <div>
-        <div class="folio-label" style="margin-bottom:1rem">Quick Access</div>
+        <div class="folio-label" style="margin-bottom:1rem">Rychlý přístup</div>
         <div class="quick-tile-grid" style="margin-bottom:1.6rem">
-          <a href="/garaz" class="quick-tile">${svgIcon('garaz')}<div><div class="quick-tile-label">Garage</div><div class="quick-tile-sub">Your vehicles</div></div></a>
-          <a href="/nemovitosti" class="quick-tile">${svgIcon('properties')}<div><div class="quick-tile-label">Properties</div><div class="quick-tile-sub">Your properties</div></div></a>
-          <a href="/weed-sazeni" class="quick-tile">${svgIcon('weed')}<div><div class="quick-tile-label">Weed</div><div class="quick-tile-sub">Your plants</div></div></a>
-          <a href="/weed-sazeni#timers" class="quick-tile">${svgIcon('timer')}<div><div class="quick-tile-label">Weed Timer</div><div class="quick-tile-sub">Check timers</div></div></a>
-          <a href="/home#deposit" class="quick-tile">${svgIcon('deposit')}<div><div class="quick-tile-label">Deposit</div><div class="quick-tile-sub">Deposit money</div></div></a>
-          <a href="/sklad" class="quick-tile">${svgIcon('reserve')}<div><div class="quick-tile-label">Reserve Fund</div><div class="quick-tile-sub">Your balance</div></div></a>
+          <a href="/garaz" class="quick-tile">${svgIcon('garaz')}<div><div class="quick-tile-label">Garáž</div><div class="quick-tile-sub">Tvoje vozidla</div></div></a>
+          <a href="/nemovitosti" class="quick-tile">${svgIcon('properties')}<div><div class="quick-tile-label">Nemovitosti</div><div class="quick-tile-sub">Tvoje nemovitosti</div></div></a>
+          <a href="/weed-sazeni" class="quick-tile">${svgIcon('weed')}<div><div class="quick-tile-label">Weed</div><div class="quick-tile-sub">Tvoje rostliny</div></div></a>
+          <a href="/weed-sazeni#timers" class="quick-tile">${svgIcon('timer')}<div><div class="quick-tile-label">Časovač weedu</div><div class="quick-tile-sub">Zkontrolovat časovače</div></div></a>
+          <a href="/home#deposit" class="quick-tile">${svgIcon('deposit')}<div><div class="quick-tile-label">Vklad</div><div class="quick-tile-sub">Vložit peníze</div></div></a>
+          <a href="/sklad" class="quick-tile">${svgIcon('reserve')}<div><div class="quick-tile-label">Reserve Fund</div><div class="quick-tile-sub">Tvůj zůstatek</div></div></a>
         </div>
 
         <div class="dash-widget">
-          <div class="dash-widget-title"><span>Recent Activity</span></div>
-          <div class="quiet-timeline" id="member-activity-stream"><div class="ledger-loading">Loading…</div></div>
+          <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
+          <div class="quiet-timeline" id="member-activity-stream"><div class="ledger-loading">Načítám…</div></div>
         </div>
       </div>
     </div>
-    <div class="quote-strip"><span>"Discipline. Loyalty. Results."</span><span class="sig">— Caledonia</span></div>
+    <div class="quote-strip"><span>"Kázeň. Loajalita. Výsledky."</span><span class="sig">— Caledonia</span></div>
     `;
   }
 
@@ -421,7 +421,7 @@ function renderHome(req, data) {
       fetch('/api/me/achievements').then(r=>r.json()).catch(()=>null),
     ]).then(([session, ach]) => {
       if (session && session.ok) document.getElementById('member-rank').textContent = RANK_LABEL[session.accessLevel] || '—';
-      if (ach && ach.ok) document.getElementById('member-badges').textContent = ach.earned.length + ' badges';
+      if (ach && ach.ok) document.getElementById('member-badges').textContent = ach.earned.length + ' odznaků';
     }).catch(() => {});
 
     fetch('/api/weed-timers').then(r=>r.json()).then(d => {
@@ -439,14 +439,14 @@ function renderHome(req, data) {
         const pct = totalMs > 0 ? Math.round((doneMs / totalMs) * 100) : 0;
         const doneHours = Math.round(doneMs / 3600000);
         const totalHours = Math.round(totalMs / 3600000);
-        document.getElementById('op-title').textContent = active.icName + ' — ' + active.plants + ' plants';
+        document.getElementById('op-title').textContent = active.icName + ' — ' + active.plants + ' kytek';
         document.getElementById('op-fill').style.width = pct + '%';
-        document.getElementById('op-progress').textContent = doneHours + ' / ' + totalHours + ' hours';
+        document.getElementById('op-progress').textContent = doneHours + ' / ' + totalHours + ' hodin';
         const remainMs = Math.max(0, active.endsAt - now);
         const remainH = Math.floor(remainMs/3600000), remainM = Math.floor((remainMs%3600000)/60000);
-        document.getElementById('op-next').textContent = remainMs > 0 ? ('Ready in ' + remainH + 'h ' + remainM + 'm') : 'Ready now';
+        document.getElementById('op-next').textContent = remainMs > 0 ? ('Připraveno za ' + remainH + 'h ' + remainM + 'm') : 'Připraveno nyní';
       } else {
-        document.getElementById('op-title').textContent = 'No active cultivation';
+        document.getElementById('op-title').textContent = 'Žádné aktivní pěstování';
         document.getElementById('op-progress').textContent = '—';
         document.getElementById('op-next').textContent = '—';
       }

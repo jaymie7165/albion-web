@@ -34,6 +34,10 @@ const { renderProfitCentrum } = require('./views/profit-centrum');
 const { renderAuth } = require('./views/auth');
 const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
+const { renderPrehled } = require('./views/prehled');
+const { renderVyznamenani } = require('./views/vyznamenani');
+const { renderAuditMe } = require('./views/audit-me');
+const { CATEGORY_LABELS, grant: grantAchievement } = require('./achievements');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
 const { renderSpisy } = require('./views/spis');
@@ -1142,6 +1146,35 @@ app.get('/api/me/export', requireAuth, async (req, res) => {
   }
 });
 
+// ── VLASTNÍ HISTORIE ČLENA (pro /audit-me a Member dashboard) ───────────────
+app.get('/api/me/history', requireAuth, async (req, res) => {
+  try {
+    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
+      sheets.getRows('Zbraně').catch(() => []),
+      sheets.getRows('Weed').catch(() => []),
+      sheets.getRows('Drogy').catch(() => []),
+      sheets.getRows('Účetnictví').catch(() => []),
+      sheets.getRows('Chemky').catch(() => []),
+    ]);
+    const allUsers = db.prepare('SELECT * FROM users').all();
+    const { map: nameMap } = buildNameMap(allUsers);
+    const norm = (n) => normalizeName(n, nameMap);
+    const me = req.session.icName;
+    const filterMine = (rows, col) => (rows || []).slice(1).filter(r => norm(r[col]) === me);
+    res.json({
+      ok: true,
+      zbrane: filterMine(zbraneRows, 5),
+      weed: filterMine(weedRows, 6),
+      drogy: filterMine(drogyRows, 6),
+      chemky: filterMine(chemkyRows, 4),
+      ucet: filterMine(ucetRows, 5),
+    });
+  } catch (e) {
+    console.error('[ME HISTORY]', e.message);
+    res.json({ ok: false, zbrane: [], weed: [], drogy: [], chemky: [], ucet: [] });
+  }
+});
+
 // ── GLOBÁLNÍ VYHLEDÁVÁNÍ ─────────────────────────────────────────────────────
 app.get('/api/search', requireAuth, (req, res) => {
   const q = (req.query.q || '').toString().trim().toLowerCase();
@@ -1212,6 +1245,33 @@ app.get('/api/admin/discord-status', requireAuth, requireFounderCouncil, (req, r
   };
   const missing = Object.entries(channels).filter(([, v]) => !v).map(([k]) => k);
   res.json({ ok: true, missing, botConfigured: !!(process.env.DISCORD_TOKEN && process.env.GUILD_ID) });
+});
+
+// ── VYZNAMENÁNÍ — katalog + ruční udělení (Founder/Council) ─────────────────
+app.get('/api/achievements/all', requireAuth, (req, res) => {
+  try {
+    const allUsers = db.prepare('SELECT * FROM users').all();
+    const members = allUsers
+      .map(u => ({ id: u.id, ic_name: u.ic_name, achievements: u.achievements || [] }))
+      .sort((a, b) => (a.ic_name || '').localeCompare(b.ic_name || '', 'cs'));
+    res.json({ ok: true, catalog: ACHIEVEMENTS, categories: CATEGORY_LABELS, members });
+  } catch (e) {
+    console.error('[ACHIEVEMENTS ALL]', e.message);
+    res.json({ ok: false, catalog: {}, categories: {}, members: [] });
+  }
+});
+
+app.post('/api/admin/achievements/grant', requireAuth, requireFounderCouncil, (req, res) => {
+  const userId = parseInt(req.body.userId);
+  const key = (req.body.key || '').toString();
+  if (!Number.isInteger(userId)) return res.json({ ok: false, error: 'Neplatný uživatel' });
+  if (!ACHIEVEMENTS[key]) return res.json({ ok: false, error: 'Neplatné vyznamenání' });
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) return res.json({ ok: false, error: 'Člen nenalezen' });
+  const granted = grantAchievement(userId, key, req.session.icName);
+  if (!granted) return res.json({ ok: false, error: 'Člen už toto vyznamenání má' });
+  broadcastSSE('achievementUpdate', { label: ACHIEVEMENTS[key].label, uzivatel: user.ic_name });
+  res.json({ ok: true });
 });
 
 function renderProfil(req, user, aliases) {
@@ -2834,6 +2894,57 @@ app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (
   } catch(e){ res.json({ ok:false }); }
 });
 
+// ── CALEDONIA INDEX (Staff dashboard — /home) ───────────────────────────────
+const CALEDONIA_INDEX_FILE = path.join(DATA_DIR, 'caledonia-index-history.json');
+function loadIndexHistory() { try { return JSON.parse(fs.readFileSync(CALEDONIA_INDEX_FILE, 'utf8')) || []; } catch { return []; } }
+function saveIndexHistory(list) { try { writeJsonAtomic(CALEDONIA_INDEX_FILE, list); } catch (e) {} }
+
+app.get('/api/caledonia-index', requireAuth, async (req, res) => {
+  try {
+    const [ucet, zbraneStav, weedStav, drogyStav, chemkyStav] = await Promise.all([
+      sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 })),
+      sheets.getStockSummary('Zbraně').catch(() => ({})),
+      sheets.getStockSummary('Weed').catch(() => ({})),
+      sheets.getStockSummary('Drogy').catch(() => ({})),
+      sheets.getStockSummary('Chemky').catch(() => ({})),
+    ]);
+    const sumPositive = (obj) => Object.values(obj).filter(q => q > 0).reduce((a, b) => a + b, 0);
+    const skladCelkem = sumPositive(zbraneStav) + sumPositive(weedStav) + sumPositive(drogyStav) + sumPositive(chemkyStav);
+
+    const allUsers = db.prepare('SELECT * FROM users').all();
+    const celkemClenu = allUsers.length;
+
+    const onlineNames = new Set();
+    for (const client of sseClients) { if (client.albionIcName) onlineNames.add(client.albionIcName); }
+    const activniPocet = onlineNames.size;
+
+    // Vzorec 0–100: pokladna (40 bodů) + sklad (30 bodů) + živá aktivita (30 bodů).
+    // Dělitele (25000 SAD, 2000 ks) uprav podle reálné velikosti organizace,
+    // pokud by index dlouhodobě vycházel pořád na 0 nebo pořád na 100.
+    const financeScore = Math.min(40, (ucet.usd / 25000) * 40);
+    const skladScore = Math.min(30, (skladCelkem / 2000) * 30);
+    const aktivitaScore = celkemClenu > 0 ? Math.min(30, (activniPocet / celkemClenu) * 30 * 3) : 0;
+    const index = Math.round(Math.max(0, Math.min(100, financeScore + skladScore + aktivitaScore)));
+
+    const health = index >= 75 ? 'Výborný' : index >= 50 ? 'Stabilní' : index >= 25 ? 'Nestabilní' : 'Ohrožený';
+
+    const history = loadIndexHistory();
+    const lastEntry = history.length ? history[history.length - 1] : null;
+    const deltaPct = lastEntry && lastEntry.value > 0 ? Math.round(((index - lastEntry.value) / lastEntry.value) * 1000) / 10 : 0;
+
+    const now = Date.now();
+    if (!lastEntry || now - lastEntry.at > 15 * 60 * 1000) {
+      history.push({ value: index, at: now });
+      saveIndexHistory(history.slice(-200));
+    }
+
+    res.json({ ok: true, index, deltaPct, health, activniPocet, celkemClenu, pokladnaUsd: ucet.usd, skladCelkem });
+  } catch (e) {
+    console.error('[CALEDONIA INDEX]', e.message);
+    res.json({ ok: false });
+  }
+});
+
 // ── API — EVELYN ASHCROFT ──
 app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
   const page = (req.query.page || 'home').toString();
@@ -3537,6 +3648,9 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
+app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
+app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
+app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
 app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
   res.send(renderSpisy(req));
 });
