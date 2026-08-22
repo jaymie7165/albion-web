@@ -48,30 +48,23 @@ function renderNav(req, active) {
   const accessLevel = req.session.accessLevel || 3;
   const can = (pageId) => canAccess(accessLevel, pageId);
   const isAssociate = !!req.session.isAssociate;
-  const isStaff = accessLevel <= 2; // Founder/Council/Senior Member → grouped nav
+  const isStaff = accessLevel <= 2; // Founder/Council/Senior Member → víc práv v Evidence/Financích
 
-  // ── PLOCHÁ NAVIGACE MEMBER/ASSOCIATE — odpovídá schválenému mocku ──────────
-  const flatLinks = [
-    { id: 'home', label: 'Dashboard', href: '/home', icon: ICONS.home },
-    { id: 'garaz', label: 'Garáž', href: '/garaz', icon: ICONS.garaz },
-    can('nemovitosti') && { id: 'nemovitosti', label: 'Nemovitosti', href: '/nemovitosti', icon: ICONS.nemovitosti },
-    { id: 'weed-sazeni', label: 'Weed', href: '/weed-sazeni', icon: ICONS.weed },
-    { id: 'weed-timer', label: 'Časovač weedu', href: '/weed-sazeni#timers', icon: ICONS.timer },
-    { id: 'deposit', label: 'Vklad', href: '/home#deposit', icon: ICONS.deposit },
-    { id: 'reserve-fund', label: 'Reserve Fund', href: '/sklad', icon: ICONS.reserve },
-    { id: 'history', label: 'Moje aktivita', href: '/audit-me', icon: ICONS.history },
-    { id: 'hierarchy', label: 'Hierarchie', href: '/hierarchy', icon: ICONS.hierarchy },
-    { id: 'navigator', label: 'Rozcestník', href: '/prehled', icon: ICONS.navigator },
-  ].filter(Boolean);
-
-  // ── SESKUPENÁ NAVIGACE PRO VEDENÍ ────────────────────────────────────────
+  // ── SESKUPENÁ NAVIGACE — STEJNÁ STRUKTURA PRO VŠECHNY ────────────────────
+  // Dřív měli Member/Associate úplně jiný, plochý seznam bez skupin — a
+  // chyběly v něm stránky, na které přitom měli přístup (Kodex, Historie,
+  // Mentoring, Bazar, Galerie, Aktivita, Vyznamenání — vše level 3 =
+  // dostupné každému, viz roles.js). Teď je struktura pro obě role stejná
+  // (Dashboard/Evidence/Finance/Organizace/Analytika), liší se jen obsah
+  // jednotlivých skupin podle canAccess(). Weed a Weed Timer byly dřív dvě
+  // položky vedoucí na tutéž stránku — sloučeno do jedné ("Weed").
   const GROUPS = [
     { id: 'dashboard', label: 'Dashboard', links: [{ id: 'home', label: 'Dashboard', href: '/home', icon: ICONS.home }] },
     {
       id: 'evidence', label: 'Evidence',
       links: [
-        can('sklad-view') && { id: 'sklad', label: 'Sklad', href: '/sklad', icon: ICONS.sklad },
-        { id: 'weed-sazeni', label: 'Weed sázení', href: '/weed-sazeni', icon: ICONS.weed },
+        isStaff && can('sklad-view') && { id: 'sklad', label: 'Sklad', href: '/sklad', icon: ICONS.sklad },
+        { id: 'weed-sazeni', label: 'Weed', href: '/weed-sazeni', icon: ICONS.weed },
         { id: 'garaz', label: 'Garáž', href: '/garaz', icon: ICONS.garaz },
         can('nemovitosti') && { id: 'nemovitosti', label: 'Nemovitosti', href: '/nemovitosti', icon: ICONS.nemovitosti },
       ].filter(Boolean),
@@ -81,6 +74,8 @@ function renderNav(req, active) {
       links: [
         can('blackbook') && { id: 'blackbook', label: 'Blackbook', href: '/blackbook', icon: ICONS.blackbook },
         can('profit-centrum') && { id: 'profit-centrum', label: 'Profit centrum', href: '/profit-centrum', icon: ICONS.profit },
+        !isStaff && { id: 'sklad', label: 'Reserve Fund', href: '/sklad', icon: ICONS.reserve },
+        !isStaff && { id: 'deposit', label: 'Vklad', href: '/home#deposit', icon: ICONS.deposit },
       ].filter(Boolean),
     },
     {
@@ -101,6 +96,7 @@ function renderNav(req, active) {
       id: 'analytika', label: 'Analytika',
       links: [
         can('audit') && { id: 'audit', label: 'Audit', href: '/audit', icon: ICONS.audit },
+        !isStaff && { id: 'history', label: 'Moje aktivita', href: '/audit-me', icon: ICONS.history },
         can('statistiky') && { id: 'statistiky', label: 'Statistiky', href: '/statistiky', icon: ICONS.statistiky },
         { id: 'leaderboard', label: 'Aktivita', href: '/leaderboard', icon: ICONS.leaderboard },
         { id: 'achievements', label: 'Vyznamenání', href: '/vyznamenani', icon: ICONS.achievements },
@@ -108,16 +104,12 @@ function renderNav(req, active) {
     },
   ].filter(g => g.links.length);
 
-  const sidebarInner = isStaff
-    ? GROUPS.map(g => `
+  const sidebarInner = GROUPS.map(g => `
         <div class="sb-eyebrow">${g.label}</div>
         ${g.links.map(l => `<a href="${l.href}" class="sb-link${l.id === active ? ' active' : ''}">${l.icon}<span>${l.label}</span></a>`).join('')}
-      `).join('')
-    : flatLinks.map(l => `<a href="${l.href}" class="sb-link${l.id === active ? ' active' : ''}">${l.icon}<span>${l.label}</span></a>`).join('');
+      `).join('');
 
-  const mobileDrawerHtml = isStaff
-    ? GROUPS.map(g => `<div class="md-group-label">${g.label}</div>${g.links.map(l => `<a href="${l.href}" class="${l.id === active ? 'active' : ''}">${l.label}</a>`).join('')}`).join('')
-    : `<div class="md-group-label">Caledonia</div>${flatLinks.map(l => `<a href="${l.href}" class="${l.id === active ? 'active' : ''}">${l.label}</a>`).join('')}`;
+  const mobileDrawerHtml = GROUPS.map(g => `<div class="md-group-label">${g.label}</div>${g.links.map(l => `<a href="${l.href}" class="${l.id === active ? 'active' : ''}">${l.label}</a>`).join('')}`).join('');
 
   return `
     <div class="app-sidebar" id="appSidebar">
