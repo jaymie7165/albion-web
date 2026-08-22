@@ -2,7 +2,7 @@
 //
 // Založeno vlevo (--sidebar-w), ne nahoře — odpovídá referenčnímu vzhledu.
 // Founder/Council/Senior Member vidí SESKUPENOU navigaci (Dashboard/
-// Evidence/Finance/Organization/Analytics + Settings/Log out dole).
+// Evidence/Finance/Organization/Analytics + Nastavení/Odhlásit dole).
 // Member/Associate vidí PLOCHÝ seznam bez skupin (jen položky, na které
 // mají právo) — přesně podle schváleného návrhu.
 //
@@ -50,21 +50,21 @@ function renderNav(req, active) {
   const isAssociate = !!req.session.isAssociate;
   const isStaff = accessLevel <= 2; // Founder/Council/Senior Member → grouped nav
 
-  // ── FLAT MEMBER/ASSOCIATE NAV — matches approved mock exactly ──────────
+  // ── PLOCHÁ NAVIGACE MEMBER/ASSOCIATE — odpovídá schválenému mocku ──────────
   const flatLinks = [
     { id: 'home', label: 'Dashboard', href: '/home', icon: ICONS.home },
-    { id: 'garaz', label: 'Garage', href: '/garaz', icon: ICONS.garaz },
-    can('nemovitosti') && { id: 'nemovitosti', label: 'Properties', href: '/nemovitosti', icon: ICONS.nemovitosti },
+    { id: 'garaz', label: 'Garáž', href: '/garaz', icon: ICONS.garaz },
+    can('nemovitosti') && { id: 'nemovitosti', label: 'Nemovitosti', href: '/nemovitosti', icon: ICONS.nemovitosti },
     { id: 'weed-sazeni', label: 'Weed', href: '/weed-sazeni', icon: ICONS.weed },
-    { id: 'weed-timer', label: 'Weed Timer', href: '/weed-sazeni#timers', icon: ICONS.timer },
-    { id: 'deposit', label: 'Deposit', href: '/home#deposit', icon: ICONS.deposit },
+    { id: 'weed-timer', label: 'Časovač weedu', href: '/weed-sazeni#timers', icon: ICONS.timer },
+    { id: 'deposit', label: 'Vklad', href: '/home#deposit', icon: ICONS.deposit },
     { id: 'reserve-fund', label: 'Reserve Fund', href: '/sklad', icon: ICONS.reserve },
-    { id: 'history', label: 'History', href: '/audit-me', icon: ICONS.history },
-    { id: 'hierarchy', label: 'Hierarchy', href: '/hierarchy', icon: ICONS.hierarchy },
-    { id: 'navigator', label: 'Directory', href: '/prehled', icon: ICONS.navigator },
+    { id: 'history', label: 'Moje aktivita', href: '/audit-me', icon: ICONS.history },
+    { id: 'hierarchy', label: 'Hierarchie', href: '/hierarchy', icon: ICONS.hierarchy },
+    { id: 'navigator', label: 'Rozcestník', href: '/prehled', icon: ICONS.navigator },
   ].filter(Boolean);
 
-  // ── GROUPED STAFF NAV ────────────────────────────────────────────────
+  // ── SESKUPENÁ NAVIGACE PRO VEDENÍ ────────────────────────────────────────
   const GROUPS = [
     { id: 'dashboard', label: 'Dashboard', links: [{ id: 'home', label: 'Dashboard', href: '/home', icon: ICONS.home }] },
     {
@@ -84,7 +84,7 @@ function renderNav(req, active) {
       ].filter(Boolean),
     },
     {
-      id: 'organizace', label: 'Organization',
+      id: 'organizace', label: 'Organizace',
       links: [
         can('nastenska') && { id: 'nastenska', label: 'Nástěnka', href: '/nastenska', icon: ICONS.nastenska },
         can('spis') && { id: 'spis', label: 'Osobní spisy', href: '/spis', icon: ICONS.spis },
@@ -98,7 +98,7 @@ function renderNav(req, active) {
       ].filter(Boolean),
     },
     {
-      id: 'analytika', label: 'Analytics',
+      id: 'analytika', label: 'Analytika',
       links: [
         can('audit') && { id: 'audit', label: 'Audit', href: '/audit', icon: ICONS.audit },
         can('statistiky') && { id: 'statistiky', label: 'Statistiky', href: '/statistiky', icon: ICONS.statistiky },
@@ -130,8 +130,8 @@ function renderNav(req, active) {
       ${sidebarInner}
 
       <div class="sb-bottom">
-        <a href="/profil" class="sb-link">${ICONS.settings}<span>Settings</span></a>
-        <a href="/logout" class="sb-link">${ICONS.logout}<span>Log out</span></a>
+        <a href="/profil" class="sb-link">${ICONS.settings}<span>Nastavení</span></a>
+        <a href="/logout" class="sb-link">${ICONS.logout}<span>Odhlásit se</span></a>
         <div class="sb-version">CALEDONIA NETWORK SYSTEMS<br>v6.0 · secure</div>
       </div>
     </div>
@@ -169,8 +169,8 @@ function renderNav(req, active) {
         </button>
         ${req.session.realAccessLevel === 1 ? `
         <div class="view-as-switcher" style="position:relative">
-          <button class="nav-shortcut-hint" id="viewAsBtn" style="cursor:pointer;${req.session.viewAsLevel ? 'border-color:var(--oxblood-bright);color:var(--oxblood-bright)' : ''}" title="View As">
-            ${req.session.viewAsLevel ? 'Náhled: ' + ({ 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member' }[req.session.viewAsLevel]) : 'View As'}
+          <button class="nav-shortcut-hint" id="viewAsBtn" style="cursor:pointer;${req.session.viewAsLevel ? 'border-color:var(--oxblood-bright);color:var(--oxblood-bright)' : ''}" title="Zobrazit jako">
+            ${req.session.viewAsLevel ? 'Náhled: ' + ({ 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member' }[req.session.viewAsLevel]) : 'Zobrazit jako'}
           </button>
           <div id="viewAsMenu" class="app-sidebar" style="position:absolute;top:120%;right:0;left:auto;bottom:auto;width:200px;padding:0.5rem;opacity:0;pointer-events:none;transition:opacity .15s;box-shadow:var(--shadow)">
             <a href="#" class="sb-link" onclick="setViewAs(null);return false">Vlastní role</a>
@@ -320,7 +320,7 @@ function renderNav(req, active) {
             let link = document.querySelector("link[rel='icon']");
             if (!link) { link = document.createElement('link'); link.rel='icon'; document.head.appendChild(link); }
             link.href = canvas.toDataURL('image/png');
-            document.title = (unread>0?'('+unread+') ':'') + document.title.replace(/^\(\d+\)\s*/,'');
+            document.title = (unread>0?'('+unread+') ':'') + document.title.replace(/^\\(\\d+\\)\\s*/,'');
           };
         }
         window.bumpUnread = function(){ unread++; renderFavicon(); };
