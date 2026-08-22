@@ -55,7 +55,7 @@ function renderDashboard(req, data) {
   };
 
   const totalValue = (() => {
-    const W={"Žlutý kanabis":165,"Zelený kanabis":165,"Kanabis":165,"Červený kanabis":165,"Modrý kanabis":165};
+    const W={"Žlutý kanabis":150,"Zelený kanabis":150,"Kanabis":150,"Červený kanabis":150,"Modrý kanabis":150};
     let t=0;
     Object.entries(weed).forEach(([k,q])=>{if(q>0&&W[k])t+=q*W[k];});
     return t;
@@ -533,7 +533,7 @@ function renderDashboard(req, data) {
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
-                <div id="stock-list-weed">${formatSklad(weed, {"Žlutý kanabis":{prodej:165},"Zelený kanabis":{prodej:165},"Kanabis":{prodej:165},"Červený kanabis":{prodej:165},"Modrý kanabis":{prodej:165}}, true)}</div>
+                <div id="stock-list-weed">${formatSklad(weed, {"Žlutý kanabis":{prodej:150},"Zelený kanabis":{prodej:150},"Kanabis":{prodej:150},"Červený kanabis":{prodej:150},"Modrý kanabis":{prodej:150}}, true)}</div>
               </div>
               <div>
                 <div class="fav-chips" id="weed-chips"></div>
@@ -578,9 +578,9 @@ function renderDashboard(req, data) {
                 <div class="vyroba-stat-val">5 dávek</div>
               </div>
               <div class="vyroba-stat" style="border-top-color:var(--brass)">
-                <div class="vyroba-stat-label">Výtěžnost</div>
+                <div class="vyroba-stat-label">Výtěžnost (dle receptu)</div>
                 <div class="vyroba-stat-val" style="color:var(--brass)">150×</div>
-                <div class="vyroba-stat-sub">metamfetamin / várka</div>
+                <div class="vyroba-stat-sub">metamfetamin / várka — reálný výtěžek se zapisuje ručně</div>
               </div>
               <div class="vyroba-stat" id="vyroba-stat-cost" style="border-top-color:var(--oxblood-bright)">
                 <div class="vyroba-stat-label">Náklad / várka</div>
@@ -613,6 +613,13 @@ function renderDashboard(req, data) {
                 <div class="form-group" style="margin-bottom:1rem">
                   <label>Kolik várek chceš uvařit?</label>
                   <input type="number" id="vyroba-batches" min="1" value="1">
+                </div>
+                <div class="form-group" style="margin-bottom:1rem">
+                  <label>Skutečně vyrobené množství (ks)</label>
+                  <input type="number" id="vyroba-qty" min="1" placeholder="např. 150">
+                  <div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint);margin-top:0.3rem">
+                    Přednastaveno dle receptu (várky × 150) — přepiš skutečným počtem sáčků, které z vaření reálně vzniklo.
+                  </div>
                 </div>
                 <div id="vyroba-yield-box" style="margin-bottom:1rem"></div>
                 <div class="info-box" id="vyroba-status-box" style="display:block;margin-top:0"></div>
@@ -949,7 +956,7 @@ function renderDashboard(req, data) {
         return '<div class="sklad-row"><span>'+item+'</span><span>'+qty+' ks</span></div>';
       }).join('');
     }
-    const WEED_PRICE_MAP={"Žlutý kanabis":{prodej:165},"Zelený kanabis":{prodej:165},"Kanabis":{prodej:165},"Červený kanabis":{prodej:165},"Modrý kanabis":{prodej:165}};
+    const WEED_PRICE_MAP={"Žlutý kanabis":{prodej:150},"Zelený kanabis":{prodej:150},"Kanabis":{prodej:150},"Červený kanabis":{prodej:150},"Modrý kanabis":{prodej:150}};
     async function refreshSkladData(){
       try{
         const res=await fetch('/api/sklad/summary',{cache:'no-store'});
@@ -1044,7 +1051,7 @@ function renderDashboard(req, data) {
     const ZBRANE=["Pump Shotgun","Pistol MK2","Pistol","Combat Pistol","Double Action Revolver","Navy Revolver","Vintage Pistol","Gusenberg","Dlouhé"];
     const NABOJE=["9mm","9mm Mk2",".75cal",".50cal","12-gauge"];
     const AKCE=["Malá C4","Velká C4","Přístupová karta","Pokročilá zvláštní karta","EMP zařízení","Řezací laser","Cable Cutter","Zvláštní karta"];
-    const WEED_CENY={"Žlutý kanabis":{vyroba:100,prodej:165},"Zelený kanabis":{vyroba:100,prodej:165},"Kanabis":{vyroba:100,prodej:165},"Červený kanabis":{vyroba:100,prodej:165},"Modrý kanabis":{vyroba:100,prodej:165}};
+    const WEED_CENY={"Žlutý kanabis":{vyroba:100,prodej:150},"Zelený kanabis":{vyroba:100,prodej:150},"Kanabis":{vyroba:100,prodej:150},"Červený kanabis":{vyroba:100,prodej:150},"Modrý kanabis":{vyroba:100,prodej:150}};
     const DROGY_LIST=["Kapky","Kokain","Extáze","Metamfetamin","Benzo","Joyka","Heroin","Speed","LSD"];
     const CHEMKY_LIST=["Aceton","Peroxid vodíku","Potravinářský kofein","Propylenglykol","Toluen","Technický benzín","Bismut","Kyselina fosforečná","Kerosen","Pekáč","Genkadon","Amanita Genkia","Kapátka","Forma","Lithiová baterie","Semínko","Cukr","Nadrcené listy"];
     // Ceník chemikálií — používá se pro dopočet nákladů na várku ve Výrobě.
@@ -1073,7 +1080,7 @@ function renderDashboard(req, data) {
     (KATALOG.zbrane||[]).forEach(i=>{if(!ZBRANE.includes(i))ZBRANE.push(i);});
     (KATALOG.naboje||[]).forEach(i=>{if(!NABOJE.includes(i))NABOJE.push(i);});
     (KATALOG.akce||[]).forEach(i=>{if(!AKCE.includes(i))AKCE.push(i);});
-    (KATALOG.weed||[]).forEach(i=>{if(!WEED_CENY[i])WEED_CENY[i]={vyroba:100,prodej:165};});
+    (KATALOG.weed||[]).forEach(i=>{if(!WEED_CENY[i])WEED_CENY[i]={vyroba:100,prodej:150};});
     (KATALOG.drogy||[]).forEach(i=>{if(!DROGY_LIST.includes(i))DROGY_LIST.push(i);});
     (KATALOG.chemky||[]).forEach(i=>{if(!CHEMKY_LIST.includes(i))CHEMKY_LIST.push(i);});
     function refreshStaticSelects(){
@@ -1164,8 +1171,24 @@ function renderDashboard(req, data) {
     }
 
     let VYROBA_ALL_OK = false;
+    function syncVyrobaQtyDefault(batches){
+      const qtyEl=document.getElementById('vyroba-qty');
+      if(!qtyEl)return;
+      // Dokud člen pole ručně nepřepíše, drží se odhadu dle receptu (batches × 150).
+      // Jakmile do pole sám něco napíše, přestane se přepisovat — viz listener níže.
+      if(qtyEl.dataset.autofilled!=='0'){
+        qtyEl.value=batches*METH_RECIPE.yieldPerBatch;
+        qtyEl.dataset.autofilled='1';
+      }
+    }
+    function getVyrobaQty(batches){
+      const qtyEl=document.getElementById('vyroba-qty');
+      const v=qtyEl?parseInt(qtyEl.value):NaN;
+      return Number.isInteger(v)&&v>0 ? v : batches*METH_RECIPE.yieldPerBatch;
+    }
     function renderVyrobaCalc(){
       const batches=Math.max(1,parseInt(document.getElementById('vyroba-batches').value)||1);
+      syncVyrobaQtyDefault(batches);
 
       const rows=Object.entries(METH_RECIPE.rawPerBatch).map(([item,qtyPerBatch])=>{
         const needed=qtyPerBatch*batches;
@@ -1198,7 +1221,8 @@ function renderDashboard(req, data) {
       const yieldBox=document.getElementById('vyroba-yield-box');
       if(yieldBox){
         yieldBox.innerHTML=
-          '<div class="manifest-row"><span class="mr-name">Výtěžnost</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--brass)">'+(batches*METH_RECIPE.dávkyPerBatch)+' dávek · '+(batches*METH_RECIPE.yieldPerBatch)+'× Metamfetamin</span></div>'+
+          '<div class="manifest-row"><span class="mr-name">Odhad dle receptu</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--brass)">'+(batches*METH_RECIPE.dávkyPerBatch)+' dávek · ~'+(batches*METH_RECIPE.yieldPerBatch)+'× Metamfetamin</span></div>'+
+          '<div class="manifest-row"><span class="mr-name">Zapíše se do skladu</span><span class="mr-dots"></span><span class="mr-val" style="color:#8FE0A0">'+getVyrobaQty(batches)+'× Metamfetamin</span></div>'+
           '<div class="manifest-row"><span class="mr-name">Celkový náklad</span><span class="mr-dots"></span><span class="mr-val" style="color:var(--oxblood-bright)">'+pesosF(cost.pesos)+' + '+money(cost.sad)+'</span></div>';
       }
 
@@ -1213,6 +1237,11 @@ function renderDashboard(req, data) {
       }
     }
     document.getElementById('vyroba-batches') && document.getElementById('vyroba-batches').addEventListener('input',renderVyrobaCalc);
+    document.getElementById('vyroba-qty') && document.getElementById('vyroba-qty').addEventListener('input',function(){
+      // Jakmile člen sám do pole napíše, přestane se přepočítávat na odhad z receptu.
+      this.dataset.autofilled='0';
+      renderVyrobaCalc();
+    });
     renderVyrobaSteps();renderVyrobaStatMax();renderVyrobaCalc();
 
     // ── VÝROBA — přepínání záložek receptů (Metamfetamin / Benzodiazepin / Joy) ──
@@ -1271,20 +1300,24 @@ function renderDashboard(req, data) {
     async function submitVyroba(){
       const batches=Math.max(1,parseInt(document.getElementById('vyroba-batches').value)||1);
       if(!VYROBA_ALL_OK) return showToast('Na skladě nejsou potřebné suroviny na tolik várek', true);
+      const vyrobenoQty=getVyrobaQty(batches);
+      if(!Number.isInteger(vyrobenoQty)||vyrobenoQty<1) return showToast('Zadej platné vyrobené množství (ks)', true);
       const cost=computeBatchCost(batches);
       showModal(
         'Potvrdit výrobu',
         'Suroviny se okamžitě odečtou ze skladu chemikálií a hotový produkt se přičte do skladu drog.',
         [
           ['Počet várek', batches],
-          ['Výtěžnost', (batches*METH_RECIPE.yieldPerBatch)+'× Metamfetamin'],
+          ['Vyrobené množství', vyrobenoQty+'× Metamfetamin'],
           ['Náklad', pesosF(cost.pesos)+' + '+money(cost.sad)],
           ...Object.entries(METH_RECIPE.rawPerBatch).map(([item,qty])=>['Odečte se — '+item, (qty*batches)+' ks']),
         ],
         async()=>{
-          const r=await post('/api/vyroba/potvrdit',{batches});
+          const r=await post('/api/vyroba/potvrdit',{batches,vyrobenoQty});
           if(r.ok){
             showToast('Výroba potvrzena — '+r.vyrobenoQty+'× '+r.outputItem+' přičteno do skladu');
+            const qtyEl=document.getElementById('vyroba-qty');
+            if(qtyEl){qtyEl.value='';qtyEl.dataset.autofilled='1';}
             flashActivePanel();
             refreshSkladData();
           } else showToast(r.error,true);
@@ -1430,7 +1463,7 @@ function renderDashboard(req, data) {
       const typ=document.getElementById('weed-typ').value;
       const odruda=document.getElementById('weed-odruda').value;
       const mnozstvi=document.getElementById('weed-mnozstvi').value;
-      const c=WEED_CENY[odruda]||{vyroba:100,prodej:165};
+      const c=WEED_CENY[odruda]||{vyroba:100,prodej:150};
       const qty=parseInt(mnozstvi)||0;
       showModal(
         typ==='VKLAD'?'Vložit weed':'Vybrat weed',

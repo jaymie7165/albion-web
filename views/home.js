@@ -23,7 +23,7 @@ function renderHome(req, data) {
   const canSklad = canAccess(accessLevel, 'sklad');
   const RANK_LABEL = { 1: 'Founder / Council', 2: 'Senior Member', 3: 'Member / Associate' };
 
-  const WEED_P = { "Žlutý kanabis": 165, "Zelený kanabis": 165, "Kanabis": 165, "Červený kanabis": 165, "Modrý kanabis": 165 };
+  const WEED_P = { "Žlutý kanabis": 150, "Zelený kanabis": 150, "Kanabis": 150, "Červený kanabis": 150, "Modrý kanabis": 150 };
   let totalValue = 0;
   Object.entries(weed).forEach(([k, q]) => { if (q > 0 && WEED_P[k]) totalValue += q * WEED_P[k]; });
   const totalWeed = Object.values(weed).filter(q => q > 0).reduce((a, b) => a + b, 0);
