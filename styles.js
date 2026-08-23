@@ -234,10 +234,11 @@ function baseStyles() {
          Active state = thin crimson line only, no fill blocks.
          ══════════════════════════════════════════════ */
       .app-sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);background:var(--panel);border-right:1px solid var(--border);padding:1.6rem 1rem 1.4rem;overflow-y:auto;z-index:150;display:flex;flex-direction:column}
-      .sb-brand{display:flex;flex-direction:column;align-items:center;gap:0.6rem;padding:0.4rem 0 1.6rem;text-decoration:none}
-      .sb-brand img{width:52px;height:52px;object-fit:contain;opacity:0.92}
-      .sb-brand-name{font-family:var(--font-label);font-size:0.86rem;letter-spacing:0.2em;color:var(--ivory);font-weight:600;text-align:center}
-      .sb-brand-tag{font-family:var(--font-mono);font-size:0.5rem;letter-spacing:0.16em;color:var(--ivory-faint);text-transform:uppercase}
+      .sb-brand{display:flex;flex-direction:column;align-items:center;gap:0.4rem;padding:0.35rem 0 1.5rem;margin-bottom:0.3rem;text-decoration:none;position:relative}
+      .sb-brand img{width:58px;height:58px;object-fit:contain;opacity:0.95;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.5))}
+      .sb-brand-name{font-family:var(--font-label);font-size:0.88rem;letter-spacing:0.22em;color:var(--ivory);font-weight:600;text-align:center;margin-top:0.05rem}
+      .sb-brand-tag{font-family:var(--font-mono);font-size:0.48rem;letter-spacing:0.18em;color:var(--ivory-faint);text-transform:uppercase}
+      .sb-brand::after{content:'';position:absolute;bottom:0;left:22%;right:22%;height:1px;background:var(--border-brass)}
       .sb-eyebrow{font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);padding:0 0.6rem;margin:1.1rem 0 0.6rem}
       .sb-eyebrow:first-of-type{margin-top:0}
       .app-sidebar .sb-link{display:flex;align-items:center;gap:0.7rem;padding:0.62rem 0.7rem;color:var(--ivory-dim);text-decoration:none;border-left:1.5px solid transparent;transition:color .15s,border-color .15s;margin-bottom:0.05rem;font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.08em;text-transform:uppercase}
