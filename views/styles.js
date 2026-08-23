@@ -175,9 +175,16 @@ function baseStyles() {
       .app-topbar{
         background:rgba(7,5,10,0.92);border-bottom:1px solid var(--border);
         padding:0 1.8rem;display:flex;align-items:center;justify-content:space-between;gap:1.2rem;
-        position:sticky;top:0;z-index:200;height:var(--nav-h);
+        position:sticky;top:0;z-index:140;height:var(--nav-h);
         backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
       }
+      /* Horní bar nesmí zasahovat do prostoru levého sidebaru — dřív kreslil
+         přes celou šířku obrazovky a s vyšším z-indexem (200 > 150) tak
+         "přejížděl" přes horní část sidebaru, kde je logo. Teď má nižší
+         z-index NEŽ sidebar (viz .app-sidebar níže) a navíc mu vůbec
+         nezasahuje do jeho šířky, takže logo je vždy celé vpředu. */
+      .app-sidebar ~ .app-topbar{margin-left:var(--sidebar-w)}
+      @media(max-width:980px){.app-sidebar ~ .app-topbar{margin-left:0}}
       .topbar-left{display:flex;align-items:center;gap:0.9rem;flex-shrink:0}
       .nav-logo{font-family:var(--font-label);letter-spacing:0.22em;font-size:0.92rem;font-weight:600;text-transform:uppercase;text-decoration:none;color:var(--ivory);display:flex;align-items:center;gap:0.7rem;flex-shrink:0;transition:opacity 0.2s}
       .nav-logo:hover{opacity:0.8}
@@ -233,7 +240,7 @@ function baseStyles() {
          SIDEBAR — flat for members, grouped for staff.
          Active state = thin crimson line only, no fill blocks.
          ══════════════════════════════════════════════ */
-      .app-sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);background:var(--panel);border-right:1px solid var(--border);padding:1.6rem 1rem 1.4rem;overflow-y:auto;z-index:150;display:flex;flex-direction:column}
+      .app-sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);background:var(--panel);border-right:1px solid var(--border);padding:1.6rem 1rem 1.4rem;overflow-y:auto;z-index:210;display:flex;flex-direction:column}
       .sb-brand{display:flex;flex-direction:column;align-items:center;gap:0.4rem;padding:0.35rem 0 1.5rem;margin-bottom:0.3rem;text-decoration:none;position:relative}
       .sb-brand img{width:58px;height:58px;object-fit:contain;opacity:0.95;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.5))}
       .sb-brand-name{font-family:var(--font-label);font-size:0.88rem;letter-spacing:0.22em;color:var(--ivory);font-weight:600;text-align:center;margin-top:0.05rem}
