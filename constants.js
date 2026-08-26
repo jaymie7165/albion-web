@@ -67,13 +67,13 @@ const WEED_PLANT = {
     { key: 'vyzivovaVoda',    name: 'Výživová voda',    qty: 4, unit: 40 },
   ],
   bagsPerPlant: 4,    // z 1 kytky vznikají 4 sáčky
-  bagPrice:     150,  // prodejní hodnota 1 sáčku — sníženo ze 165$ na 150$
+  bagPrice:     150,  // prodejní hodnota 1 sáčku
   growHours:    20,   // doba růstu jedné kytky
 };
 WEED_PLANT.items.forEach(it => { it.cost = it.qty * it.unit; });                          // cena za danou položku na 1 kytku
 WEED_PLANT.costPerPlant    = WEED_PLANT.items.reduce((a, it) => a + it.cost, 0);          // 455
 WEED_PLANT.revenuePerPlant = WEED_PLANT.bagsPerPlant * WEED_PLANT.bagPrice;               // 4 × 150 = 600
-WEED_PLANT.profitPerPlant  = WEED_PLANT.revenuePerPlant - WEED_PLANT.costPerPlant;        // dopočteno automaticky (600 - 455 = 145)
+WEED_PLANT.profitPerPlant  = WEED_PLANT.revenuePerPlant - WEED_PLANT.costPerPlant;        // dopočteno automaticky (600 - 485 = 115)
 WEED_PLANT.growMs          = WEED_PLANT.growHours * 60 * 60 * 1000;
 
 // ── VÝROBA — Metamfetamin (Recept 1 vaření) ───────────────────────────────

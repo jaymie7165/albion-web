@@ -581,7 +581,7 @@ const CENIK_DEFAULT = {
     {
       id: 'vyroba', label: 'Výroba — doporučené prodejní ceny',
       rows: [
-        { label: 'Metamfetamin — sáček', cena: '1100$' },
+        { label: 'Metamfetamin — sáček', cena: '1000$' },
       ],
     },
     {
