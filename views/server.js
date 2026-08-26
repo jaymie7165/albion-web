@@ -2515,6 +2515,28 @@ app.delete('/api/gallery/:id', requireAuth, requireAccess('audit'), (req, res) =
 });
 
 // ── API — NÁSTĚNKA ──
+// Nahradí Discord zmínky (<@123...> / <@!123...>) v textu oznámení za IC
+// jméno člena, pokud ho v DB dokážeme dohledat podle discord_id. Jméno se
+// obalí neviditelnými sentinel znaky (\uE000/\uE001 — soukromá unicode
+// oblast, v běžném textu se nevyskytují), aby si je frontend
+// (formatAnnouncementContent v nastenska.js) mohl po HTML-escapování
+// bezpečně najít a vykreslit jako zvýrazněné "@Jméno" — bez nutnosti
+// posílat na klienta syrové Discord ID.
+function resolveDiscordMentions(content) {
+  if (!content) return content;
+  let byDiscordId;
+  try {
+    byDiscordId = {};
+    db.prepare('SELECT * FROM users').all().forEach(u => {
+      if (u.discord_id) byDiscordId[u.discord_id] = u.ic_name || u.discord_username || u.discord_id;
+    });
+  } catch (e) { return content; }
+  return content.replace(/<@!?(\d+)>/g, (match, id) => {
+    const name = byDiscordId[id];
+    return name ? ('\uE000' + name + '\uE001') : match;
+  });
+}
+
 app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, res) => {
   try {
     const msgs = await discord.getAnnouncementMessages(20);
@@ -2523,7 +2545,7 @@ app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, r
       .map(m => ({
         id: m.id,
         author: m.author?.username || 'Albion',
-        content: m.content || (m.embeds[0]?.description || ''),
+        content: resolveDiscordMentions(m.content || (m.embeds[0]?.description || '')),
         title: m.embeds?.[0]?.title || null,
         timestamp: m.timestamp,
         color: m.embeds?.[0]?.color || null,

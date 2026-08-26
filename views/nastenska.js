@@ -21,7 +21,15 @@ function renderNastenska(req) {
     .ann-meta-row{display:flex;align-items:center;gap:0.7rem;margin-bottom:0.5rem;flex-wrap:wrap}
     .ann-author{font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint)}
     .ann-title{font-family:var(--font-display);font-size:1.1rem;color:var(--ivory);margin-bottom:0.4rem}
-    .ann-content{font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.75;white-space:pre-wrap;font-weight:300}
+    .ann-content{font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);line-height:1.75;font-weight:300}
+    .ann-content strong{color:var(--ivory);font-weight:600}
+    .ann-content em{font-style:italic}
+    .ann-content u{text-decoration:underline}
+    .ann-content s{text-decoration:line-through;opacity:0.7}
+    .ann-content code{font-family:var(--font-mono);font-size:0.82em;background:var(--panel3);padding:0.05rem 0.35rem;border:1px solid var(--border)}
+    .ann-content pre.md-code-block{font-family:var(--font-mono);font-size:0.78rem;background:var(--panel3);border:1px solid var(--border);padding:0.7rem 0.9rem;overflow-x:auto;white-space:pre-wrap;margin:0.5rem 0}
+    .ann-content blockquote{margin:0.5rem 0;padding:0.3rem 0.9rem;border-left:2px solid var(--border-oxblood);color:var(--ivory-faint)}
+    .ann-content .mention{color:var(--brass-bright);font-weight:600}
   </style>
   </head><body>
   ${renderNav(req, 'nastenska')}
@@ -56,6 +64,56 @@ function renderNastenska(req) {
     const LAST_ID_KEY='albion_last_ann_id';
     let lastSeenId=localStorage.getItem(LAST_ID_KEY)||'0';
     function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+    // Discord-style formátování obsahu oznámení: hvězdičkami tučně/kurzíva,
+    // podtržítky podtržení, vlnovkami přeškrtnuté, apostrofy (jedním nebo
+    // trojicí) inline kód / blok kódu, a "> " na začátku řádku jako citace.
+    // Zmínky (<@ID>) server už přeložil na IC jméno a obalil
+    // neviditelnými sentinely \uE000/\uE001 (viz resolveDiscordMentions v
+    // server.js) — tady se z nich udělá zvýrazněné "@Jméno" místo syrového
+    // Discord ID. Text se nejdřív HTML-escapuje (bezpečnost), teprve pak se
+    // aplikuje markdown, ať nejde vložit škodlivé HTML přes obsah oznámení.
+    function formatAnnouncementContent(raw){
+      let text = esc(raw || '');
+
+      // Zmínky — sentinely přežily esc() beze změny (nejsou to HTML znaky)
+      text = text.replace(/\uE000([^\uE001]*)\uE001/g, '<span class="mention">@$1</span>');
+
+      // Bloky kódu (trojice zpětných apostrofů), pak inline kód (jeden
+      // zpětný apostrof) — musí jít první, ať se obsah uvnitř nerozbije
+      // dalšími pravidly níže
+      text = text.replace(/\`\`\`([\\s\\S]*?)\`\`\`/g, function(m, code){ return '<pre class="md-code-block">'+code.replace(/^\\n/,'')+'</pre>'; });
+      text = text.replace(/\`([^\`\\n]+)\`/g, '<code>$1</code>');
+
+      // Tučná kurzíva, tučně, podtržení, přeškrtnuté
+      text = text.replace(/\\*\\*\\*([^*]+)\\*\\*\\*/g, '<strong><em>$1</em></strong>');
+      text = text.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+      text = text.replace(/__([^_]+)__/g, '<u>$1</u>');
+      text = text.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+      // Kurzíva — zbylé jednotlivé * nebo _ (musí jít až po tučně/podtržení)
+      text = text.replace(/\\*([^*\\n]+)\\*/g, '<em>$1</em>');
+      text = text.replace(/(^|[^_])_([^_\\n]+)_(?!_)/g, '$1<em>$2</em>');
+
+      // Citace (> na začátku řádku, v escapovaném textu je to "&gt; ") —
+      // celý souvislý blok citace se sestaví jako jeden kus HTML, ne po
+      // jednotlivých řádcích prokládaných <br> zvenku, ať na začátku/konci
+      // citace nevznikne nechtěný prázdný řádek.
+      const lines = text.split('\\n');
+      const out = [];
+      let quoteBuf = null;
+      for (const line of lines){
+        const m = line.match(/^&gt;\\s?(.*)$/);
+        if (m){
+          if (quoteBuf === null) quoteBuf = [];
+          quoteBuf.push(m[1]);
+        } else {
+          if (quoteBuf !== null){ out.push('<blockquote>'+quoteBuf.join('<br>')+'</blockquote>'); quoteBuf = null; }
+          out.push(line);
+        }
+      }
+      if (quoteBuf !== null) out.push('<blockquote>'+quoteBuf.join('<br>')+'</blockquote>');
+      return out.join('<br>');
+    }
     function catPill(cat){ cat = cat && CAT_LABELS[cat] ? cat : 'ostatni'; return '<span class="cat-pill '+cat+'">'+CAT_LABELS[cat]+'</span>'; }
 
     async function loadAnnouncements(){
@@ -68,7 +126,7 @@ function renderNastenska(req) {
         return '<div class="ann-item">'+
           '<div class="ann-meta-row">'+catPill(m.category)+'<span class="ann-author">'+esc(m.author)+' · '+esc(dt)+'</span></div>'+
           (m.title?'<div class="ann-title">'+esc(m.title.replace(/^[🔴🟡🔵⚪]\\s*[A-ZÁ-Ž]+\\s*·\\s*/,'').replace(/^📢\\s*/,''))+'</div>':'')+
-          '<div class="ann-content">'+esc(m.content||'')+'</div>'+
+          '<div class="ann-content">'+formatAnnouncementContent(m.content||'')+'</div>'+
         '</div>';
       }).join('');
     }
