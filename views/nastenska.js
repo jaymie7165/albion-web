@@ -16,8 +16,11 @@ function renderNastenska(req) {
   <style>
     .nastenska-layout{display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start}
     @media(max-width:860px){.nastenska-layout{grid-template-columns:1fr}}
-    .ann-item{padding:1.3rem 0;border-bottom:1px solid var(--border)}
-    .ann-item:last-child{border-bottom:none}
+    .ann-item{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--ivory-faint);padding:1.2rem 1.4rem;margin-bottom:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.18)}
+    .ann-item.dulezite{border-left-color:var(--oxblood-bright)}
+    .ann-item.personalni{border-left-color:var(--brass-bright)}
+    .ann-item.provozni{border-left-color:#6FA8C9}
+    .ann-item.ostatni{border-left-color:var(--ivory-faint)}
     .ann-meta-row{display:flex;align-items:center;gap:0.7rem;margin-bottom:0.5rem;flex-wrap:wrap}
     .ann-author{font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint)}
     .ann-title{font-family:var(--font-display);font-size:1.1rem;color:var(--ivory);margin-bottom:0.4rem}
@@ -123,7 +126,8 @@ function renderNastenska(req) {
       if(!data.messages||!data.messages.length){list.innerHTML=ledgerEmptyHTML('Žádná oznámení',false,'photo');return;}
       list.innerHTML=data.messages.map((m)=>{
         const dt=new Date(m.timestamp).toLocaleString('cs-CZ',{timeZone:'Europe/Prague'});
-        return '<div class="ann-item">'+
+        const catClass = (m.category && CAT_LABELS[m.category]) ? m.category : 'ostatni';
+        return '<div class="ann-item '+catClass+'">'+
           '<div class="ann-meta-row">'+catPill(m.category)+'<span class="ann-author">'+esc(m.author)+' · '+esc(dt)+'</span></div>'+
           (m.title?'<div class="ann-title">'+esc(m.title.replace(/^[🔴🟡🔵⚪]\\s*[A-ZÁ-Ž]+\\s*·\\s*/,'').replace(/^📢\\s*/,''))+'</div>':'')+
           '<div class="ann-content">'+formatAnnouncementContent(m.content||'')+'</div>'+

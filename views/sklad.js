@@ -64,6 +64,11 @@ function renderDashboard(req, data) {
   const totalWeedSacky = Object.values(weed).filter(q=>q>0).reduce((a,b)=>a+b,0);
   const totalDrogySacky = Object.values(drogy).filter(q=>q>0).reduce((a,b)=>a+b,0);
 
+  // Referenční prodejní ceny drog — zatím jen Metamfetamin (dle Ceníku, 1000$
+  // za sáček). Ostatní drogy záměrně bez ceny (viz komentář v constants.js),
+  // takže se u nich hodnota nezobrazuje, stejně jako dosud.
+  const DROGY_PRICE_MAP = { "Metamfetamin": { prodej: 1000 } };
+
   // ── ROZDĚLENÍ TABŮ: HLAVNÍ (denní použití) vs VEDLEJŠÍ (schované pod "Více") ──
   const sekceMetaPrimary = [
     { id: 'ucet',   label: 'Účetnictví', sub: 'Finance',     icon: '◉' },
@@ -672,7 +677,7 @@ function renderDashboard(req, data) {
             <div class="panel-split">
               <div>
                 <div class="panel-list-label">Stav skladu</div>
-                <div id="stock-list-drogy">${formatSklad(drogy, null, true)}</div>
+                <div id="stock-list-drogy">${formatSklad(drogy, DROGY_PRICE_MAP, true)}</div>
               </div>
               <div>
                 <div class="fav-chips" id="drogy-chips"></div>
@@ -957,6 +962,7 @@ function renderDashboard(req, data) {
       }).join('');
     }
     const WEED_PRICE_MAP={"Žlutý kanabis":{prodej:150},"Zelený kanabis":{prodej:150},"Kanabis":{prodej:150},"Červený kanabis":{prodej:150},"Modrý kanabis":{prodej:150}};
+    const DROGY_PRICE_MAP={"Metamfetamin":{prodej:1000}};
     async function refreshSkladData(){
       try{
         const res=await fetch('/api/sklad/summary',{cache:'no-store'});
@@ -964,7 +970,7 @@ function renderDashboard(req, data) {
         if(!d.ok)return;
         const zb=document.getElementById('stock-list-zbrane'); if(zb) zb.innerHTML=fmtSklad(d.zbrane,null);
         const we=document.getElementById('stock-list-weed'); if(we) we.innerHTML=fmtSklad(d.weed,WEED_PRICE_MAP,true);
-        const dr=document.getElementById('stock-list-drogy'); if(dr) dr.innerHTML=fmtSklad(d.drogy,null,true);
+        const dr=document.getElementById('stock-list-drogy'); if(dr) dr.innerHTML=fmtSklad(d.drogy,DROGY_PRICE_MAP,true);
         const ch=document.getElementById('stock-list-chemky'); if(ch) ch.innerHTML=fmtSklad(d.chemky||{},null);
         if(d.chemky){ Object.assign(VYROBA_STOCK,d.chemky); Object.keys(VYROBA_STOCK).forEach(k=>{ if(!(k in d.chemky)) delete VYROBA_STOCK[k]; }); renderVyrobaStatMax(); renderVyrobaCalc(); }
         const ucetList=document.getElementById('ucet-recent-list');

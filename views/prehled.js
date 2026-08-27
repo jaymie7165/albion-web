@@ -39,7 +39,7 @@ function renderPrehled(req) {
       cat: 'Organization',
       items: [
         { title: 'Nástěnka', desc: 'Oznámení organizace synchronizovaná s Discordem, tříděná dle kategorie.', href: '/nastenska', ok: can('nastenska') },
-        { title: 'Osobní spisy', desc: 'Důvěrné poznámky o lidech uvnitř i vně organizace.', href: '/spis', ok: can('spis') },
+        { title: 'Informace', desc: 'Skupiny, osoby a průběžně doplňovaný přehled zjištění organizace.', href: '/informace', ok: can('informace') },
         { title: 'Mentorský program', desc: 'Strukturovaný proces růstu členů — cíle, checkpointy, hodnocení.', href: '/mentoring', ok: true },
         { title: 'Kodex', desc: 'Deset závazných principů organizace.', href: '/kodex', ok: true },
         { title: 'Historie', desc: 'Kronika organizace od jejího vzniku po současnost.', href: '/lore', ok: true },

@@ -148,6 +148,26 @@ function renderHome(req, data) {
       tick();setInterval(tick,1000);
     })();
     const RESTRICTED_HOME = ${isRestricted ? 'true' : 'false'};
+
+    // ── VYSÍLAČKA — čtení existujícího Discord kanálu, viditelné pro úplně
+    // každého na hlavním dashboardu (viz /api/vysilacka/latest v server.js) ──
+    function vysEsc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    async function loadVysilacka(){
+      const el = document.getElementById('vysilacka-content');
+      if(!el) return;
+      try{
+        const res = await fetch('/api/vysilacka/latest');
+        const d = await res.json();
+        if(!d.ok || !d.messages.length){ el.textContent = 'Zatím žádné hlášení.'; return; }
+        el.innerHTML = d.messages.map(function(m){
+          const t = vysEsc(m.content||'').replace(/\\n/g,'<br>');
+          return '<div style="margin-bottom:0.6rem;padding-bottom:0.6rem;border-bottom:1px solid var(--border)">'+
+            (m.title?('<strong style="color:var(--brass-bright)">'+vysEsc(m.title)+'</strong><br>'):'')+t+'</div>';
+        }).join('');
+      }catch(e){}
+    }
+    loadVysilacka();
+    setInterval(loadVysilacka, 20000);
     ${!isRestricted ? staffDashboardScript() : memberDashboardScript()}
 
     // ── ONBOARDING (beze změny chování) ──
@@ -197,6 +217,11 @@ function renderHome(req, data) {
           <div><div class="pulse-stat-num" id="pulse-tx">—</div><div class="pulse-stat-label">Skladové jednotky</div></div>
         </div>
       </div>
+    </div>
+
+    <div class="dash-widget" style="margin-bottom:1.4rem">
+      <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
+      <div id="vysilacka-content" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);line-height:1.7;padding-top:0.6rem">Načítám…</div>
     </div>
 
     <div class="finance-strip">
@@ -364,6 +389,11 @@ function renderHome(req, data) {
       </div>
 
       <div>
+        <div class="dash-widget" style="margin-bottom:1.4rem">
+          <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
+          <div id="vysilacka-content" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);line-height:1.7;padding-top:0.6rem">Načítám…</div>
+        </div>
+
         <div class="folio-label" style="margin-bottom:1rem">Rychlý přístup</div>
         <div class="quick-tile-grid" style="margin-bottom:1.6rem">
           <a href="/garaz" class="quick-tile">${svgIcon('garaz')}<div><div class="quick-tile-label">Garáž</div><div class="quick-tile-sub">Tvoje vozidla</div></div></a>
