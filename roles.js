@@ -48,9 +48,10 @@ const PAGE_ACCESS = {
   blackbook:       1, // Blackbook
   'profit-centrum':1, // Profit centrum
   nastenska:       2, // Nástěnka
-  spis:            2, // Osobní spisy členů — Founder/Council/GenK + Senior Member
+  informace:       2, // Informace (bývalé Osobní spisy) — Founder/Council/GenK + Senior Member
   bazar:           3, // Bazar — vidí a nakupuje úplně každý přihlášený člen
   mentoring:       3, // Mentorský program — vidí každý, zápisy jen Senior Member výš (řeší se v UI/API)
+  darkchat:        3, // Darkchat — živý chat propojený s Discordem, vidí úplně každý přihlášený člen
   // Volně přístupné všem přihlášeným (level 3 = bez omezení):
   garaz:           3,
   nemovitosti:     3, // viditelnost jednotlivých lokací (vsichni/vedeni) se řeší v API, ne na úrovni stránky

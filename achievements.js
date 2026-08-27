@@ -109,11 +109,28 @@ function grant(userId, key, udelil) {
   if (!info) return false;
 
   if (udelil) {
-    discord.notifyVyznamenaniRucne(info.label, info.desc, radek?.ic_name || 'Neznámý', radek?.discord_username, udelil)
-      .catch(err => console.error('[ACHIEVEMENTS] Discord notifikace (ruční) selhala:', err.message));
+    try {
+      const p = discord.notifyVyznamenaniRucne(info.label, info.desc, radek?.ic_name || 'Neznámý', radek?.discord_username, udelil);
+      if (p && typeof p.catch === 'function') {
+        p.catch(err => console.error('[ACHIEVEMENTS] Discord notifikace (ruční) selhala:', err.message));
+      }
+    } catch (err) {
+      // Pokud discord.notifyVyznamenaniRucne neexistuje / hodí synchronní chybu,
+      // dřív to shodilo celý request ještě PŘED odpovědí klientovi (viz .catch()
+      // volané na undefined) — odznak se tiše uložil, ale web nikdy nedostal
+      // potvrzení a na Discord se nic neposlalo. Teď se to jen zaloguje a
+      // pokračuje se dál, ať klient vždy dostane odpověď.
+      console.error('[ACHIEVEMENTS] Discord notifikace (ruční) selhala synchronně — zkontroluj, že discord.notifyVyznamenaniRucne existuje:', err.message);
+    }
   } else {
-    discord.notifyVyznamenani(info.label, info.desc, radek?.ic_name || 'Neznámý', radek?.discord_username)
-      .catch(err => console.error('[ACHIEVEMENTS] Discord notifikace selhala:', err.message));
+    try {
+      const p = discord.notifyVyznamenani(info.label, info.desc, radek?.ic_name || 'Neznámý', radek?.discord_username);
+      if (p && typeof p.catch === 'function') {
+        p.catch(err => console.error('[ACHIEVEMENTS] Discord notifikace selhala:', err.message));
+      }
+    } catch (err) {
+      console.error('[ACHIEVEMENTS] Discord notifikace selhala synchronně:', err.message);
+    }
   }
   return true;
 }

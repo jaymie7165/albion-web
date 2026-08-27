@@ -37,10 +37,11 @@ const { renderCard } = require('./views/card');
 const { renderPrehled } = require('./views/prehled');
 const { renderVyznamenani } = require('./views/vyznamenani');
 const { renderAuditMe } = require('./views/audit-me');
+const { renderDarkchat } = require('./views/darkchat');
 const { CATEGORY_LABELS, grant: grantAchievement } = require('./achievements');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
-const { renderSpisy } = require('./views/spis');
+const { renderInformace } = require('./views/informace');
 const { renderBazar } = require('./views/bazar');
 const { renderMentoring } = require('./views/mentoring');
 
@@ -184,61 +185,106 @@ function saveGarage(cars) {
   try { writeJsonAtomic(GARAGE_FILE, cars); } catch (e) { console.error('[GARAGE]', e.message); }
 }
 
-// ── OSOBNÍ SPISY ČLENŮ ──
+// ── INFORMACE (dřív "Osobní spisy") ──
+// Soubor na disku zůstává stejný (dossiers.json), ať se nepřijde o starší
+// data — jen se při čtení každý záznam starého tvaru (jmeno/kategorie/
+// pozice/kontakt/rizika/historie/poznamky) převede na nový (nazev/zjistil/
+// osoby/zaznamy). Staré textové údaje se nezahodí, jen se z nich udělají
+// první položky v logu daného záznamu.
 const DOSSIERS_FILE = path.join(DATA_DIR, 'dossiers.json');
-function loadDossiers() { try { const d = JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
-function saveDossiers(d) { try { writeJsonAtomic(DOSSIERS_FILE, d); } catch (e) { console.error('[DOSSIERS]', e.message); } }
+function loadDossiersRaw() { try { const d = JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
+function saveDossiers(d) { try { writeJsonAtomic(DOSSIERS_FILE, d); } catch (e) { console.error('[INFORMACE]', e.message); } }
 
-app.get('/api/spis', requireAuth, requireAccess('spis'), (req, res) => {
+function migrateInformaceEntry(e) {
+  if (Array.isArray(e.zaznamy)) return e; // už nový tvar
+  const zaznamy = [];
+  const autor = e.vytvoril || null;
+  const cas = e.vytvorenoAt || new Date().toISOString();
+  if (e.pozice)   zaznamy.push({ text: `Pozice / vztah: ${e.pozice}`, autor, cas });
+  if (e.rizika)   zaznamy.push({ text: `Rizika: ${e.rizika}`, autor, cas });
+  if (e.historie) zaznamy.push({ text: `Historie jednání: ${e.historie}`, autor, cas });
+  if (e.poznamky) zaznamy.push({ text: `Poznámky: ${e.poznamky}`, autor, cas });
+  if (e.kategorie === 'externi') zaznamy.push({ text: 'Vně organizace (převedeno ze starého spisu)', autor, cas });
+  return {
+    id: e.id,
+    nazev: e.jmeno || '(bez názvu)',
+    zjistil: e.vytvoril || '',
+    osoby: e.kontakt ? [{ jmeno: e.jmeno || '', kontakt: e.kontakt }] : [],
+    zaznamy,
+    vytvoril: e.vytvoril, vytvorenoAt: e.vytvorenoAt, upravil: e.upravil, upravenoAt: e.upravenoAt,
+  };
+}
+function loadDossiers() { return loadDossiersRaw().map(migrateInformaceEntry); }
+
+function sanitizeOsoby(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 50)
+    .map(o => ({ jmeno: sanitizeText(o && o.jmeno, 80) || '', kontakt: sanitizeText(o && o.kontakt, 120) || '' }))
+    .filter(o => o.jmeno);
+}
+
+app.get('/api/informace', requireAuth, requireAccess('informace'), (req, res) => {
   res.json({ ok: true, entries: loadDossiers() });
 });
 
-app.post('/api/spis', requireAuth, requireAccess('spis'), (req, res) => {
-  const jmeno = sanitizeText(req.body.jmeno, 80);
-  if (!jmeno) return res.json({ ok: false, error: 'Vyplň jméno' });
-  const kategorie = req.body.kategorie === 'externi' ? 'externi' : 'interni';
+app.post('/api/informace', requireAuth, requireAccess('informace'), (req, res) => {
+  const nazev = sanitizeText(req.body.nazev, 100);
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název' });
   const entry = {
-    id: `spis_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
-    jmeno, kategorie,
-    pozice: sanitizeText(req.body.pozice, 100) || '',
-    kontakt: sanitizeText(req.body.kontakt, 120) || '',
-    rizika: sanitizeText(req.body.rizika, 2000) || '',
-    historie: sanitizeText(req.body.historie, 2000) || '',
-    poznamky: sanitizeText(req.body.poznamky, 5000) || '',
+    id: `inf_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
+    nazev,
+    zjistil: sanitizeText(req.body.zjistil, 80) || req.session.icName,
+    osoby: sanitizeOsoby(req.body.osoby),
+    zaznamy: [],
     vytvoril: req.session.icName, vytvorenoAt: new Date().toISOString(),
     upravil: null, upravenoAt: null,
   };
-  const list = loadDossiers();
+  const list = loadDossiersRaw();
   list.push(entry);
   saveDossiers(list);
   res.json({ ok: true, entry });
 });
 
-app.put('/api/spis/:id', requireAuth, requireAccess('spis'), (req, res) => {
-  const list = loadDossiers();
-  const entry = list.find(e => e.id === req.params.id);
-  if (!entry) return res.json({ ok: false, error: 'Spis nenalezen' });
-  const jmeno = sanitizeText(req.body.jmeno, 80);
-  if (!jmeno) return res.json({ ok: false, error: 'Vyplň jméno' });
-  entry.jmeno = jmeno;
-  entry.kategorie = req.body.kategorie === 'externi' ? 'externi' : 'interni';
-  entry.pozice = sanitizeText(req.body.pozice, 100) || '';
-  entry.kontakt = sanitizeText(req.body.kontakt, 120) || '';
-  entry.rizika = sanitizeText(req.body.rizika, 2000) || '';
-  entry.historie = sanitizeText(req.body.historie, 2000) || '';
-  entry.poznamky = sanitizeText(req.body.poznamky, 5000) || '';
+app.put('/api/informace/:id', requireAuth, requireAccess('informace'), (req, res) => {
+  const list = loadDossiersRaw();
+  let entry = list.find(e => e.id === req.params.id);
+  if (!entry) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  entry = migrateInformaceEntry(entry); // ať se starý tvar při první úpravě rovnou napevno převede
+  const idx = list.findIndex(e => e.id === req.params.id);
+  const nazev = sanitizeText(req.body.nazev, 100);
+  if (!nazev) return res.json({ ok: false, error: 'Vyplň název' });
+  entry.nazev = nazev;
+  entry.zjistil = sanitizeText(req.body.zjistil, 80) || entry.zjistil || '';
+  entry.osoby = sanitizeOsoby(req.body.osoby);
   entry.upravil = req.session.icName;
   entry.upravenoAt = new Date().toISOString();
+  list[idx] = entry;
   saveDossiers(list);
   res.json({ ok: true, entry });
 });
 
-app.delete('/api/spis/:id', requireAuth, requireAccess('spis'), (req, res) => {
-  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat spisy smí jen Founder/Council/GenK' });
-  let list = loadDossiers();
+// Přidání záznamu do logu — nic se nepřepisuje, jen přibývá. Oddělené od
+// PUT výše (to mění jen název/zjistil/osoby), ať jde dopisovat do logu bez
+// rizika, že se něčí souběžná úprava hlavičky přepíše.
+app.post('/api/informace/:id/zaznam', requireAuth, requireAccess('informace'), (req, res) => {
+  const text = sanitizeText(req.body.text, 3000);
+  if (!text) return res.json({ ok: false, error: 'Napiš text záznamu' });
+  const list = loadDossiersRaw();
+  const idx = list.findIndex(e => e.id === req.params.id);
+  if (idx === -1) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  const entry = migrateInformaceEntry(list[idx]);
+  entry.zaznamy.push({ text, autor: req.session.icName, cas: new Date().toISOString() });
+  list[idx] = entry;
+  saveDossiers(list);
+  res.json({ ok: true, entry });
+});
+
+app.delete('/api/informace/:id', requireAuth, requireAccess('informace'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat záznamy smí jen Founder/Council/GenK' });
+  let list = loadDossiersRaw();
   const before = list.length;
   list = list.filter(e => e.id !== req.params.id);
-  if (list.length === before) return res.json({ ok: false, error: 'Spis nenalezen' });
+  if (list.length === before) return res.json({ ok: false, error: 'Záznam nenalezen' });
   saveDossiers(list);
   res.json({ ok: true });
 });
@@ -250,7 +296,7 @@ function saveRelationships(r) { try { writeJsonAtomic(RELATIONSHIPS_FILE, r); } 
 const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival'];
 
 app.get('/api/vztahy', requireAuth, (req, res) => res.json({ ok: true, vztahy: loadRelationships() }));
-app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
+app.post('/api/vztahy', requireAuth, requireAccess('informace'), (req, res) => {
   const a = sanitizeText(req.body.a, 80), b = sanitizeText(req.body.b, 80);
   const typ = (req.body.typ || '').toString();
   const note = req.body.note ? sanitizeText(req.body.note, 200) : '';
@@ -261,7 +307,7 @@ app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
   saveRelationships(list);
   res.json({ ok: true });
 });
-app.delete('/api/vztahy/:id', requireAuth, requireAccess('spis'), (req, res) => {
+app.delete('/api/vztahy/:id', requireAuth, requireAccess('informace'), (req, res) => {
   let list = loadRelationships();
   const before = list.length;
   list = list.filter(v => v.id !== req.params.id);
@@ -2577,6 +2623,85 @@ app.post('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, 
   res.json({ ok: true });
 });
 
+// ══════════════════════════════════════════════════════════════════════
+// DARKCHAT — živý obousměrný chat web ↔ Discord (viz discord.js)
+// ══════════════════════════════════════════════════════════════════════
+// Zprávy přišlé z Discordu (přes Gateway naslouchání v discord.js) se sem
+// zaregistrují JEDNOU při startu serveru a přeposílají se dál na web přes
+// stejný SSE kanál (/api/events), který web už používá pro Nástěnku,
+// sklad atd. — žádná nová infrastruktura na straně webu není potřeba.
+discord.onDarkchatMessage((msg) => {
+  try {
+    let displayName = msg.author;
+    if (msg.discordId) {
+      const u = db.prepare('SELECT * FROM users WHERE discord_id = ?').get(msg.discordId);
+      if (u && u.ic_name) displayName = u.ic_name;
+    }
+    broadcastSSE('darkchatMessage', {
+      id: msg.id,
+      author: displayName,
+      content: resolveDiscordMentions(msg.content || ''),
+      timestamp: msg.timestamp,
+    });
+  } catch (e) { console.error('[DARKCHAT SSE]', e.message); }
+});
+
+app.get('/api/darkchat/history', requireAuth, requireAccess('darkchat'), async (req, res) => {
+  try {
+    const msgs = await discord.getDarkchatMessages(50);
+    const allUsers = db.prepare('SELECT * FROM users').all();
+    const byDiscordId = {};
+    allUsers.forEach(u => { if (u.discord_id) byDiscordId[u.discord_id] = u.ic_name || u.discord_username || u.discord_id; });
+    // Discord REST vrací zprávy od nejnovější — pro chatový log je chceme
+    // seřazené chronologicky (nejstarší nahoře, nejnovější dole).
+    const formatted = msgs.slice().reverse().map(m => ({
+      id: m.id,
+      author: byDiscordId[m.author?.id] || m.author?.username || 'Discord',
+      content: resolveDiscordMentions(m.content || ''),
+      timestamp: m.timestamp,
+    }));
+    res.json({ ok: true, messages: formatted });
+  } catch (e) {
+    console.error('[DARKCHAT HISTORY]', e.message);
+    res.json({ ok: false, messages: [] });
+  }
+});
+
+app.post('/api/darkchat/send', requireAuth, requireAccess('darkchat'), async (req, res) => {
+  const content = sanitizeText(req.body.content, 1500);
+  if (!content) return res.json({ ok: false, error: 'Zpráva nemůže být prázdná' });
+  const uzivatel = req.session.icName;
+  const ok = await discord.sendDarkchatMessage(content, uzivatel);
+  if (!ok) return res.json({ ok: false, error: 'Odeslání do Discordu selhalo — zkontroluj CHANNEL_DARKCHAT a práva bota' });
+  // Bot posílá zprávy jako sám sebe, takže gateway listener výše je záměrně
+  // ignoruje (author.bot === true) — proto se odeslaná zpráva musí na web
+  // přidat rovnou tady, jinak by odesílatel svou vlastní zprávu neviděl.
+  broadcastSSE('darkchatMessage', {
+    id: `web_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    author: uzivatel,
+    content,
+    timestamp: new Date().toISOString(),
+  });
+  res.json({ ok: true });
+});
+
+// ── VYSÍLAČKA — jen čtení existujícího Discord kanálu, nic se sem nezapisuje ──
+app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
+  try {
+    const msgs = await discord.getVysilackaMessages(5);
+    const formatted = msgs.map(m => ({
+      id: m.id,
+      content: resolveDiscordMentions(m.content || (m.embeds?.[0]?.description || '')),
+      title: m.embeds?.[0]?.title || null,
+      timestamp: m.timestamp,
+    }));
+    res.json({ ok: true, messages: formatted });
+  } catch (e) {
+    console.error('[VYSILACKA]', e.message);
+    res.json({ ok: false, messages: [] });
+  }
+});
+
 app.get('/api/nastenska/scheduled', requireAuth, requireAccess('nastenska'), (req, res) => {
   res.json({ ok: true, items: loadScheduledAnn().sort((a, b) => a.publishAt - b.publishAt) });
 });
@@ -3673,8 +3798,9 @@ app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(re
 app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
 app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
 app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
-app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
-  res.send(renderSpisy(req));
+app.get('/darkchat', requireAuth, requireAccess('darkchat'), (req, res) => res.send(renderDarkchat(req)));
+app.get('/informace', requireAuth, requireAccess('informace'), (req, res) => {
+  res.send(renderInformace(req));
 });
 app.get('/bazar', requireAuth, requireAccess('bazar'), (req, res) => res.send(renderBazar(req)));
 app.get('/mentoring', requireAuth, requireAccess('mentoring'), (req, res) => res.send(renderMentoring(req)));

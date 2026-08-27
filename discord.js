@@ -542,6 +542,37 @@ async function notifyVyznamenani(nazevOdznaku, popis, uzivatel, discordUsername)
   });
 }
 
+// Ruční udělení vyznamenání Founder/Council přes web (/vyznamenani → "Udělit
+// vyznamenání"). Dřív se na tuhle funkci odkazoval achievements.js, ale
+// vůbec neexistovala — volání spadlo na TypeError ještě před odpovědí
+// klientovi, takže odznak se sice v DB tiše uložil, ale web nikdy nedostal
+// potvrzení a sem do Discordu se nic neposlalo. Vizuálně odlišeno od
+// automatického udělení (jiný nadpis/barva + pole "Udělil"), ať je na první
+// pohled poznat, že šlo o vědomé rozhodnutí vedení, ne o systémový zápis.
+async function notifyVyznamenaniRucne(nazevOdznaku, popis, uzivatel, discordUsername, udelil) {
+  const channelId = process.env.CHANNEL_VYZNAMENANI;
+  if (!channelId) {
+    console.error('[DISCORD] CHANNEL_VYZNAMENANI není nastaven v .env, ruční odznak se nezapsal do Discordu.');
+    return;
+  }
+  const fields = [
+    { name: '👤 Jméno', value: uzivatel || '—', inline: true },
+    { name: '🏅 Odznak', value: nazevOdznaku, inline: true },
+    { name: '✋ Udělil', value: udelil || '—', inline: true },
+  ];
+  if (discordUsername) fields.push({ name: '🔗 Discord', value: `@${discordUsername}`, inline: true });
+  if (popis) fields.push({ name: '📝 Popis', value: popis, inline: false });
+
+  await sendEmbed(channelId, {
+    title: '🏅 RUČNÍ UDĚLENÍ VYZNAMENÁNÍ (vedení)',
+    color: 0xB3172F,
+    fields,
+    timestamp: new Date().toISOString(),
+    author: EVELYN_AUTHOR,
+    description: `${pozdrav()}. Vedení organizace se rozhodlo vědomě udělit toto vyznamenání — nejde o automatický zápis.`,
+  });
+}
+
 async function notifyPersonalni(typ, jmeno, detail) {
   const channelId = process.env.CHANNEL_PERSONALNI;
   if (!channelId) {
@@ -649,8 +680,10 @@ async function notifyTydenniSouhrn({ income, expense, net, ops, inactiveCount, t
   });
 }
 
-async function getAnnouncementMessages(limit = 20) {
-  const channelId = process.env.CHANNEL_OZNAMENI;
+// Obecný pomocník pro načtení posledních zpráv z libovolného kanálu — sdílí
+// ho Nástěnka (getAnnouncementMessages), Darkchat i Vysílačka, ať se stejná
+// REST logika nepíše na třech místech zvlášť.
+async function getChannelMessages(channelId, limit = 20) {
   if (!channelId || !BOT_TOKEN()) return [];
   try {
     const res = await axios.get(
@@ -659,10 +692,123 @@ async function getAnnouncementMessages(limit = 20) {
     );
     return res.data || [];
   } catch (err) {
-    console.error('[DISCORD] Chyba načtení zpráv:', err.response?.data || err.message);
+    console.error('[DISCORD] Chyba načtení zpráv kanálu:', err.response?.data || err.message);
     return [];
   }
 }
+
+async function getAnnouncementMessages(limit = 20) {
+  return getChannelMessages(process.env.CHANNEL_OZNAMENI, limit);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// DARKCHAT — živý obousměrný chat web ↔ Discord
+// ══════════════════════════════════════════════════════════════════════
+// Zbytek souboru je čistě REST (axios) — pro ODESÍLÁNÍ zpráv to stačí, ale
+// pro PŘÍJEM zpráv v reálném čase (bez toho, aby web musel Discord pořád
+// dokola dotazovat) je potřeba trvalé Gateway (WebSocket) spojení, což REST
+// neumí. Proto se tu navíc zapojuje oficiální balíček "discord.js" (NPM
+// knihovna — jmenovcem tohoto souboru, ale je to jiná věc; tenhle soubor
+// zůstává pod svým názvem beze změny). Vyžaduje:
+//   1) `npm install discord.js` (přidá se do package.json)
+//   2) V Discord Developer Portal → aplikace bota → Bot → zapnout
+//      "MESSAGE CONTENT INTENT" (bez toho bot dostane zprávu, ale s prázdným
+//      obsahem — nejde přečíst, co bylo napsáno).
+// Pokud balíček není nainstalovaný, server kvůli tomu nespadne — jen se
+// nerozjede živé naslouchání a v logu se ukáže jasná hláška; REST notifikace
+// (embed zprávy, DM, Nástěnka…) v celém zbytku souboru fungují beze změny.
+let GatewaySDK = null;
+try {
+  GatewaySDK = require('discord.js');
+} catch (e) {
+  console.error('[DISCORD GATEWAY] Balíček "discord.js" není nainstalovaný (npm install discord.js) — Darkchat naslouchání poběží jen v REST režimu (bez okamžitého doručení zpráv z Discordu na web).');
+}
+
+const DARKCHAT_LISTENERS = [];
+// server.js si sem zaregistruje callback, který novou zprávu z Discordu
+// pošle přes SSE na web (broadcastSSE('darkchatMessage', ...)). Řešeno přes
+// registraci callbacku (ne přímým require('./server')), ať nevznikne
+// kruhová závislost mezi server.js a discord.js.
+function onDarkchatMessage(fn) { if (typeof fn === 'function') DARKCHAT_LISTENERS.push(fn); }
+
+let gatewayClient = null;
+function startDarkchatGateway() {
+  if (!GatewaySDK || !BOT_TOKEN()) return;
+  if (gatewayClient) return; // už běží, nezakládat druhé spojení
+  const channelId = process.env.CHANNEL_DARKCHAT;
+  if (!channelId) {
+    console.error('[DISCORD GATEWAY] CHANNEL_DARKCHAT není nastaven v .env — Darkchat naslouchání se nespouští.');
+    return;
+  }
+  try {
+    const { Client, GatewayIntentBits, Partials } = GatewaySDK;
+    gatewayClient = new Client({
+      intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+      partials: [Partials.Channel],
+    });
+    gatewayClient.once('ready', () => {
+      console.log(`[DISCORD GATEWAY] Přihlášen jako ${gatewayClient.user.tag} — Darkchat naslouchá živě.`);
+    });
+    gatewayClient.on('messageCreate', (message) => {
+      try {
+        if (message.channelId !== channelId) return;
+        if (message.author?.bot) return; // ignoruj zprávy od bota (i vlastní echo z webu)
+        const payload = {
+          id: message.id,
+          author: message.member?.displayName || message.author?.username || 'Discord',
+          discordId: message.author?.id || null,
+          content: message.content || '',
+          timestamp: message.createdAt ? message.createdAt.toISOString() : new Date().toISOString(),
+        };
+        DARKCHAT_LISTENERS.forEach(fn => { try { fn(payload); } catch (e) { console.error('[DARKCHAT LISTENER]', e.message); } });
+      } catch (e) {
+        console.error('[DISCORD GATEWAY] Chyba zpracování příchozí zprávy:', e.message);
+      }
+    });
+    gatewayClient.on('error', (e) => console.error('[DISCORD GATEWAY] Chyba spojení:', e.message));
+    gatewayClient.login(BOT_TOKEN()).catch(e => console.error('[DISCORD GATEWAY] Přihlášení selhalo:', e.message));
+  } catch (e) {
+    console.error('[DISCORD GATEWAY] Inicializace selhala:', e.message);
+  }
+}
+
+// Odeslání zprávy z webu do Discord Darkchatu. Posílá se jako obyčejná
+// zpráva bota s jménem odesílatele na začátku (ne přes webhook — to by
+// vyžadovalo zvlášť založit a uložit webhook URL pro tenhle kanál, což teď
+// není k dispozici). Vlastní odeslaná zpráva se na web přidá OKAMŽITĚ přímo
+// v server.js (broadcastSSE hned po úspěšném POSTu) — gateway listener výše
+// ji stejně ignoruje, protože jde o zprávu od bota.
+async function sendDarkchatMessage(content, uzivatel) {
+  const channelId = process.env.CHANNEL_DARKCHAT;
+  if (!channelId || !BOT_TOKEN()) return false;
+  try {
+    await axios.post(
+      `https://discord.com/api/v10/channels/${channelId}/messages`,
+      { content: `**${uzivatel || 'Web'}** (web): ${content}` },
+      { headers: { Authorization: `Bot ${BOT_TOKEN()}`, 'Content-Type': 'application/json' } }
+    );
+    return true;
+  } catch (err) {
+    console.error('[DISCORD] Odeslání do Darkchatu selhalo:', err.response?.data || err.message);
+    return false;
+  }
+}
+
+async function getDarkchatMessages(limit = 40) {
+  return getChannelMessages(process.env.CHANNEL_DARKCHAT, limit);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// VYSÍLAČKA — jen čtení existujícího kanálu, který si bot sám generuje
+// ══════════════════════════════════════════════════════════════════════
+async function getVysilackaMessages(limit = 10) {
+  return getChannelMessages(process.env.CHANNEL_VYSILACKA, limit);
+}
+
+// Spustí se hned při načtení modulu (stejný vzor jako sheets.js#startPrewarm) —
+// pokud balíček/token/kanál chybí, funkce se tiše (s logem) nespustí a zbytek
+// appky běží dál beze změny.
+startDarkchatGateway();
 
 async function notifyGalerie(imageUrl, caption, uzivatel) {
   const channelId = process.env.CHANNEL_FOTOALBUM || '1521532400113553488';
@@ -792,9 +938,10 @@ async function getMemberRoles(discordId) {
 
 module.exports = {
   notifyZbrane, notifyWeed, notifyDrogy, notifyChemky, notifyGarage, notifyUcet, notifySmena,
-  notifyBulkSklad, notifyVyroba, notifyPovyseni, notifyVyznamenani, notifyPersonalni, notifyRegistrace,
+  notifyBulkSklad, notifyVyroba, notifyPovyseni, notifyVyznamenani, notifyVyznamenaniRucne, notifyPersonalni, notifyRegistrace,
   notifyTydenniSouhrn, notifyAudit, checkNizkaZasoba, sendOnboardingDM, sendAnnouncement,
   getAnnouncementMessages, isUserOnServer, getMemberRoles, notifyGalerie, notifyBazarNove,
   notifyBazarProdano, notifyBazarZajem, dmUser, sendPasswordResetDM,
   notifyReserveFundDluznici, notifyReserveFundZaplaceno,
+  onDarkchatMessage, sendDarkchatMessage, getDarkchatMessages, getVysilackaMessages,
 };
