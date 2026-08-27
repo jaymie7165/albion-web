@@ -90,7 +90,6 @@ function renderNav(req, active) {
         { id: 'hierarchy', label: 'Hierarchie', href: '/hierarchy', icon: ICONS.hierarchy },
         can('bazar') && { id: 'bazar', label: 'Bazar', href: '/bazar', icon: ICONS.bazar },
         !isAssociate && { id: 'galerie', label: 'Galerie', href: '/galerie', icon: ICONS.galerie },
-        { id: 'darkchat', label: 'Darkchat', href: '/darkchat', icon: ICONS.darkchat },
         { id: 'navigator', label: 'Rozcestník', href: '/prehled', icon: ICONS.navigator },
       ].filter(Boolean),
     },
@@ -180,6 +179,23 @@ function renderNav(req, active) {
       </div>
     </nav>
     <div class="nav-overlay" id="navOverlay"></div>
+
+    ${can('darkchat') ? `
+    <button class="dc-bubble" id="dcBubble" title="Darkchat">
+      ${ICONS.darkchat}
+      <span class="dc-bubble-badge" id="dcBubbleBadge" style="display:none">0</span>
+    </button>
+    <div class="dc-panel" id="dcPanel">
+      <div class="dc-panel-head">
+        <span>Darkchat</span>
+        <button id="dcPanelClose" title="Zavřít">✕</button>
+      </div>
+      <div class="dc-panel-log" id="dcPanelLog"><div class="ledger-loading">Načítám…</div></div>
+      <div class="dc-panel-input-row">
+        <textarea id="dcPanelInput" rows="1" placeholder="Napiš zprávu…"></textarea>
+        <button class="dc-panel-send-btn" id="dcPanelSend" title="Odeslat">➤</button>
+      </div>
+    </div>` : ''}
 
     ${req.session.viewAsLevel ? `<div style="background:var(--oxblood-faint);border-bottom:1px solid var(--border-oxblood);padding:0.5rem 2rem;text-align:center;font-family:var(--font-mono);font-size:0.7rem;color:var(--oxblood-bright);margin-left:var(--sidebar-w)">
       Náhled jako role: ${({ 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member/Associate' })[req.session.viewAsLevel]} — <a href="#" onclick="setViewAs(null);return false" style="color:var(--oxblood-bright)">ukončit náhled</a>
@@ -405,6 +421,95 @@ function renderNav(req, active) {
           if(url.origin!==location.origin)return;
           e.preventDefault(); document.body.style.opacity='0.4'; setTimeout(()=>{location.href=url.href;},120);
         });
+      })();
+
+      (function darkchat(){
+        const bubble = document.getElementById('dcBubble');
+        const panel = document.getElementById('dcPanel');
+        if(!bubble || !panel) return;
+        const closeBtn = document.getElementById('dcPanelClose');
+        const logEl = document.getElementById('dcPanelLog');
+        const input = document.getElementById('dcPanelInput');
+        const sendBtn = document.getElementById('dcPanelSend');
+        const badge = document.getElementById('dcBubbleBadge');
+        const ME_IC_NAME = ${JSON.stringify(ic)};
+        let loaded = false, isOpen = false, unread = 0;
+        const seenIds = new Set();
+
+        function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+        function fmt(raw){
+          let text = esc(raw || '');
+          text = text.replace(/\\uE000([^\\uE001]*)\\uE001/g, '<span class="mention">@$1</span>');
+          text = text.replace(/\`([^\`\\n]+)\`/g, '<code>$1</code>');
+          text = text.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+          text = text.replace(/__([^_]+)__/g, '<u>$1</u>');
+          text = text.replace(/\\*([^*\\n]+)\\*/g, '<em>$1</em>');
+          return text.split('\\n').join('<br>');
+        }
+        function fmtTime(iso){
+          try{ return new Date(iso).toLocaleTimeString('cs-CZ',{timeZone:'Europe/Prague',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; }
+        }
+        function appendMsg(m){
+          if(m.id && seenIds.has(m.id)) return;
+          if(m.id) seenIds.add(m.id);
+          const empty = logEl.querySelector('.dc-empty');
+          if(empty) logEl.innerHTML = '';
+          const isMe = m.author === ME_IC_NAME;
+          const row = document.createElement('div');
+          row.className = 'dc-msg' + (isMe ? ' me' : '');
+          row.innerHTML = '<div class="dc-msg-meta">'+esc(m.author)+' · '+fmtTime(m.timestamp)+'</div><div class="dc-msg-bubble">'+fmt(m.content||'')+'</div>';
+          logEl.appendChild(row);
+          logEl.scrollTop = logEl.scrollHeight;
+        }
+        function setBadge(n){
+          unread = n;
+          if(n > 0){ badge.textContent = n > 9 ? '9+' : n; badge.style.display='flex'; }
+          else badge.style.display = 'none';
+        }
+        async function loadHistory(){
+          logEl.innerHTML = '<div class="ledger-loading">Načítám…</div>';
+          try{
+            const res = await fetch('/api/darkchat/history');
+            const d = await res.json();
+            logEl.innerHTML = '';
+            if(!d.ok || !d.messages.length){ logEl.innerHTML = '<div class="dc-empty" style="color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.72rem;text-align:center;padding:1rem 0">Zatím žádné zprávy</div>'; return; }
+            d.messages.forEach(appendMsg);
+            logEl.scrollTop = logEl.scrollHeight;
+          }catch(e){ logEl.innerHTML = '<div style="color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.72rem">Nelze načíst historii.</div>'; }
+        }
+        function openPanel(){
+          panel.classList.add('open'); isOpen = true; setBadge(0);
+          if(!loaded){ loaded = true; loadHistory(); }
+          setTimeout(()=>input.focus(), 150);
+        }
+        function closePanel(){ panel.classList.remove('open'); isOpen = false; }
+        bubble.addEventListener('click', ()=>{ isOpen ? closePanel() : openPanel(); });
+        closeBtn.addEventListener('click', closePanel);
+        document.addEventListener('click', (e)=>{ if(isOpen && !e.target.closest('.dc-panel') && !e.target.closest('.dc-bubble')) closePanel(); });
+
+        async function send(){
+          const content = input.value.trim();
+          if(!content) return;
+          sendBtn.disabled = true;
+          try{
+            const res = await fetch('/api/darkchat/send', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ content }) });
+            const d = await res.json();
+            if(d.ok){ input.value=''; input.style.height='auto'; }
+            else if(window.showToast) showToast(d.error||'Odeslání selhalo', true);
+          }catch(e){ if(window.showToast) showToast('Odeslání selhalo', true); }
+          sendBtn.disabled = false;
+        }
+        sendBtn.addEventListener('click', send);
+        input.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+        input.addEventListener('input', function(){ this.style.height='auto'; this.style.height = Math.min(this.scrollHeight, 70)+'px'; });
+
+        if(window.evtSource){
+          window.evtSource.addEventListener('darkchatMessage', (e)=>{
+            const d = JSON.parse(e.data);
+            if(isOpen) appendMsg(d);
+            else if(!d.id || !seenIds.has(d.id)) setBadge(unread+1);
+          });
+        }
       })();
     </script>
   `;

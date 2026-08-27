@@ -570,6 +570,34 @@ function baseStyles() {
       .evelyn-letter-body{padding:1rem 1.1rem 1.1rem;max-height:58vh;overflow-y:auto}
       @media(max-width:880px){.evelyn-letter{right:1rem;left:1rem;width:auto}}
 
+      /* ── DARKCHAT — plovoucí bublina + panel na každé stránce ── */
+      .dc-bubble{position:fixed;bottom:1.5rem;right:1.5rem;width:52px;height:52px;border-radius:50%;background:var(--oxblood);border:1px solid var(--oxblood-bright);color:var(--ivory);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:400;box-shadow:0 4px 16px rgba(0,0,0,0.45);transition:transform 0.15s}
+      .dc-bubble:hover{transform:scale(1.06)}
+      .dc-bubble svg{width:24px;height:24px}
+      .dc-bubble-badge{position:absolute;top:-3px;right:-3px;background:var(--brass-bright);color:#1a1108;font-family:var(--font-mono);font-weight:700;font-size:0.62rem;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:1.5px solid var(--noir)}
+      .dc-panel{position:fixed;bottom:5.6rem;right:1.5rem;width:340px;max-width:calc(100vw - 2rem);height:460px;max-height:70vh;background:var(--panel2);border:1px solid var(--border-brass);display:flex;flex-direction:column;z-index:400;box-shadow:0 10px 36px rgba(0,0,0,0.55);opacity:0;pointer-events:none;transform:translateY(14px);transition:opacity 0.2s,transform 0.2s}
+      .dc-panel.open{opacity:1;pointer-events:all;transform:translateY(0)}
+      .dc-panel-head{display:flex;justify-content:space-between;align-items:center;padding:0.8rem 1rem;border-bottom:1px solid var(--border-brass);font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass-bright)}
+      .dc-panel-head button{background:none;border:none;color:var(--ivory-faint);cursor:pointer;font-size:0.85rem}
+      .dc-panel-head button:hover{color:var(--ivory)}
+      .dc-panel-log{flex:1;overflow-y:auto;padding:0.9rem 1rem;display:flex;flex-direction:column;gap:0.7rem}
+      .dc-msg{max-width:85%}
+      .dc-msg.me{align-self:flex-end;text-align:right}
+      .dc-msg-meta{font-family:var(--font-mono);font-size:0.56rem;color:var(--ivory-faint);margin-bottom:0.2rem}
+      .dc-msg-bubble{display:inline-block;background:var(--panel3);border:1px solid var(--border);padding:0.5rem 0.7rem;font-family:var(--font-body);font-size:0.8rem;color:var(--ivory-dim);line-height:1.5;text-align:left;font-weight:300}
+      .dc-msg.me .dc-msg-bubble{background:var(--oxblood-faint);border-color:var(--border-oxblood);color:var(--ivory)}
+      .dc-msg-bubble strong{color:var(--ivory);font-weight:600}
+      .dc-msg-bubble em{font-style:italic}
+      .dc-msg-bubble u{text-decoration:underline}
+      .dc-msg-bubble code{font-family:var(--font-mono);font-size:0.82em;background:rgba(0,0,0,0.25);padding:0.05rem 0.35rem}
+      .dc-msg-bubble .mention{color:var(--brass-bright);font-weight:600}
+      .dc-panel-input-row{display:flex;gap:0.5rem;padding:0.7rem 0.8rem;border-top:1px solid var(--border-brass)}
+      .dc-panel-input-row textarea{flex:1;resize:none;min-height:2.1rem;max-height:70px;background:var(--input-bg);border:1px solid var(--border);color:var(--ivory);font-family:var(--font-body);font-size:0.8rem;padding:0.4rem 0.6rem}
+      .dc-panel-input-row textarea:focus{outline:none;border-color:var(--brass)}
+      .dc-panel-send-btn{flex:0 0 auto;width:36px;background:var(--oxblood);color:var(--ivory);border:1px solid var(--oxblood);cursor:pointer;font-size:0.9rem}
+      .dc-panel-send-btn:disabled{opacity:0.5;cursor:default}
+      @media(max-width:480px){.dc-panel{right:0.6rem;left:0.6rem;width:auto;bottom:5.2rem}.dc-bubble{right:1rem;bottom:1rem}}
+
       .profil-tab-panel{display:none}
       .profil-tab-panel.active{display:block;animation:fadeReveal 0.3s ease-out 1}
       .report-nav{display:flex;flex-wrap:wrap;gap:0 1.8rem;margin-bottom:0.4rem;border-bottom:1px solid var(--border)}

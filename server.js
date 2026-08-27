@@ -37,7 +37,6 @@ const { renderCard } = require('./views/card');
 const { renderPrehled } = require('./views/prehled');
 const { renderVyznamenani } = require('./views/vyznamenani');
 const { renderAuditMe } = require('./views/audit-me');
-const { renderDarkchat } = require('./views/darkchat');
 const { CATEGORY_LABELS, grant: grantAchievement } = require('./achievements');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
@@ -2686,19 +2685,29 @@ app.post('/api/darkchat/send', requireAuth, requireAccess('darkchat'), async (re
 });
 
 // ── VYSÍLAČKA — jen čtení existujícího Discord kanálu, nic se sem nezapisuje ──
+// Bot posílá embed s polem "📡 Frekvence" (hodnota = číslo) a v popisu mimo
+// jiné řádek "Platí do…" — nás zajímá hlavně to číslo, zbytek jen jako
+// doplňkový kontext platnosti.
 app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
   try {
     const msgs = await discord.getVysilackaMessages(5);
-    const formatted = msgs.map(m => ({
-      id: m.id,
-      content: resolveDiscordMentions(m.content || (m.embeds?.[0]?.description || '')),
-      title: m.embeds?.[0]?.title || null,
-      timestamp: m.timestamp,
-    }));
-    res.json({ ok: true, messages: formatted });
+    const msg = msgs.find(m => m.embeds && m.embeds.length) || msgs[0] || null;
+    if (!msg) return res.json({ ok: true, frekvence: null, platnost: null, timestamp: null });
+
+    const embed = (msg.embeds && msg.embeds[0]) || null;
+    let frekvence = null;
+    let platnost = null;
+    if (embed) {
+      const field = (embed.fields || []).find(f => /frekvence/i.test(f.name || ''));
+      if (field) frekvence = (field.value || '').toString().trim();
+      const desc = embed.description || '';
+      const m = desc.match(/Plat[íi][^\n]*/i);
+      if (m) platnost = m[0].trim();
+    }
+    res.json({ ok: true, frekvence, platnost, timestamp: msg.timestamp });
   } catch (e) {
     console.error('[VYSILACKA]', e.message);
-    res.json({ ok: false, messages: [] });
+    res.json({ ok: false, frekvence: null, platnost: null, timestamp: null });
   }
 });
 
@@ -3798,7 +3807,6 @@ app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(re
 app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
 app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
 app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
-app.get('/darkchat', requireAuth, requireAccess('darkchat'), (req, res) => res.send(renderDarkchat(req)));
 app.get('/informace', requireAuth, requireAccess('informace'), (req, res) => {
   res.send(renderInformace(req));
 });
