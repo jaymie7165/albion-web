@@ -153,17 +153,15 @@ function renderHome(req, data) {
     // každého na hlavním dashboardu (viz /api/vysilacka/latest v server.js) ──
     function vysEsc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
     async function loadVysilacka(){
-      const el = document.getElementById('vysilacka-content');
-      if(!el) return;
+      const freqEl = document.getElementById('vysilacka-frekvence');
+      const platEl = document.getElementById('vysilacka-platnost');
+      if(!freqEl) return;
       try{
         const res = await fetch('/api/vysilacka/latest');
         const d = await res.json();
-        if(!d.ok || !d.messages.length){ el.textContent = 'Zatím žádné hlášení.'; return; }
-        el.innerHTML = d.messages.map(function(m){
-          const t = vysEsc(m.content||'').replace(/\\n/g,'<br>');
-          return '<div style="margin-bottom:0.6rem;padding-bottom:0.6rem;border-bottom:1px solid var(--border)">'+
-            (m.title?('<strong style="color:var(--brass-bright)">'+vysEsc(m.title)+'</strong><br>'):'')+t+'</div>';
-        }).join('');
+        if(!d.ok || !d.frekvence){ freqEl.textContent = '—'; if(platEl) platEl.textContent = 'Zatím žádná frekvence.'; return; }
+        freqEl.textContent = d.frekvence;
+        if(platEl) platEl.textContent = d.platnost || '';
       }catch(e){}
     }
     loadVysilacka();
@@ -221,7 +219,11 @@ function renderHome(req, data) {
 
     <div class="dash-widget" style="margin-bottom:1.4rem">
       <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
-      <div id="vysilacka-content" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);line-height:1.7;padding-top:0.6rem">Načítám…</div>
+      <div style="padding-top:0.7rem">
+        <div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
+        <div id="vysilacka-frekvence" style="font-family:var(--font-display);font-weight:700;font-size:2.4rem;color:var(--oxblood-bright);letter-spacing:0.04em;line-height:1">—</div>
+        <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-top:0.5rem"></div>
+      </div>
     </div>
 
     <div class="finance-strip">
@@ -391,7 +393,11 @@ function renderHome(req, data) {
       <div>
         <div class="dash-widget" style="margin-bottom:1.4rem">
           <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
-          <div id="vysilacka-content" style="font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);line-height:1.7;padding-top:0.6rem">Načítám…</div>
+          <div style="padding-top:0.7rem">
+            <div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
+            <div id="vysilacka-frekvence" style="font-family:var(--font-display);font-weight:700;font-size:2.4rem;color:var(--oxblood-bright);letter-spacing:0.04em;line-height:1">—</div>
+            <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-top:0.5rem"></div>
+          </div>
         </div>
 
         <div class="folio-label" style="margin-bottom:1rem">Rychlý přístup</div>
