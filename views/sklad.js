@@ -903,7 +903,7 @@ function renderDashboard(req, data) {
       if(id==='nevyrizene' && window.loadNevyrizene) window.loadNevyrizene();
     }
     window.addEventListener('popstate', function(){
-      const m=location.pathname.match(/^\/sklad\/([a-z-]+)\/?$/);
+      const m=location.pathname.match(/^\\/sklad\\/([a-z-]+)\\/?$/);
       const tab=m?m[1]:'ucet';
       if(document.getElementById('panel-'+tab)) skladTab(tab, true);
     });
@@ -918,7 +918,7 @@ function renderDashboard(req, data) {
     }
     (function restoreTab(){
       try{
-        const urlMatch=location.pathname.match(/^\/sklad\/([a-z-]+)\/?$/);
+        const urlMatch=location.pathname.match(/^\\/sklad\\/([a-z-]+)\\/?$/);
         const SECONDARY_IDS=['zbrane','vyroba','smena','cenik','nevyrizene'];
         if(urlMatch){
           // Server už vykreslil správný tab podle URL (viz initialTab v
