@@ -926,6 +926,36 @@ app.get('/api/online-members', requireAuth, (req, res) => {
   res.json({ ok: true, members: [...names], count: names.size });
 });
 
+// ── TICKER — krátký běžící pruh nedávné aktivity na hlavním dashboardu ──
+// Znovupoužívá stejná data, co se už tahala pro /home (getRecentRows) —
+// žádná nová logika, jen jiné seřazení/formát pro plynule scrollující pásku.
+app.get('/api/ticker', requireAuth, async (req, res) => {
+  try {
+    const [recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky] = await Promise.all([
+      sheets.getRecentRows('Účetnictví', 6).catch(() => []),
+      sheets.getRecentRows('Zbraně', 4).catch(() => []),
+      sheets.getRecentRows('Weed', 4).catch(() => []),
+      sheets.getRecentRows('Drogy', 4).catch(() => []),
+      sheets.getRecentRows('Chemky', 4).catch(() => []),
+    ]);
+    const rows = [];
+    recentUcet.forEach(r => {
+      const sym = (r[3] || '') === 'USD' ? 'SAD ' : '₱';
+      const isIn = r[1] === 'PŘÍJEM';
+      rows.push({ cas: r[0] || '', text: (isIn ? '💰 Příjem ' : '💸 Výdaj ') + sym + r[2] + (r[4] ? ' — ' + r[4] : '') + (r[5] ? ' · ' + r[5] : '') });
+    });
+    recentZbrane.forEach(r => rows.push({ cas: r[0] || '', text: '🔫 ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + (r[5] || '') }));
+    recentWeed.forEach(r => rows.push({ cas: r[0] || '', text: '🌿 ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + ((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '')) }));
+    recentDrogy.forEach(r => rows.push({ cas: r[0] || '', text: '💊 ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + ((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '')) }));
+    recentChemky.forEach(r => rows.push({ cas: r[0] || '', text: '⚗️ ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + (r[4] || '') }));
+    rows.sort((a, b) => (b.cas || '').localeCompare(a.cas || ''));
+    res.json({ ok: true, items: rows.slice(0, 14).map(r => r.text) });
+  } catch (e) {
+    console.error('[TICKER]', e.message);
+    res.json({ ok: false, items: [] });
+  }
+});
+
 // ── NAPLÁNOVANÁ OZNÁMENÍ ──
 const SCHEDULED_ANN_FILE = path.join(DATA_DIR, 'scheduled-announcements.json');
 function loadScheduledAnn() { try { return JSON.parse(fs.readFileSync(SCHEDULED_ANN_FILE, 'utf8')) || []; } catch { return []; } }
@@ -1005,18 +1035,31 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/manifest.webmanifest', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.json({
-    name: 'Albion',
-    short_name: 'Albion',
-    description: 'Albion — interní rejstřík organizace',
+    id: '/home',
+    name: 'Caledonia Private Network',
+    short_name: 'Caledonia',
+    description: 'Caledonia — interní rejstřík organizace',
     start_url: '/home',
+    scope: '/',
     display: 'standalone',
-    background_color: '#0A0908',
-    theme_color: '#0A0908',
+    orientation: 'any',
+    background_color: '#07050A',
+    theme_color: '#07050A',
     icons: [
-      { src: '/logo.png', sizes: '192x192', type: 'image/png' },
-      { src: '/logo.png', sizes: '512x512', type: 'image/png' },
+      { src: '/logo.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/logo.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
     ],
   });
+});
+
+// Service worker musí být servírovaný z kořene (ne z /public/sw.js), aby
+// jeho "scope" pokryl celou appku — proto vlastní routa místo spoléhání na
+// express.static. Bez service workeru Chrome/Edge instalaci PWA vůbec
+// nenabídnou, i kdyby byl manifest sebelíp vyplněný.
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
 app.get('/', requireAuth, (req, res) => res.redirect('/home'));
@@ -1380,6 +1423,7 @@ function renderProfil(req, user, aliases) {
       <div class="card">
         <div class="card-header"><span class="card-title">Historie povýšení</span><span class="card-badge">Růst v organizaci</span></div>
         <div id="promotions-list"><div class="ledger-loading">Načítám…</div></div>
+        <div id="badge-progress-wrap" style="margin-top:1rem"></div>
         ${!req.session.isAssociate ? `
         <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);cursor:pointer">
           <input type="checkbox" id="card-private-toggle" style="width:auto"> Skrýt mou kartu před ostatními členy
@@ -1579,6 +1623,24 @@ function renderProfil(req, user, aliases) {
       ).join('');
     }
     loadPromotions();
+
+    async function loadBadgeProgress(){
+      const wrap=document.getElementById('badge-progress-wrap');
+      if(!wrap)return;
+      try{
+        const res=await fetch('/api/me/achievements');
+        const d=await res.json();
+        if(!d.ok || !d.progress){ wrap.innerHTML=''; return; }
+        const p=d.progress;
+        wrap.innerHTML=
+          '<div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem">Nejbližší odznak</div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem;font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim)">'+
+            '<span>'+p.icon+' '+p.label+'</span><span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)">'+p.current+' / '+p.target+'</span>'+
+          '</div>'+
+          '<div style="height:5px;background:var(--panel3);border:1px solid var(--border)"><div style="height:100%;width:'+p.pct+'%;background:var(--oxblood-bright)"></div></div>';
+      }catch(e){}
+    }
+    loadBadgeProgress();
 
     ${isFounderCouncil ? `
     fetch('/api/season').then(r=>r.json()).then(d=>{const sel=document.getElementById('season-select');if(sel)sel.value=d.season;});
@@ -3216,6 +3278,67 @@ app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
   });
 });
 
+// ── EVELYN — jednoduchý chat, ne skutečné AI ─────────────────────────────
+// Rozpoznávání záměru je čisté klíčové slovo → odpověď, nic chytřejšího.
+// Cílem je odpovědět na pár nejčastějších otázek přímo ze stejných dat, co
+// používá /api/evelyn/brief, ne simulovat obecnou konverzaci.
+function stripDiacritics(s) {
+  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+app.post('/api/evelyn/ask', requireAuth, async (req, res) => {
+  const raw = (req.body.question || '').toString().slice(0, 300);
+  const q = stripDiacritics(raw).toLowerCase();
+  const jmeno = (req.session.icName || '').split(' ')[0] || 'člene';
+
+  try {
+    if (/pokladn|penez|penize|zustatek|kolik.*(sad|usd|pesos)/.test(q)) {
+      const acc = await sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 }));
+      return res.json({ ok: true, answer: `Pokladna organizace aktuálně stojí na $${Math.round(acc.usd).toLocaleString('cs-CZ')} a ₱${Math.round(acc.pesos).toLocaleString('cs-CZ')}.` });
+    }
+    if (/frekvenc|vysilac/.test(q)) {
+      const msgs = await discord.getVysilackaMessages(3);
+      const msg = msgs.find(m => m.embeds && m.embeds.length);
+      const field = msg && msg.embeds[0].fields && msg.embeds[0].fields.find(f => /frekvence/i.test(f.name || ''));
+      if (field) return res.json({ ok: true, answer: `Aktuální frekvence vysílačky je ${field.value}.` });
+      return res.json({ ok: true, answer: 'Frekvenci teď bohužel nemám k dispozici.' });
+    }
+    if (/kdo.*online|online.*kdo|kolik.*online/.test(q)) {
+      const names = new Set();
+      for (const client of sseClients) { if (client.albionIcName) names.add(client.albionIcName); }
+      if (!names.size) return res.json({ ok: true, answer: 'Teď není online nikdo jiný.' });
+      return res.json({ ok: true, answer: `Teď je online ${names.size} ${names.size === 1 ? 'člen' : 'členů'}: ${[...names].join(', ')}.` });
+    }
+    if (/odznak|vyznamenani|achievement/.test(q)) {
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+      const earned = (user?.achievements || []).length;
+      const actionCount = user?.action_count || 0;
+      return res.json({ ok: true, answer: `Zatím máš ${earned} ${earned === 1 ? 'vyznamenání' : 'vyznamenání'} a ${actionCount} zapsaných akcí celkem. Podrobnosti najdeš na Vyznamenání.` });
+    }
+    if (/reserve.?fund|odvod/.test(q)) {
+      return res.json({ ok: true, answer: `Aktuální výše Reserve Fondu je $${getReserveFundAmount().toLocaleString('cs-CZ')}. Jestli máš tenhle týden zaplaceno, zkontroluješ na Skladu.` });
+    }
+    if (/sklad|zasob/.test(q)) {
+      const [zbrane, weed, drogy, chemky] = await Promise.all([
+        sheets.getStockSummary('Zbraně').catch(() => ({})),
+        sheets.getStockSummary('Weed').catch(() => ({})),
+        sheets.getStockSummary('Drogy').catch(() => ({})),
+        sheets.getStockSummary('Chemky').catch(() => ({})),
+      ]);
+      const sum = (o) => Object.values(o).filter(v => v > 0).reduce((a, b) => a + b, 0);
+      const total = sum(zbrane) + sum(weed) + sum(drogy) + sum(chemky);
+      return res.json({ ok: true, answer: `Sklad má aktuálně ${total.toLocaleString('cs-CZ')} kusů napříč zbraněmi, weedem, drogami a chemikáliemi dohromady.` });
+    }
+  } catch (e) {
+    console.error('[EVELYN ASK]', e.message);
+  }
+
+  return res.json({
+    ok: true,
+    answer: `Na tohle přesně neumím odpovědět, ${jmeno}. Zkus se zeptat na stav pokladny, sklad, kdo je online, frekvenci vysílačky, Reserve Fund nebo svoje vyznamenání.`,
+  });
+});
+
 // ── API — PROFIL: PROMOTIONS, ACHIEVEMENTY, ONBOARDING ──
 app.get('/api/me/promotions', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
@@ -3247,7 +3370,25 @@ app.get('/api/me/achievements', requireAuth, (req, res) => {
   const { ACHIEVEMENTS } = require('./achievements');
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   const earned = user?.achievements || [];
-  res.json({ ok: true, earned, catalog: ACHIEVEMENTS });
+  const earnedKeys = earned.map(a => (typeof a === 'string' ? a : a.id));
+  // Progress k nejbližšímu automatickému odznaku podle počtu akcí — stejné
+  // hranice, jaké používá checkActionAchievements v achievements.js.
+  const actionCount = user?.action_count || 0;
+  const OPS_MILESTONES = [
+    { key: 'hundred_ops', target: 100 },
+    { key: 'ops_500', target: 500 },
+    { key: 'ops_1000', target: 1000 },
+  ];
+  const nextOps = OPS_MILESTONES.find(m => !earnedKeys.includes(m.key) && actionCount < m.target);
+  const progress = nextOps ? {
+    key: nextOps.key,
+    label: ACHIEVEMENTS[nextOps.key]?.label || nextOps.key,
+    icon: ACHIEVEMENTS[nextOps.key]?.icon || '★',
+    current: actionCount,
+    target: nextOps.target,
+    pct: Math.min(100, Math.round((actionCount / nextOps.target) * 100)),
+  } : null;
+  res.json({ ok: true, earned, catalog: ACHIEVEMENTS, progress });
 });
 
 app.get('/api/me/onboarding', requireAuth, (req, res) => {
@@ -3782,7 +3923,7 @@ app.get('/home', requireAuth, async (req, res) => {
 app.get('/dashboard', requireAuth, async (req, res) => res.redirect('/home'));
 
 
-app.get('/sklad', requireAuth, requireAccess('sklad-view'), async (req, res) => {
+app.get(['/sklad', '/sklad/:tab'], requireAuth, requireAccess('sklad-view'), async (req, res) => {
   try {
     const { zbrane, weed, drogy, chemky, ucet, recentUcet } = await buildSkladSummary();
     const cenik = loadCenik();

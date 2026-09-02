@@ -568,6 +568,14 @@ function baseStyles() {
       .evelyn-letter-head{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;padding:0.7rem 0.9rem;border-bottom:1px solid var(--border)}
       .evelyn-letter-from{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass-bright)}
       .evelyn-letter-body{padding:1rem 1.1rem 1.1rem;max-height:58vh;overflow-y:auto}
+      .evelyn-chat-row{display:flex;gap:0.5rem;padding:0.7rem 0.9rem;border-top:1px solid var(--border-brass)}
+      .evelyn-chat-row input{flex:1;background:var(--input-bg);border:1px solid var(--border);color:var(--ivory);font-family:var(--font-body);font-size:0.8rem;padding:0.45rem 0.7rem}
+      .evelyn-chat-row input:focus{outline:none;border-color:var(--brass)}
+      .evelyn-chat-row button{flex:0 0 auto;width:34px;background:var(--oxblood);color:var(--ivory);border:1px solid var(--oxblood);cursor:pointer;font-size:0.85rem}
+      .evelyn-chat-row button:disabled{opacity:0.5;cursor:default}
+      .evelyn-qa{margin-top:0.9rem;padding-top:0.8rem;border-top:1px solid var(--border)}
+      .evelyn-qa-q{font-family:var(--font-mono);font-size:0.7rem;color:var(--ivory-faint);margin-bottom:0.3rem}
+      .evelyn-qa-a{font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim);line-height:1.6;font-weight:300}
       @media(max-width:880px){.evelyn-letter{right:1rem;left:1rem;width:auto}}
 
       /* ── DARKCHAT — plovoucí bublina + panel na každé stránce ── */

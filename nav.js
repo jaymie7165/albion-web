@@ -155,6 +155,10 @@ function renderNav(req, active) {
             </div>
           </div>
           <div class="evelyn-letter-body" id="evelynLetterBody"><div class="ledger-loading">Evelyn píše zprávu…</div></div>
+          <div class="evelyn-chat-row">
+            <input type="text" id="evelynAskInput" placeholder="Zeptej se Evelyn…" maxlength="300">
+            <button id="evelynAskBtn" title="Zeptat se">➤</button>
+          </div>
         </div>
         <button class="notif-bell" id="notifBell" title="Oznámení" onclick="window.location='${can('nastenska') ? '/nastenska' : '/bazar'}'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -317,6 +321,9 @@ function renderNav(req, active) {
 
       (function favicon(){
         let unread = 0;
+        const baseTitle = document.title;
+        let blinkTimer = null, blinkOn = false;
+
         function renderFavicon() {
           const size = 64; const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
           const ctx = canvas.getContext('2d'); const img = new Image(); img.src = '/logo.png';
@@ -330,15 +337,51 @@ function renderNav(req, active) {
             let link = document.querySelector("link[rel='icon']");
             if (!link) { link = document.createElement('link'); link.rel='icon'; document.head.appendChild(link); }
             link.href = canvas.toDataURL('image/png');
-            document.title = (unread>0?'('+unread+') ':'') + document.title.replace(/^\\(\\d+\\)\\s*/,'');
           };
         }
-        window.bumpUnread = function(){ unread++; renderFavicon(); };
-        window.clearUnread = function(){ unread=0; renderFavicon(); };
+
+        // Blikání title baru v taskbaru — jen dokud je karta na pozadí.
+        // Lidem, co se dívají přímo na kartu, by to jen otravovalo; cílem je
+        // zachytit pohled koutkem oka, když je přes appku třeba GTA na celou
+        // obrazovku. Jakmile se karta vrátí do popředí, blikání se zastaví.
+        function stopBlink(){ clearInterval(blinkTimer); blinkTimer = null; document.title = baseTitle; }
+        function startBlink(){
+          if (blinkTimer || document.visibilityState === 'visible') return;
+          blinkTimer = setInterval(() => {
+            blinkOn = !blinkOn;
+            document.title = blinkOn ? ('● Caledonia — ' + unread + ' nové') : baseTitle;
+          }, 1200);
+        }
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') stopBlink();
+          else if (unread > 0) startBlink();
+        });
+
+        window.bumpUnread = function(){ unread++; renderFavicon(); if (document.visibilityState !== 'visible') startBlink(); };
+        window.clearUnread = function(){ unread=0; renderFavicon(); stopBlink(); };
         renderFavicon();
       })();
 
-      window.albionSealThud = function(){};
+      // ── SERVICE WORKER — podmínka pro nabídku instalace PWA (viz sw.js) ──
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+
+      // Skutečný zvuk "pečetního bouchnutí" — dřív existoval jen lokálně ve
+      // sklad.js (playSealThud), zatímco tenhle globální hák byl prázdný
+      // no-op. Ostatní stránky (Nástěnka, Informace…) ho už volaly
+      // optimisticky, jen z toho nikdy nic nebylo slyšet. Teď je to
+      // jedna funkce pro celý web.
+      window.albionSealThud = function(){
+        try{
+          window._albionAudioCtx = window._albionAudioCtx || new (window.AudioContext||window.webkitAudioContext)();
+          const ctx = window._albionAudioCtx; if(ctx.state==='suspended') ctx.resume();
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator(); osc.type='sine'; osc.frequency.setValueAtTime(180,now); osc.frequency.exponentialRampToValueAtTime(48,now+0.16);
+          const gain = ctx.createGain(); gain.gain.setValueAtTime(0.0001,now); gain.gain.exponentialRampToValueAtTime(0.5,now+0.012); gain.gain.exponentialRampToValueAtTime(0.0001,now+0.32);
+          osc.connect(gain); const master=ctx.createGain(); master.gain.value=0.9; gain.connect(master); master.connect(ctx.destination); osc.start(now); osc.stop(now+0.34);
+        }catch(e){}
+      };
       window.albionPaper = function(){};
       window.albionSound = { login(){}, success(){}, notification(){}, timerDone(){} };
 
@@ -387,6 +430,37 @@ function renderNav(req, active) {
         closeBtn.addEventListener('click',(e)=>{e.stopPropagation();closeLetter();});
         document.addEventListener('click',(e)=>{ if(shown&&!e.target.closest('.evelyn-widget')&&!e.target.closest('.evelyn-letter'))closeLetter(); });
         setTimeout(()=>{ if(isSnoozedToday())return; fetchBrief().then(()=>{ openLetter(10000); }); },1000);
+
+        // ── CHAT — Evelyn odpovídá na dotazy přímo v dopise, ne jen posílá
+        // jednosměrné hlášení. Rozpoznávání je jednoduché klíčové slovo →
+        // odpověď (viz /api/evelyn/ask v server.js), ne skutečné AI.
+        const askInput = document.getElementById('evelynAskInput');
+        const askBtn = document.getElementById('evelynAskBtn');
+        async function askEvelyn(){
+          const question = askInput.value.trim();
+          if(!question) return;
+          clearTimeout(autoCloseTimer); // dokud si člověk povídá, dopis se sám nezavře
+          askBtn.disabled = true;
+          const qaBlock = document.createElement('div');
+          qaBlock.className = 'evelyn-qa';
+          qaBlock.innerHTML = '<div class="evelyn-qa-q">Ty: '+esc(question)+'</div><div class="evelyn-qa-a">…</div>';
+          body.appendChild(qaBlock);
+          body.scrollTop = body.scrollHeight;
+          askInput.value = '';
+          try{
+            const res = await fetch('/api/evelyn/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question }) });
+            const d = await res.json();
+            qaBlock.querySelector('.evelyn-qa-a').textContent = (d.ok && d.answer) ? d.answer : 'Momentálně ti nedokážu odpovědět.';
+          }catch(e){
+            qaBlock.querySelector('.evelyn-qa-a').textContent = 'Momentálně ti nedokážu odpovědět.';
+          }
+          body.scrollTop = body.scrollHeight;
+          askBtn.disabled = false;
+          askInput.focus();
+        }
+        if(askBtn) askBtn.addEventListener('click', askEvelyn);
+        if(askInput) askInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); askEvelyn(); } });
+        if(askInput) askInput.addEventListener('click', (e)=>e.stopPropagation());
       })();
 
       (function globalSearch(){
