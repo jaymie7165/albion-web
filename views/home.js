@@ -88,6 +88,14 @@ function renderHome(req, data) {
     .dash-lower-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:1.4rem}
     @media(max-width:980px){.dash-lower-grid{grid-template-columns:1fr}}
 
+    .dash-online-bar{display:flex;align-items:center;gap:0.6rem;font-family:var(--font-mono);font-size:0.76rem;color:var(--ivory-dim);padding:0.65rem 1.1rem;background:var(--panel2);border:1px solid var(--border-brass);margin-bottom:1rem}
+    .dash-online-dot{width:8px;height:8px;border-radius:50%;background:#7CC79A;box-shadow:0 0 6px #7CC79A;flex-shrink:0;animation:dashOnlinePulse 2s ease-in-out infinite}
+    @keyframes dashOnlinePulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+    .dash-ticker{overflow:hidden;white-space:nowrap;border-top:1px solid var(--border-brass);border-bottom:1px solid var(--border-brass);background:var(--panel2);padding:0.55rem 0;margin-bottom:1.6rem;position:relative}
+    .dash-ticker-track{display:inline-block;padding-left:100%;font-family:var(--font-mono);font-size:0.76rem;color:var(--ivory-dim);animation:dashTickerScroll 45s linear infinite}
+    @keyframes dashTickerScroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+
     .quote-strip{margin-top:1.6rem;padding:1rem 1.4rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-family:var(--font-display);font-style:italic;font-size:1rem;color:var(--ivory-dim)}
     .quote-strip .sig{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.14em;color:var(--oxblood-bright);text-transform:uppercase;font-style:normal}
 
@@ -119,6 +127,15 @@ function renderHome(req, data) {
         <div class="dash-clock" id="live-clock-hero">--:--:--</div>
         <div class="dash-date">${dateStr}</div>
       </div>
+    </div>
+
+    <div class="dash-online-bar">
+      <span class="dash-online-dot"></span>
+      <span id="dash-online-text">Zjišťuji, kdo je online…</span>
+    </div>
+
+    <div class="dash-ticker">
+      <div class="dash-ticker-track" id="dash-ticker-track">Načítám aktivitu…</div>
     </div>
 
     ${!isRestricted ? renderStaffDashboard() : renderMemberDashboard()}
@@ -166,6 +183,60 @@ function renderHome(req, data) {
     }
     loadVysilacka();
     setInterval(loadVysilacka, 20000);
+
+    // ── KDO JE ONLINE — viditelné prominentně, ne schované ──
+    async function loadOnlineBar(){
+      const el = document.getElementById('dash-online-text');
+      if(!el) return;
+      try{
+        const res = await fetch('/api/online-members');
+        const d = await res.json();
+        if(!d.ok || !d.count){ el.textContent = 'Teď není online nikdo jiný.'; return; }
+        el.textContent = 'Teď online (' + d.count + '): ' + d.members.join(', ');
+      }catch(e){}
+    }
+    loadOnlineBar();
+    setInterval(loadOnlineBar, 15000);
+
+    // ── TICKER — běžící pruh nedávné aktivity (funguje pro obě role stejně) ──
+    let tickerItems = [];
+    function renderTicker(){
+      const track = document.getElementById('dash-ticker-track');
+      if(!track) return;
+      track.textContent = tickerItems.length ? tickerItems.join('   ·   ') : 'Zatím žádná aktivita.';
+      // restart animace, ať nová položka naskočí hned od začátku pásky
+      track.style.animation = 'none';
+      void track.offsetWidth;
+      track.style.animation = '';
+    }
+    async function loadTicker(){
+      try{
+        const res = await fetch('/api/ticker');
+        const d = await res.json();
+        if(d.ok) tickerItems = d.items;
+        renderTicker();
+      }catch(e){}
+    }
+    loadTicker();
+    if(window.evtSource){
+      window.evtSource.addEventListener('skladUpdate', function(e){
+        const d = JSON.parse(e.data);
+        const ic2 = d.sekce==='zbrane'?'🔫':d.sekce==='weed'?'🌿':d.sekce==='chemky'?'⚗️':d.sekce==='undo'?null:'💊';
+        const item = d.polozka||d.odruda||d.droga||d.chemikalie||'';
+        if(!ic2) return;
+        tickerItems.unshift(ic2+' '+d.typ+' — '+item+' · '+d.uzivatel);
+        tickerItems = tickerItems.slice(0,14);
+        renderTicker();
+      });
+      window.evtSource.addEventListener('ucetUpdate', function(e){
+        const d = JSON.parse(e.data);
+        const sym = d.valuta==='USD'?'SAD ':'₱';
+        tickerItems.unshift((d.typ==='PŘÍJEM'?'💰':'💸')+' '+d.typ+' '+sym+d.castka+' · '+d.uzivatel);
+        tickerItems = tickerItems.slice(0,14);
+        renderTicker();
+      });
+    }
+
     ${!isRestricted ? staffDashboardScript() : memberDashboardScript()}
 
     // ── ONBOARDING (beze změny chování) ──

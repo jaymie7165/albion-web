@@ -88,6 +88,18 @@ function renderDashboard(req, data) {
     ? [{ id:'ucet', label:'Reserve Fund', sub:'Povinný odvod', icon:'◉' }, { id:'cenik', label:'Ceník', sub:'Referenční ceny', icon:'$' }]
     : null; // null = použij plné primary/secondary rozdělení níže
 
+  // ── VLASTNÍ URL PRO KAŽDÝ TAB (/sklad/vyroba, /sklad/cenik…) ──────────────
+  // Dřív byl aktivní tab jen v localStorage — nešlo poslat odkaz "podívej se
+  // na výrobu" ani se tlačítkem zpět vrátit na předchozí tab. req.params.tab
+  // (viz routa v server.js) se tu ověří proti povoleným tabům pro danou roli
+  // a použije se k vykreslení správného panelu i zvýraznění v sidebaru rovnou
+  // na serveru — klient pak jen doladí "Více" sekci a localStorage.
+  const VALID_TABS_ALL = ['ucet','weed','drogy','chemky','zbrane','vyroba','smena','cenik','nevyrizene'];
+  const VALID_TABS_MEMBER = ['ucet','cenik'];
+  const allowedTabs = memberOnly ? VALID_TABS_MEMBER : VALID_TABS_ALL;
+  const requestedTab = (req.params && req.params.tab) ? String(req.params.tab) : null;
+  const initialTab = (requestedTab && allowedTabs.includes(requestedTab)) ? requestedTab : 'ucet';
+
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Caledonia — Sklad</title>
@@ -376,16 +388,16 @@ function renderDashboard(req, data) {
 
       <!-- Sidebar -->
       <div class="sklad-sidebar" id="skladSidebar">
-        ${sekceMeta ? sekceMeta.map((s, i) => `
-          <div class="sklad-sidebar-item${i===0?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
+        ${sekceMeta ? sekceMeta.map((s) => `
+          <div class="sklad-sidebar-item${s.id===initialTab?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
             <div class="sklad-sidebar-icon">${s.icon}</div>
             <div class="sklad-sidebar-text">
               <div class="sklad-sidebar-label">${s.label}</div>
               <div class="sklad-sidebar-sub">${s.sub}</div>
             </div>
           </div>`).join('') : `
-        ${sekceMetaPrimary.map((s, i) => `
-          <div class="sklad-sidebar-item${i===0?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
+        ${sekceMetaPrimary.map((s) => `
+          <div class="sklad-sidebar-item${s.id===initialTab?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
             <div class="sklad-sidebar-icon">${s.icon}</div>
             <div class="sklad-sidebar-text">
               <div class="sklad-sidebar-label">${s.label}</div>
@@ -398,7 +410,7 @@ function renderDashboard(req, data) {
         </div>
         <div class="sklad-sidebar-secondary" id="skladSecondary">
           ${sekceMetaSecondary.map((s) => `
-          <div class="sklad-sidebar-item" data-panel="${s.id}" onclick="skladTab('${s.id}')">
+          <div class="sklad-sidebar-item${s.id===initialTab?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
             <div class="sklad-sidebar-icon">${s.icon}</div>
             <div class="sklad-sidebar-text">
               <div class="sklad-sidebar-label">${s.label}</div>
@@ -413,7 +425,7 @@ function renderDashboard(req, data) {
       <div>
 
         <!-- Účetnictví -->
-        <div class="sklad-panel active" id="panel-ucet">
+        <div class="sklad-panel${initialTab==='ucet'?' active':''}" id="panel-ucet">
           <div class="panel-card">
             ${!memberOnly ? `
             <div class="panel-head">
@@ -465,7 +477,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Směnárna -->
-        <div class="sklad-panel" id="panel-smena">
+        <div class="sklad-panel${initialTab==='smena'?' active':''}" id="panel-smena">
           <div class="panel-card">
             <div class="panel-head">
               <span class="panel-title">Směnárna</span>
@@ -502,7 +514,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Zbraně -->
-        <div class="sklad-panel" id="panel-zbrane">
+        <div class="sklad-panel${initialTab==='zbrane'?' active':''}" id="panel-zbrane">
           <div class="panel-card">
             <div class="panel-head"><span class="panel-title">Zbraně &amp; Střelivo</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('zbrane')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('zbrane')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
@@ -532,7 +544,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Weed -->
-        <div class="sklad-panel" id="panel-weed">
+        <div class="sklad-panel${initialTab==='weed'?' active':''}" id="panel-weed">
           <div class="panel-card">
             <div class="panel-head"><span class="panel-title">Weed</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('weed')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('weed')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
@@ -559,7 +571,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Výroba -->
-        <div class="sklad-panel" id="panel-vyroba">
+        <div class="sklad-panel${initialTab==='vyroba'?' active':''}" id="panel-vyroba">
           <div class="panel-card">
             <div class="recept-tabs">
               <button class="recept-tab active" id="recept-tab-meth" onclick="switchVyrobaRecept('meth')">Metamfetamin</button>
@@ -671,7 +683,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Drogy -->
-        <div class="sklad-panel" id="panel-drogy">
+        <div class="sklad-panel${initialTab==='drogy'?' active':''}" id="panel-drogy">
           <div class="panel-card">
             <div class="panel-head"><span class="panel-title">Drogy</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('drogy')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('drogy')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
@@ -697,7 +709,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Chemky -->
-        <div class="sklad-panel" id="panel-chemky">
+        <div class="sklad-panel${initialTab==='chemky'?' active':''}" id="panel-chemky">
           <div class="panel-card">
             <div class="panel-head"><span class="panel-title">Chemikálie</span><span class="panel-badge">Sklad</span>${canManage ? `<button class="quick-btn" onclick="openKatalogModal('chemky')" style="margin-left:auto">+ Spravovat položky</button>` : ''}<button class="quick-btn" onclick="openBulkModal('chemky')" style="${canManage ? '' : 'margin-left:auto'}">+ Hromadný zápis</button></div>
             <div class="panel-split">
@@ -736,7 +748,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Ceník -->
-        <div class="sklad-panel" id="panel-cenik">
+        <div class="sklad-panel${initialTab==='cenik'?' active':''}" id="panel-cenik">
           <div class="panel-card">
             <div class="panel-head">
               <span class="panel-title">Ceník</span>
@@ -763,7 +775,7 @@ function renderDashboard(req, data) {
         </div>
 
         <!-- Nevyřízené -->
-        <div class="sklad-panel" id="panel-nevyrizene">
+        <div class="sklad-panel${initialTab==='nevyrizene'?' active':''}" id="panel-nevyrizene">
           <div class="panel-card">
             <div class="panel-head">
               <span class="panel-title">Nevyřízené akce</span>
@@ -879,12 +891,22 @@ function renderDashboard(req, data) {
     updateClock();setInterval(updateClock,1000);
 
     // Tab navigace
-    function skladTab(id){
+    function skladTab(id, skipPush){
       document.querySelectorAll('.sklad-sidebar-item').forEach(el=>el.classList.toggle('active',el.dataset.panel===id));
       document.querySelectorAll('.sklad-panel').forEach(el=>el.classList.toggle('active',el.id==='panel-'+id));
       try{localStorage.setItem('albion_sklad_tab',id);}catch(e){}
+      // Vlastní URL pro každý tab (/sklad/vyroba…) — jde poslat odkaz na
+      // konkrétní tab a funguje tlačítko zpět/vpřed (viz popstate níže).
+      if(!skipPush){
+        try{ if(location.pathname !== '/sklad/'+id) history.pushState({tab:id}, '', '/sklad/'+id); }catch(e){}
+      }
       if(id==='nevyrizene' && window.loadNevyrizene) window.loadNevyrizene();
     }
+    window.addEventListener('popstate', function(){
+      const m=location.pathname.match(/^\/sklad\/([a-z-]+)\/?$/);
+      const tab=m?m[1]:'ucet';
+      if(document.getElementById('panel-'+tab)) skladTab(tab, true);
+    });
     function skladToggleMore(){
       const sec=document.getElementById('skladSecondary');
       const toggle=document.getElementById('skladMoreToggle');
@@ -896,27 +918,29 @@ function renderDashboard(req, data) {
     }
     (function restoreTab(){
       try{
-        const secOpen=localStorage.getItem('albion_sklad_more_open')==='1';
+        const urlMatch=location.pathname.match(/^\/sklad\/([a-z-]+)\/?$/);
         const SECONDARY_IDS=['zbrane','vyroba','smena','cenik','nevyrizene'];
+        if(urlMatch){
+          // Server už vykreslil správný tab podle URL (viz initialTab v
+          // sklad.js) — tady se jen dořeší otevření "Více" sekce, pokud jde
+          // o vedlejší tab, a případné dotažení dat (Nevyřízené).
+          if(SECONDARY_IDS.includes(urlMatch[1])) skladToggleMore();
+          if(urlMatch[1]==='nevyrizene' && window.loadNevyrizene) window.loadNevyrizene();
+          return;
+        }
+        // Holé /sklad bez tabu v URL — beze změny chování, obnoví se
+        // naposledy otevřený tab z localStorage jako dřív.
+        const secOpen=localStorage.getItem('albion_sklad_more_open')==='1';
         const saved=localStorage.getItem('albion_sklad_tab');
         if(secOpen || (saved && SECONDARY_IDS.includes(saved))) skladToggleMore();
-        if(saved&&document.getElementById('panel-'+saved))skladTab(saved);
+        if(saved&&document.getElementById('panel-'+saved))skladTab(saved, true);
       }catch(e){}
     })();
 
     // Modal
     let _pendingAction=null;
     let _audioCtx=null;
-    function playSealThud(){
-      try{
-        _audioCtx=_audioCtx||new(window.AudioContext||window.webkitAudioContext)();
-        const ctx=_audioCtx;if(ctx.state==='suspended')ctx.resume();
-        const now=ctx.currentTime;
-        const osc=ctx.createOscillator();osc.type='sine';osc.frequency.setValueAtTime(180,now);osc.frequency.exponentialRampToValueAtTime(48,now+0.16);
-        const gain=ctx.createGain();gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(0.5,now+0.012);gain.gain.exponentialRampToValueAtTime(0.0001,now+0.32);
-        osc.connect(gain);const master=ctx.createGain();master.gain.value=0.9;gain.connect(master);master.connect(ctx.destination);osc.start(now);osc.stop(now+0.34);
-      }catch(e){}
-    }
+    function playSealThud(){ if(window.albionSealThud) window.albionSealThud(); }
     function showModal(title,subtitle,details,actionFn){
       if(window.albionPaper)window.albionPaper();
       document.getElementById('modalTitle').textContent=title;

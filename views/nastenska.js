@@ -145,6 +145,8 @@ function renderNastenska(req) {
       const res=await fetch('/api/nastenska',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,content,publishAt,category})});
       const data=await res.json();
       if(data.ok){
+        if(window.albionSealThud) window.albionSealThud();
+        if(window.rewardFlash) window.rewardFlash(document.getElementById('ann-content').closest('.card'));
         showToast(data.scheduled?'Oznámení naplánováno':'Oznámení odesláno');
         document.getElementById('ann-title').value='';document.getElementById('ann-content').value='';document.getElementById('ann-publish-at').value='';
         setTimeout(loadAnnouncements,2000); loadScheduled();

@@ -170,6 +170,8 @@ function renderInformace(req) {
       const res = await fetch(url, { method: method, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nazev, zjistil, osoby }) });
       const d = await res.json();
       if(d.ok){
+        if(window.albionSealThud) window.albionSealThud();
+        if(window.rewardFlash) window.rewardFlash(document.getElementById('infEditor'));
         showToast(id ? 'Záznam uložen' : 'Záznam založen');
         await loadEntries();
         openInformace(d.entry.id);
@@ -184,6 +186,8 @@ function renderInformace(req) {
       const res = await fetch('/api/informace/'+id+'/zaznam', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
       const d = await res.json();
       if(d.ok){
+        if(window.albionSealThud) window.albionSealThud();
+        if(window.rewardFlash) window.rewardFlash(document.getElementById('infEditor'));
         showToast('Záznam přidán do logu');
         await loadEntries();
         openInformace(id);
