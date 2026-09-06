@@ -48,10 +48,9 @@ const PAGE_ACCESS = {
   blackbook:       1, // Blackbook
   'profit-centrum':1, // Profit centrum
   nastenska:       2, // Nástěnka
-  informace:       2, // Informace (bývalé Osobní spisy) — Founder/Council/GenK + Senior Member
+  spis:            2, // Osobní spisy členů — Founder/Council/GenK + Senior Member
   bazar:           3, // Bazar — vidí a nakupuje úplně každý přihlášený člen
   mentoring:       3, // Mentorský program — vidí každý, zápisy jen Senior Member výš (řeší se v UI/API)
-  darkchat:        3, // Darkchat — živý chat propojený s Discordem, vidí úplně každý přihlášený člen
   // Volně přístupné všem přihlášeným (level 3 = bez omezení):
   garaz:           3,
   nemovitosti:     3, // viditelnost jednotlivých lokací (vsichni/vedeni) se řeší v API, ne na úrovni stránky
@@ -110,4 +109,81 @@ function isAssociateOnly(roleIds) {
   return hasAssociate && !hasHigher;
 }
 
-module.exports = { ROLE_IDS, LEVELS, levelFromRoleIds, canAccess, requireAccess, PAGE_ACCESS, isAssociateOnly };
+// ══════════════════════════════════════════════════════════════════════
+// ODDĚLENÍ (department) — Albion v4 · ruční přiřazení na webu
+// ══════════════════════════════════════════════════════════════════════
+// Nezávislé na Discord rolích — žádná nová Discord role kvůli tomu není
+// potřeba. Týká se VÝHRADNĚ Senior Member (accessLevel 2); Founder/Council
+// (level 1) mají vždy plný přístup bez ohledu na oddělení, Member/Associate
+// (level 3) mají svůj vlastní zjednodušený pohled řešený jinde (memberOnly
+// v sklad.js), oddělení se jich netýká.
+//
+// `skladTabs` — které VEDLEJŠÍ taby Skladu navíc uvidí (nad rámec toho, co
+// mají úplně všichni Senior Members — viz SHARED_SENIOR_TABS níže).
+// `canManageCenik` — smí upravovat Ceník (jinak jen Founder/Council).
+// `fullBlackbook`/`fullStatistiky` — vidí neomezeně, ne jen kurátorovaný
+// výsek podle oddělení (zatím jen Head of Financials).
+const DEPARTMENTS = {
+  weapons: {
+    label: 'Head of Weapons',
+    skladTabs: ['zbrane'],
+  },
+  narcotics: {
+    label: 'Head of Narcotics',
+    skladTabs: ['weed', 'drogy', 'vyroba', 'chemky'],
+  },
+  members: {
+    label: 'Head of Members',
+    skladTabs: [],
+  },
+  financials: {
+    label: 'Head of Financials',
+    skladTabs: [],
+    canManageCenik: true,
+    fullBlackbook: true,
+    fullStatistiky: true,
+  },
+};
+
+// Taby Skladu dostupné úplně KAŽDÉMU Senior Member bez ohledu na oddělení
+// (dle zadání: Účetnictví, Ceník, Směnárna a Nevyřízené nejsou vázané na
+// konkrétní komoditu, takže je vidí každá "hlava").
+const SHARED_SENIOR_TABS = ['ucet', 'cenik', 'smena', 'nevyrizene'];
+
+// Taby, které vidí Member/Associate (accessLevel 3) — zjednodušený pohled.
+const MEMBER_SKLAD_TABS = ['ucet', 'cenik'];
+
+// Vrátí seznam ID tabů, které smí daný uživatel ve Skladu vidět.
+// `null` = bez omezení (Founder/Council vidí úplně všechno).
+function getSkladTabsForUser(accessLevel, department) {
+  if (accessLevel <= 1) return null;
+  if (accessLevel === 2) {
+    const dept = DEPARTMENTS[department];
+    const extra = dept ? dept.skladTabs : [];
+    return [...new Set([...SHARED_SENIOR_TABS, ...extra])];
+  }
+  return [...MEMBER_SKLAD_TABS];
+}
+
+function canAccessSkladTab(accessLevel, department, tabId) {
+  const allowed = getSkladTabsForUser(accessLevel, department);
+  if (allowed === null) return true;
+  return allowed.includes(tabId);
+}
+
+// Smí upravovat Ceník? Founder/Council vždy, Head of Financials navíc.
+function canManageCenik(accessLevel, department) {
+  if (accessLevel === 1) return true;
+  if (accessLevel === 2 && department && DEPARTMENTS[department] && DEPARTMENTS[department].canManageCenik) return true;
+  return false;
+}
+
+function departmentLabel(department) {
+  return (DEPARTMENTS[department] && DEPARTMENTS[department].label) || null;
+}
+
+module.exports = {
+  ROLE_IDS, LEVELS, levelFromRoleIds, canAccess, requireAccess, PAGE_ACCESS, isAssociateOnly,
+  DEPARTMENTS, SHARED_SENIOR_TABS, MEMBER_SKLAD_TABS,
+  getSkladTabsForUser, canAccessSkladTab, canManageCenik, departmentLabel,
+};

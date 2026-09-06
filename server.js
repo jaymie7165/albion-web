@@ -34,13 +34,9 @@ const { renderProfitCentrum } = require('./views/profit-centrum');
 const { renderAuth } = require('./views/auth');
 const { renderLeaderboard } = require('./views/leaderboard');
 const { renderCard } = require('./views/card');
-const { renderPrehled } = require('./views/prehled');
-const { renderVyznamenani } = require('./views/vyznamenani');
-const { renderAuditMe } = require('./views/audit-me');
-const { CATEGORY_LABELS, grant: grantAchievement } = require('./achievements');
 const { renderGallery } = require('./views/gallery');
 const { renderAlbion } = require('./views/albion');
-const { renderInformace } = require('./views/informace');
+const { renderSpisy } = require('./views/spis');
 const { renderBazar } = require('./views/bazar');
 const { renderMentoring } = require('./views/mentoring');
 
@@ -184,106 +180,61 @@ function saveGarage(cars) {
   try { writeJsonAtomic(GARAGE_FILE, cars); } catch (e) { console.error('[GARAGE]', e.message); }
 }
 
-// ── INFORMACE (dřív "Osobní spisy") ──
-// Soubor na disku zůstává stejný (dossiers.json), ať se nepřijde o starší
-// data — jen se při čtení každý záznam starého tvaru (jmeno/kategorie/
-// pozice/kontakt/rizika/historie/poznamky) převede na nový (nazev/zjistil/
-// osoby/zaznamy). Staré textové údaje se nezahodí, jen se z nich udělají
-// první položky v logu daného záznamu.
+// ── OSOBNÍ SPISY ČLENŮ ──
 const DOSSIERS_FILE = path.join(DATA_DIR, 'dossiers.json');
-function loadDossiersRaw() { try { const d = JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
-function saveDossiers(d) { try { writeJsonAtomic(DOSSIERS_FILE, d); } catch (e) { console.error('[INFORMACE]', e.message); } }
+function loadDossiers() { try { const d = JSON.parse(fs.readFileSync(DOSSIERS_FILE, 'utf8')); return Array.isArray(d) ? d : []; } catch { return []; } }
+function saveDossiers(d) { try { writeJsonAtomic(DOSSIERS_FILE, d); } catch (e) { console.error('[DOSSIERS]', e.message); } }
 
-function migrateInformaceEntry(e) {
-  if (Array.isArray(e.zaznamy)) return e; // už nový tvar
-  const zaznamy = [];
-  const autor = e.vytvoril || null;
-  const cas = e.vytvorenoAt || new Date().toISOString();
-  if (e.pozice)   zaznamy.push({ text: `Pozice / vztah: ${e.pozice}`, autor, cas });
-  if (e.rizika)   zaznamy.push({ text: `Rizika: ${e.rizika}`, autor, cas });
-  if (e.historie) zaznamy.push({ text: `Historie jednání: ${e.historie}`, autor, cas });
-  if (e.poznamky) zaznamy.push({ text: `Poznámky: ${e.poznamky}`, autor, cas });
-  if (e.kategorie === 'externi') zaznamy.push({ text: 'Vně organizace (převedeno ze starého spisu)', autor, cas });
-  return {
-    id: e.id,
-    nazev: e.jmeno || '(bez názvu)',
-    zjistil: e.vytvoril || '',
-    osoby: e.kontakt ? [{ jmeno: e.jmeno || '', kontakt: e.kontakt }] : [],
-    zaznamy,
-    vytvoril: e.vytvoril, vytvorenoAt: e.vytvorenoAt, upravil: e.upravil, upravenoAt: e.upravenoAt,
-  };
-}
-function loadDossiers() { return loadDossiersRaw().map(migrateInformaceEntry); }
-
-function sanitizeOsoby(raw) {
-  if (!Array.isArray(raw)) return [];
-  return raw.slice(0, 50)
-    .map(o => ({ jmeno: sanitizeText(o && o.jmeno, 80) || '', kontakt: sanitizeText(o && o.kontakt, 120) || '' }))
-    .filter(o => o.jmeno);
-}
-
-app.get('/api/informace', requireAuth, requireAccess('informace'), (req, res) => {
+app.get('/api/spis', requireAuth, requireAccess('spis'), (req, res) => {
   res.json({ ok: true, entries: loadDossiers() });
 });
 
-app.post('/api/informace', requireAuth, requireAccess('informace'), (req, res) => {
-  const nazev = sanitizeText(req.body.nazev, 100);
-  if (!nazev) return res.json({ ok: false, error: 'Vyplň název' });
+app.post('/api/spis', requireAuth, requireAccess('spis'), (req, res) => {
+  const jmeno = sanitizeText(req.body.jmeno, 80);
+  if (!jmeno) return res.json({ ok: false, error: 'Vyplň jméno' });
+  const kategorie = req.body.kategorie === 'externi' ? 'externi' : 'interni';
   const entry = {
-    id: `inf_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
-    nazev,
-    zjistil: sanitizeText(req.body.zjistil, 80) || req.session.icName,
-    osoby: sanitizeOsoby(req.body.osoby),
-    zaznamy: [],
+    id: `spis_${Date.now()}_${Math.floor(Math.random()*1e6)}`,
+    jmeno, kategorie,
+    pozice: sanitizeText(req.body.pozice, 100) || '',
+    kontakt: sanitizeText(req.body.kontakt, 120) || '',
+    rizika: sanitizeText(req.body.rizika, 2000) || '',
+    historie: sanitizeText(req.body.historie, 2000) || '',
+    poznamky: sanitizeText(req.body.poznamky, 5000) || '',
     vytvoril: req.session.icName, vytvorenoAt: new Date().toISOString(),
     upravil: null, upravenoAt: null,
   };
-  const list = loadDossiersRaw();
+  const list = loadDossiers();
   list.push(entry);
   saveDossiers(list);
   res.json({ ok: true, entry });
 });
 
-app.put('/api/informace/:id', requireAuth, requireAccess('informace'), (req, res) => {
-  const list = loadDossiersRaw();
-  let entry = list.find(e => e.id === req.params.id);
-  if (!entry) return res.json({ ok: false, error: 'Záznam nenalezen' });
-  entry = migrateInformaceEntry(entry); // ať se starý tvar při první úpravě rovnou napevno převede
-  const idx = list.findIndex(e => e.id === req.params.id);
-  const nazev = sanitizeText(req.body.nazev, 100);
-  if (!nazev) return res.json({ ok: false, error: 'Vyplň název' });
-  entry.nazev = nazev;
-  entry.zjistil = sanitizeText(req.body.zjistil, 80) || entry.zjistil || '';
-  entry.osoby = sanitizeOsoby(req.body.osoby);
+app.put('/api/spis/:id', requireAuth, requireAccess('spis'), (req, res) => {
+  const list = loadDossiers();
+  const entry = list.find(e => e.id === req.params.id);
+  if (!entry) return res.json({ ok: false, error: 'Spis nenalezen' });
+  const jmeno = sanitizeText(req.body.jmeno, 80);
+  if (!jmeno) return res.json({ ok: false, error: 'Vyplň jméno' });
+  entry.jmeno = jmeno;
+  entry.kategorie = req.body.kategorie === 'externi' ? 'externi' : 'interni';
+  entry.pozice = sanitizeText(req.body.pozice, 100) || '';
+  entry.kontakt = sanitizeText(req.body.kontakt, 120) || '';
+  entry.rizika = sanitizeText(req.body.rizika, 2000) || '';
+  entry.historie = sanitizeText(req.body.historie, 2000) || '';
+  entry.poznamky = sanitizeText(req.body.poznamky, 5000) || '';
   entry.upravil = req.session.icName;
   entry.upravenoAt = new Date().toISOString();
-  list[idx] = entry;
   saveDossiers(list);
   res.json({ ok: true, entry });
 });
 
-// Přidání záznamu do logu — nic se nepřepisuje, jen přibývá. Oddělené od
-// PUT výše (to mění jen název/zjistil/osoby), ať jde dopisovat do logu bez
-// rizika, že se něčí souběžná úprava hlavičky přepíše.
-app.post('/api/informace/:id/zaznam', requireAuth, requireAccess('informace'), (req, res) => {
-  const text = sanitizeText(req.body.text, 3000);
-  if (!text) return res.json({ ok: false, error: 'Napiš text záznamu' });
-  const list = loadDossiersRaw();
-  const idx = list.findIndex(e => e.id === req.params.id);
-  if (idx === -1) return res.json({ ok: false, error: 'Záznam nenalezen' });
-  const entry = migrateInformaceEntry(list[idx]);
-  entry.zaznamy.push({ text, autor: req.session.icName, cas: new Date().toISOString() });
-  list[idx] = entry;
-  saveDossiers(list);
-  res.json({ ok: true, entry });
-});
-
-app.delete('/api/informace/:id', requireAuth, requireAccess('informace'), (req, res) => {
-  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat záznamy smí jen Founder/Council/GenK' });
-  let list = loadDossiersRaw();
+app.delete('/api/spis/:id', requireAuth, requireAccess('spis'), (req, res) => {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Mazat spisy smí jen Founder/Council/GenK' });
+  let list = loadDossiers();
   const before = list.length;
   list = list.filter(e => e.id !== req.params.id);
-  if (list.length === before) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  if (list.length === before) return res.json({ ok: false, error: 'Spis nenalezen' });
   saveDossiers(list);
   res.json({ ok: true });
 });
@@ -295,7 +246,7 @@ function saveRelationships(r) { try { writeJsonAtomic(RELATIONSHIPS_FILE, r); } 
 const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival'];
 
 app.get('/api/vztahy', requireAuth, (req, res) => res.json({ ok: true, vztahy: loadRelationships() }));
-app.post('/api/vztahy', requireAuth, requireAccess('informace'), (req, res) => {
+app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
   const a = sanitizeText(req.body.a, 80), b = sanitizeText(req.body.b, 80);
   const typ = (req.body.typ || '').toString();
   const note = req.body.note ? sanitizeText(req.body.note, 200) : '';
@@ -306,7 +257,7 @@ app.post('/api/vztahy', requireAuth, requireAccess('informace'), (req, res) => {
   saveRelationships(list);
   res.json({ ok: true });
 });
-app.delete('/api/vztahy/:id', requireAuth, requireAccess('informace'), (req, res) => {
+app.delete('/api/vztahy/:id', requireAuth, requireAccess('spis'), (req, res) => {
   let list = loadRelationships();
   const before = list.length;
   list = list.filter(v => v.id !== req.params.id);
@@ -626,7 +577,7 @@ const CENIK_DEFAULT = {
     {
       id: 'vyroba', label: 'Výroba — doporučené prodejní ceny',
       rows: [
-        { label: 'Metamfetamin — sáček', cena: '1000$' },
+        { label: 'Metamfetamin — sáček', cena: '1100$' },
       ],
     },
     {
@@ -926,36 +877,6 @@ app.get('/api/online-members', requireAuth, (req, res) => {
   res.json({ ok: true, members: [...names], count: names.size });
 });
 
-// ── TICKER — krátký běžící pruh nedávné aktivity na hlavním dashboardu ──
-// Znovupoužívá stejná data, co se už tahala pro /home (getRecentRows) —
-// žádná nová logika, jen jiné seřazení/formát pro plynule scrollující pásku.
-app.get('/api/ticker', requireAuth, async (req, res) => {
-  try {
-    const [recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky] = await Promise.all([
-      sheets.getRecentRows('Účetnictví', 6).catch(() => []),
-      sheets.getRecentRows('Zbraně', 4).catch(() => []),
-      sheets.getRecentRows('Weed', 4).catch(() => []),
-      sheets.getRecentRows('Drogy', 4).catch(() => []),
-      sheets.getRecentRows('Chemky', 4).catch(() => []),
-    ]);
-    const rows = [];
-    recentUcet.forEach(r => {
-      const sym = (r[3] || '') === 'USD' ? 'SAD ' : '₱';
-      const isIn = r[1] === 'PŘÍJEM';
-      rows.push({ cas: r[0] || '', text: (isIn ? '💰 Příjem ' : '💸 Výdaj ') + sym + r[2] + (r[4] ? ' — ' + r[4] : '') + (r[5] ? ' · ' + r[5] : '') });
-    });
-    recentZbrane.forEach(r => rows.push({ cas: r[0] || '', text: '🔫 ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + (r[5] || '') }));
-    recentWeed.forEach(r => rows.push({ cas: r[0] || '', text: '🌿 ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + ((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '')) }));
-    recentDrogy.forEach(r => rows.push({ cas: r[0] || '', text: '💊 ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + ((r[6] && isNaN(r[6])) ? r[6] : (r[7] || r[6] || '')) }));
-    recentChemky.forEach(r => rows.push({ cas: r[0] || '', text: '⚗️ ' + r[1] + ' — ' + r[2] + ' (' + r[3] + ' ks) · ' + (r[4] || '') }));
-    rows.sort((a, b) => (b.cas || '').localeCompare(a.cas || ''));
-    res.json({ ok: true, items: rows.slice(0, 14).map(r => r.text) });
-  } catch (e) {
-    console.error('[TICKER]', e.message);
-    res.json({ ok: false, items: [] });
-  }
-});
-
 // ── NAPLÁNOVANÁ OZNÁMENÍ ──
 const SCHEDULED_ANN_FILE = path.join(DATA_DIR, 'scheduled-announcements.json');
 function loadScheduledAnn() { try { return JSON.parse(fs.readFileSync(SCHEDULED_ANN_FILE, 'utf8')) || []; } catch { return []; } }
@@ -1035,31 +956,18 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/manifest.webmanifest', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.json({
-    id: '/home',
-    name: 'Caledonia Private Network',
-    short_name: 'Caledonia',
-    description: 'Caledonia — interní rejstřík organizace',
+    name: 'Albion',
+    short_name: 'Albion',
+    description: 'Albion — interní rejstřík organizace',
     start_url: '/home',
-    scope: '/',
     display: 'standalone',
-    orientation: 'any',
-    background_color: '#07050A',
-    theme_color: '#07050A',
+    background_color: '#0A0908',
+    theme_color: '#0A0908',
     icons: [
-      { src: '/logo.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/logo.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/logo.png', sizes: '192x192', type: 'image/png' },
+      { src: '/logo.png', sizes: '512x512', type: 'image/png' },
     ],
   });
-});
-
-// Service worker musí být servírovaný z kořene (ne z /public/sw.js), aby
-// jeho "scope" pokryl celou appku — proto vlastní routa místo spoléhání na
-// express.static. Bez service workeru Chrome/Edge instalaci PWA vůbec
-// nenabídnou, i kdyby byl manifest sebelíp vyplněný.
-app.get('/sw.js', (req, res) => {
-  res.setHeader('Content-Type', 'application/javascript');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.sendFile(path.join(__dirname, 'sw.js'));
 });
 
 app.get('/', requireAuth, (req, res) => res.redirect('/home'));
@@ -1234,35 +1142,6 @@ app.get('/api/me/export', requireAuth, async (req, res) => {
   }
 });
 
-// ── VLASTNÍ HISTORIE ČLENA (pro /audit-me a Member dashboard) ───────────────
-app.get('/api/me/history', requireAuth, async (req, res) => {
-  try {
-    const [zbraneRows, weedRows, drogyRows, ucetRows, chemkyRows] = await Promise.all([
-      sheets.getRows('Zbraně').catch(() => []),
-      sheets.getRows('Weed').catch(() => []),
-      sheets.getRows('Drogy').catch(() => []),
-      sheets.getRows('Účetnictví').catch(() => []),
-      sheets.getRows('Chemky').catch(() => []),
-    ]);
-    const allUsers = db.prepare('SELECT * FROM users').all();
-    const { map: nameMap } = buildNameMap(allUsers);
-    const norm = (n) => normalizeName(n, nameMap);
-    const me = req.session.icName;
-    const filterMine = (rows, col) => (rows || []).slice(1).filter(r => norm(r[col]) === me);
-    res.json({
-      ok: true,
-      zbrane: filterMine(zbraneRows, 5),
-      weed: filterMine(weedRows, 6),
-      drogy: filterMine(drogyRows, 6),
-      chemky: filterMine(chemkyRows, 4),
-      ucet: filterMine(ucetRows, 5),
-    });
-  } catch (e) {
-    console.error('[ME HISTORY]', e.message);
-    res.json({ ok: false, zbrane: [], weed: [], drogy: [], chemky: [], ucet: [] });
-  }
-});
-
 // ── GLOBÁLNÍ VYHLEDÁVÁNÍ ─────────────────────────────────────────────────────
 app.get('/api/search', requireAuth, (req, res) => {
   const q = (req.query.q || '').toString().trim().toLowerCase();
@@ -1335,33 +1214,6 @@ app.get('/api/admin/discord-status', requireAuth, requireFounderCouncil, (req, r
   res.json({ ok: true, missing, botConfigured: !!(process.env.DISCORD_TOKEN && process.env.GUILD_ID) });
 });
 
-// ── VYZNAMENÁNÍ — katalog + ruční udělení (Founder/Council) ─────────────────
-app.get('/api/achievements/all', requireAuth, (req, res) => {
-  try {
-    const allUsers = db.prepare('SELECT * FROM users').all();
-    const members = allUsers
-      .map(u => ({ id: u.id, ic_name: u.ic_name, achievements: u.achievements || [] }))
-      .sort((a, b) => (a.ic_name || '').localeCompare(b.ic_name || '', 'cs'));
-    res.json({ ok: true, catalog: ACHIEVEMENTS, categories: CATEGORY_LABELS, members });
-  } catch (e) {
-    console.error('[ACHIEVEMENTS ALL]', e.message);
-    res.json({ ok: false, catalog: {}, categories: {}, members: [] });
-  }
-});
-
-app.post('/api/admin/achievements/grant', requireAuth, requireFounderCouncil, (req, res) => {
-  const userId = parseInt(req.body.userId);
-  const key = (req.body.key || '').toString();
-  if (!Number.isInteger(userId)) return res.json({ ok: false, error: 'Neplatný uživatel' });
-  if (!ACHIEVEMENTS[key]) return res.json({ ok: false, error: 'Neplatné vyznamenání' });
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
-  if (!user) return res.json({ ok: false, error: 'Člen nenalezen' });
-  const granted = grantAchievement(userId, key, req.session.icName);
-  if (!granted) return res.json({ ok: false, error: 'Člen už toto vyznamenání má' });
-  broadcastSSE('achievementUpdate', { label: ACHIEVEMENTS[key].label, uzivatel: user.ic_name });
-  res.json({ ok: true });
-});
-
 function renderProfil(req, user, aliases) {
   const { baseStyles } = require('./styles');
   const { renderNav } = require('./nav');
@@ -1423,7 +1275,6 @@ function renderProfil(req, user, aliases) {
       <div class="card">
         <div class="card-header"><span class="card-title">Historie povýšení</span><span class="card-badge">Růst v organizaci</span></div>
         <div id="promotions-list"><div class="ledger-loading">Načítám…</div></div>
-        <div id="badge-progress-wrap" style="margin-top:1rem"></div>
         ${!req.session.isAssociate ? `
         <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);cursor:pointer">
           <input type="checkbox" id="card-private-toggle" style="width:auto"> Skrýt mou kartu před ostatními členy
@@ -1623,24 +1474,6 @@ function renderProfil(req, user, aliases) {
       ).join('');
     }
     loadPromotions();
-
-    async function loadBadgeProgress(){
-      const wrap=document.getElementById('badge-progress-wrap');
-      if(!wrap)return;
-      try{
-        const res=await fetch('/api/me/achievements');
-        const d=await res.json();
-        if(!d.ok || !d.progress){ wrap.innerHTML=''; return; }
-        const p=d.progress;
-        wrap.innerHTML=
-          '<div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem">Nejbližší odznak</div>'+
-          '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.4rem;font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim)">'+
-            '<span>'+p.icon+' '+p.label+'</span><span style="font-family:var(--font-mono);font-size:0.72rem;color:var(--ivory-faint)">'+p.current+' / '+p.target+'</span>'+
-          '</div>'+
-          '<div style="height:5px;background:var(--panel3);border:1px solid var(--border)"><div style="height:100%;width:'+p.pct+'%;background:var(--oxblood-bright)"></div></div>';
-      }catch(e){}
-    }
-    loadBadgeProgress();
 
     ${isFounderCouncil ? `
     fetch('/api/season').then(r=>r.json()).then(d=>{const sel=document.getElementById('season-select');if(sel)sel.value=d.season;});
@@ -2622,28 +2455,6 @@ app.delete('/api/gallery/:id', requireAuth, requireAccess('audit'), (req, res) =
 });
 
 // ── API — NÁSTĚNKA ──
-// Nahradí Discord zmínky (<@123...> / <@!123...>) v textu oznámení za IC
-// jméno člena, pokud ho v DB dokážeme dohledat podle discord_id. Jméno se
-// obalí neviditelnými sentinel znaky (\uE000/\uE001 — soukromá unicode
-// oblast, v běžném textu se nevyskytují), aby si je frontend
-// (formatAnnouncementContent v nastenska.js) mohl po HTML-escapování
-// bezpečně najít a vykreslit jako zvýrazněné "@Jméno" — bez nutnosti
-// posílat na klienta syrové Discord ID.
-function resolveDiscordMentions(content) {
-  if (!content) return content;
-  let byDiscordId;
-  try {
-    byDiscordId = {};
-    db.prepare('SELECT * FROM users').all().forEach(u => {
-      if (u.discord_id) byDiscordId[u.discord_id] = u.ic_name || u.discord_username || u.discord_id;
-    });
-  } catch (e) { return content; }
-  return content.replace(/<@!?(\d+)>/g, (match, id) => {
-    const name = byDiscordId[id];
-    return name ? ('\uE000' + name + '\uE001') : match;
-  });
-}
-
 app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, res) => {
   try {
     const msgs = await discord.getAnnouncementMessages(20);
@@ -2652,7 +2463,7 @@ app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, r
       .map(m => ({
         id: m.id,
         author: m.author?.username || 'Albion',
-        content: resolveDiscordMentions(m.content || (m.embeds[0]?.description || '')),
+        content: m.content || (m.embeds[0]?.description || ''),
         title: m.embeds?.[0]?.title || null,
         timestamp: m.timestamp,
         color: m.embeds?.[0]?.color || null,
@@ -2682,95 +2493,6 @@ app.post('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, 
   await discord.sendAnnouncement(title || 'Oznámení', content, uzivatel);
   broadcastSSE('nastenska', { title: title || 'Oznámení', content, uzivatel, timestamp: new Date().toISOString() });
   res.json({ ok: true });
-});
-
-// ══════════════════════════════════════════════════════════════════════
-// DARKCHAT — živý obousměrný chat web ↔ Discord (viz discord.js)
-// ══════════════════════════════════════════════════════════════════════
-// Zprávy přišlé z Discordu (přes Gateway naslouchání v discord.js) se sem
-// zaregistrují JEDNOU při startu serveru a přeposílají se dál na web přes
-// stejný SSE kanál (/api/events), který web už používá pro Nástěnku,
-// sklad atd. — žádná nová infrastruktura na straně webu není potřeba.
-discord.onDarkchatMessage((msg) => {
-  try {
-    let displayName = msg.author;
-    if (msg.discordId) {
-      const u = db.prepare('SELECT * FROM users WHERE discord_id = ?').get(msg.discordId);
-      if (u && u.ic_name) displayName = u.ic_name;
-    }
-    broadcastSSE('darkchatMessage', {
-      id: msg.id,
-      author: displayName,
-      content: resolveDiscordMentions(msg.content || ''),
-      timestamp: msg.timestamp,
-    });
-  } catch (e) { console.error('[DARKCHAT SSE]', e.message); }
-});
-
-app.get('/api/darkchat/history', requireAuth, requireAccess('darkchat'), async (req, res) => {
-  try {
-    const msgs = await discord.getDarkchatMessages(50);
-    const allUsers = db.prepare('SELECT * FROM users').all();
-    const byDiscordId = {};
-    allUsers.forEach(u => { if (u.discord_id) byDiscordId[u.discord_id] = u.ic_name || u.discord_username || u.discord_id; });
-    // Discord REST vrací zprávy od nejnovější — pro chatový log je chceme
-    // seřazené chronologicky (nejstarší nahoře, nejnovější dole).
-    const formatted = msgs.slice().reverse().map(m => ({
-      id: m.id,
-      author: byDiscordId[m.author?.id] || m.author?.username || 'Discord',
-      content: resolveDiscordMentions(m.content || ''),
-      timestamp: m.timestamp,
-    }));
-    res.json({ ok: true, messages: formatted });
-  } catch (e) {
-    console.error('[DARKCHAT HISTORY]', e.message);
-    res.json({ ok: false, messages: [] });
-  }
-});
-
-app.post('/api/darkchat/send', requireAuth, requireAccess('darkchat'), async (req, res) => {
-  const content = sanitizeText(req.body.content, 1500);
-  if (!content) return res.json({ ok: false, error: 'Zpráva nemůže být prázdná' });
-  const uzivatel = req.session.icName;
-  const ok = await discord.sendDarkchatMessage(content, uzivatel);
-  if (!ok) return res.json({ ok: false, error: 'Odeslání do Discordu selhalo — zkontroluj CHANNEL_DARKCHAT a práva bota' });
-  // Bot posílá zprávy jako sám sebe, takže gateway listener výše je záměrně
-  // ignoruje (author.bot === true) — proto se odeslaná zpráva musí na web
-  // přidat rovnou tady, jinak by odesílatel svou vlastní zprávu neviděl.
-  broadcastSSE('darkchatMessage', {
-    id: `web_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
-    author: uzivatel,
-    content,
-    timestamp: new Date().toISOString(),
-  });
-  res.json({ ok: true });
-});
-
-// ── VYSÍLAČKA — jen čtení existujícího Discord kanálu, nic se sem nezapisuje ──
-// Bot posílá embed s polem "📡 Frekvence" (hodnota = číslo) a v popisu mimo
-// jiné řádek "Platí do…" — nás zajímá hlavně to číslo, zbytek jen jako
-// doplňkový kontext platnosti.
-app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
-  try {
-    const msgs = await discord.getVysilackaMessages(5);
-    const msg = msgs.find(m => m.embeds && m.embeds.length) || msgs[0] || null;
-    if (!msg) return res.json({ ok: true, frekvence: null, platnost: null, timestamp: null });
-
-    const embed = (msg.embeds && msg.embeds[0]) || null;
-    let frekvence = null;
-    let platnost = null;
-    if (embed) {
-      const field = (embed.fields || []).find(f => /frekvence/i.test(f.name || ''));
-      if (field) frekvence = (field.value || '').toString().trim();
-      const desc = embed.description || '';
-      const m = desc.match(/Plat[íi][^\n]*/i);
-      if (m) platnost = m[0].trim();
-    }
-    res.json({ ok: true, frekvence, platnost, timestamp: msg.timestamp });
-  } catch (e) {
-    console.error('[VYSILACKA]', e.message);
-    res.json({ ok: false, frekvence: null, platnost: null, timestamp: null });
-  }
 });
 
 app.get('/api/nastenska/scheduled', requireAuth, requireAccess('nastenska'), (req, res) => {
@@ -3112,57 +2834,6 @@ app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (
   } catch(e){ res.json({ ok:false }); }
 });
 
-// ── CALEDONIA INDEX (Staff dashboard — /home) ───────────────────────────────
-const CALEDONIA_INDEX_FILE = path.join(DATA_DIR, 'caledonia-index-history.json');
-function loadIndexHistory() { try { return JSON.parse(fs.readFileSync(CALEDONIA_INDEX_FILE, 'utf8')) || []; } catch { return []; } }
-function saveIndexHistory(list) { try { writeJsonAtomic(CALEDONIA_INDEX_FILE, list); } catch (e) {} }
-
-app.get('/api/caledonia-index', requireAuth, async (req, res) => {
-  try {
-    const [ucet, zbraneStav, weedStav, drogyStav, chemkyStav] = await Promise.all([
-      sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 })),
-      sheets.getStockSummary('Zbraně').catch(() => ({})),
-      sheets.getStockSummary('Weed').catch(() => ({})),
-      sheets.getStockSummary('Drogy').catch(() => ({})),
-      sheets.getStockSummary('Chemky').catch(() => ({})),
-    ]);
-    const sumPositive = (obj) => Object.values(obj).filter(q => q > 0).reduce((a, b) => a + b, 0);
-    const skladCelkem = sumPositive(zbraneStav) + sumPositive(weedStav) + sumPositive(drogyStav) + sumPositive(chemkyStav);
-
-    const allUsers = db.prepare('SELECT * FROM users').all();
-    const celkemClenu = allUsers.length;
-
-    const onlineNames = new Set();
-    for (const client of sseClients) { if (client.albionIcName) onlineNames.add(client.albionIcName); }
-    const activniPocet = onlineNames.size;
-
-    // Vzorec 0–100: pokladna (40 bodů) + sklad (30 bodů) + živá aktivita (30 bodů).
-    // Dělitele (25000 SAD, 2000 ks) uprav podle reálné velikosti organizace,
-    // pokud by index dlouhodobě vycházel pořád na 0 nebo pořád na 100.
-    const financeScore = Math.min(40, (ucet.usd / 25000) * 40);
-    const skladScore = Math.min(30, (skladCelkem / 2000) * 30);
-    const aktivitaScore = celkemClenu > 0 ? Math.min(30, (activniPocet / celkemClenu) * 30 * 3) : 0;
-    const index = Math.round(Math.max(0, Math.min(100, financeScore + skladScore + aktivitaScore)));
-
-    const health = index >= 75 ? 'Výborný' : index >= 50 ? 'Stabilní' : index >= 25 ? 'Nestabilní' : 'Ohrožený';
-
-    const history = loadIndexHistory();
-    const lastEntry = history.length ? history[history.length - 1] : null;
-    const deltaPct = lastEntry && lastEntry.value > 0 ? Math.round(((index - lastEntry.value) / lastEntry.value) * 1000) / 10 : 0;
-
-    const now = Date.now();
-    if (!lastEntry || now - lastEntry.at > 15 * 60 * 1000) {
-      history.push({ value: index, at: now });
-      saveIndexHistory(history.slice(-200));
-    }
-
-    res.json({ ok: true, index, deltaPct, health, activniPocet, celkemClenu, pokladnaUsd: ucet.usd, skladCelkem });
-  } catch (e) {
-    console.error('[CALEDONIA INDEX]', e.message);
-    res.json({ ok: false });
-  }
-});
-
 // ── API — EVELYN ASHCROFT ──
 app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
   const page = (req.query.page || 'home').toString();
@@ -3278,67 +2949,6 @@ app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
   });
 });
 
-// ── EVELYN — jednoduchý chat, ne skutečné AI ─────────────────────────────
-// Rozpoznávání záměru je čisté klíčové slovo → odpověď, nic chytřejšího.
-// Cílem je odpovědět na pár nejčastějších otázek přímo ze stejných dat, co
-// používá /api/evelyn/brief, ne simulovat obecnou konverzaci.
-function stripDiacritics(s) {
-  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-app.post('/api/evelyn/ask', requireAuth, async (req, res) => {
-  const raw = (req.body.question || '').toString().slice(0, 300);
-  const q = stripDiacritics(raw).toLowerCase();
-  const jmeno = (req.session.icName || '').split(' ')[0] || 'člene';
-
-  try {
-    if (/pokladn|penez|penize|zustatek|kolik.*(sad|usd|pesos)/.test(q)) {
-      const acc = await sheets.getAccountingSummary().catch(() => ({ usd: 0, pesos: 0 }));
-      return res.json({ ok: true, answer: `Pokladna organizace aktuálně stojí na $${Math.round(acc.usd).toLocaleString('cs-CZ')} a ₱${Math.round(acc.pesos).toLocaleString('cs-CZ')}.` });
-    }
-    if (/frekvenc|vysilac/.test(q)) {
-      const msgs = await discord.getVysilackaMessages(3);
-      const msg = msgs.find(m => m.embeds && m.embeds.length);
-      const field = msg && msg.embeds[0].fields && msg.embeds[0].fields.find(f => /frekvence/i.test(f.name || ''));
-      if (field) return res.json({ ok: true, answer: `Aktuální frekvence vysílačky je ${field.value}.` });
-      return res.json({ ok: true, answer: 'Frekvenci teď bohužel nemám k dispozici.' });
-    }
-    if (/kdo.*online|online.*kdo|kolik.*online/.test(q)) {
-      const names = new Set();
-      for (const client of sseClients) { if (client.albionIcName) names.add(client.albionIcName); }
-      if (!names.size) return res.json({ ok: true, answer: 'Teď není online nikdo jiný.' });
-      return res.json({ ok: true, answer: `Teď je online ${names.size} ${names.size === 1 ? 'člen' : 'členů'}: ${[...names].join(', ')}.` });
-    }
-    if (/odznak|vyznamenani|achievement/.test(q)) {
-      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
-      const earned = (user?.achievements || []).length;
-      const actionCount = user?.action_count || 0;
-      return res.json({ ok: true, answer: `Zatím máš ${earned} ${earned === 1 ? 'vyznamenání' : 'vyznamenání'} a ${actionCount} zapsaných akcí celkem. Podrobnosti najdeš na Vyznamenání.` });
-    }
-    if (/reserve.?fund|odvod/.test(q)) {
-      return res.json({ ok: true, answer: `Aktuální výše Reserve Fondu je $${getReserveFundAmount().toLocaleString('cs-CZ')}. Jestli máš tenhle týden zaplaceno, zkontroluješ na Skladu.` });
-    }
-    if (/sklad|zasob/.test(q)) {
-      const [zbrane, weed, drogy, chemky] = await Promise.all([
-        sheets.getStockSummary('Zbraně').catch(() => ({})),
-        sheets.getStockSummary('Weed').catch(() => ({})),
-        sheets.getStockSummary('Drogy').catch(() => ({})),
-        sheets.getStockSummary('Chemky').catch(() => ({})),
-      ]);
-      const sum = (o) => Object.values(o).filter(v => v > 0).reduce((a, b) => a + b, 0);
-      const total = sum(zbrane) + sum(weed) + sum(drogy) + sum(chemky);
-      return res.json({ ok: true, answer: `Sklad má aktuálně ${total.toLocaleString('cs-CZ')} kusů napříč zbraněmi, weedem, drogami a chemikáliemi dohromady.` });
-    }
-  } catch (e) {
-    console.error('[EVELYN ASK]', e.message);
-  }
-
-  return res.json({
-    ok: true,
-    answer: `Na tohle přesně neumím odpovědět, ${jmeno}. Zkus se zeptat na stav pokladny, sklad, kdo je online, frekvenci vysílačky, Reserve Fund nebo svoje vyznamenání.`,
-  });
-});
-
 // ── API — PROFIL: PROMOTIONS, ACHIEVEMENTY, ONBOARDING ──
 app.get('/api/me/promotions', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
@@ -3370,25 +2980,7 @@ app.get('/api/me/achievements', requireAuth, (req, res) => {
   const { ACHIEVEMENTS } = require('./achievements');
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   const earned = user?.achievements || [];
-  const earnedKeys = earned.map(a => (typeof a === 'string' ? a : a.id));
-  // Progress k nejbližšímu automatickému odznaku podle počtu akcí — stejné
-  // hranice, jaké používá checkActionAchievements v achievements.js.
-  const actionCount = user?.action_count || 0;
-  const OPS_MILESTONES = [
-    { key: 'hundred_ops', target: 100 },
-    { key: 'ops_500', target: 500 },
-    { key: 'ops_1000', target: 1000 },
-  ];
-  const nextOps = OPS_MILESTONES.find(m => !earnedKeys.includes(m.key) && actionCount < m.target);
-  const progress = nextOps ? {
-    key: nextOps.key,
-    label: ACHIEVEMENTS[nextOps.key]?.label || nextOps.key,
-    icon: ACHIEVEMENTS[nextOps.key]?.icon || '★',
-    current: actionCount,
-    target: nextOps.target,
-    pct: Math.min(100, Math.round((actionCount / nextOps.target) * 100)),
-  } : null;
-  res.json({ ok: true, earned, catalog: ACHIEVEMENTS, progress });
+  res.json({ ok: true, earned, catalog: ACHIEVEMENTS });
 });
 
 app.get('/api/me/onboarding', requireAuth, (req, res) => {
@@ -3923,7 +3515,7 @@ app.get('/home', requireAuth, async (req, res) => {
 app.get('/dashboard', requireAuth, async (req, res) => res.redirect('/home'));
 
 
-app.get(['/sklad', '/sklad/:tab'], requireAuth, requireAccess('sklad-view'), async (req, res) => {
+app.get('/sklad', requireAuth, requireAccess('sklad-view'), async (req, res) => {
   try {
     const { zbrane, weed, drogy, chemky, ucet, recentUcet } = await buildSkladSummary();
     const cenik = loadCenik();
@@ -3945,11 +3537,8 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
-app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
-app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
-app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
-app.get('/informace', requireAuth, requireAccess('informace'), (req, res) => {
-  res.send(renderInformace(req));
+app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
+  res.send(renderSpisy(req));
 });
 app.get('/bazar', requireAuth, requireAccess('bazar'), (req, res) => res.send(renderBazar(req)));
 app.get('/mentoring', requireAuth, requireAccess('mentoring'), (req, res) => res.send(renderMentoring(req)));

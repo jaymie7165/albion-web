@@ -198,6 +198,28 @@ db.setIsAssociate = (id, isAssociate) => {
   return false;
 };
 
+// ── ODDĚLENÍ (department) — jen pro Senior Member (accessLevel 2) ──
+// Ruční přiřazení na webu, NEZÁVISLÉ na Discord rolích — žádnou novou
+// Discord roli kvůli tomu není potřeba zakládat. Skutečně řídí přístup do
+// jednotlivých tabů Skladu a výsek Blackbooku/Statistik (viz roles.js
+// DEPARTMENTS). Hodnoty: 'weapons' | 'narcotics' | 'members' | 'financials' | null.
+db.setDepartment = (id, department) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.department = department || null; save(users); return true; }
+  return false;
+};
+
+// ── POZICE (positionLabel) — čistě popisek, BEZ vlivu na oprávnění ──
+// Používá se hlavně pro Council (např. "Legal" / "Illegal"), volitelně
+// jako doplněk i jinde. Zobrazuje se vedle hodnosti jako "Rank — Position".
+db.setPositionLabel = (id, label) => {
+  const users = load();
+  const u = users.find(x => x.id === id);
+  if (u) { u.positionLabel = label || null; save(users); return true; }
+  return false;
+};
+
 // ── SOUKROMÍ TRADING KARTY ──
 db.setCardPrivate = (id, isPrivate) => {
   const users = load();

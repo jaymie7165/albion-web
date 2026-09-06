@@ -10,7 +10,7 @@
 // nemusí měnit. Globální JS funkce (showToast, ledgerEmptyHTML, atd.)
 // zůstávají beze změny.
 
-const { canAccess } = require('./roles');
+const { canAccess, DEPARTMENTS, departmentLabel } = require('./roles');
 const { escapeHtml } = require('./utils');
 
 const ICONS = {
@@ -167,12 +167,15 @@ function renderNav(req, active) {
         ${req.session.realAccessLevel === 1 ? `
         <div class="view-as-switcher" style="position:relative">
           <button class="nav-shortcut-hint" id="viewAsBtn" style="cursor:pointer;${req.session.viewAsLevel ? 'border-color:var(--oxblood-bright);color:var(--oxblood-bright)' : ''}" title="Zobrazit jako">
-            ${req.session.viewAsLevel ? 'Náhled: ' + ({ 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member' }[req.session.viewAsLevel]) : 'Zobrazit jako'}
+            ${req.session.viewAsLevel ? 'Náhled: ' + (req.session.viewAsLevel === 2 ? ('Senior Member' + (req.session.viewAsDepartment ? ' — ' + (departmentLabel(req.session.viewAsDepartment) || '') : '')) : ({ 1: 'Founder/Council', 3: 'Member' }[req.session.viewAsLevel])) : 'Zobrazit jako'}
           </button>
-          <div id="viewAsMenu" class="app-sidebar" style="position:absolute;top:120%;right:0;left:auto;bottom:auto;width:200px;padding:0.5rem;opacity:0;pointer-events:none;transition:opacity .15s;box-shadow:var(--shadow)">
+          <div id="viewAsMenu" class="app-sidebar" style="position:absolute;top:120%;right:0;left:auto;bottom:auto;width:220px;padding:0.5rem;opacity:0;pointer-events:none;transition:opacity .15s;box-shadow:var(--shadow);max-height:70vh;overflow-y:auto">
             <a href="#" class="sb-link" onclick="setViewAs(null);return false">Vlastní role</a>
-            <a href="#" class="sb-link" onclick="setViewAs(2);return false">Senior Member</a>
-            <a href="#" class="sb-link" onclick="setViewAs(3);return false">Member/Associate</a>
+            <div class="sb-eyebrow" style="margin-top:0.5rem">Senior Member</div>
+            <a href="#" class="sb-link" onclick="setViewAs(2,null);return false">— bez oddělení —</a>
+            ${Object.entries(DEPARTMENTS).map(([key, d]) => `<a href="#" class="sb-link" onclick="setViewAs(2,'${key}');return false">${d.label}</a>`).join('')}
+            <div class="sb-eyebrow" style="margin-top:0.5rem">Ostatní</div>
+            <a href="#" class="sb-link" onclick="setViewAs(3,null);return false">Member/Associate</a>
           </div>
         </div>` : ''}
         <div class="theme-switcher" title="Přepnout téma">
@@ -202,7 +205,7 @@ function renderNav(req, active) {
     </div>` : ''}
 
     ${req.session.viewAsLevel ? `<div style="background:var(--oxblood-faint);border-bottom:1px solid var(--border-oxblood);padding:0.5rem 2rem;text-align:center;font-family:var(--font-mono);font-size:0.7rem;color:var(--oxblood-bright);margin-left:var(--sidebar-w)">
-      Náhled jako role: ${({ 1: 'Founder/Council', 2: 'Senior Member', 3: 'Member/Associate' })[req.session.viewAsLevel]} — <a href="#" onclick="setViewAs(null);return false" style="color:var(--oxblood-bright)">ukončit náhled</a>
+      Náhled jako role: ${req.session.viewAsLevel === 2 ? ('Senior Member' + (req.session.viewAsDepartment ? ' — ' + (departmentLabel(req.session.viewAsDepartment) || '') : '')) : ({ 1: 'Founder/Council', 3: 'Member/Associate' })[req.session.viewAsLevel]} — <a href="#" onclick="setViewAs(null);return false" style="color:var(--oxblood-bright)">ukončit náhled</a>
     </div>` : ''}
 
     <div class="mobile-drawer" id="mobileDrawer">
@@ -385,8 +388,8 @@ function renderNav(req, active) {
       window.albionPaper = function(){};
       window.albionSound = { login(){}, success(){}, notification(){}, timerDone(){} };
 
-      window.setViewAs=async function(level){
-        const res=await fetch('/api/view-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level})});
+      window.setViewAs=async function(level, department){
+        const res=await fetch('/api/view-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level, department: department||null})});
         const d=await res.json();
         if(d.ok)location.reload(); else if(window.showToast)showToast(d.error,true);
       };
