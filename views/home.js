@@ -12,7 +12,7 @@
 
 const { ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
-const { canAccess } = require('../roles');
+const { canAccess, departmentLabel } = require('../roles');
 const { escapeHtml } = require('../utils');
 
 function renderHome(req, data) {
@@ -22,6 +22,10 @@ function renderHome(req, data) {
   const isRestricted = accessLevel >= 3;
   const canSklad = canAccess(accessLevel, 'sklad');
   const RANK_LABEL = { 1: 'Founder / Council', 2: 'Senior Member', 3: 'Member / Associate' };
+  // "Rank — Position": u Senior Membera je to přiřazené oddělení (Head of
+  // Weapons/Narcotics/Members/Financials, viz roles.js DEPARTMENTS), jinde
+  // čistě popisek (např. Council "Legal"/"Illegal") bez vlivu na oprávnění.
+  const positionText = accessLevel === 2 ? departmentLabel(req.session.department) : (req.session.positionLabel || null);
 
   const WEED_P = { "Žlutý kanabis": 150, "Zelený kanabis": 150, "Kanabis": 150, "Červený kanabis": 150, "Modrý kanabis": 150 };
   let totalValue = 0;
@@ -121,7 +125,7 @@ function renderHome(req, data) {
       <div>
         <div class="dash-greet-eyebrow">${isRestricted ? 'Nástěnka člena' : 'Organizace Caledonia'}</div>
         <div class="dash-greet-title">${greeting},<br>${escapeHtml(firstName)}<span class="dot">.</span></div>
-        <div class="dash-rank-row">${RANK_LABEL[accessLevel]}<span class="dash-rank-rule"></span></div>
+        <div class="dash-rank-row">${escapeHtml(RANK_LABEL[accessLevel] + (positionText ? ' — ' + positionText : ''))}<span class="dash-rank-rule"></span></div>
       </div>
       <div class="dash-clock-box">
         <div class="dash-clock" id="live-clock-hero">--:--:--</div>
@@ -237,6 +241,25 @@ function renderHome(req, data) {
       });
     }
 
+    // ── ŽLUTÝ KANABIS — rychlý výběr, sdílené pro obě role ──────────────────
+    // Dřív existovalo jen v memberDashboardScript(), takže Senior Member na
+    // staff dashboardu měl tlačítko, ale žádnou funkci za ním — teď je to
+    // tady, dostupné bez ohledu na to, který dashboard se právě vykreslil.
+    window.yellowTake = async function(){
+      const btn = document.getElementById('yellowTakeBtn');
+      const hint = document.getElementById('yellowTakeHint');
+      const qty = parseInt(document.getElementById('yellowTakeQty').value);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 500) { showToast('Množství musí být 1–500', true); return; }
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/weed/yellow-take', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mnozstvi: qty }) });
+        const d = await res.json();
+        if (d.ok) { showToast('Žlutý kanabis — VÝBĚR (' + qty + ' ks) zapsáno'); hint.textContent = 'Naposledy vzato: ' + qty + ' ks'; }
+        else showToast(d.error, true);
+      } catch (e) { showToast('Zápis se nepodařil', true); }
+      btn.disabled = false;
+    };
+
     ${!isRestricted ? staffDashboardScript() : memberDashboardScript()}
 
     // ── ONBOARDING (beze změny chování) ──
@@ -325,6 +348,15 @@ function renderHome(req, data) {
           ${canAccess(accessLevel, 'blackbook') ? `<a href="/blackbook" class="quick-tile">${svgIcon('blackbook')}<div><div class="quick-tile-label">Blackbook</div><div class="quick-tile-sub">Reporty</div></div></a>` : ''}
           ${canAccess(accessLevel, 'audit') ? `<a href="/audit" class="quick-tile">${svgIcon('audit')}<div><div class="quick-tile-label">Audit</div><div class="quick-tile-sub">Historie</div></div></a>` : ''}
         </div>
+        ${accessLevel === 2 ? `
+        <div class="dash-widget" style="margin-top:1.2rem">
+          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem">
+            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="1"></div>
+            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Vzít</button>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="yellowTakeHint"></div>
+        </div>` : ''}
       </div>
     </div>
     `;
@@ -493,20 +525,6 @@ function renderHome(req, data) {
 
   function memberDashboardScript() {
     return `
-    window.yellowTake = async function(){
-      const btn = document.getElementById('yellowTakeBtn');
-      const hint = document.getElementById('yellowTakeHint');
-      const qty = parseInt(document.getElementById('yellowTakeQty').value);
-      if (!Number.isInteger(qty) || qty < 1 || qty > 500) { showToast('Množství musí být 1–500', true); return; }
-      btn.disabled = true;
-      try {
-        const res = await fetch('/api/weed/yellow-take', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mnozstvi: qty }) });
-        const d = await res.json();
-        if (d.ok) { showToast('Žlutý kanabis — VÝBĚR (' + qty + ' ks) zapsáno'); hint.textContent = 'Naposledy vzato: ' + qty + ' ks'; }
-        else showToast(d.error, true);
-      } catch (e) { showToast('Zápis se nepodařil', true); }
-      btn.disabled = false;
-    };
     window.kufrVklad = async function(){
       const btn = document.getElementById('kufrVkladBtn');
       const hint = document.getElementById('kufrVkladHint');
