@@ -8,11 +8,21 @@
 
 const { baseStyles, ledgerEmpty } = require('../styles');
 const { renderNav } = require('../nav');
+const { getSkladTabsForUser, canManageCenik, departmentLabel } = require('../roles');
 
 function renderDashboard(req, data) {
   const { zbrane, weed, drogy, chemky, ucet, recentUcet, cenik, katalog } = data;
   const icName = req.session.icName;
-  const canManage = req.session.accessLevel === 1; // jen Founder/Council smí upravovat ceník a katalog položek
+  const accessLevel = req.session.accessLevel || 3;
+  const department = req.session.department || null;
+  const canManage = accessLevel === 1; // jen Founder/Council smí upravovat katalog položek (Zbraně/Weed/Drogy/Chemky)
+  const canEditCenik = canManageCenik(accessLevel, department); // Founder/Council + Head of Financials
+  // null = bez omezení (Founder/Council vidí úplně všechno). Pole = jen tyhle
+  // taby (Senior Member podle přiřazeného oddělení — viz roles.js DEPARTMENTS
+  // — a bez oddělení jen sdílené účetní taby; Member/Associate zjednodušený
+  // pohled beze změny).
+  const allowedTabs = getSkladTabsForUser(accessLevel, department);
+  const deptLabel = accessLevel === 2 ? departmentLabel(department) : null;
 
   const esc = (s) => (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -78,10 +88,15 @@ function renderDashboard(req, data) {
     { id: 'cenik',  label: 'Ceník',      sub: 'Referenční ceny', icon: '$' },
     { id: 'nevyrizene', label: 'Nevyřízené', sub: 'Weed & kufr od membérů', icon: '⚑' },
   ];
-  const memberOnly = (req.session.accessLevel || 3) >= 3;
+  const memberOnly = accessLevel >= 3;
   let sekceMeta = memberOnly
     ? [{ id:'ucet', label:'Reserve Fund', sub:'Povinný odvod', icon:'◉' }, { id:'cenik', label:'Ceník', sub:'Referenční ceny', icon:'$' }]
-    : null; // null = použij plné primary/secondary rozdělení níže
+    : null; // null = použij plné primary/secondary rozdělení níže (dál filtrované podle oddělení)
+
+  // Senior Member (level 2) vidí jen taby povolené jeho oddělením (+ sdílené
+  // účetní taby) — Founder/Council (level 1, allowedTabs === null) beze změny.
+  const sekceMetaPrimaryVisible = allowedTabs ? sekceMetaPrimary.filter(s => allowedTabs.includes(s.id)) : sekceMetaPrimary;
+  const sekceMetaSecondaryVisible = allowedTabs ? sekceMetaSecondary.filter(s => allowedTabs.includes(s.id)) : sekceMetaSecondary;
 
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -379,7 +394,7 @@ function renderDashboard(req, data) {
               <div class="sklad-sidebar-sub">${s.sub}</div>
             </div>
           </div>`).join('') : `
-        ${sekceMetaPrimary.map((s, i) => `
+        ${sekceMetaPrimaryVisible.map((s, i) => `
           <div class="sklad-sidebar-item${i===0?' active':''}" data-panel="${s.id}" onclick="skladTab('${s.id}')">
             <div class="sklad-sidebar-icon">${s.icon}</div>
             <div class="sklad-sidebar-text">
@@ -387,12 +402,13 @@ function renderDashboard(req, data) {
               <div class="sklad-sidebar-sub">${s.sub}</div>
             </div>
           </div>`).join('')}
+        ${sekceMetaSecondaryVisible.length ? `
         <div class="sklad-sidebar-more-toggle" id="skladMoreToggle" onclick="skladToggleMore()">
-          <span>Více — Zbraně, Výroba, Směnárna, Ceník, Nevyřízené</span>
+          <span>Více — ${sekceMetaSecondaryVisible.map(s => s.label).join(', ')}</span>
           <span class="more-arrow">▾</span>
         </div>
         <div class="sklad-sidebar-secondary" id="skladSecondary">
-          ${sekceMetaSecondary.map((s) => `
+          ${sekceMetaSecondaryVisible.map((s) => `
           <div class="sklad-sidebar-item" data-panel="${s.id}" onclick="skladTab('${s.id}')">
             <div class="sklad-sidebar-icon">${s.icon}</div>
             <div class="sklad-sidebar-text">
@@ -400,9 +416,10 @@ function renderDashboard(req, data) {
               <div class="sklad-sidebar-sub">${s.sub}</div>
             </div>
           </div>`).join('')}
-        </div>
+        </div>` : ''}
         `}
       </div>
+      ${deptLabel ? `<div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);padding:0.6rem 0 0 0.2rem">Tvoje oddělení: <strong style="color:var(--brass-bright)">${deptLabel}</strong></div>` : ''}
 
       <!-- Panely -->
       <div>
@@ -735,12 +752,12 @@ function renderDashboard(req, data) {
           <div class="panel-card">
             <div class="panel-head">
               <span class="panel-title">Ceník</span>
-              <span class="panel-badge">${canManage ? 'Editovatelné · Founder/Council' : 'Jen ke čtení'}</span>
-              ${canManage ? `<button class="quick-btn" onclick="addCenikRow()" style="margin-left:auto">+ Přidat řádek</button>
+              <span class="panel-badge">${canEditCenik ? 'Editovatelné · Founder/Council' : 'Jen ke čtení'}</span>
+              ${canEditCenik ? `<button class="quick-btn" onclick="addCenikRow()" style="margin-left:auto">+ Přidat řádek</button>
               <button class="quick-btn primary" onclick="saveCenik()">Uložit ceník</button>` : ''}
             </div>
             <p style="font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-faint);line-height:1.7;margin-bottom:0.6rem;max-width:640px">
-              Referenční výkupní a prodejní ceny. ${canManage ? 'Uprav hodnoty přímo v tabulce a klikni na <strong style="color:var(--brass-bright)">Uložit ceník</strong>.' : 'Upravovat může jen Founder/Council.'}
+              Referenční výkupní a prodejní ceny. ${canEditCenik ? 'Uprav hodnoty přímo v tabulce a klikni na <strong style="color:var(--brass-bright)">Uložit ceník</strong>.' : 'Upravovat může jen Founder/Council nebo Head of Financials.'}
             </p>
             <div style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-bottom:1.2rem">
               ${cenik.updatedAt ? `Naposledy upraveno ${new Date(cenik.updatedAt).toLocaleString('cs-CZ')}${cenik.updatedBy ? ' — ' + esc(cenik.updatedBy) : ''}` : 'Ceník zatím nebyl ručně upraven — zobrazují se výchozí hodnoty.'}
@@ -750,7 +767,7 @@ function renderDashboard(req, data) {
                 <div class="cenik-cat" data-cat="${ci}">
                   <div class="panel-list-label" style="margin-top:${ci ? '1.6rem' : '0'}">${esc(cat.label)}</div>
                   <div class="cenik-rows" data-cat-rows="${ci}">
-                    ${cat.rows.map((r, ri) => cenikRowHtml(r, ci, ri, canManage)).join('')}
+                    ${cat.rows.map((r, ri) => cenikRowHtml(r, ci, ri, canEditCenik)).join('')}
                   </div>
                 </div>`).join('')}
             </div>
@@ -1694,7 +1711,7 @@ function renderDashboard(req, data) {
     }
 
     // ── CENÍK ──
-    const CAN_MANAGE=${canManage};
+    const CAN_MANAGE=${canEditCenik};
     function addCenikRow(){
       const wrap=document.querySelector('#cenik-categories .cenik-cat:last-child .cenik-rows');
       if(!wrap)return;

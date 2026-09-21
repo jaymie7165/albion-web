@@ -14,7 +14,7 @@ const { ACHIEVEMENTS } = require('./achievements');
 
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
-const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly } = require('./roles');
+const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly, DEPARTMENTS, canManageCenik, canAccessSkladTab } = require('./roles');
 
 const { CONFIG, WEED_PLANT, METH_RECIPE, CHEMKY_CENY } = require('./constants');
 const { makeStore } = require('./content-store');
@@ -26,6 +26,8 @@ const { renderAudit } = require('./views/audit');
 const { renderStatistiky } = require('./views/statistiky');
 const { renderLore } = require('./views/lore');
 const { renderHierarchy } = require('./views/hierarchy');
+const { renderPrehled } = require('./views/prehled');
+const { renderVyznamenani } = require('./views/vyznamenani');
 const { renderGaraz } = require('./views/garaz');
 const { renderNemovitosti } = require('./views/nemovitosti');
 const { renderWeedSazeni } = require('./views/weed-sazeni');
@@ -129,6 +131,38 @@ app.post('/api/season', requireAuth, requireAccess('audit'), (req, res) => {
   if (!allowed.includes(season)) return res.json({ ok: false, error: 'Neplatný motiv' });
   saveSeason(season);
   broadcastSSE('seasonChange', { season });
+  res.json({ ok: true });
+});
+
+// ── ODDĚLENÍ SENIOR MEMBERŮ (Head of Weapons/Narcotics/Members/Financials) ──
+// Nezávislé na Discord rolích (viz roles.js DEPARTMENTS) — ruční přiřazení
+// na webu, Founder/Council. Klíčováno podle user.id, ukládáno do stejného
+// TRVALÉHO Volume jako ostatní JSON úložiště v appce.
+const DEPARTMENTS_FILE = path.join(DATA_DIR, 'departments.json');
+function loadDepartmentsMap() { try { return JSON.parse(fs.readFileSync(DEPARTMENTS_FILE, 'utf8')) || {}; } catch { return {}; } }
+function saveDepartmentsMap(map) { try { writeJsonAtomic(DEPARTMENTS_FILE, map); } catch (e) { console.error('[DEPARTMENTS]', e.message); } }
+function getDepartmentForUser(userId) { return loadDepartmentsMap()[String(userId)] || null; }
+
+app.get('/api/admin/departments', requireAuth, requireFounderCouncil, (req, res) => {
+  const map = loadDepartmentsMap();
+  const seniorMembers = db.prepare('SELECT * FROM users').all()
+    .filter(u => (u.access_level || 3) === 2)
+    .map(u => ({ id: u.id, icName: u.ic_name, discordUsername: u.discord_username, department: map[String(u.id)] || null }))
+    .sort((a, b) => (a.icName || '').localeCompare(b.icName || '', 'cs'));
+  const options = Object.entries(DEPARTMENTS).map(([key, d]) => ({ key, label: d.label }));
+  res.json({ ok: true, seniorMembers, options });
+});
+
+app.post('/api/admin/departments', requireAuth, requireFounderCouncil, (req, res) => {
+  const userId = parseInt(req.body.userId);
+  const department = (req.body.department || '').toString().trim() || null;
+  if (!Number.isInteger(userId)) return res.json({ ok: false, error: 'Neplatné ID člena' });
+  if (department && !DEPARTMENTS[department]) return res.json({ ok: false, error: 'Neplatné oddělení' });
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) return res.json({ ok: false, error: 'Člen nenalezen' });
+  const map = loadDepartmentsMap();
+  if (department) map[String(userId)] = department; else delete map[String(userId)];
+  saveDepartmentsMap(map);
   res.json({ ok: true });
 });
 
@@ -860,6 +894,13 @@ function broadcastSSE(event, data) {
   }
 }
 
+// nav.js má už dlouho posluchač na SSE event 'achievementUpdate' (bell toast
+// "Vyznamenání · Label — Uživatel"), ale nikdy se neemitoval — grant() v
+// achievements.js teď pošle interní event, tady ho jen přeposíláme dál.
+require('./achievements').events.on('granted', (info) => {
+  broadcastSSE('achievementUpdate', { label: info.label, uzivatel: info.icName });
+});
+
 app.get('/api/events', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1055,6 +1096,7 @@ app.post('/login/password', async (req, res) => {
     req.session.realAccessLevel = 3;
     req.session.isAssociate = true;
   }
+  try { req.session.department = getDepartmentForUser(user.id); } catch (e) { req.session.department = null; }
   try { db.setLastLogin(user.id, new Date().toISOString()); } catch (e) { console.error('[LOGIN]', e.message); }
   try { require('./achievements').checkTenureAchievements(user.id, user.created_at); } catch (e) {}
   res.redirect('/home');
@@ -1529,6 +1571,13 @@ const DISCORD_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 async function requireDiscordMember(req, res, next) {
   if (!req.session || !req.session.userId || !req.session.discordId) return next();
 
+  // Rychlé jednorázové doplnění oddělení pro session, která vznikla ještě
+  // před zavedením oddělení (aby uživatel nemusel kvůli tomu dělat nový
+  // login) — nezávislé na 5min throttlu Discord kontroly níže.
+  if (req.session.department === undefined) {
+    try { req.session.department = getDepartmentForUser(req.session.userId); } catch (e) { req.session.department = null; }
+  }
+
   const now = Date.now();
   const lastCheck = req.session.discordCheckedAt || 0;
 
@@ -1556,6 +1605,7 @@ async function requireDiscordMember(req, res, next) {
     req.session.isAssociate = isAssociateOnly(roles);
     try { db.setAccessLevel(req.session.userId, newLevel); } catch (e) {}
     if (!req.session.viewAsLevel) req.session.accessLevel = newLevel;
+    try { req.session.department = getDepartmentForUser(req.session.userId); } catch (e) {}
     req.session.discordCheckedAt = now;
     return next();
   } catch (err) {
@@ -1569,9 +1619,16 @@ function applyViewAs(req, res, next) {
     const real = req.session.realAccessLevel ?? req.session.accessLevel ?? 3;
     if (req.session.viewAsLevel && real === 1) {
       req.session.accessLevel = req.session.viewAsLevel;
+      // Preview konkrétního oddělení má smysl jen při View As level 2
+      // (Senior Member) — jinak se použije skutečné oddělení účtu.
+      req.session.department = req.session.viewAsLevel === 2
+        ? (req.session.viewAsDepartment || null)
+        : getDepartmentForUser(req.session.userId);
     } else {
       req.session.viewAsLevel = null;
+      req.session.viewAsDepartment = null;
       req.session.accessLevel = real;
+      req.session.department = getDepartmentForUser(req.session.userId);
     }
   }
   next();
@@ -1580,16 +1637,33 @@ function applyViewAs(req, res, next) {
 app.post('/api/view-as', requireAuth, (req, res) => {
   const real = req.session.realAccessLevel ?? req.session.accessLevel ?? 3;
   if (real !== 1) return res.status(403).json({ ok: false, error: 'Pouze Founder/Council může používat View As' });
-  const { level } = req.body;
+  const { level, department } = req.body;
   if (level === null || level === undefined) {
     req.session.viewAsLevel = null;
+    req.session.viewAsDepartment = null;
   } else {
     const lvl = parseInt(level);
     if (![1,2,3].includes(lvl)) return res.json({ ok: false, error: 'Neplatná úroveň' });
     req.session.viewAsLevel = lvl;
+    if (department !== undefined) {
+      const dept = (department || '').toString().trim() || null;
+      if (dept && !DEPARTMENTS[dept]) return res.json({ ok: false, error: 'Neplatné oddělení' });
+      req.session.viewAsDepartment = dept;
+    }
   }
-  res.json({ ok: true, viewAsLevel: req.session.viewAsLevel });
+  res.json({ ok: true, viewAsLevel: req.session.viewAsLevel, viewAsDepartment: req.session.viewAsDepartment || null });
 });
+
+// ── ODDĚLENÍ — vynucení i na serveru (ne jen schování tabu v UI) ────────────
+// Founder/Council (level 1) vždy bez omezení. Member/Associate (level 3) sem
+// vůbec nedojde, protože requireAccess('sklad') je pustí až za touto branou.
+function requireSkladTab(tabId) {
+  return (req, res, next) => {
+    const level = req.session.accessLevel || 3;
+    if (canAccessSkladTab(level, req.session.department, tabId)) return next();
+    return res.status(403).json({ ok: false, error: 'Tvoje oddělení nemá k této sekci skladu přístup' });
+  };
+}
 
 // ── VALIDAČNÍ HELPERY ─────────────────────────────────────────────────────────
 function inEnum(value, allowed) { return allowed.includes((value || '').toString().toUpperCase()); }
@@ -1640,7 +1714,7 @@ app.post('/api/sklad/undo', requireAuth, requireAccess('sklad'), async (req, res
 });
 
 // ── API — SKLADY ──────────────────────────────────────────────────────────────
-app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.post('/api/zbrane', requireAuth, requireAccess('sklad'), requireSkladTab('zbrane'), async (req, res) => {
   const { typ, polozka, mnozstvi, kategorie, ucel } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -1668,7 +1742,7 @@ app.post('/api/zbrane', requireAuth, requireAccess('sklad'), async (req, res) =>
   res.json({ ok: true });
 });
 
-app.post('/api/weed', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.post('/api/weed', requireAuth, requireAccess('sklad'), requireSkladTab('weed'), async (req, res) => {
   const { typ, odruda, mnozstvi } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -1721,7 +1795,7 @@ app.post('/api/weed/yellow-take', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/drogy', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.post('/api/drogy', requireAuth, requireAccess('sklad'), requireSkladTab('drogy'), async (req, res) => {
   const { typ, droga, mnozstvi } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -1769,7 +1843,7 @@ app.post('/api/ucet', requireAuth, requireAccess('sklad'), async (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.post('/api/chemky', requireAuth, requireAccess('sklad'), requireSkladTab('chemky'), async (req, res) => {
   const { typ, chemikalie, mnozstvi, cenaZdroj, cenaVlastni, cenaVlastniMena } = req.body;
   const typUp = (typ || '').toString().toUpperCase();
   const qty = parseInt(mnozstvi);
@@ -1840,7 +1914,7 @@ app.post('/api/chemky', requireAuth, requireAccess('sklad'), async (req, res) =>
 // stejně jako u ostatních skladových zápisů. Odečet surovin a přírůstek
 // hotového produktu (Metamfetamin) se zapíší v jednom požadavku, ať sklad
 // nikdy neskončí v mezistavu (suroviny pryč, produkt nikde).
-app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), requireSkladTab('vyroba'), async (req, res) => {
   const batches = parseInt(req.body.batches);
   if (!Number.isInteger(batches) || batches < 1 || batches > 50) {
     return res.json({ ok: false, error: 'Neplatný počet várek (1–50)' });
@@ -1917,7 +1991,7 @@ app.post('/api/vyroba/potvrdit', requireAuth, requireAccess('sklad'), async (req
 });
 
 // ── API — SMĚNÁRNA ──
-app.post('/api/smena', requireAuth, requireAccess('sklad'), async (req, res) => {
+app.post('/api/smena', requireAuth, requireAccess('sklad'), requireSkladTab('smena'), async (req, res) => {
   const { smer, castka } = req.body;
   const smerOk = (smer || '').toString().trim();
   const amount = parseFloat(castka);
@@ -1956,6 +2030,9 @@ app.post('/api/sklad/bulk', requireAuth, requireAccess('sklad'), async (req, res
   const { sekce, typ, items } = req.body;
   const cfg = BULK_SEKCE[sekce];
   if (!cfg) return res.json({ ok: false, error: 'Neplatná sekce skladu' });
+  if (!canAccessSkladTab(req.session.accessLevel || 3, req.session.department, sekce)) {
+    return res.status(403).json({ ok: false, error: 'Tvoje oddělení nemá k této sekci skladu přístup' });
+  }
 
   const typUp = (typ || '').toString().toUpperCase();
   if (!inEnum(typUp, TYP_SKLAD)) return res.json({ ok: false, error: 'Neplatný typ pohybu (VKLAD nebo VÝBĚR)' });
@@ -2034,7 +2111,7 @@ app.get('/api/cenik', requireAuth, (req, res) => {
   res.json({ ok: true, cenik: loadCenik() });
 });
 app.put('/api/cenik', requireAuth, requireAccess('sklad'), (req, res) => {
-  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Ceník smí upravovat jen Founder/Council' });
+  if (!canManageCenik(req.session.accessLevel, req.session.department)) return res.status(403).json({ ok: false, error: 'Ceník smí upravovat jen Founder/Council nebo Head of Financials' });
   const { categories } = req.body;
   if (!Array.isArray(categories)) return res.json({ ok: false, error: 'Neplatná data ceníku' });
   const clean = categories.map(cat => ({
@@ -2983,6 +3060,21 @@ app.get('/api/me/achievements', requireAuth, (req, res) => {
   res.json({ ok: true, earned, catalog: ACHIEVEMENTS });
 });
 
+app.post('/api/admin/achievements/grant', requireAuth, requireFounderCouncil, (req, res) => {
+  const { ACHIEVEMENTS, grant } = require('./achievements');
+  const userId = parseInt(req.body.userId);
+  const key = (req.body.key || '').toString();
+  if (!Number.isInteger(userId)) return res.json({ ok: false, error: 'Neplatné ID člena' });
+  const info = ACHIEVEMENTS[key];
+  if (!info) return res.json({ ok: false, error: 'Neznámý odznak' });
+  if (!info.manual) return res.json({ ok: false, error: 'Tenhle odznak se uděluje automaticky, ne ručně' });
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) return res.json({ ok: false, error: 'Člen nenalezen' });
+  const granted = grant(userId, key, req.session.icName);
+  if (!granted) return res.json({ ok: false, error: 'Člen tento odznak už má' });
+  res.json({ ok: true });
+});
+
 app.get('/api/me/onboarding', requireAuth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   res.json({ ok: true, seen: !!user?.onboarding_seen });
@@ -3492,6 +3584,130 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
 });
 
 
+// ══════════════════════════════════════════════════════════════════════
+// DASHBOARD (/home) — chybějící API endpointy
+// ══════════════════════════════════════════════════════════════════════
+// views/home.js na tyhle 4 endpointy volá `fetch(...)` už od dřívějška,
+// ale žádný z nich v serveru vůbec neexistoval — proto vysílačka, jezdící
+// ticker nedávné aktivity a Živý puls / Index Caledonie na dashboardu jen
+// tiše nic nezobrazily (fetch dostal 404, catch(e){} chybu spolkl).
+
+// ── VYSÍLAČKA — čtení existujícího Discord kanálu (CHANNEL_VYSILACKA) ──────
+// discord.js už měl hotovou getVysilackaMessages() přesně pro tohle (bot si
+// kanál generuje sám) — home.js na endpoint volal už dřív, jen v serveru
+// nikdy nebyl. Bereme nejnovější zprávu: 1. řádek = frekvence, zbytek (pokud
+// je) = platnost/poznámka. Pokud bot posílá jiný formát, dej vědět a
+// parsování doladím přesně na tvar zprávy.
+app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
+  try {
+    const messages = await discord.getVysilackaMessages(1);
+    if (!messages || !messages.length) return res.json({ ok: true, frekvence: null });
+    const msg = messages[0];
+    const lines = (msg.content || '').split('\n').map(l => l.trim()).filter(Boolean);
+    const frekvence = lines[0] || null;
+    const platnost = lines.slice(1).join(' · ') || (msg.timestamp ? `Aktualizováno ${new Date(msg.timestamp).toLocaleString('cs-CZ')}` : '');
+    res.json({ ok: true, frekvence, platnost });
+  } catch (e) {
+    console.error('[VYSILACKA]', e.message);
+    res.json({ ok: true, frekvence: null });
+  }
+});
+
+// ── TICKER — jezdící pruh nedávné aktivity napříč sklady + účetnictvím ─────
+app.get('/api/ticker', requireAuth, async (req, res) => {
+  try {
+    const [zbrane, weed, drogy, chemky, ucet] = await Promise.all([
+      sheets.getRecentRows('Zbraně', 5).catch(() => []),
+      sheets.getRecentRows('Weed', 5).catch(() => []),
+      sheets.getRecentRows('Drogy', 5).catch(() => []),
+      sheets.getRecentRows('Chemky', 5).catch(() => []),
+      sheets.getRecentRows('Účetnictví', 5).catch(() => []),
+    ]);
+    const events = [
+      ...zbrane.map(r => ({ cas: r[0] || '', text: `🔫 ${r[1] || ''} — ${r[2] || '?'} · ${r[5] || '—'}` })),
+      ...weed.map(r => ({ cas: r[0] || '', text: `🌿 ${r[1] || ''} — ${r[2] || '?'} · ${r[6] || '—'}` })),
+      ...drogy.map(r => ({ cas: r[0] || '', text: `💊 ${r[1] || ''} — ${r[2] || '?'} · ${r[6] || '—'}` })),
+      ...chemky.map(r => ({ cas: r[0] || '', text: `⚗️ ${r[1] || ''} — ${r[2] || '?'} · ${r[4] || '—'}` })),
+      ...ucet.map(r => {
+        const sym = (r[3] || '') === 'USD' ? 'SAD ' : '₱';
+        return { cas: r[0] || '', text: `${r[1] === 'PŘÍJEM' ? '💰' : '💸'} ${r[1] || ''} ${sym}${r[2] || ''} · ${r[5] || '—'}` };
+      }),
+    ];
+    events.sort((a, b) => b.cas.localeCompare(a.cas));
+    res.json({ ok: true, items: events.slice(0, 14).map(e => e.text) });
+  } catch (e) {
+    console.error('[TICKER]', e.message);
+    res.json({ ok: true, items: [] });
+  }
+});
+
+// ── CALEDONIA INDEX / ŽIVÝ PULS ─────────────────────────────────────────────
+// Kompozitní skóre 0–100 z pokladny, skladu a podílu online členů. Váhy jsou
+// orientační — klidně je dolaď, jakmile uvidíš reálná čísla organizace.
+// deltaPct = změna oproti poslední uložené hodnotě z PŘEDCHOZÍHO dne (uloženo
+// v CALEDONIA_INDEX_FILE), ne oproti minutě předtím.
+const CALEDONIA_INDEX_FILE = path.join(DATA_DIR, 'caledonia-index-history.json');
+function loadIndexHistory() { try { return JSON.parse(fs.readFileSync(CALEDONIA_INDEX_FILE, 'utf8')); } catch { return {}; } }
+function saveIndexHistory(entry) { try { writeJsonAtomic(CALEDONIA_INDEX_FILE, entry); } catch (e) {} }
+
+function computeCaledoniaIndex(skladCelkem, pokladnaUsd, activniPocet, celkemClenu) {
+  const financeScore   = Math.min(100, (pokladnaUsd / 50000) * 100);
+  const skladScore      = Math.min(100, (skladCelkem / 2000) * 100);
+  const aktivitaScore  = celkemClenu > 0 ? Math.min(100, (activniPocet / celkemClenu) * 200) : 0;
+  return Math.max(0, Math.min(100, Math.round(financeScore * 0.4 + skladScore * 0.3 + aktivitaScore * 0.3)));
+}
+
+app.get('/api/caledonia-index', requireAuth, async (req, res) => {
+  try {
+    const [{ zbrane, weed, drogy, chemky, ucet }, allUsers] = await Promise.all([
+      buildSkladSummary(),
+      Promise.resolve(db.prepare('SELECT * FROM users').all()),
+    ]);
+    const sumStock = (obj) => Object.values(obj || {}).filter(q => q > 0).reduce((a, b) => a + b, 0);
+    const skladCelkem = sumStock(zbrane) + sumStock(weed) + sumStock(drogy) + sumStock(chemky);
+    const celkemClenu = allUsers.length;
+    const onlineNames = new Set();
+    for (const client of sseClients) { if (client.albionIcName) onlineNames.add(client.albionIcName); }
+    const activniPocet = onlineNames.size;
+    const pokladnaUsd = ucet.usd || 0;
+    const index = computeCaledoniaIndex(skladCelkem, pokladnaUsd, activniPocet, celkemClenu);
+
+    const hist = loadIndexHistory();
+    const todayKey = new Date().toISOString().slice(0, 10);
+    let baseline;
+    if (hist.lastDay !== todayKey) {
+      baseline = hist.lastDay ? hist.lastValue : index; // první běh vůbec — porovnávej sám se sebou (delta 0)
+      saveIndexHistory({ lastDay: todayKey, lastValue: index, prevDayValue: baseline });
+    } else {
+      baseline = hist.prevDayValue != null ? hist.prevDayValue : index;
+      saveIndexHistory({ ...hist, lastValue: index });
+    }
+    const deltaPct = baseline > 0 ? Math.round(((index - baseline) / baseline) * 100) : 0;
+    const health = index >= 70 ? 'Vynikající' : index >= 45 ? 'Stabilní' : index >= 25 ? 'Křehký' : 'Kritický';
+
+    res.json({ ok: true, index, deltaPct, health, activniPocet, celkemClenu, pokladnaUsd, skladCelkem });
+  } catch (e) {
+    console.error('[CALEDONIA INDEX]', e.message);
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ── MOJE HISTORIE — nedávná aktivita PŘIHLÁŠENÉHO člena (member dashboard) ──
+app.get('/api/me/history', requireAuth, async (req, res) => {
+  try {
+    const icName = req.session.icName;
+    const [zbraneRows, weedRows] = await Promise.all([
+      sheets.getRows('Zbraně').catch(() => []),
+      sheets.getRows('Weed').catch(() => []),
+    ]);
+    const mine = (rows, ucolIdx) => rows.slice(1).filter(r => (r[ucolIdx] || '') === icName).slice(-30).reverse();
+    res.json({ ok: true, zbrane: mine(zbraneRows, 5), weed: mine(weedRows, 6) });
+  } catch (e) {
+    console.error('[ME HISTORY]', e.message);
+    res.json({ ok: true, zbrane: [], weed: [] });
+  }
+});
+
 app.get('/home', requireAuth, async (req, res) => {
   try {
     const [zbrane, weed, drogy, chemky, ucet, recentUcet, recentZbrane, recentWeed, recentDrogy, recentChemky] = await Promise.all([
@@ -3535,6 +3751,8 @@ app.get('/audit', requireAuth, requireAccess('audit'), (req, res) => res.send(re
 app.get('/statistiky', requireAuth, requireAccess('statistiky'), (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
+app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
+app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
 app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {

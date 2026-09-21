@@ -48,6 +48,16 @@ function renderHierarchy(req) {
     <div id="rank-editor" style="display:none"></div>
     ${canEdit ? `<div id="editorActions" style="display:none;margin-top:1rem"><button class="btn-submit" onclick="saveHierarchy()" style="width:auto;padding:0.7rem 1.3rem">Uložit změny</button></div>` : ''}
 
+    ${canEdit ? `
+    <div class="folio-rule"></div>
+    <div class="page-header" style="margin-bottom:1.4rem;border-bottom:none;padding-bottom:0">
+      <div><div class="page-label">Vedení</div><h1 class="page-title" style="font-size:1.6rem">Oddělení Senior Members</h1>
+      <p class="page-sub">Head of Weapons / Narcotics / Members / Financials — určuje, které taby ve Skladu daný Senior Member vidí (viz roles.js).</p></div>
+    </div>
+    <div id="dept-loading" class="ledger-loading">Načítám…</div>
+    <div id="dept-list" style="display:grid;gap:0.6rem"></div>
+    ` : ''}
+
     <div class="folio-rule"></div>
     <div class="page-header" style="margin-bottom:1.4rem;border-bottom:none;padding-bottom:0">
       <div><div class="page-label">Kdo je s kým</div><h1 class="page-title" style="font-size:1.6rem">Vztahy mezi členy</h1></div>
@@ -93,6 +103,30 @@ function renderHierarchy(req) {
       document.getElementById('rank-timeline').innerHTML = rankViewHtml(RANKS);
     }
     loadHierarchy();
+
+    const CAN_EDIT_DEPT = ${canEdit};
+    async function loadDepartments(){
+      if(!CAN_EDIT_DEPT) return;
+      try{
+        const res = await fetch('/api/admin/departments');
+        const d = await res.json();
+        document.getElementById('dept-loading').style.display='none';
+        const list = document.getElementById('dept-list');
+        if(!d.ok || !d.seniorMembers.length){ list.innerHTML = ledgerEmptyHTML('Zatím žádní Senior Members', true); return; }
+        const optionHtml = (current) => '<option value=""' + (!current?' selected':'') + '>— bez oddělení —</option>' +
+          d.options.map(o => '<option value="' + o.key + '"' + (o.key===current?' selected':'') + '>' + esc(o.label) + '</option>').join('');
+        list.innerHTML = d.seniorMembers.map(m => '<div class="nav-card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem">' +
+          '<div><div class="nav-card-title" style="font-size:0.95rem;margin-bottom:0.1rem">' + esc(m.icName||'—') + '</div><div class="nav-card-desc">@' + esc(m.discordUsername||'—') + '</div></div>' +
+          '<select onchange="setDepartment(' + m.id + ',this.value)" style="width:auto;min-width:200px">' + optionHtml(m.department) + '</select>' +
+        '</div>').join('');
+      }catch(e){ document.getElementById('dept-loading').textContent = 'Nepodařilo se načíst.'; }
+    }
+    window.setDepartment = async function(userId, department){
+      const res = await fetch('/api/admin/departments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId, department }) });
+      const d = await res.json();
+      if(d.ok) showToast('Oddělení uloženo'); else showToast(d.error||'Chyba', true);
+    };
+    loadDepartments();
 
     function rankEditorHtml(ranks){
       return ranks.map((r,i) => '<div class="card" style="margin-bottom:0.9rem">' +
