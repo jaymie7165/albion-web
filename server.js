@@ -897,9 +897,19 @@ function broadcastSSE(event, data) {
 // nav.js má už dlouho posluchač na SSE event 'achievementUpdate' (bell toast
 // "Vyznamenání · Label — Uživatel"), ale nikdy se neemitoval — grant() v
 // achievements.js teď pošle interní event, tady ho jen přeposíláme dál.
-require('./achievements').events.on('granted', (info) => {
-  broadcastSSE('achievementUpdate', { label: info.label, uzivatel: info.icName });
-});
+// Guard: pokud běží starší/nesynchronizovaná verze achievements.js bez
+// exportovaného `events`, tohle už neshodí celý server (viz Railway crash) —
+// jen se to zaloguje, ať je hned vidět, že achievements.js potřebuje nahradit.
+{
+  const achievementsEvents = require('./achievements').events;
+  if (achievementsEvents && typeof achievementsEvents.on === 'function') {
+    achievementsEvents.on('granted', (info) => {
+      broadcastSSE('achievementUpdate', { label: info.label, uzivatel: info.icName });
+    });
+  } else {
+    console.error('[ACHIEVEMENTS] achievements.js neexportuje "events" — nahraj aktualizovanou verzi achievements.js do kořene projektu. Bell notifikace při udělení odznaku prozatím nepůjdou, ale server neshodí.');
+  }
+}
 
 app.get('/api/events', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
