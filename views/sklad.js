@@ -418,8 +418,8 @@ function renderDashboard(req, data) {
           </div>`).join('')}
         </div>` : ''}
         `}
+        ${deptLabel ? `<div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);padding:0.9rem 0.2rem 0;border-top:1px solid var(--border);margin-top:0.6rem">Tvoje oddělení<br><strong style="color:var(--brass-bright)">${deptLabel}</strong></div>` : ''}
       </div>
-      ${deptLabel ? `<div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);padding:0.6rem 0 0 0.2rem">Tvoje oddělení: <strong style="color:var(--brass-bright)">${deptLabel}</strong></div>` : ''}
 
       <!-- Panely -->
       <div>

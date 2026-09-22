@@ -28,6 +28,7 @@ const { renderLore } = require('./views/lore');
 const { renderHierarchy } = require('./views/hierarchy');
 const { renderPrehled } = require('./views/prehled');
 const { renderVyznamenani } = require('./views/vyznamenani');
+const { renderAuditMe } = require('./views/audit-me');
 const { renderGaraz } = require('./views/garaz');
 const { renderNemovitosti } = require('./views/nemovitosti');
 const { renderWeedSazeni } = require('./views/weed-sazeni');
@@ -3609,9 +3610,16 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
 // je) = platnost/poznámka. Pokud bot posílá jiný formát, dej vědět a
 // parsování doladím přesně na tvar zprávy.
 app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
+  if (!process.env.CHANNEL_VYSILACKA) {
+    console.error('[VYSILACKA] Chybí env proměnná CHANNEL_VYSILACKA na Railway — bez ní se nemá odkud číst frekvence. Nastav ji na ID Discord kanálu, kam bot frekvenci píše.');
+    return res.json({ ok: true, frekvence: null });
+  }
   try {
     const messages = await discord.getVysilackaMessages(1);
-    if (!messages || !messages.length) return res.json({ ok: true, frekvence: null });
+    if (!messages || !messages.length) {
+      console.error('[VYSILACKA] Discord API nevrátil žádné zprávy z CHANNEL_VYSILACKA (buď je kanál prázdný, nebo bot do něj nevidí — zkontroluj práva "View Channel" + "Read Message History").');
+      return res.json({ ok: true, frekvence: null });
+    }
     const msg = messages[0];
     const lines = (msg.content || '').split('\n').map(l => l.trim()).filter(Boolean);
     const frekvence = lines[0] || null;
@@ -3706,15 +3714,25 @@ app.get('/api/caledonia-index', requireAuth, async (req, res) => {
 app.get('/api/me/history', requireAuth, async (req, res) => {
   try {
     const icName = req.session.icName;
-    const [zbraneRows, weedRows] = await Promise.all([
+    const [zbraneRows, weedRows, drogyRows, chemkyRows, ucetRows] = await Promise.all([
       sheets.getRows('Zbraně').catch(() => []),
       sheets.getRows('Weed').catch(() => []),
+      sheets.getRows('Drogy').catch(() => []),
+      sheets.getRows('Chemky').catch(() => []),
+      sheets.getRows('Účetnictví').catch(() => []),
     ]);
-    const mine = (rows, ucolIdx) => rows.slice(1).filter(r => (r[ucolIdx] || '') === icName).slice(-30).reverse();
-    res.json({ ok: true, zbrane: mine(zbraneRows, 5), weed: mine(weedRows, 6) });
+    const mine = (rows, ucolIdx, limit = 30) => rows.slice(1).filter(r => (r[ucolIdx] || '') === icName).slice(-limit).reverse();
+    res.json({
+      ok: true,
+      zbrane: mine(zbraneRows, 5),
+      weed: mine(weedRows, 6),
+      drogy: mine(drogyRows, 6),
+      chemky: mine(chemkyRows, 4),
+      ucet: mine(ucetRows, 5),
+    });
   } catch (e) {
     console.error('[ME HISTORY]', e.message);
-    res.json({ ok: true, zbrane: [], weed: [] });
+    res.json({ ok: true, zbrane: [], weed: [], drogy: [], chemky: [], ucet: [] });
   }
 });
 
@@ -3763,6 +3781,7 @@ app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
 app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
 app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
+app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
 app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
