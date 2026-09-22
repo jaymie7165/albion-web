@@ -60,6 +60,9 @@ const PAGE_ACCESS = {
   hierarchy:       3,
   home:            3, // Home má vlastní vnitřní omezení obsahu (ne celé stránky), viz home.js
   profil:          3,
+  navigator:       3, // Rozcestník — otevřené všem přihlášeným
+  achievements:    3, // Vyznamenání — vidí každý svůj postup; ruční udělení je omezené uvnitř API na Founder/Council
+  'audit-me':      3, // Moje aktivita — vlastní historie, otevřené všem přihlášeným
 };
 
 function canAccess(level, pageId) {
