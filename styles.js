@@ -67,6 +67,8 @@ function baseStyles() {
         --brass-dim:rgba(203,164,92,0.20);
         --brass-faint:rgba(203,164,92,0.07);
         --brass-line:rgba(203,164,92,0.26);
+        --amber:#B8752E;
+        --amber-bright:#D99A4E;
         --ivory:#EFE7D8;
         --ivory-dim:#B7ACA0;
         --ivory-faint:#6E6660;
@@ -117,6 +119,8 @@ function baseStyles() {
         --brass-bright:#5B4520;
         --brass-dim:rgba(122,95,46,0.22);
         --brass-faint:rgba(122,95,46,0.09);
+        --amber:#8A5A1E;
+        --amber-bright:#6B4415;
         --ivory:#231C14;
         --ivory-dim:#4C4230;
         --ivory-faint:#6E624A;
@@ -349,7 +353,10 @@ function baseStyles() {
       .index-delta.up{color:#7CC79A}
       .index-delta.down{color:var(--oxblood-bright)}
       .index-health{margin-top:1.2rem;font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ivory-faint)}
-      .index-health strong{color:var(--brass-bright);display:block;margin-top:0.2rem;font-size:0.66rem}
+      .index-health strong{color:var(--brass-bright);display:block;margin-top:0.2rem;font-size:0.66rem;transition:color 0.3s ease}
+      .index-health.status-excellent strong{color:#7CC79A}
+      .index-health.status-fragile strong{color:var(--amber-bright)}
+      .index-health.status-critical strong{color:var(--oxblood-bright)}
 
       .pulse-card{background:var(--panel2);border:1px solid var(--border);padding:1.4rem 1.6rem}
       .pulse-title{display:flex;align-items:center;gap:0.5rem;font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.9rem}

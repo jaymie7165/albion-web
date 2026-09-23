@@ -282,7 +282,13 @@ function renderNav(req, active) {
       evtSource.addEventListener('weedTimer', (e) => { const d = JSON.parse(e.data); if (d.action === 'add' && d.timer) showToast('Weed sázení · ' + d.timer.icName); });
       evtSource.addEventListener('bazarUpdate', (e) => { const d = JSON.parse(e.data); if (d.action === 'add') { bumpBellBadge(); showToast('Bazar · nová nabídka'); } else if (d.action === 'zajem') { bumpBellBadge(); showToast('Bazar · nový zájemce'); } });
       evtSource.addEventListener('mentoringUpdate', () => { bumpBellBadge(); showToast('Mentorský program · nová aktivita'); });
-      evtSource.addEventListener('achievementUpdate', (e) => { const d = JSON.parse(e.data); bumpBellBadge(); showToast('Vyznamenání · ' + d.label + ' — ' + d.uzivatel); });
+      evtSource.addEventListener('achievementUpdate', (e) => {
+        const d = JSON.parse(e.data);
+        bumpBellBadge();
+        showToast('🏅 Vyznamenání uděleno — ' + d.label + ' pro ' + d.uzivatel);
+        if (window.albionSound) window.albionSound.notification();
+        if (window.rewardFlash) window.rewardFlash(document.getElementById('notifBell'));
+      });
 
       let _toastQueue = [], _toastActive = false;
       function showToast(msg, isError) { _toastQueue.push({ msg, isError }); _processToastQueue(); }
@@ -385,8 +391,74 @@ function renderNav(req, active) {
           osc.connect(gain); const master=ctx.createGain(); master.gain.value=0.9; gain.connect(master); master.connect(ctx.destination); osc.start(now); osc.stop(now+0.34);
         }catch(e){}
       };
-      window.albionPaper = function(){};
-      window.albionSound = { login(){}, success(){}, notification(){}, timerDone(){} };
+      // Sdílený krátký tón pro celý zvukový systém webu (žádné externí
+      // soubory — vše syntetizované stejně jako albionSealThud výše).
+      function albionTone(freq, start, dur, type, peak){
+        const ctx = window._albionAudioCtx;
+        const osc = ctx.createOscillator(); osc.type = type || 'sine'; osc.frequency.setValueAtTime(freq, start);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(peak || 0.28, start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(start); osc.stop(start + dur + 0.02);
+      }
+      function albionEnsureCtx(){
+        window._albionAudioCtx = window._albionAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = window._albionAudioCtx; if (ctx.state === 'suspended') ctx.resume();
+        return ctx;
+      }
+      // "Šustění papíru" — krátký filtrovaný šum, pro potvrzení zápisu do
+      // skladu/účetnictví (sklad.js na tohle už dřív volal, jen z toho
+      // nikdy nic nebylo slyšet).
+      window.albionPaper = function(){
+        try{
+          const ctx = albionEnsureCtx(); const now = ctx.currentTime;
+          const len = ctx.sampleRate * 0.16;
+          const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+          const noise = ctx.createBufferSource(); noise.buffer = buffer;
+          const band = ctx.createBiquadFilter(); band.type = 'bandpass'; band.frequency.value = 2400; band.Q.value = 0.7;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.0001, now);
+          gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+          noise.connect(band); band.connect(gain); gain.connect(ctx.destination);
+          noise.start(now); noise.stop(now + 0.16);
+        }catch(e){}
+      };
+      window.albionSound = {
+        // Potvrzení úspěšné akce (uložení, udělení odznaku…) — teplý dvojtón nahoru.
+        success(){
+          try{ const ctx = albionEnsureCtx(); const now = ctx.currentTime;
+            albionTone(392.00, now, 0.14, 'triangle', 0.20);
+            albionTone(523.25, now + 0.09, 0.22, 'triangle', 0.24);
+          }catch(e){}
+        },
+        // Tichá "zvonková" notifikace — pro bell/SSE upozornění.
+        notification(){
+          try{ const ctx = albionEnsureCtx(); const now = ctx.currentTime;
+            albionTone(660, now, 0.18, 'sine', 0.16);
+          }catch(e){}
+        },
+        // Dokončený časovač (weed sázení apod.) — dva stejné tóny za sebou.
+        timerDone(){
+          try{ const ctx = albionEnsureCtx(); const now = ctx.currentTime;
+            albionTone(587.33, now, 0.14, 'triangle', 0.22);
+            albionTone(587.33, now + 0.22, 0.14, 'triangle', 0.22);
+          }catch(e){}
+        },
+        // Přihlášení — jemná tříntónová fanfárka, ať nový den v Caledonii
+        // začíná pocitem, ne jen "Uloženo".
+        login(){
+          try{ const ctx = albionEnsureCtx(); const now = ctx.currentTime;
+            albionTone(261.63, now, 0.16, 'triangle', 0.16);
+            albionTone(329.63, now + 0.1, 0.16, 'triangle', 0.18);
+            albionTone(392.00, now + 0.2, 0.26, 'triangle', 0.22);
+          }catch(e){}
+        },
+      };
 
       window.setViewAs=async function(level, department){
         const res=await fetch('/api/view-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({level, department: department||null})});

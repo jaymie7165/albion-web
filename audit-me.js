@@ -33,7 +33,7 @@ function renderAuditMe(req) {
         <p class="page-sub">Tvoje vlastní historie zápisů</p>
       </div>
     </div>
-    <div id="am-root"><div class="ledger-loading">Načítám…</div></div>
+    <div id="am-root"></div>
   </main>
   <script>
     function esc(s){return(s==null?'':String(s)).replace(/</g,'&lt;');}
@@ -58,6 +58,7 @@ function renderAuditMe(req) {
 
     async function loadHistory(){
       const root = document.getElementById('am-root');
+      root.innerHTML = skeletonRows(5, [1,3,1]);
       try{
         const res = await fetch('/api/me/history');
         const d = await res.json();
