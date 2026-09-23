@@ -124,7 +124,7 @@ function renderHierarchy(req) {
     window.setDepartment = async function(userId, department){
       const res = await fetch('/api/admin/departments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId, department }) });
       const d = await res.json();
-      if(d.ok) showToast('Oddělení uloženo'); else showToast(d.error||'Chyba', true);
+      if(d.ok){ showToast('Oddělení uloženo'); if(window.albionSound) window.albionSound.success(); } else showToast(d.error||'Chyba', true);
     };
     loadDepartments();
 
@@ -152,7 +152,7 @@ function renderHierarchy(req) {
     window.saveHierarchy = async function(){
       const res = await fetch('/api/content/hierarchy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: RANKS }) });
       const d = await res.json();
-      if(d.ok){ showToast('Hierarchie uložena'); toggleEdit(); loadHierarchy(); } else showToast(d.error||'Chyba', true);
+      if(d.ok){ showToast('Hierarchie uložena'); if(window.albionSound) window.albionSound.success(); toggleEdit(); loadHierarchy(); } else showToast(d.error||'Chyba', true);
     };
 
     // Vztahy — beze změny oproti dřívější verzi

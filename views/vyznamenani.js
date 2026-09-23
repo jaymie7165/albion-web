@@ -63,8 +63,12 @@ function renderVyznamenani(req) {
     const CATEGORY_ORDER = ${JSON.stringify(Object.keys(CATEGORY_LABELS))};
     function esc(s){return(s==null?'':String(s)).replace(/</g,'&lt;');}
 
+    let PREV_EARNED = null;
     async function loadAchievements(){
       try{
+        if (!PREV_EARNED) {
+          document.getElementById('vz-grid').innerHTML = skeletonRows(3, [1,1,1,1]);
+        }
         const res = await fetch('/api/me/achievements');
         const d = await res.json();
         const summary = document.getElementById('vz-summary');
@@ -83,16 +87,36 @@ function renderVyznamenani(req) {
           return '<div class="vz-cat-label">' + esc(CATEGORY_LABELS[cat] || cat) + '</div><div class="vz-cat-grid">' +
             keys.map(k => {
               const a = CATALOG[k]; const earned = earnedKeys.has(k);
-              return '<div class="badge-tile ' + (earned?'earned':'locked') + '" title="' + esc(a.desc) + '">' +
+              return '<div class="badge-tile ' + (earned?'earned':'locked') + '" data-key="' + k + '" title="' + esc(a.desc) + '">' +
                 '<div class="badge-tile-icon">' + (a.icon||'★') + '</div>' +
                 '<div class="badge-tile-label">' + esc(a.label) + '</div>' +
                 '<div class="badge-tile-cat">' + (earned ? 'Získáno' : (a.manual ? 'Uděluje vedení' : 'Zamčeno')) + '</div>' +
               '</div>';
             }).join('') + '</div>';
         }).join('');
+
+        // Odznak, který mezi minulým a tímhle načtením přibyl, dostane
+        // krátký "reward pop" — ne jen tichou změnu opacity.
+        if (PREV_EARNED) {
+          for (const k of earnedKeys) {
+            if (!PREV_EARNED.has(k) && window.rewardFlash) {
+              const tile = grid.querySelector('[data-key="' + k + '"]');
+              if (tile) window.rewardFlash(tile);
+            }
+          }
+        }
+        PREV_EARNED = earnedKeys;
       }catch(e){ document.getElementById('vz-summary').textContent = 'Nepodařilo se načíst vyznamenání.'; }
     }
     loadAchievements();
+
+    if (window.evtSource) {
+      window.evtSource.addEventListener('achievementUpdate', () => {
+        // Bell toast/zvuk už řeší nav.js — tady jen doplníme, že se grid
+        // sám přerenderuje, ať nově získaný odznak není vidět až po F5.
+        setTimeout(loadAchievements, 250);
+      });
+    }
 
     ${canGrant ? `
     async function loadGrantForm(){
@@ -114,7 +138,7 @@ function renderVyznamenani(req) {
       if(!userId || !key) return showToast('Vyber člena i odznak', true);
       const res = await fetch('/api/admin/achievements/grant', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ userId, key }) });
       const d = await res.json();
-      if(d.ok){ showToast('Odznak udělen'); loadAchievements(); } else showToast(d.error || 'Chyba', true);
+      if(d.ok){ showToast('Odznak udělen'); if(window.albionSound) window.albionSound.success(); loadAchievements(); } else showToast(d.error || 'Chyba', true);
     };
     ` : ''}
   </script>

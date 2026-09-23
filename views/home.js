@@ -389,6 +389,11 @@ function renderHome(req, data) {
         deltaEl.textContent=(d.deltaPct>=0?'↑ ':'↓ ')+Math.abs(d.deltaPct)+'%';
         deltaEl.className='index-delta '+(d.deltaPct>=0?'up':'down');
         document.getElementById('idx-health').textContent=d.health;
+        const healthEl = document.getElementById('idx-health').parentElement;
+        healthEl.classList.remove('status-excellent','status-fragile','status-critical');
+        if (d.health === 'Vynikající') healthEl.classList.add('status-excellent');
+        else if (d.health === 'Křehký') healthEl.classList.add('status-fragile');
+        else if (d.health === 'Kritický') healthEl.classList.add('status-critical');
         document.getElementById('pulse-ops').textContent=d.activniPocet;
         document.getElementById('pulse-members').textContent=d.celkemClenu;
         document.getElementById('pulse-moved').textContent='$'+Math.round(d.pokladnaUsd).toLocaleString('cs-CZ');
