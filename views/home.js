@@ -114,6 +114,12 @@ function renderHome(req, data) {
     .balance-tile{background:var(--panel2);padding:1.2rem 1.3rem;text-align:center}
     .balance-label{font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
     .balance-val{font-family:var(--font-display);font-size:1.4rem;color:var(--ivory);font-weight:600}
+
+    .attention-widget{display:none;background:var(--oxblood-faint);border:1px solid var(--border-oxblood);padding:1.1rem 1.4rem;margin-bottom:1.6rem}
+    .attention-title{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--oxblood-bright);margin-bottom:0.7rem;display:flex;align-items:center;gap:0.5rem}
+    .attention-row{display:flex;justify-content:space-between;gap:1rem;padding:0.4rem 0;font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);border-top:1px solid var(--border-oxblood)}
+    .attention-row:first-of-type{border-top:none}
+    .attention-row a{color:var(--ivory-dim)}
   </style>
   </head><body>
   ${renderNav(req, 'home')}
@@ -140,6 +146,11 @@ function renderHome(req, data) {
 
     <div class="dash-ticker">
       <div class="dash-ticker-track" id="dash-ticker-track">Načítám aktivitu…</div>
+    </div>
+
+    <div class="attention-widget" id="attention-widget">
+      <div class="attention-title">⚠ Potřebuje pozornost</div>
+      <div id="attention-rows"></div>
     </div>
 
     ${!isRestricted ? renderStaffDashboard() : renderMemberDashboard()}
@@ -240,6 +251,25 @@ function renderHome(req, data) {
         renderTicker();
       });
     }
+
+    // ── POTŘEBUJE POZORNOST — jen staff, a jen když je opravdu co hlásit ──
+    ${!isRestricted ? `
+    async function loadAttention(){
+      try{
+        const res = await fetch('/api/attention');
+        const d = await res.json();
+        if(!d.ok) return;
+        const rows = [];
+        d.lowStock.forEach(s => rows.push('<div class="attention-row"><span>Nízké zásoby — ' + s.sekce + ' · ' + s.polozka + '</span><span>' + s.qty + ' ks (práh ' + s.prah + ')</span></div>'));
+        if (d.nevyrizeneCount > 0) rows.push('<div class="attention-row"><span><a href="/sklad">Nevyřízené položky ve Skladu</a></span><span>' + d.nevyrizeneCount + '</span></div>');
+        const widget = document.getElementById('attention-widget');
+        if (rows.length) { document.getElementById('attention-rows').innerHTML = rows.join(''); widget.style.display = 'block'; }
+        else widget.style.display = 'none';
+      }catch(e){}
+    }
+    loadAttention();
+    setInterval(loadAttention, 120000);
+    ` : ''}
 
     // ── ŽLUTÝ KANABIS — rychlý výběr, sdílené pro obě role ──────────────────
     // Dřív existovalo jen v memberDashboardScript(), takže Senior Member na
@@ -592,6 +622,32 @@ function renderHome(req, data) {
       if (!items.length) { stream.innerHTML = '<div style="padding:1rem 0;color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.78rem">Zatím žádná aktivita</div>'; return; }
       stream.innerHTML = items.slice(0,8).map(ev => '<div class="qt-row"><div class="qt-time">'+((ev.cas||'').match(/\\d{1,2}:\\d{2}/)||[''])[0]+'</div><div class="qt-main"><div class="qt-title">'+ev.title+'</div><div class="qt-sub">'+ev.sub+'</div></div><div class="qt-amount"></div></div>').join('');
     }).catch(()=>{});
+
+    // ── ŽIVÁ AKTIVITA — stejná parita jako staff dashboard, jen filtrovaná
+    // na vlastní zápisy (SSE zprávy jsou globální pro celou organizaci) ──
+    const MEMBER_IC_NAME = ${JSON.stringify(icName || '')};
+    function prependMemberActivity(title, sub){
+      const stream = document.getElementById('member-activity-stream');
+      if (!stream) return;
+      const empty = stream.querySelector('div[style*="Zatím žádná aktivita"]');
+      if (empty) empty.remove();
+      const row = document.createElement('div');
+      row.className = 'qt-row';
+      row.innerHTML = '<div class="qt-time">'+new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'})+'</div>'+
+        '<div class="qt-main"><div class="qt-title">'+title+'</div><div class="qt-sub">'+sub+'</div></div><div class="qt-amount"></div>';
+      stream.prepend(row);
+      if (window.rewardFlash) window.rewardFlash(row);
+      while (stream.children.length > 8) stream.lastElementChild.remove();
+    }
+    if (MEMBER_IC_NAME && window.evtSource) {
+      window.evtSource.addEventListener('skladUpdate', (e) => {
+        const d = JSON.parse(e.data);
+        if (d.uzivatel !== MEMBER_IC_NAME) return;
+        const item = d.polozka||d.odruda||d.droga||d.chemikalie||'';
+        if (!item) return;
+        prependMemberActivity(d.typ+' — '+item, (d.qty||'')+' ks');
+      });
+    }
     `;
   }
 }

@@ -29,6 +29,7 @@ const { renderHierarchy } = require('./views/hierarchy');
 const { renderPrehled } = require('./views/prehled');
 const { renderVyznamenani } = require('./views/vyznamenani');
 const { renderAuditMe } = require('./views/audit-me');
+const { renderInformace } = require('./views/informace');
 const { renderGaraz } = require('./views/garaz');
 const { renderNemovitosti } = require('./views/nemovitosti');
 const { renderWeedSazeni } = require('./views/weed-sazeni');
@@ -104,16 +105,17 @@ app.use(applyViewAs);
 const kodexStore = makeStore(DATA_DIR, 'content-kodex.json', []);
 const loreStore  = makeStore(DATA_DIR, 'content-lore.json', []);
 const hierStore  = makeStore(DATA_DIR, 'content-hierarchy.json', []);
+const informaceStore = makeStore(DATA_DIR, 'content-informace.json', []);
 
 app.get('/api/content/:key', requireAuth, (req, res) => {
-  const stores = { kodex: kodexStore, lore: loreStore, hierarchy: hierStore };
+  const stores = { kodex: kodexStore, lore: loreStore, hierarchy: hierStore, informace: informaceStore };
   const store = stores[req.params.key];
   if (!store) return res.status(404).json({ ok: false });
   res.json({ ok: true, data: store.load() });
 });
 
 app.post('/api/content/:key', requireAuth, requireAccess('audit'), (req, res) => {
-  const stores = { kodex: kodexStore, lore: loreStore, hierarchy: hierStore };
+  const stores = { kodex: kodexStore, lore: loreStore, hierarchy: hierStore, informace: informaceStore };
   const store = stores[req.params.key];
   if (!store) return res.status(404).json({ ok: false });
   store.save(req.body.data);
@@ -3617,10 +3619,14 @@ app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
   try {
     const messages = await discord.getVysilackaMessages(1);
     if (!messages || !messages.length) {
-      console.error('[VYSILACKA] Discord API nevrátil žádné zprávy z CHANNEL_VYSILACKA (buď je kanál prázdný, nebo bot do něj nevidí — zkontroluj práva "View Channel" + "Read Message History").');
+      console.error('[VYSILACKA] Discord API nevrátil žádné zprávy z CHANNEL_VYSILACKA (buď je kanál prázdný, nebo bot do něj nevidí — zkontroluj práva "View Channel" + "Read Message History" pro roli bota v tom kanálu).');
       return res.json({ ok: true, frekvence: null });
     }
     const msg = messages[0];
+    if (!msg.content) {
+      console.error('[VYSILACKA] Poslední zpráva z kanálu se načetla, ale pole "content" je prázdné — typický příznak vypnutého "MESSAGE CONTENT INTENT" u bota. Zapni ho v Discord Developer Portal → tvoje aplikace → Bot → Privileged Gateway Intents → Message Content Intent, a ulož.');
+      return res.json({ ok: true, frekvence: null });
+    }
     const lines = (msg.content || '').split('\n').map(l => l.trim()).filter(Boolean);
     const frekvence = lines[0] || null;
     const platnost = lines.slice(1).join(' · ') || (msg.timestamp ? `Aktualizováno ${new Date(msg.timestamp).toLocaleString('cs-CZ')}` : '');
@@ -3711,6 +3717,35 @@ app.get('/api/caledonia-index', requireAuth, async (req, res) => {
 });
 
 // ── MOJE HISTORIE — nedávná aktivita PŘIHLÁŠENÉHO člena (member dashboard) ──
+// ── POTŘEBUJE POZORNOST — staff dashboard widget ────────────────────────────
+// Discord už dřív uměl upozornit na nízké zásoby (checkNizkaZasoba), ale jen
+// jako jednorázovou zprávu do kanálu — na webu nešlo zjistit "co teď hoří"
+// bez otevření každé sekce Skladu zvlášť. Tenhle endpoint jen znovu použije
+// existující buildSkladSummary()/loadThresholds()/loadNevyrizeneAkce().
+app.get('/api/attention', requireAuth, requireAccess('sklad'), async (req, res) => {
+  try {
+    const [{ zbrane, weed, drogy, chemky }, thresholds] = await Promise.all([
+      buildSkladSummary(),
+      Promise.resolve(loadThresholds()),
+    ]);
+    const SEKCE_LABEL = { zbrane: 'Zbraně', weed: 'Weed', drogy: 'Drogy', chemky: 'Chemky' };
+    const lowStock = [];
+    for (const [key, data] of Object.entries({ zbrane, weed, drogy, chemky })) {
+      const prah = thresholds[key];
+      if (!prah) continue;
+      for (const [polozka, qty] of Object.entries(data || {})) {
+        if (qty > 0 && qty < prah) lowStock.push({ sekce: SEKCE_LABEL[key], polozka, qty, prah });
+      }
+    }
+    lowStock.sort((a, b) => (a.qty / a.prah) - (b.qty / b.prah));
+    const nevyrizeneCount = loadNevyrizeneAkce().filter(r => !r.vyrizeno).length;
+    res.json({ ok: true, lowStock: lowStock.slice(0, 8), nevyrizeneCount });
+  } catch (e) {
+    console.error('[ATTENTION]', e.message);
+    res.json({ ok: true, lowStock: [], nevyrizeneCount: 0 });
+  }
+});
+
 app.get('/api/me/history', requireAuth, async (req, res) => {
   try {
     const icName = req.session.icName;
@@ -3782,6 +3817,7 @@ app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)))
 app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
 app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
 app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
+app.get('/informace', requireAuth, (req, res) => res.send(renderInformace(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
 app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {
