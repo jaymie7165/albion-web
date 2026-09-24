@@ -297,6 +297,17 @@ function baseStyles() {
       }
       textarea{resize:vertical;min-height:100px}
       select:focus,input:focus,textarea:focus{border-color:var(--brass)}
+
+      /* ══════════════════════════════════════════════
+         FOCUS & PRESS FEEDBACK — invisible to mouse users,
+         consistent everywhere. Quiet by design (thin brass
+         outline, no glow/fill) — same restraint as the rest
+         of the system, just extended to keyboard interaction.
+         ══════════════════════════════════════════════ */
+      :focus-visible{outline:1.5px solid var(--brass-bright);outline-offset:2px}
+      .btn-submit:focus-visible,.quick-btn:focus-visible,.nav-logout:focus-visible{outline-offset:1px}
+      button:active,.btn-submit:active,.quick-btn:active,.fav-chip:active,.yt-chip:active,.typ-btn:active,.nav-card:active{transform:scale(0.98)}
+      button,.btn-submit,.quick-btn,.fav-chip,.yt-chip,.typ-btn,.nav-card{transition:transform 0.1s ease,background 0.15s,color 0.15s,border-color 0.15s}
       select option{background:var(--panel2)}
       .btn-submit{background:transparent;color:var(--ivory);border:1px solid var(--oxblood-bright);padding:0.78rem 1.3rem;font-family:var(--font-label);font-size:0.6rem;letter-spacing:0.16em;text-transform:uppercase;font-weight:500;cursor:pointer;width:100%;margin-top:0.5rem;transition:background 0.15s,color 0.15s}
       .btn-submit:hover{background:var(--oxblood-bright);color:var(--noir)}
