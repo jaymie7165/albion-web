@@ -46,6 +46,19 @@ function renderWeedSazeni(req) {
     .timer-bar-track{height:3px;background:var(--border);margin-top:1rem;overflow:hidden}
     .timer-bar-fill{height:100%;background:linear-gradient(90deg,var(--oxblood),var(--brass));transition:width 1s linear}
 
+    /* Vizuální růst kytky — místo pouhého čísla vidí člověk, jak rostlina
+       skutečně roste. --progress (0–1) řídí výšku stonku a počet lístků. */
+    .plant-visual{width:52px;height:64px;flex-shrink:0}
+    .plant-pot{fill:var(--panel4)}
+    .plant-stem{stroke:#6FBF52;stroke-width:2.5;fill:none;transition:stroke-dashoffset 1s linear}
+    .plant-leaf{fill:#6FBF52;transition:opacity 0.6s ease,transform 0.6s ease;transform-origin:center}
+    .plant-leaf.hidden{opacity:0;transform:scale(0.3)}
+    .timer-card.timer-done .plant-stem{stroke:var(--brass-bright)}
+    .timer-card.timer-done .plant-leaf{fill:var(--brass-bright)}
+    .timer-card.timer-done .plant-visual{filter:drop-shadow(0 0 6px var(--brass-dim))}
+    .harvest-cta{display:none;margin-top:0.7rem}
+    .timer-card.timer-done .harvest-cta{display:inline-block}
+
     .notif-permission-row{
       display:flex;align-items:center;justify-content:space-between;gap:0.8rem;
       padding:0.7rem 0.9rem;margin-bottom:1.2rem;
@@ -230,9 +243,19 @@ function renderWeedSazeni(req) {
       wrap.innerHTML=timers.map(function(t){
         return '<div class="timer-card" data-id="'+t.id+'">'+
           '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">'+
-            '<div>'+
-              '<div style="font-family:var(--font-display);font-weight:600;font-style:italic;font-size:0.95rem;color:var(--ivory)">'+escT(t.icName)+' <span style="color:var(--ivory-faint);font-size:0.8rem;font-style:normal;font-family:var(--font-mono)">· Postal '+escT(t.postal)+'</span></div>'+
-              '<div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.3rem">'+t.plants+' kytek · '+escT(t.createdBy||'—')+'</div>'+
+            '<div style="display:flex;gap:0.9rem;align-items:center">'+
+              '<svg class="plant-visual" viewBox="0 0 52 64" data-plant="'+t.id+'">'+
+                '<path class="plant-pot" d="M14 50 L38 50 L34 64 L18 64 Z"/>'+
+                '<path class="plant-stem" data-stem="'+t.id+'" d="M26 50 L26 16" stroke-dasharray="34" stroke-dashoffset="34"/>'+
+                '<ellipse class="plant-leaf hidden" data-leaf="'+t.id+'-0" cx="18" cy="42" rx="7" ry="4" transform="rotate(-25 18 42)"/>'+
+                '<ellipse class="plant-leaf hidden" data-leaf="'+t.id+'-1" cx="34" cy="32" rx="7" ry="4" transform="rotate(25 34 32)"/>'+
+                '<ellipse class="plant-leaf hidden" data-leaf="'+t.id+'-2" cx="26" cy="16" rx="8" ry="5"/>'+
+              '</svg>'+
+              '<div>'+
+                '<div style="font-family:var(--font-display);font-weight:600;font-style:italic;font-size:0.95rem;color:var(--ivory)">'+escT(t.icName)+' <span style="color:var(--ivory-faint);font-size:0.8rem;font-style:normal;font-family:var(--font-mono)">· Postal '+escT(t.postal)+'</span></div>'+
+                '<div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.3rem">'+t.plants+' kytek · '+escT(t.createdBy||'—')+'</div>'+
+                '<a class="harvest-cta btn-submit" style="width:auto;padding:0.4rem 0.9rem;font-size:0.7rem" href="/home#yellow-take">Sklidit a nahlásit →</a>'+
+              '</div>'+
             '</div>'+
             '<div style="text-align:right">'+
               '<div class="cd-remain" data-id="'+t.id+'" data-ends="'+t.endsAt+'" style="font-family:var(--font-display);font-style:italic;font-size:1.2rem;color:var(--brass)">–</div>'+
@@ -265,7 +288,16 @@ function renderWeedSazeni(req) {
       });
       document.querySelectorAll('.cd-bar').forEach(el=>{
         const start=parseInt(el.dataset.start),ends=parseInt(el.dataset.ends);
-        el.style.width=Math.min(100,Math.max(0,((nowS-start)/(ends-start))*100))+'%';
+        const pct=Math.min(1,Math.max(0,(nowS-start)/(ends-start)));
+        el.style.width=(pct*100)+'%';
+        const id=el.closest('.timer-card').dataset.id;
+        const stem=document.querySelector('[data-stem="'+id+'"]');
+        if(stem) stem.style.strokeDashoffset = String(34*(1-pct));
+        const thresholds=[0.2,0.55,0.85];
+        thresholds.forEach((th,i)=>{
+          const leaf=document.querySelector('[data-leaf="'+id+'-'+i+'"]');
+          if(leaf) leaf.classList.toggle('hidden', pct<th);
+        });
       });
     }
     async function loadTimers(){
@@ -283,9 +315,17 @@ function renderWeedSazeni(req) {
       if(!/^\\d{4}$/.test(postal))return showToast('Postal musí být 4 číslice',true);
       const res=await fetch('/api/weed-timers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({icName,postal,plants})});
       const d=await res.json();
-      if(d.ok){showToast('Odpočet spuštěn');document.getElementById('t-postal').value='';loadTimers();}
+      if(d.ok){
+        showToast('Odpočet spuštěn');
+        try{ localStorage.setItem('caledonia_last_postal', postal); }catch(e){}
+        loadTimers();
+      }
       else showToast(d.error,true);
     }
+    try{
+      const lastPostal = localStorage.getItem('caledonia_last_postal');
+      if(lastPostal) document.getElementById('t-postal').value = lastPostal;
+    }catch(e){}
     async function removeTimer(id){
       const res=await fetch('/api/weed-timers/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
       const d=await res.json();if(d.ok)loadTimers();else showToast(d.error,true);

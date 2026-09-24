@@ -120,6 +120,11 @@ function renderHome(req, data) {
     .attention-row{display:flex;justify-content:space-between;gap:1rem;padding:0.4rem 0;font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);border-top:1px solid var(--border-oxblood)}
     .attention-row:first-of-type{border-top:none}
     .attention-row a{color:var(--ivory-dim)}
+
+    .yt-chips{display:flex;gap:0.5rem;margin-bottom:0.8rem;flex-wrap:wrap}
+    .yt-chip{background:var(--panel3);border:1px solid var(--border-brass);color:var(--ivory-dim);font-family:var(--font-mono);font-size:0.76rem;padding:0.35rem 0.8rem;cursor:pointer;transition:background 0.15s,border-color 0.15s}
+    .yt-chip:hover{background:var(--brass-faint);border-color:var(--brass)}
+    .yt-preview{font-family:var(--font-mono);font-size:0.82rem;color:var(--brass-bright);margin-top:0.5rem;min-height:1.1em}
   </style>
   </head><body>
   ${renderNav(req, 'home')}
@@ -275,6 +280,17 @@ function renderHome(req, data) {
     // Dřív existovalo jen v memberDashboardScript(), takže Senior Member na
     // staff dashboardu měl tlačítko, ale žádnou funkci za ním — teď je to
     // tady, dostupné bez ohledu na to, který dashboard se právě vykreslil.
+    const YELLOW_PRICE = 150;
+    window.setYellowQty = function(n){
+      document.getElementById('yellowTakeQty').value = n;
+      updateYellowPreview();
+    };
+    window.updateYellowPreview = function(){
+      const qty = parseInt(document.getElementById('yellowTakeQty').value) || 0;
+      const el = document.getElementById('yellowTakePreview');
+      if (!el) return;
+      el.textContent = qty > 0 ? '≈ $' + (qty * YELLOW_PRICE).toLocaleString('cs-CZ') + ' při prodeji' : '';
+    };
     window.yellowTake = async function(){
       const btn = document.getElementById('yellowTakeBtn');
       const hint = document.getElementById('yellowTakeHint');
@@ -284,11 +300,17 @@ function renderHome(req, data) {
       try {
         const res = await fetch('/api/weed/yellow-take', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mnozstvi: qty }) });
         const d = await res.json();
-        if (d.ok) { showToast('Žlutý kanabis — VÝBĚR (' + qty + ' ks) zapsáno'); hint.textContent = 'Naposledy vzato: ' + qty + ' ks'; }
+        if (d.ok) {
+          showToast('🌿 Žlutý kanabis — VÝBĚR (' + qty + ' ks · $' + (qty*YELLOW_PRICE).toLocaleString('cs-CZ') + ') zapsáno');
+          hint.textContent = 'Naposledy vzato: ' + qty + ' ks';
+          if (window.albionSound) window.albionSound.success();
+          if (window.rewardFlash) { document.querySelectorAll('.yt-widget').forEach(w => window.rewardFlash(w)); }
+        }
         else showToast(d.error, true);
       } catch (e) { showToast('Zápis se nepodařil', true); }
       btn.disabled = false;
     };
+    updateYellowPreview();
 
     ${!isRestricted ? staffDashboardScript() : memberDashboardScript()}
 
@@ -379,13 +401,17 @@ function renderHome(req, data) {
           ${canAccess(accessLevel, 'audit') ? `<a href="/audit" class="quick-tile">${svgIcon('audit')}<div><div class="quick-tile-label">Audit</div><div class="quick-tile-sub">Historie</div></div></a>` : ''}
         </div>
         ${accessLevel === 2 ? `
-        <div class="dash-widget" style="margin-top:1.2rem">
-          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem">
-            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="1"></div>
-            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Vzít</button>
+        <div class="dash-widget yt-widget" id="yellow-take" style="margin-top:1.2rem">
+          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr <span style="color:var(--ivory-faint);font-weight:400">· $150/sáček</span></div>
+          <div class="yt-chips">
+            ${[4,8,12,20].map(n => `<button type="button" class="yt-chip" onclick="setYellowQty(${n})">${n}×</button>`).join('')}
           </div>
-          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="yellowTakeHint"></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem;align-items:end">
+            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="4" oninput="updateYellowPreview()"></div>
+            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="width:auto;padding:0.7rem 1.3rem">Vzít</button>
+          </div>
+          <div class="yt-preview" id="yellowTakePreview"></div>
+          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
         </div>` : ''}
       </div>
     </div>
@@ -518,13 +544,17 @@ function renderHome(req, data) {
           <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="kufrVkladHint"></div>
         </div>
 
-        <div class="dash-widget">
-          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem">
-            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="1"></div>
-            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Vzít</button>
+        <div class="dash-widget yt-widget" id="yellow-take">
+          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr <span style="color:var(--ivory-faint);font-weight:400">· $150/sáček</span></div>
+          <div class="yt-chips">
+            ${[4,8,12,20].map(n => `<button type="button" class="yt-chip" onclick="setYellowQty(${n})">${n}×</button>`).join('')}
           </div>
-          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="yellowTakeHint"></div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem;align-items:end">
+            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="4" oninput="updateYellowPreview()"></div>
+            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="width:auto;padding:0.7rem 1.3rem">Vzít</button>
+          </div>
+          <div class="yt-preview" id="yellowTakePreview"></div>
+          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
         </div>
       </div>
 
