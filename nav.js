@@ -84,13 +84,23 @@ function renderNav(req, active) {
       links: [
         can('nastenska') && { id: 'nastenska', label: 'Nástěnka', href: '/nastenska', icon: ICONS.nastenska },
         can('informace') && { id: 'informace', label: 'Informace', href: '/informace', icon: ICONS.informace },
-        { id: 'mentoring', label: 'Mentoring', href: '/mentoring', icon: ICONS.mentoring },
-        { id: 'kodex', label: 'Kodex', href: '/kodex', icon: ICONS.kodex },
-        { id: 'lore', label: 'Historie', href: '/lore', icon: ICONS.lore },
         { id: 'hierarchy', label: 'Hierarchie', href: '/hierarchy', icon: ICONS.hierarchy },
+        { id: 'navigator', label: 'Rozcestník', href: '/prehled', icon: ICONS.navigator },
+      ].filter(Boolean),
+    },
+    {
+      id: 'komunita', label: 'Komunita',
+      links: [
+        { id: 'mentoring', label: 'Mentoring', href: '/mentoring', icon: ICONS.mentoring },
         can('bazar') && { id: 'bazar', label: 'Bazar', href: '/bazar', icon: ICONS.bazar },
         !isAssociate && { id: 'galerie', label: 'Galerie', href: '/galerie', icon: ICONS.galerie },
-        { id: 'navigator', label: 'Rozcestník', href: '/prehled', icon: ICONS.navigator },
+      ].filter(Boolean),
+    },
+    {
+      id: 'reference', label: 'Reference',
+      links: [
+        { id: 'kodex', label: 'Kodex', href: '/kodex', icon: ICONS.kodex },
+        { id: 'lore', label: 'Historie', href: '/lore', icon: ICONS.lore },
       ].filter(Boolean),
     },
     {
