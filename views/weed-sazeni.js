@@ -22,7 +22,7 @@ function renderWeedSazeni(req) {
       border-top:2px solid transparent;transition:background 0.2s;
     }
     .recipe-plaque:hover{background:var(--panel3);border-top-color:var(--brass)}
-    .recipe-plaque-name{font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .recipe-plaque-name{font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
     .recipe-plaque-qty{font-family:var(--font-display);font-style:italic;font-size:1.5rem;color:var(--ivory);line-height:1}
     .recipe-plaque-cost{font-family:var(--font-mono);font-size:0.64rem;color:var(--ivory-faint);margin-top:0.4rem}
 
@@ -30,20 +30,19 @@ function renderWeedSazeni(req) {
     .weed-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border-brass);margin-bottom:2.5rem}
     .weed-stat{background:var(--panel2);padding:1.6rem 1.4rem;text-align:center;border-top:2px solid transparent;transition:background 0.2s}
     .weed-stat:hover{background:var(--panel3);border-top-color:var(--brass)}
-    .weed-stat-label{font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
+    .weed-stat-label{font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
     .weed-stat-val{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.8rem;color:var(--ivory);line-height:1}
     .weed-stat-sub{font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.4rem}
 
     /* Odpočty */
     .timer-card{
-      background:var(--panel2);border:1px solid var(--border-brass);
+      background:var(--panel2);border:1px solid var(--border-brass);border-radius:var(--radius);
       padding:1.3rem 1.5rem;margin-bottom:0.9rem;
-      position:relative;transition:border-color 0.2s;
+      position:relative;transition:border-color 0.2s,transform 0.15s;
     }
-    .timer-card::before{content:'';position:absolute;top:0;left:0;width:12px;height:12px;border-top:1px solid var(--brass-dim);border-left:1px solid var(--brass-dim)}
-    .timer-card:hover{border-color:var(--brass)}
+    .timer-card:hover{border-color:var(--brass);transform:translateY(-2px)}
     .timer-card.timer-done{border-color:#6FBF52}
-    .timer-bar-track{height:3px;background:var(--border);margin-top:1rem;overflow:hidden}
+    .timer-bar-track{height:4px;background:var(--border);margin-top:1rem;overflow:hidden;border-radius:2px}
     .timer-bar-fill{height:100%;background:linear-gradient(90deg,var(--oxblood),var(--brass));transition:width 1s linear}
 
     /* Vizuální růst kytky — místo pouhého čísla vidí člověk, jak rostlina
@@ -137,15 +136,15 @@ function renderWeedSazeni(req) {
         <div id="calc-result" style="margin-top:0.5rem">
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border-brass);margin-bottom:1rem">
             <div style="background:var(--panel3);padding:1rem;text-align:center">
-              <div style="font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Náklad</div>
+              <div style="font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Náklad</div>
               <div id="calc-cost" style="font-family:var(--font-display);font-style:italic;font-size:1.3rem;color:var(--ivory)">$0</div>
             </div>
             <div style="background:var(--panel3);padding:1rem;text-align:center">
-              <div style="font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Tržba</div>
+              <div style="font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Tržba</div>
               <div id="calc-rev" style="font-family:var(--font-display);font-style:italic;font-size:1.3rem;color:var(--brass)">$0</div>
             </div>
             <div style="background:var(--panel3);padding:1rem;text-align:center">
-              <div style="font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Zisk</div>
+              <div style="font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Zisk</div>
               <div id="calc-profit" style="font-family:var(--font-display);font-style:italic;font-size:1.3rem;color:#6FBF52">$0</div>
             </div>
           </div>
@@ -259,7 +258,7 @@ function renderWeedSazeni(req) {
             '</div>'+
             '<div style="text-align:right">'+
               '<div class="cd-remain" data-id="'+t.id+'" data-ends="'+t.endsAt+'" style="font-family:var(--font-display);font-style:italic;font-size:1.2rem;color:var(--brass)">–</div>'+
-              '<button onclick="removeTimer(\\''+t.id+'\\')" style="margin-top:0.4rem;background:none;border:1px solid var(--border-brass);color:var(--ivory-faint);font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.22rem 0.6rem;cursor:pointer">Smazat</button>'+
+              '<button onclick="removeTimer(\\''+t.id+'\\')" style="margin-top:0.4rem;background:none;border:1px solid var(--border-brass);color:var(--ivory-faint);font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.04em;text-transform:uppercase;padding:0.22rem 0.6rem;cursor:pointer">Smazat</button>'+
             '</div>'+
           '</div>'+
           '<div class="timer-bar-track"><div class="cd-bar" data-start="'+t.startedAt+'" data-ends="'+t.endsAt+'" style="height:100%;width:0%"></div></div>'+

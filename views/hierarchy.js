@@ -41,7 +41,7 @@ function renderHierarchy(req) {
         <h1 class="page-title">Hierarchie</h1>
         <p class="page-sub">Struktura a řád organizace</p>
       </div>
-      ${canEdit ? `<button onclick="toggleEdit()" id="editToggleBtn" style="background:transparent;border:1px solid var(--border-brass);color:var(--ivory-dim);padding:0.55rem 1.1rem;font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Upravit</button>` : ''}
+      ${canEdit ? `<button onclick="toggleEdit()" id="editToggleBtn" style="background:transparent;border:1px solid var(--border-brass);color:var(--ivory-dim);padding:0.55rem 1.1rem;font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer">Upravit</button>` : ''}
     </div>
 
     <div id="rank-timeline"><div class="ledger-loading">Načítám…</div></div>

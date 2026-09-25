@@ -24,7 +24,7 @@ function renderVyznamenani(req) {
   <style>
     .vz-progress-track{height:6px;background:var(--panel2);border:1px solid var(--border);margin:1.1rem 0 2.2rem;overflow:hidden}
     .vz-progress-fill{height:100%;background:var(--brass-bright);transition:width 0.4s ease}
-    .vz-cat-label{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin:2rem 0 0.9rem}
+    .vz-cat-label{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin:2rem 0 0.9rem}
     .vz-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:0.8rem}
     .badge-tile{cursor:default}
   </style>

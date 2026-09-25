@@ -109,12 +109,12 @@ function renderDashboard(req, data) {
       border-bottom:1px solid var(--border-brass);
       display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;
     }
-    .sklad-opener-tag{font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.32em;text-transform:uppercase;color:var(--brass);margin-bottom:1rem;font-weight:500}
+    .sklad-opener-tag{font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.32em;text-transform:uppercase;color:var(--brass);margin-bottom:1rem;font-weight:500}
     .sklad-opener h1{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:clamp(2rem,4.5vw,3rem);color:var(--ivory);line-height:1}
     .sklad-opener p{font-family:var(--font-body);color:var(--ivory-faint);margin-top:0.6rem;font-size:0.9rem;max-width:480px;font-weight:300}
 
     .sklad-clock{font-family:var(--font-mono);font-size:1.1rem;color:var(--ivory-dim);letter-spacing:0.08em}
-    .sklad-clock-date{font-family:var(--font-label);font-size:0.52rem;color:var(--ivory-faint);letter-spacing:0.12em;text-transform:uppercase;margin-top:0.3rem}
+    .sklad-clock-date{font-family:var(--font-label);font-size:0.64rem;color:var(--ivory-faint);letter-spacing:0.04em;text-transform:uppercase;margin-top:0.3rem}
 
     /* ── TALLY STRIP ── */
     .tally-strip{
@@ -127,16 +127,16 @@ function renderDashboard(req, data) {
       transition:background 0.2s;border-top:2px solid transparent;
     }
     .tally-cell:hover{background:var(--panel3);border-top-color:var(--brass)}
-    .tally-cell-label{font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .tally-cell-label{font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
     .tally-cell-val{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.35rem;color:var(--ivory);line-height:1}
 
     /* ══════════════════════════════════════════════
        TAB LAYOUT
        ══════════════════════════════════════════════ */
-    .sklad-shell{display:grid;grid-template-columns:230px 1fr;gap:1.6rem;align-items:start}
+    .sklad-shell{display:grid;grid-template-columns:240px 1fr;gap:1.6rem;align-items:start}
 
     .sklad-sidebar{
-      background:var(--panel2);border:1px solid var(--border-brass);
+      background:var(--panel2);border:1px solid var(--border-brass);border-radius:var(--radius);
       position:sticky;top:calc(var(--nav-h) + 1.5rem);
       overflow:hidden;
     }
@@ -144,29 +144,28 @@ function renderDashboard(req, data) {
       display:flex;align-items:center;gap:0.85rem;
       padding:1rem 1.2rem;cursor:pointer;
       border-bottom:1px solid var(--border);
-      border-left:3px solid transparent;
-      transition:background 0.15s,border-color 0.15s;
+      transition:background 0.15s;
       position:relative;
     }
     .sklad-sidebar-item:last-child{border-bottom:none}
     .sklad-sidebar-item:hover{background:var(--brass-faint)}
-    .sklad-sidebar-item.active{background:var(--oxblood-faint);border-left-color:var(--oxblood)}
+    .sklad-sidebar-item.active{background:var(--oxblood-faint)}
     .sklad-sidebar-icon{
       font-family:var(--font-label);font-size:0.95rem;color:var(--brass);
-      width:26px;height:26px;flex-shrink:0;border:1px solid var(--border-brass);
+      width:30px;height:30px;flex-shrink:0;border:1px solid var(--border-brass);border-radius:var(--radius-sm);
       display:flex;align-items:center;justify-content:center;
       transition:border-color 0.15s,color 0.15s;
     }
     .sklad-sidebar-item.active .sklad-sidebar-icon{border-color:var(--oxblood);color:var(--oxblood-bright)}
     .sklad-sidebar-text{flex:1;min-width:0}
-    .sklad-sidebar-label{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:0.92rem;color:var(--ivory);line-height:1.2}
+    .sklad-sidebar-label{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:0.98rem;color:var(--ivory);line-height:1.2}
     .sklad-sidebar-item.active .sklad-sidebar-label{color:var(--brass-bright)}
     .sklad-sidebar-sub{font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.15rem;letter-spacing:0.03em}
 
     .sklad-sidebar-more-toggle{
       display:flex;align-items:center;justify-content:space-between;gap:0.5rem;
       padding:0.75rem 1.2rem;cursor:pointer;background:var(--panel3);
-      font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;
+      font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.02em;text-transform:uppercase;font-weight:500;
       color:var(--ivory-faint);transition:color 0.15s,background 0.15s;
     }
     .sklad-sidebar-more-toggle:hover{color:var(--brass-bright);background:var(--brass-faint)}
@@ -179,12 +178,10 @@ function renderDashboard(req, data) {
     .sklad-panel.active{display:block}
 
     .panel-card{
-      background:var(--panel2);border:1px solid var(--border-brass);
+      background:var(--panel2);border:1px solid var(--border-brass);border-radius:var(--radius-lg);
       padding:2rem 2.2rem;box-shadow:var(--shadow-card);position:relative;
-      transition:box-shadow 0.2s;
+      transition:box-shadow 0.2s,border-color 0.2s;
     }
-    .panel-card::before{content:'';position:absolute;top:0;left:0;width:18px;height:18px;border-top:1px solid var(--brass-dim);border-left:1px solid var(--brass-dim)}
-    .panel-card::after{content:'';position:absolute;bottom:0;right:0;width:18px;height:18px;border-bottom:1px solid var(--brass-dim);border-right:1px solid var(--brass-dim)}
     .panel-head{
       display:flex;align-items:baseline;justify-content:space-between;gap:1rem;
       margin-bottom:1.4rem;padding-bottom:1.1rem;border-bottom:1px solid var(--border-brass);
@@ -195,7 +192,7 @@ function renderDashboard(req, data) {
     .panel-split{display:grid;grid-template-columns:1fr 1.15fr;gap:2.2rem;align-items:start}
     @media(max-width:1180px){.panel-split{grid-template-columns:1fr}}
 
-    .panel-list-label{font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.9rem}
+    .panel-list-label{font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass);margin-bottom:0.9rem}
 
     /* ── OBLÍBENÉ POLOŽKY (rychlé vyplnění formuláře) ── */
     .fav-chips{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.9rem}
@@ -210,7 +207,7 @@ function renderDashboard(req, data) {
     .vyroba-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border-brass);margin-bottom:2rem}
     .vyroba-stat{background:var(--panel3);padding:1.3rem 1.2rem;text-align:center;border-top:2px solid transparent;transition:background 0.2s}
     .vyroba-stat:hover{background:var(--panel4)}
-    .vyroba-stat-label{font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.55rem}
+    .vyroba-stat-label{font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.55rem}
     .vyroba-stat-val{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.5rem;color:var(--ivory);line-height:1}
     .vyroba-stat-sub{font-family:var(--font-mono);font-size:0.58rem;color:var(--ivory-faint);margin-top:0.4rem}
 
@@ -235,7 +232,7 @@ function renderDashboard(req, data) {
     }
     .vyroba-step-card.final{border-color:var(--border-oxblood);background:radial-gradient(ellipse 90% 100% at 0% 0%, rgba(220,20,60,0.14) 0%, var(--panel3) 65%)}
     .vyroba-step-card.final::before{width:12px;height:12px;left:-1.83rem;top:1.3rem;background:var(--oxblood-bright);border:2px solid var(--brass);box-shadow:0 0 10px var(--oxblood-glow)}
-    .vyroba-step-meta{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
+    .vyroba-step-meta{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem}
     .vyroba-step-label{font-family:var(--font-display);font-weight:600;font-style:italic;font-size:1.02rem;color:var(--ivory);margin-bottom:0.6rem}
     .vyroba-step-flow{display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap}
     .vyroba-chip{
@@ -258,7 +255,7 @@ function renderDashboard(req, data) {
     /* ── VÝROBA — záložky receptů (Metamfetamin / Benzodiazepin / Joy) ── */
     .recept-tabs{display:flex;gap:0.5rem;margin-bottom:1.4rem;flex-wrap:wrap}
     .recept-tab{
-      font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;
+      font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;
       padding:0.6rem 1.1rem;background:var(--panel3);border:1px solid var(--border);color:var(--ivory-dim);
       cursor:pointer;transition:all 0.2s;
     }
@@ -275,7 +272,7 @@ function renderDashboard(req, data) {
       background:var(--brass-faint);border:1px solid var(--border-brass);
     }
     .smena-side{text-align:center;flex:1}
-    .smena-side-label{font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.4rem}
+    .smena-side-label{font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.4rem}
     .smena-side-val{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.5rem;color:var(--ivory)}
     .smena-arrow-btn{
       width:42px;height:42px;border-radius:50%;flex-shrink:0;
@@ -418,7 +415,7 @@ function renderDashboard(req, data) {
           </div>`).join('')}
         </div>` : ''}
         `}
-        ${deptLabel ? `<div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);padding:0.9rem 0.2rem 0;border-top:1px solid var(--border);margin-top:0.6rem">Tvoje oddělení<br><strong style="color:var(--brass-bright)">${deptLabel}</strong></div>` : ''}
+        ${deptLabel ? `<div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);padding:0.9rem 0.2rem 0;border-top:1px solid var(--border);margin-top:0.6rem">Tvoje oddělení<br><strong style="color:var(--brass-bright)">${deptLabel}</strong></div>` : ''}
       </div>
 
       <!-- Panely -->
@@ -1056,7 +1053,7 @@ function renderDashboard(req, data) {
       const wrap=document.getElementById(containerId);
       if(!wrap)return;
       if(!items||!items.length){ wrap.innerHTML=''; return; }
-      wrap.innerHTML='<span style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);align-self:center;margin-right:0.2rem">Oblíbené:</span>'+
+      wrap.innerHTML='<span style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--ivory-faint);align-self:center;margin-right:0.2rem">Oblíbené:</span>'+
         items.map(function(item){ return '<span class="fav-chip" data-item="'+item.replace(/"/g,'&quot;')+'">'+item+'</span>'; }).join('');
       wrap.querySelectorAll('.fav-chip').forEach(function(chip){
         chip.addEventListener('click', function(){ onPick(chip.dataset.item); });

@@ -69,21 +69,22 @@ function renderHome(req, data) {
   ${require('../styles').baseStyles()}
   <style>
     .dash-top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:2rem;margin-bottom:2.4rem;flex-wrap:wrap}
-    .dash-greet-eyebrow{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.5rem}
+    .dash-greet-eyebrow{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.5rem}
     .dash-greet-title{font-family:var(--font-display);font-weight:600;font-size:clamp(2.2rem,4.4vw,3.2rem);color:var(--ivory);line-height:1}
     .dash-greet-title .dot{color:var(--oxblood-bright)}
-    .dash-rank-row{display:flex;align-items:center;gap:0.8rem;margin-top:0.7rem;font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass)}
+    .dash-rank-row{display:flex;align-items:center;gap:0.8rem;margin-top:0.7rem;font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass)}
     .dash-rank-rule{flex:1;height:1px;background:var(--border);max-width:220px}
     .dash-clock-box{text-align:right}
     .dash-clock{font-family:var(--font-mono);font-size:1rem;color:var(--ivory-dim)}
-    .dash-date{font-family:var(--font-label);font-size:0.5rem;color:var(--ivory-faint);letter-spacing:0.1em;margin-top:0.3rem}
+    .dash-date{font-family:var(--font-label);font-size:0.62rem;color:var(--ivory-faint);letter-spacing:0.04em;margin-top:0.3rem}
 
     .dash-top-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:1.4rem;margin-bottom:1.4rem}
     @media(max-width:980px){.dash-top-grid{grid-template-columns:1fr}}
 
-    .finance-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:1.4rem}
-    .finance-tile{background:var(--panel2);padding:1.3rem 1.4rem}
-    .finance-tile-label{font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
+    .finance-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:0.9rem;margin-bottom:1.4rem}
+    .finance-tile{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:1.3rem 1.4rem;transition:border-color 0.2s,transform 0.15s}
+    .finance-tile:hover{border-color:var(--border-brass);transform:translateY(-2px)}
+    .finance-tile-label{font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
     .finance-tile-val{font-family:var(--font-display);font-size:1.5rem;color:var(--ivory);font-weight:600;line-height:1}
     .finance-tile-sub{font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.4rem}
     .finance-tile-sub.pos{color:#7CC79A}
@@ -92,19 +93,19 @@ function renderHome(req, data) {
     .dash-lower-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:1.4rem}
     @media(max-width:980px){.dash-lower-grid{grid-template-columns:1fr}}
 
-    .dash-online-bar{display:flex;align-items:center;gap:0.6rem;font-family:var(--font-mono);font-size:0.76rem;color:var(--ivory-dim);padding:0.65rem 1.1rem;background:var(--panel2);border:1px solid var(--border-brass);margin-bottom:1rem}
+    .dash-online-bar{display:flex;align-items:center;gap:0.6rem;font-family:var(--font-mono);font-size:0.76rem;color:var(--ivory-dim);padding:0.65rem 1.1rem;background:var(--panel2);border:1px solid var(--border-brass);border-radius:var(--radius);margin-bottom:1rem}
     .dash-online-dot{width:8px;height:8px;border-radius:50%;background:#7CC79A;box-shadow:0 0 6px #7CC79A;flex-shrink:0;animation:dashOnlinePulse 2s ease-in-out infinite}
     @keyframes dashOnlinePulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
-    .dash-ticker{overflow:hidden;white-space:nowrap;border-top:1px solid var(--border-brass);border-bottom:1px solid var(--border-brass);background:var(--panel2);padding:0.55rem 0;margin-bottom:1.6rem;position:relative}
+    .dash-ticker{overflow:hidden;white-space:nowrap;border:1px solid var(--border-brass);border-radius:var(--radius);background:var(--panel2);padding:0.55rem 0;margin-bottom:1.6rem;position:relative}
     .dash-ticker-track{display:inline-block;padding-left:100%;font-family:var(--font-mono);font-size:0.76rem;color:var(--ivory-dim);animation:dashTickerScroll 45s linear infinite}
     @keyframes dashTickerScroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 
     .quote-strip{margin-top:1.6rem;padding:1rem 1.4rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-family:var(--font-display);font-style:italic;font-size:1rem;color:var(--ivory-dim)}
-    .quote-strip .sig{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.14em;color:var(--oxblood-bright);text-transform:uppercase;font-style:normal}
+    .quote-strip .sig{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.04em;color:var(--oxblood-bright);text-transform:uppercase;font-style:normal}
 
     .op-card{background:var(--panel2);border:1px solid var(--border);padding:1.5rem 1.7rem}
-    .op-card-label{font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--brass);margin-bottom:0.7rem}
+    .op-card-label{font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.7rem}
     .op-card-title{font-family:var(--font-display);font-size:1.35rem;color:var(--ivory);margin-bottom:1.1rem}
     .op-track{height:4px;background:var(--border);position:relative;margin-bottom:0.6rem}
     .op-fill{height:100%;background:var(--oxblood-bright)}
@@ -112,11 +113,11 @@ function renderHome(req, data) {
 
     .balance-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin:1.6rem 0}
     .balance-tile{background:var(--panel2);padding:1.2rem 1.3rem;text-align:center}
-    .balance-label{font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .balance-label{font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
     .balance-val{font-family:var(--font-display);font-size:1.4rem;color:var(--ivory);font-weight:600}
 
-    .attention-widget{display:none;background:var(--oxblood-faint);border:1px solid var(--border-oxblood);padding:1.1rem 1.4rem;margin-bottom:1.6rem}
-    .attention-title{font-family:var(--font-label);font-size:0.56rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--oxblood-bright);margin-bottom:0.7rem;display:flex;align-items:center;gap:0.5rem}
+    .attention-widget{display:none;background:var(--oxblood-faint);border:1px solid var(--border-oxblood);border-radius:var(--radius);padding:1.1rem 1.4rem;margin-bottom:1.6rem}
+    .attention-title{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--oxblood-bright);margin-bottom:0.7rem;display:flex;align-items:center;gap:0.5rem}
     .attention-row{display:flex;justify-content:space-between;gap:1rem;padding:0.4rem 0;font-family:var(--font-mono);font-size:0.78rem;color:var(--ivory-dim);border-top:1px solid var(--border-oxblood)}
     .attention-row:first-of-type{border-top:none}
     .attention-row a{color:var(--ivory-dim)}
@@ -366,7 +367,7 @@ function renderHome(req, data) {
     <div class="dash-widget" style="margin-bottom:1.4rem">
       <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
       <div style="padding-top:0.7rem">
-        <div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
+        <div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
         <div id="vysilacka-frekvence" style="font-family:var(--font-display);font-weight:700;font-size:2.4rem;color:var(--oxblood-bright);letter-spacing:0.04em;line-height:1">—</div>
         <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-top:0.5rem"></div>
       </div>
@@ -517,8 +518,8 @@ function renderHome(req, data) {
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.6rem;align-items:start" id="memberGrid">
       <div>
         <div style="display:flex;gap:2rem;margin-bottom:1.6rem;flex-wrap:wrap">
-          <div><div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Hodnost</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-rank">—</div></div>
-          <div><div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Loajalita</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-badges">—</div></div>
+          <div><div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Hodnost</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-rank">—</div></div>
+          <div><div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Loajalita</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-badges">—</div></div>
         </div>
 
         <div class="op-card" style="margin-bottom:1.6rem">
@@ -562,7 +563,7 @@ function renderHome(req, data) {
         <div class="dash-widget" style="margin-bottom:1.4rem">
           <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
           <div style="padding-top:0.7rem">
-            <div style="font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
+            <div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
             <div id="vysilacka-frekvence" style="font-family:var(--font-display);font-weight:700;font-size:2.4rem;color:var(--oxblood-bright);letter-spacing:0.04em;line-height:1">—</div>
             <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-top:0.5rem"></div>
           </div>
