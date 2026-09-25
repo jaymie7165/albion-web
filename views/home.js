@@ -155,8 +155,11 @@ function renderHome(req, data) {
     </div>
 
     <div class="attention-widget" id="attention-widget">
-      <div class="attention-title">⚠ Potřebuje pozornost</div>
-      <div id="attention-rows"></div>
+      <div class="attention-title" onclick="toggleAttention()" style="cursor:pointer;justify-content:space-between">
+        <span>⚠ Potřebuje pozornost <span id="attention-count" style="color:var(--ivory-faint);font-weight:400"></span></span>
+        <span id="attention-arrow" style="transition:transform 0.2s">▾</span>
+      </div>
+      <div id="attention-rows" style="display:none"></div>
     </div>
 
     ${!isRestricted ? renderStaffDashboard() : renderMemberDashboard()}
@@ -269,10 +272,20 @@ function renderHome(req, data) {
         d.lowStock.forEach(s => rows.push('<div class="attention-row"><span>Nízké zásoby — ' + s.sekce + ' · ' + s.polozka + '</span><span>' + s.qty + ' ks (práh ' + s.prah + ')</span></div>'));
         if (d.nevyrizeneCount > 0) rows.push('<div class="attention-row"><span><a href="/sklad">Nevyřízené položky ve Skladu</a></span><span>' + d.nevyrizeneCount + '</span></div>');
         const widget = document.getElementById('attention-widget');
-        if (rows.length) { document.getElementById('attention-rows').innerHTML = rows.join(''); widget.style.display = 'block'; }
-        else widget.style.display = 'none';
+        if (rows.length) {
+          document.getElementById('attention-rows').innerHTML = rows.join('');
+          document.getElementById('attention-count').textContent = '(' + rows.length + ')';
+          widget.style.display = 'block';
+        } else widget.style.display = 'none';
       }catch(e){}
     }
+    window.toggleAttention = function(){
+      const rows = document.getElementById('attention-rows');
+      const arrow = document.getElementById('attention-arrow');
+      const open = rows.style.display === 'none';
+      rows.style.display = open ? 'block' : 'none';
+      arrow.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+    };
     loadAttention();
     setInterval(loadAttention, 120000);
     ` : ''}
