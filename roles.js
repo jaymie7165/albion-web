@@ -61,8 +61,10 @@ const PAGE_ACCESS = {
   home:            3, // Home má vlastní vnitřní omezení obsahu (ne celé stránky), viz home.js
   profil:          3,
   navigator:       3, // Rozcestník — otevřené všem přihlášeným
+  informace:       3, // Informace — otevřené všem přihlášeným, edituje jen Founder/Council (viz requireAccess('audit') na POST)
   achievements:    3, // Vyznamenání — vidí každý svůj postup; ruční udělení je omezené uvnitř API na Founder/Council
   'audit-me':      3, // Moje aktivita — vlastní historie, otevřené všem přihlášeným
+  denik:           3, // Deník — osobní poznámky, otevřené všem; Founder/Council má přístup i k cizím (viz denik.js banner)
 };
 
 function canAccess(level, pageId) {

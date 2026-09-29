@@ -30,6 +30,7 @@ const { renderPrehled } = require('./views/prehled');
 const { renderVyznamenani } = require('./views/vyznamenani');
 const { renderAuditMe } = require('./views/audit-me');
 const { renderInformace } = require('./views/informace');
+const { renderDenik } = require('./views/denik');
 const { renderGaraz } = require('./views/garaz');
 const { renderNemovitosti } = require('./views/nemovitosti');
 const { renderWeedSazeni } = require('./views/weed-sazeni');
@@ -167,6 +168,65 @@ app.post('/api/admin/departments', requireAuth, requireFounderCouncil, (req, res
   if (department) map[String(userId)] = department; else delete map[String(userId)];
   saveDepartmentsMap(map);
   res.json({ ok: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// DENÍK — osobní poznámkový blok každého člena
+// ══════════════════════════════════════════════════════════════════════
+// Ostatní členové organizace k tomu nemají přístup vůbec. Founder/Council
+// PŘÍSTUP MÁ, a tohle je o tom jediné poctivé řešení: stránka to sama
+// otevřeně píše členovi rovnou v UI (views/denik.js), žádná skrytá logika.
+const NOTES_FILE = path.join(DATA_DIR, 'personal-notes.json');
+function loadNotesStore() { try { return JSON.parse(fs.readFileSync(NOTES_FILE, 'utf8')) || {}; } catch { return {}; } }
+function saveNotesStore(map) { try { writeJsonAtomic(NOTES_FILE, map); } catch (e) { console.error('[DENIK]', e.message); } }
+function genNoteId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+app.get('/api/notes/mine', requireAuth, (req, res) => {
+  const store = loadNotesStore();
+  const mine = (store[String(req.session.userId)] || []).slice().reverse();
+  res.json({ ok: true, notes: mine });
+});
+
+app.post('/api/notes', requireAuth, (req, res) => {
+  const text = (req.body.text || '').toString().trim().slice(0, 5000);
+  if (!text) return res.json({ ok: false, error: 'Záznam je prázdný' });
+  const store = loadNotesStore();
+  const uid = String(req.session.userId);
+  if (!store[uid]) store[uid] = [];
+  const entry = { id: genNoteId(), text, createdAt: new Date().toISOString() };
+  store[uid].push(entry);
+  saveNotesStore(store);
+  res.json({ ok: true, entry });
+});
+
+app.delete('/api/notes/:id', requireAuth, (req, res) => {
+  const store = loadNotesStore();
+  const uid = String(req.session.userId);
+  const list = store[uid] || [];
+  const next = list.filter(e => e.id !== req.params.id);
+  if (next.length === list.length) return res.json({ ok: false, error: 'Záznam nenalezen' });
+  store[uid] = next;
+  saveNotesStore(store);
+  res.json({ ok: true });
+});
+
+// Founder/Council dohled — POCTIVĚ, žádné utajení. views/denik.js na tohle
+// upozorňuje přímo v rozhraní (banner), takže se nejedná o skrytý přístup.
+app.get('/api/admin/notes', requireAuth, requireFounderCouncil, (req, res) => {
+  const store = loadNotesStore();
+  const users = db.prepare('SELECT * FROM users').all();
+  const members = users
+    .filter(u => (store[String(u.id)] || []).length)
+    .map(u => ({ id: u.id, icName: u.ic_name, count: store[String(u.id)].length }))
+    .sort((a, b) => (a.icName || '').localeCompare(b.icName || '', 'cs'));
+  res.json({ ok: true, members });
+});
+
+app.get('/api/admin/notes/:userId', requireAuth, requireFounderCouncil, (req, res) => {
+  const store = loadNotesStore();
+  const notes = (store[String(req.params.userId)] || []).slice().reverse();
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.userId);
+  res.json({ ok: true, notes, icName: user ? user.ic_name : null });
 });
 
 // ── GALERIE ORGANIZACE ──
@@ -3818,6 +3878,7 @@ app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
 app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
 app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
 app.get('/informace', requireAuth, (req, res) => res.send(renderInformace(req)));
+app.get('/denik', requireAuth, (req, res) => res.send(renderDenik(req)));
 app.get('/garaz', requireAuth, (req, res) => res.send(renderGaraz(req)));
 app.get('/leaderboard', requireAuth, (req, res) => res.send(renderLeaderboard(req)));
 app.get('/spis', requireAuth, requireAccess('spis'), (req, res) => {

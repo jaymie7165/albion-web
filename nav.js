@@ -28,6 +28,7 @@ const ICONS = {
   profit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17l6-6 4 4 8-8"/></svg>',
   nastenska: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>',
   informace: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  denik: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4h9a3 3 0 0 1 3 3v13H8a2 2 0 0 1-2-2z"/><path d="M6 18a2 2 0 0 1 2-2h10"/></svg>',
   mentoring: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="7" r="3"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
   kodex: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>',
   lore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 9h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z"/></svg>',
@@ -61,6 +62,7 @@ function renderNav(req, active) {
   // položky vedoucí na tutéž stránku — sloučeno do jedné ("Weed").
   const GROUPS = [
     { id: 'dashboard', label: 'Dashboard', links: [{ id: 'home', label: 'Dashboard', href: '/home', icon: ICONS.home }] },
+    { id: 'osobni', label: 'Osobní', links: [{ id: 'denik', label: 'Deník', href: '/denik', icon: ICONS.denik }] },
     {
       id: 'evidence', label: 'Evidence',
       links: [
@@ -337,6 +339,47 @@ function renderNav(req, active) {
         el.classList.add('reward-flash','reward-pop');
         setTimeout(() => el.classList.remove('reward-flash','reward-pop'), 900);
       };
+
+      // ── SPOTLIGHT — kurzorem tažená záře na kartách, napříč úplně celým
+      // webem. Jeden delegovaný listener namísto listeneru na každý prvek —
+      // levné, funguje i na stránkách přidaných později bez jediné úpravy.
+      (function spotlight(){
+        if (window.matchMedia && window.matchMedia('(hover:none)').matches) return;
+        const SEL = '.card,.nav-card,.dash-widget,.badge-tile,.stat,.finance-tile,.panel-card,.timer-card,.gal-item';
+        let current = null;
+        document.addEventListener('mousemove', (e) => {
+          const el = e.target.closest ? e.target.closest(SEL) : null;
+          if (el !== current) {
+            if (current) current.classList.remove('spotlight-on');
+            current = el;
+            if (current) current.classList.add('spotlight-on');
+          }
+          if (el) {
+            const r = el.getBoundingClientRect();
+            el.style.setProperty('--sx', (e.clientX - r.left) + 'px');
+            el.style.setProperty('--sy', (e.clientY - r.top) + 'px');
+          }
+        }, { passive: true });
+      })();
+
+      // ── SCROLL REVEAL — jemné objevení karet, ne blikání. Jeden
+      // IntersectionObserver pro celou stránku, žádný scroll listener. ──
+      (function revealOnScroll(){
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        if (!('IntersectionObserver' in window)) return;
+        const els = document.querySelectorAll('.card,.nav-card,.stat,.dash-widget,.badge-tile,.finance-tile,.gal-item');
+        if (!els.length) return;
+        els.forEach(el => el.classList.add('reveal-pending'));
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('reveal-in');
+              io.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+        els.forEach(el => io.observe(el));
+      })();
 
       (function favicon(){
         let unread = 0;
