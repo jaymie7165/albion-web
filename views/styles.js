@@ -271,7 +271,12 @@ function baseStyles() {
 
       main{max-width:1440px;margin:0 auto;padding:2.4rem 2.4rem 5rem;position:relative;z-index:1}
 
-      .page-header{margin-bottom:2.4rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border);position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:2rem}
+      .page-header{margin-bottom:2.4rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border);position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;overflow:hidden}
+      .page-header::after{content:'';position:absolute;left:0;bottom:-1px;height:1px;width:100%;background:var(--border-brass);transform:scaleX(0);transform-origin:left;animation:pageHeaderDraw 0.8s cubic-bezier(.4,0,.2,1) 0.15s forwards}
+      @keyframes pageHeaderDraw{to{transform:scaleX(1)}}
+      .page-header>div:first-child{animation:pageHeaderRise 0.5s cubic-bezier(.4,0,.2,1) both}
+      @keyframes pageHeaderRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+      @media(prefers-reduced-motion:reduce){.page-header::after{animation:none;transform:scaleX(1)}.page-header>div:first-child{animation:none}}
       .page-label{font-family:var(--font-label);font-size:0.72rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.8rem;font-weight:600}
       .page-title{font-family:var(--font-display);font-size:clamp(2rem,4vw,2.9rem);color:var(--ivory);font-weight:600;letter-spacing:0.01em;line-height:1.0}
       .page-sub{font-family:var(--font-body);color:var(--ivory-faint);margin-top:0.6rem;font-size:0.9rem;font-weight:400}
@@ -283,7 +288,25 @@ function baseStyles() {
          CARDS — thinner border, no corner ornaments,
          used sparingly (prefer plain sections + rules)
          ══════════════════════════════════════════════ */
-      .card{background:var(--panel2);border:1px solid var(--border);padding:1.5rem;transition:border-color 0.2s,transform 0.15s;position:relative;border-radius:var(--radius)}
+      .card{background:var(--panel2);border:1px solid var(--border);padding:1.5rem;transition:border-color 0.2s,transform 0.15s;position:relative;border-radius:var(--radius);overflow:hidden}
+
+      /* ══════════════════════════════════════════════
+         SPOTLIGHT — soft glow that follows the cursor across
+         every card-like surface. One delegated listener (see
+         nav.js), pure CSS var + radial-gradient, cheap.
+         ══════════════════════════════════════════════ */
+      .card,.nav-card,.dash-widget,.badge-tile,.stat,.finance-tile,.panel-card,.timer-card,.gal-item,.rank-item{position:relative;overflow:hidden}
+      .card::before,.nav-card::before,.dash-widget::before,.badge-tile::before,.stat::before,.finance-tile::before,.panel-card::before,.timer-card::before,.gal-item::before,.rank-item::before{
+        content:'';position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 0.4s ease;
+        background:radial-gradient(circle 220px at var(--sx,50%) var(--sy,50%),rgba(232,192,131,0.10),transparent 70%);
+      }
+      .card.spotlight-on::before,.nav-card.spotlight-on::before,.dash-widget.spotlight-on::before,.badge-tile.spotlight-on::before,.stat.spotlight-on::before,.finance-tile.spotlight-on::before,.panel-card.spotlight-on::before,.timer-card.spotlight-on::before,.gal-item.spotlight-on::before,.rank-item.spotlight-on::before{opacity:1}
+      .card>*,.nav-card>*,.dash-widget>*,.badge-tile>*,.stat>*,.finance-tile>*,.panel-card>*,.timer-card>*,.rank-item>*{position:relative;z-index:1}
+      @media(hover:none){.card::before,.nav-card::before,.dash-widget::before,.badge-tile::before,.stat::before,.finance-tile::before,.panel-card::before,.timer-card::before,.gal-item::before,.rank-item::before{display:none}}
+
+      .reveal-pending{opacity:0;transform:translateY(14px)}
+      .reveal-in{opacity:1;transform:translateY(0);transition:opacity 0.55s ease,transform 0.55s ease}
+      @media(prefers-reduced-motion:reduce){.reveal-pending{opacity:1;transform:none}}
       .card:hover{border-color:var(--border-brass)}
       .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;padding-bottom:0.8rem;border-bottom:1px solid var(--border)}
       .card-title{font-family:var(--font-label);font-size:0.78rem;letter-spacing:0.03em;text-transform:uppercase;color:var(--ivory);font-weight:600}
@@ -344,8 +367,8 @@ function baseStyles() {
       .sklad-row:last-child{border-bottom:none}
       .sklad-row em{color:var(--brass);font-style:normal;margin-left:0.5rem;font-size:0.68rem;opacity:0.85;font-family:var(--font-mono)}
 
-      .toast{position:fixed;bottom:1.4rem;right:1.4rem;display:flex;align-items:flex-start;gap:0.8rem;background:var(--panel3);border:1px solid var(--border);border-left:3px solid #5FA875;border-radius:var(--radius-sm);padding:0.85rem 1.2rem;transform:translateY(20px);opacity:0;transition:transform 0.3s,opacity 0.3s;z-index:999;max-width:340px;box-shadow:var(--shadow);pointer-events:none}
-      .toast.show{transform:translateY(0);opacity:1;pointer-events:auto}
+      .toast{position:fixed;bottom:1.4rem;right:1.4rem;display:flex;align-items:flex-start;gap:0.8rem;background:var(--panel3);border:1px solid var(--border);border-left:3px solid #5FA875;border-radius:var(--radius-sm);padding:0.85rem 1.2rem;transform:translateY(20px) scale(0.96);opacity:0;transition:transform 0.4s cubic-bezier(.34,1.56,.64,1),opacity 0.3s;z-index:999;max-width:340px;box-shadow:var(--shadow);pointer-events:none}
+      .toast.show{transform:translateY(0) scale(1);opacity:1;pointer-events:auto}
       .toast.error{border-left-color:var(--oxblood-bright)}
       .toast-icon{flex:none;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.68rem;background:rgba(95,168,117,0.12);color:#7CC79A;border:1px solid rgba(95,168,117,0.3)}
       .toast.error .toast-icon{background:var(--oxblood-faint);color:var(--oxblood-bright);border-color:var(--border-oxblood)}
@@ -460,15 +483,17 @@ function baseStyles() {
       .modal-box.stamped{opacity:0.7}
       .seal-stamp{display:none}
 
-      .rank-item{display:flex;gap:1.4rem;align-items:flex-start;padding:1.4rem 0;border-bottom:1px solid var(--border)}
-      .rank-item:last-child{border-bottom:none}
-      .rank-num{font-family:var(--font-display);font-size:1.5rem;color:var(--brass);opacity:0.4;min-width:2.4rem}
-      .rank-item.founder .rank-num{opacity:1;color:var(--oxblood-bright)}
-      .rank-info h3{font-family:var(--font-display);font-size:1.05rem;color:var(--ivory);margin-bottom:0.2rem}
-      .rank-info .rank-member{font-family:var(--font-label);font-size:0.66rem;color:var(--ivory-dim);margin-bottom:0.4rem}
-      .rank-info p{font-family:var(--font-body);font-size:0.82rem;color:var(--ivory-dim);line-height:1.7;font-weight:300}
-      .rank-rights{margin-top:0.7rem;display:flex;flex-wrap:wrap;gap:0.3rem}
-      .rank-right-tag{font-family:var(--font-label);font-size:0.52rem;letter-spacing:0.06em;padding:0.18rem 0.55rem;border:1px solid var(--border);color:var(--ivory-dim)}
+      #rank-timeline{position:relative;padding-left:0.4rem}
+      .rank-item{display:flex;gap:1.4rem;align-items:flex-start;padding:1.1rem 1.3rem;margin-bottom:0.9rem;background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);position:relative;transition:border-color 0.2s,transform 0.15s}
+      .rank-item:hover{border-color:var(--border-brass);transform:translateX(3px)}
+      .rank-item:last-child{margin-bottom:0}
+      .rank-num{font-family:var(--font-display);font-size:1.05rem;font-weight:600;color:var(--brass);min-width:2.9rem;height:2.9rem;flex-shrink:0;border:1px solid var(--border-brass);border-radius:50%;background:var(--panel3);display:flex;align-items:center;justify-content:center;z-index:1}
+      .rank-item.founder .rank-num{color:var(--oxblood-bright);border-color:var(--border-oxblood);background:var(--oxblood-faint)}
+      .rank-info h3{font-family:var(--font-display);font-size:1.1rem;color:var(--ivory);margin-bottom:0.2rem}
+      .rank-info .rank-member{font-family:var(--font-label);font-size:0.72rem;color:var(--brass-bright);margin-bottom:0.4rem;font-weight:600}
+      .rank-info p{font-family:var(--font-body);font-size:0.85rem;color:var(--ivory-dim);line-height:1.65}
+      .rank-rights{margin-top:0.7rem;display:flex;flex-wrap:wrap;gap:0.4rem}
+      .rank-right-tag{font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.02em;padding:0.24rem 0.65rem;border:1px solid var(--border);border-radius:999px;color:var(--ivory-dim)}
 
       .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.4rem}
       .stat-card{background:var(--panel2);border:1px solid var(--border);padding:1.5rem}
@@ -517,12 +542,29 @@ function baseStyles() {
       .dash-notice-text{font-family:var(--font-body);font-size:0.8rem;color:var(--ivory-dim);line-height:1.6;font-weight:300}
       .dash-notice-btn{display:inline-flex;align-items:center;gap:0.4rem;margin-top:0.9rem;font-family:var(--font-label);font-size:0.54rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass-bright);text-decoration:none}
 
-      .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
-      .gal-item{background:var(--panel2);border:1px solid var(--border);overflow:hidden;position:relative}
-      .gal-item img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
-      .gal-caption{padding:0.7rem 0.9rem 0.2rem;font-size:0.8rem;color:var(--ivory-dim)}
-      .gal-meta{font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);padding:0 0.9rem 0.7rem}
-      .gal-del{position:absolute;top:0.5rem;right:0.5rem;background:rgba(0,0,0,0.6);color:#fff;border:none;width:24px;height:24px;cursor:pointer}
+      .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.3rem}
+      .gal-item{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;position:relative;transition:border-color 0.2s,transform 0.15s;cursor:pointer}
+      .gal-item:hover{border-color:var(--border-brass);transform:translateY(-3px)}
+      .gal-item .gal-img-wrap{overflow:hidden;aspect-ratio:4/3}
+      .gal-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.35s ease}
+      .gal-item:hover img{transform:scale(1.06)}
+      .gal-caption{padding:0.8rem 1rem 0.2rem;font-size:0.86rem;color:var(--ivory-dim)}
+      .gal-meta{font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint);padding:0 1rem 0.8rem}
+      .gal-del{position:absolute;top:0.6rem;right:0.6rem;background:rgba(0,0,0,0.55);color:#fff;border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;z-index:2;font-size:0.85rem;transition:background 0.15s}
+      .gal-del:hover{background:var(--oxblood-bright)}
+
+      /* ── LIGHTBOX — plné prohlížení fotky přes celou obrazovku ── */
+      .gal-lightbox{position:fixed;inset:0;background:rgba(10,7,13,0.92);z-index:998;display:none;align-items:center;justify-content:center;padding:3rem 1.5rem;flex-direction:column}
+      .gal-lightbox.open{display:flex}
+      .gal-lightbox img{max-width:min(90vw,1100px);max-height:70vh;object-fit:contain;border-radius:var(--radius);box-shadow:var(--shadow)}
+      .gal-lightbox-caption{color:var(--ivory);font-family:var(--font-body);font-size:0.95rem;margin-top:1.1rem;text-align:center;max-width:640px}
+      .gal-lightbox-meta{color:var(--ivory-faint);font-family:var(--font-mono);font-size:0.7rem;margin-top:0.4rem}
+      .gal-lightbox-close{position:absolute;top:1.4rem;right:1.6rem;background:none;border:1px solid var(--border-brass);color:var(--ivory);width:38px;height:38px;border-radius:50%;font-size:1.1rem;cursor:pointer}
+      .gal-lightbox-nav{position:absolute;top:50%;transform:translateY(-50%);background:none;border:1px solid var(--border-brass);color:var(--ivory);width:44px;height:44px;border-radius:50%;font-size:1.3rem;cursor:pointer;transition:background 0.15s}
+      .gal-lightbox-nav:hover{background:var(--brass-faint)}
+      .gal-lightbox-prev{left:1.6rem}
+      .gal-lightbox-next{right:1.6rem}
+      @media(max-width:640px){.gal-lightbox-nav{width:36px;height:36px}.gal-lightbox-prev{left:0.6rem}.gal-lightbox-next{right:0.6rem}}
 
       .trading-card{max-width:400px;margin:0 auto;background:var(--panel2);border:1px solid var(--border-brass);border-radius:var(--radius-lg);position:relative;overflow:hidden}
       .tc-header{background:var(--oxblood);padding:2rem 1.4rem 1.6rem;text-align:center;position:relative}
