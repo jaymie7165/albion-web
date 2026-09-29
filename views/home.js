@@ -68,15 +68,24 @@ function renderHome(req, data) {
   <title>Caledonia — Dashboard</title>
   ${require('../styles').baseStyles()}
   <style>
-    .dash-top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:2rem;margin-bottom:2.4rem;flex-wrap:wrap}
-    .dash-greet-eyebrow{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.5rem}
+    .dash-hero{position:relative;border-radius:var(--radius-lg);overflow:hidden;padding:3.4rem 2.6rem 2.4rem;margin-bottom:1.6rem;min-height:280px;display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;flex-wrap:wrap;background:linear-gradient(160deg,var(--panel3),var(--panel));isolation:isolate}
+    .dash-hero-photos{position:absolute;inset:-8%;z-index:0;overflow:hidden}
+    .dash-hero-photos img{position:absolute;object-fit:cover;aspect-ratio:4/3;filter:grayscale(0.35) sepia(0.12) contrast(1.05) brightness(0.62);will-change:transform}
+    .dash-hero-veil{position:absolute;inset:0;z-index:1;pointer-events:none;
+      background:
+        radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(232,192,131,0.14),transparent 42%),
+        linear-gradient(165deg,rgba(24,20,28,0.25),rgba(24,20,28,0.94) 72%);
+    }
+    .dash-hero-content,.dash-hero-clock{position:relative;z-index:2}
+    .dash-greet-eyebrow{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.5rem}
     .dash-greet-title{font-family:var(--font-display);font-weight:600;font-size:clamp(2.2rem,4.4vw,3.2rem);color:var(--ivory);line-height:1}
     .dash-greet-title .dot{color:var(--oxblood-bright)}
     .dash-rank-row{display:flex;align-items:center;gap:0.8rem;margin-top:0.7rem;font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass)}
-    .dash-rank-rule{flex:1;height:1px;background:var(--border);max-width:220px}
+    .dash-rank-rule{flex:1;height:1px;background:var(--border-brass);max-width:80px}
     .dash-clock-box{text-align:right}
     .dash-clock{font-family:var(--font-mono);font-size:1rem;color:var(--ivory-dim)}
     .dash-date{font-family:var(--font-label);font-size:0.62rem;color:var(--ivory-faint);letter-spacing:0.04em;margin-top:0.3rem}
+    @media(prefers-reduced-motion:reduce){.dash-hero-photos img{transition:none!important}}
 
     .dash-top-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:1.4rem;margin-bottom:1.4rem}
     @media(max-width:980px){.dash-top-grid{grid-template-columns:1fr}}
@@ -133,13 +142,15 @@ function renderHome(req, data) {
 
     <div id="weekly-banner" style="display:none;background:var(--brass-faint);border:1px solid var(--border-brass);padding:0.9rem 1.4rem;margin-bottom:1.6rem;font-family:var(--font-body);font-size:0.86rem;text-align:center"></div>
 
-    <div class="dash-top-row">
-      <div>
+    <div class="dash-hero" id="dashHero">
+      <div class="dash-hero-photos" id="dashHeroPhotos"></div>
+      <div class="dash-hero-veil"></div>
+      <div class="dash-hero-content">
         <div class="dash-greet-eyebrow">${isRestricted ? 'Nástěnka člena' : 'Organizace Caledonia'}</div>
         <div class="dash-greet-title">${greeting},<br>${escapeHtml(firstName)}<span class="dot">.</span></div>
         <div class="dash-rank-row">${escapeHtml(RANK_LABEL[accessLevel] + (positionText ? ' — ' + positionText : ''))}<span class="dash-rank-rule"></span></div>
       </div>
-      <div class="dash-clock-box">
+      <div class="dash-clock-box dash-hero-clock">
         <div class="dash-clock" id="live-clock-hero">--:--:--</div>
         <div class="dash-date">${dateStr}</div>
       </div>
@@ -188,6 +199,56 @@ function renderHome(req, data) {
       function tick(){ if(ch) ch.textContent=new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
       tick();setInterval(tick,1000);
     })();
+
+    // ── HERO — fotky z galerie jako pohyblivé pozadí sledující kurzor ───────
+    // Lehké: jen transformy (translate3d), throttlováno přes requestAnimationFrame,
+    // vypnuto při prefers-reduced-motion. Bez fotek v galerii hero pořád vypadá
+    // dobře (jen gradientové pozadí), takže žádný rozbitý prázdný stav.
+    (function dashHero(){
+      const hero = document.getElementById('dashHero');
+      const wrap = document.getElementById('dashHeroPhotos');
+      if (!hero || !wrap) return;
+      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      fetch('/api/gallery', { cache: 'no-store' }).then(r => r.json()).then(d => {
+        if (!d.ok || !d.items || !d.items.length) return;
+        const photos = d.items.slice(0, 6);
+        wrap.innerHTML = photos.map((it, i) => {
+          const depth = (0.35 + (i % 3) * 0.28).toFixed(2);
+          const top = (Math.random() * 55 - 8).toFixed(1);
+          const left = (i * (100 / photos.length) + (Math.random() * 6 - 3)).toFixed(1);
+          const rot = (Math.random() * 8 - 4).toFixed(1);
+          const size = (30 + Math.random() * 12).toFixed(0);
+          return '<img src="' + it.image + '" data-depth="' + depth + '" loading="lazy" style="top:' + top + '%;left:' + left + '%;width:' + size + '%;--rot:' + rot + 'deg;transform:rotate(var(--rot))">';
+        }).join('');
+
+        if (reduced) return;
+        let raf = null;
+        hero.addEventListener('mousemove', (e) => {
+          if (raf) return;
+          raf = requestAnimationFrame(() => {
+            const r = hero.getBoundingClientRect();
+            const px = (e.clientX - r.left) / r.width;
+            const py = (e.clientY - r.top) / r.height;
+            hero.style.setProperty('--mx', (px * 100) + '%');
+            hero.style.setProperty('--my', (py * 100) + '%');
+            wrap.querySelectorAll('img').forEach(img => {
+              const depth = parseFloat(img.dataset.depth);
+              const dx = (px - 0.5) * 26 * depth;
+              const dy = (py - 0.5) * 18 * depth;
+              img.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) rotate(var(--rot))';
+            });
+            raf = null;
+          });
+        });
+        hero.addEventListener('mouseleave', () => {
+          hero.style.setProperty('--mx', '50%');
+          hero.style.setProperty('--my', '50%');
+          wrap.querySelectorAll('img').forEach(img => { img.style.transform = 'translate3d(0,0,0) rotate(var(--rot))'; });
+        });
+      }).catch(() => {});
+    })();
+
     const RESTRICTED_HOME = ${isRestricted ? 'true' : 'false'};
 
     // ── VYSÍLAČKA — čtení existujícího Discord kanálu, viditelné pro úplně
@@ -359,24 +420,6 @@ function renderHome(req, data) {
   // ── ZNAČENÍ STAFF DASHBOARDU ────────────────────────────────────────────
   function renderStaffDashboard() {
     return `
-    <div class="dash-top-grid">
-      <div class="index-card">
-        <div class="index-eyebrow">Index Caledonie</div>
-        <div class="index-value"><span id="idx-value">—</span><span class="index-delta" id="idx-delta"></span></div>
-        <div class="index-health">Provozní stav<strong id="idx-health">—</strong></div>
-      </div>
-      <div class="pulse-card">
-        <div class="pulse-title"><span class="pulse-dot"></span>Živý puls</div>
-        <svg class="pulse-svg" viewBox="0 0 400 60" preserveAspectRatio="none" style="width:100%;height:52px"><path id="pulse-path" d="M0 30 L400 30"/></svg>
-        <div class="pulse-stats">
-          <div><div class="pulse-stat-num" id="pulse-ops">—</div><div class="pulse-stat-label">Aktivní členové</div></div>
-          <div><div class="pulse-stat-num" id="pulse-members">—</div><div class="pulse-stat-label">Celkem členů</div></div>
-          <div><div class="pulse-stat-num" id="pulse-moved">—</div><div class="pulse-stat-label">Reserve $ dnes</div></div>
-          <div><div class="pulse-stat-num" id="pulse-tx">—</div><div class="pulse-stat-label">Skladové jednotky</div></div>
-        </div>
-      </div>
-    </div>
-
     <div class="dash-widget" style="margin-bottom:1.4rem">
       <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
       <div style="padding-top:0.7rem">
@@ -449,41 +492,6 @@ function renderHome(req, data) {
 
   function staffDashboardScript() {
     return `
-    async function loadIndex(){
-      try{
-        const res=await fetch('/api/caledonia-index');
-        const d=await res.json();
-        if(!d.ok)return;
-        document.getElementById('idx-value').textContent=d.index;
-        const deltaEl=document.getElementById('idx-delta');
-        deltaEl.textContent=(d.deltaPct>=0?'↑ ':'↓ ')+Math.abs(d.deltaPct)+'%';
-        deltaEl.className='index-delta '+(d.deltaPct>=0?'up':'down');
-        document.getElementById('idx-health').textContent=d.health;
-        const healthEl = document.getElementById('idx-health').parentElement;
-        healthEl.classList.remove('status-excellent','status-fragile','status-critical');
-        if (d.health === 'Vynikající') healthEl.classList.add('status-excellent');
-        else if (d.health === 'Křehký') healthEl.classList.add('status-fragile');
-        else if (d.health === 'Kritický') healthEl.classList.add('status-critical');
-        document.getElementById('pulse-ops').textContent=d.activniPocet;
-        document.getElementById('pulse-members').textContent=d.celkemClenu;
-        document.getElementById('pulse-moved').textContent='$'+Math.round(d.pokladnaUsd).toLocaleString('cs-CZ');
-        document.getElementById('pulse-tx').textContent=d.skladCelkem.toLocaleString('cs-CZ');
-        drawPulse(d.index);
-      }catch(e){}
-    }
-    function drawPulse(index){
-      const path=document.getElementById('pulse-path');
-      if(!path)return;
-      const amp = 6 + (index/100)*18;
-      let d='M0 30 ';
-      for(let x=0;x<400;x+=40){
-        d += 'L'+(x+14)+' 30 L'+(x+18)+' '+(30-amp)+' L'+(x+22)+' '+(30+amp*0.6)+' L'+(x+26)+' 30 L'+(x+40)+' 30 ';
-      }
-      path.setAttribute('d', d);
-    }
-    loadIndex();
-    setInterval(loadIndex, 60000);
-
     async function loadBriefing(){
       try{
         const res=await fetch('/api/weekly-summary');
@@ -513,14 +521,12 @@ function renderHome(req, data) {
       const label = d.sekce==='zbrane'?'Zbraně':d.sekce==='weed'?'Weed':d.sekce==='chemky'?'Chemky':d.sekce==='undo'?null:'Drogy';
       const item = d.polozka||d.odruda||d.droga||d.chemikalie||'';
       if (label) prependActivity(d.typ+' — '+item, (d.qty||'')+' ks · '+d.uzivatel, /VKLAD/.test(d.typ)?'+':'−', /VKLAD/.test(d.typ));
-      loadIndex();
     });
     evtHome.addEventListener('ucetUpdate', (e) => {
       const d = JSON.parse(e.data);
       const sym = d.valuta === 'USD' ? 'SAD ' : '₱';
       const isIn = d.typ==='PŘÍJEM';
       prependActivity(d.typ+' — '+(d.poznamka||'—'), d.uzivatel, (isIn?'+':'-')+sym+d.castka, isIn);
-      loadIndex();
     });
     `;
   }
