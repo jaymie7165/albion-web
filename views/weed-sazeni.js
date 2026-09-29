@@ -12,25 +12,26 @@ function renderWeedSazeni(req) {
   <title>Caledonia — Weed sázení</title>
   ${baseStyles()}
   <style>
-    /* Ceník tabulka — vertikální plaque styl */
+    /* Ceník — spaced plaque karty místo hairline mřížky */
     .weed-recipe-plaques{
-      display:grid;grid-template-columns:repeat(5,1fr);gap:1px;
-      background:var(--border-brass);margin-bottom:2rem;
+      display:grid;grid-template-columns:repeat(5,1fr);gap:0.8rem;
+      margin-bottom:2rem;
     }
     .recipe-plaque{
-      background:var(--panel2);padding:1.4rem 1rem;text-align:center;
-      border-top:2px solid transparent;transition:background 0.2s;
+      background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);
+      padding:1.4rem 1rem;text-align:center;
+      border-top:2px solid transparent;transition:border-color 0.2s,transform 0.15s;
     }
-    .recipe-plaque:hover{background:var(--panel3);border-top-color:var(--brass)}
-    .recipe-plaque-name{font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
+    .recipe-plaque:hover{border-color:var(--border-brass);border-top-color:var(--brass);transform:translateY(-2px)}
+    .recipe-plaque-name{font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.02em;text-transform:uppercase;color:var(--brass);margin-bottom:0.5rem}
     .recipe-plaque-qty{font-family:var(--font-display);font-style:italic;font-size:1.5rem;color:var(--ivory);line-height:1}
     .recipe-plaque-cost{font-family:var(--font-mono);font-size:0.64rem;color:var(--ivory-faint);margin-top:0.4rem}
 
-    /* Stat strip — 4 čísla */
-    .weed-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border-brass);margin-bottom:2.5rem}
-    .weed-stat{background:var(--panel2);padding:1.6rem 1.4rem;text-align:center;border-top:2px solid transparent;transition:background 0.2s}
-    .weed-stat:hover{background:var(--panel3);border-top-color:var(--brass)}
-    .weed-stat-label{font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
+    /* Stat strip — 4 čísla, stejný spaced-card jazyk */
+    .weed-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0.9rem;margin-bottom:2.5rem}
+    .weed-stat{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:1.6rem 1.4rem;text-align:center;border-top:2px solid transparent;transition:border-color 0.2s,transform 0.15s}
+    .weed-stat:hover{border-color:var(--border-brass);border-top-color:var(--brass);transform:translateY(-2px)}
+    .weed-stat-label{font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.03em;text-transform:uppercase;color:var(--brass);margin-bottom:0.6rem}
     .weed-stat-val{font-family:var(--font-display);font-weight:700;font-style:italic;font-size:1.8rem;color:var(--ivory);line-height:1}
     .weed-stat-sub{font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.4rem}
 

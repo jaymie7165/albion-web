@@ -345,7 +345,7 @@ function renderNav(req, active) {
       // levné, funguje i na stránkách přidaných později bez jediné úpravy.
       (function spotlight(){
         if (window.matchMedia && window.matchMedia('(hover:none)').matches) return;
-        const SEL = '.card,.nav-card,.dash-widget,.badge-tile,.stat,.finance-tile,.panel-card,.timer-card,.gal-item,.rank-item';
+        const SEL = '.card,.nav-card,.dash-widget,.badge-tile,.stat,.finance-tile,.panel-card,.timer-card,.gal-item,.rank-item,.recipe-plaque,.weed-stat';
         let current = null;
         document.addEventListener('mousemove', (e) => {
           const el = e.target.closest ? e.target.closest(SEL) : null;
@@ -367,7 +367,7 @@ function renderNav(req, active) {
       (function revealOnScroll(){
         if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         if (!('IntersectionObserver' in window)) return;
-        const els = document.querySelectorAll('.card,.nav-card,.stat,.dash-widget,.badge-tile,.finance-tile,.gal-item,.rank-item');
+        const els = document.querySelectorAll('.card,.nav-card,.stat,.dash-widget,.badge-tile,.finance-tile,.gal-item,.rank-item,.recipe-plaque,.weed-stat');
         if (!els.length) return;
         els.forEach(el => el.classList.add('reveal-pending'));
         const io = new IntersectionObserver((entries) => {

@@ -68,24 +68,30 @@ function renderHome(req, data) {
   <title>Caledonia — Dashboard</title>
   ${require('../styles').baseStyles()}
   <style>
-    .dash-hero{position:relative;border-radius:var(--radius-lg);overflow:hidden;padding:3.4rem 2.6rem 2.4rem;margin-bottom:1.6rem;min-height:280px;display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;flex-wrap:wrap;background:linear-gradient(160deg,var(--panel3),var(--panel));isolation:isolate}
-    .dash-hero-photos{position:absolute;inset:-8%;z-index:0;overflow:hidden}
-    .dash-hero-photos img{position:absolute;object-fit:cover;aspect-ratio:4/3;filter:grayscale(0.35) sepia(0.12) contrast(1.05) brightness(0.62);will-change:transform}
+    .dash-hero{position:relative;border-radius:var(--radius-lg);overflow:hidden;padding:3.4rem 2.6rem 2.4rem;margin-bottom:1.6rem;min-height:300px;display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;flex-wrap:wrap;background:linear-gradient(160deg,var(--panel3),var(--panel));isolation:isolate}
+    .dash-hero-photos{position:absolute;top:0;right:0;bottom:0;width:62%;z-index:0;overflow:hidden;
+      -webkit-mask-image:linear-gradient(90deg,transparent,black 22%,black 92%,transparent);
+      mask-image:linear-gradient(90deg,transparent,black 22%,black 92%,transparent);
+    }
+    .dash-hero-track{position:absolute;top:0;bottom:0;left:0;display:flex;align-items:center;gap:0.9rem;padding:0 0.9rem;animation:dashHeroDrift 38s linear infinite;will-change:transform}
+    .dash-hero-track img{height:88%;width:auto;flex-shrink:0;object-fit:cover;aspect-ratio:4/3;border-radius:var(--radius);filter:grayscale(0.1) contrast(1.05) brightness(0.92);box-shadow:0 10px 30px rgba(10,7,13,0.4)}
+    @keyframes dashHeroDrift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
     .dash-hero-veil{position:absolute;inset:0;z-index:1;pointer-events:none;
       background:
-        radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(232,192,131,0.14),transparent 42%),
-        linear-gradient(165deg,rgba(24,20,28,0.25),rgba(24,20,28,0.94) 72%);
+        radial-gradient(circle at var(--mx,20%) var(--my,50%),rgba(232,192,131,0.10),transparent 38%),
+        linear-gradient(90deg,rgba(24,20,28,0.98) 0%,rgba(24,20,28,0.9) 26%,rgba(24,20,28,0.45) 48%,rgba(24,20,28,0.18) 68%,rgba(24,20,28,0.35) 100%);
     }
     .dash-hero-content,.dash-hero-clock{position:relative;z-index:2}
     .dash-greet-eyebrow{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.5rem}
-    .dash-greet-title{font-family:var(--font-display);font-weight:600;font-size:clamp(2.2rem,4.4vw,3.2rem);color:var(--ivory);line-height:1}
+    .dash-greet-title{font-family:var(--font-display);font-weight:600;font-size:clamp(2.2rem,4.4vw,3.2rem);color:var(--ivory);line-height:1;text-shadow:0 2px 16px rgba(10,7,13,0.6)}
     .dash-greet-title .dot{color:var(--oxblood-bright)}
     .dash-rank-row{display:flex;align-items:center;gap:0.8rem;margin-top:0.7rem;font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass)}
     .dash-rank-rule{flex:1;height:1px;background:var(--border-brass);max-width:80px}
     .dash-clock-box{text-align:right}
     .dash-clock{font-family:var(--font-mono);font-size:1rem;color:var(--ivory-dim)}
     .dash-date{font-family:var(--font-label);font-size:0.62rem;color:var(--ivory-faint);letter-spacing:0.04em;margin-top:0.3rem}
-    @media(prefers-reduced-motion:reduce){.dash-hero-photos img{transition:none!important}}
+    @media(prefers-reduced-motion:reduce){.dash-hero-track{animation:none}}
+    @media(max-width:760px){.dash-hero-photos{width:100%;opacity:0.35}.dash-hero-veil{background:linear-gradient(180deg,rgba(24,20,28,0.5),rgba(24,20,28,0.95))}}
 
     .dash-top-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:1.4rem;margin-bottom:1.4rem}
     @media(max-width:980px){.dash-top-grid{grid-template-columns:1fr}}
@@ -200,53 +206,39 @@ function renderHome(req, data) {
       tick();setInterval(tick,1000);
     })();
 
-    // ── HERO — fotky z galerie jako pohyblivé pozadí sledující kurzor ───────
-    // Lehké: jen transformy (translate3d), throttlováno přes requestAnimationFrame,
-    // vypnuto při prefers-reduced-motion. Bez fotek v galerii hero pořád vypadá
-    // dobře (jen gradientové pozadí), takže žádný rozbitý prázdný stav.
+    // ── HERO — fotky z galerie jako plynoucí pás vpravo, vždy v pohybu.
+    // Pohyb řeší čistě CSS animace (spolehlivé, nezávislé na myši) — JS jen
+    // fotky natáhne a zdvojí pro nekonečnou smyčku, a jemně posouvá "spotlight"
+    // podle kurzoru (levné, jen CSS proměnná).
     (function dashHero(){
       const hero = document.getElementById('dashHero');
       const wrap = document.getElementById('dashHeroPhotos');
       if (!hero || !wrap) return;
-      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       fetch('/api/gallery', { cache: 'no-store' }).then(r => r.json()).then(d => {
         if (!d.ok || !d.items || !d.items.length) return;
-        const photos = d.items.slice(0, 6);
-        wrap.innerHTML = photos.map((it, i) => {
-          const depth = (0.35 + (i % 3) * 0.28).toFixed(2);
-          const top = (Math.random() * 55 - 8).toFixed(1);
-          const left = (i * (100 / photos.length) + (Math.random() * 6 - 3)).toFixed(1);
-          const rot = (Math.random() * 8 - 4).toFixed(1);
-          const size = (30 + Math.random() * 12).toFixed(0);
-          return '<img src="' + it.image + '" data-depth="' + depth + '" loading="lazy" style="top:' + top + '%;left:' + left + '%;width:' + size + '%;--rot:' + rot + 'deg;transform:rotate(var(--rot))">';
-        }).join('');
-
-        if (reduced) return;
-        let raf = null;
-        hero.addEventListener('mousemove', (e) => {
-          if (raf) return;
-          raf = requestAnimationFrame(() => {
-            const r = hero.getBoundingClientRect();
-            const px = (e.clientX - r.left) / r.width;
-            const py = (e.clientY - r.top) / r.height;
-            hero.style.setProperty('--mx', (px * 100) + '%');
-            hero.style.setProperty('--my', (py * 100) + '%');
-            wrap.querySelectorAll('img').forEach(img => {
-              const depth = parseFloat(img.dataset.depth);
-              const dx = (px - 0.5) * 26 * depth;
-              const dy = (py - 0.5) * 18 * depth;
-              img.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) rotate(var(--rot))';
-            });
-            raf = null;
-          });
-        });
-        hero.addEventListener('mouseleave', () => {
-          hero.style.setProperty('--mx', '50%');
-          hero.style.setProperty('--my', '50%');
-          wrap.querySelectorAll('img').forEach(img => { img.style.transform = 'translate3d(0,0,0) rotate(var(--rot))'; });
-        });
+        const photos = d.items.slice(0, 10);
+        const imgsHtml = photos.map(it => '<img src="' + it.image + '" loading="lazy">').join('');
+        const track = document.createElement('div');
+        track.className = 'dash-hero-track';
+        track.style.animationDuration = Math.max(14, photos.length * 4) + 's';
+        // Fotky zdvojené za sebou → animace jede 0 → -50% a plynule naváže na začátek.
+        track.innerHTML = imgsHtml + imgsHtml;
+        wrap.innerHTML = '';
+        wrap.appendChild(track);
       }).catch(() => {});
+
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      let raf = null;
+      hero.addEventListener('mousemove', (e) => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          const r = hero.getBoundingClientRect();
+          hero.style.setProperty('--mx', (((e.clientX - r.left) / r.width) * 100) + '%');
+          hero.style.setProperty('--my', (((e.clientY - r.top) / r.height) * 100) + '%');
+          raf = null;
+        });
+      });
     })();
 
     const RESTRICTED_HOME = ${isRestricted ? 'true' : 'false'};
