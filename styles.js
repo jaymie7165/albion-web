@@ -295,14 +295,14 @@ function baseStyles() {
          every card-like surface. One delegated listener (see
          nav.js), pure CSS var + radial-gradient, cheap.
          ══════════════════════════════════════════════ */
-      .card,.nav-card,.dash-widget,.badge-tile,.stat,.finance-tile,.panel-card,.timer-card,.gal-item,.rank-item{position:relative;overflow:hidden}
-      .card::before,.nav-card::before,.dash-widget::before,.badge-tile::before,.stat::before,.finance-tile::before,.panel-card::before,.timer-card::before,.gal-item::before,.rank-item::before{
+      .card,.nav-card,.dash-widget,.badge-tile,.stat,.finance-tile,.panel-card,.timer-card,.gal-item,.rank-item,.recipe-plaque,.weed-stat{position:relative;overflow:hidden}
+      .card::before,.nav-card::before,.dash-widget::before,.badge-tile::before,.stat::before,.finance-tile::before,.panel-card::before,.timer-card::before,.gal-item::before,.rank-item::before,.recipe-plaque::before,.weed-stat::before{
         content:'';position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 0.4s ease;
         background:radial-gradient(circle 220px at var(--sx,50%) var(--sy,50%),rgba(232,192,131,0.10),transparent 70%);
       }
-      .card.spotlight-on::before,.nav-card.spotlight-on::before,.dash-widget.spotlight-on::before,.badge-tile.spotlight-on::before,.stat.spotlight-on::before,.finance-tile.spotlight-on::before,.panel-card.spotlight-on::before,.timer-card.spotlight-on::before,.gal-item.spotlight-on::before,.rank-item.spotlight-on::before{opacity:1}
-      .card>*,.nav-card>*,.dash-widget>*,.badge-tile>*,.stat>*,.finance-tile>*,.panel-card>*,.timer-card>*,.rank-item>*{position:relative;z-index:1}
-      @media(hover:none){.card::before,.nav-card::before,.dash-widget::before,.badge-tile::before,.stat::before,.finance-tile::before,.panel-card::before,.timer-card::before,.gal-item::before,.rank-item::before{display:none}}
+      .card.spotlight-on::before,.nav-card.spotlight-on::before,.dash-widget.spotlight-on::before,.badge-tile.spotlight-on::before,.stat.spotlight-on::before,.finance-tile.spotlight-on::before,.panel-card.spotlight-on::before,.timer-card.spotlight-on::before,.gal-item.spotlight-on::before,.rank-item.spotlight-on::before,.recipe-plaque.spotlight-on::before,.weed-stat.spotlight-on::before{opacity:1}
+      .card>*,.nav-card>*,.dash-widget>*,.badge-tile>*,.stat>*,.finance-tile>*,.panel-card>*,.timer-card>*,.rank-item>*,.recipe-plaque>*,.weed-stat>*{position:relative;z-index:1}
+      @media(hover:none){.card::before,.nav-card::before,.dash-widget::before,.badge-tile::before,.stat::before,.finance-tile::before,.panel-card::before,.timer-card::before,.gal-item::before,.rank-item::before,.recipe-plaque::before,.weed-stat::before{display:none}}
 
       .reveal-pending{opacity:0;transform:translateY(14px)}
       .reveal-in{opacity:1;transform:translateY(0);transition:opacity 0.55s ease,transform 0.55s ease}
