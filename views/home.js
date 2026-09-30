@@ -73,9 +73,8 @@ function renderHome(req, data) {
       -webkit-mask-image:linear-gradient(90deg,transparent,black 22%,black 92%,transparent);
       mask-image:linear-gradient(90deg,transparent,black 22%,black 92%,transparent);
     }
-    .dash-hero-track{position:absolute;top:0;bottom:0;left:0;display:flex;align-items:center;gap:0.9rem;padding:0 0.9rem;animation:dashHeroDrift 38s linear infinite;will-change:transform}
+    .dash-hero-track{position:absolute;top:0;bottom:0;left:0;display:flex;align-items:center;gap:0.9rem;padding:0 0.9rem;will-change:transform}
     .dash-hero-track img{height:88%;width:auto;flex-shrink:0;object-fit:cover;aspect-ratio:4/3;border-radius:var(--radius);filter:grayscale(0.1) contrast(1.05) brightness(0.92);box-shadow:0 10px 30px rgba(10,7,13,0.4)}
-    @keyframes dashHeroDrift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
     .dash-hero-veil{position:absolute;inset:0;z-index:1;pointer-events:none;
       background:
         radial-gradient(circle at var(--mx,20%) var(--my,50%),rgba(232,192,131,0.10),transparent 38%),
@@ -90,7 +89,6 @@ function renderHome(req, data) {
     .dash-clock-box{text-align:right}
     .dash-clock{font-family:var(--font-mono);font-size:1rem;color:var(--ivory-dim)}
     .dash-date{font-family:var(--font-label);font-size:0.62rem;color:var(--ivory-faint);letter-spacing:0.04em;margin-top:0.3rem}
-    @media(prefers-reduced-motion:reduce){.dash-hero-track{animation:none}}
     @media(max-width:760px){.dash-hero-photos{width:100%;opacity:0.35}.dash-hero-veil{background:linear-gradient(180deg,rgba(24,20,28,0.5),rgba(24,20,28,0.95))}}
 
     .dash-top-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:1.4rem;margin-bottom:1.4rem}
@@ -221,11 +219,30 @@ function renderHome(req, data) {
         const imgsHtml = photos.map(it => '<img src="' + it.image + '" loading="lazy">').join('');
         const track = document.createElement('div');
         track.className = 'dash-hero-track';
-        track.style.animationDuration = Math.max(14, photos.length * 4) + 's';
-        // Fotky zdvojené za sebou → animace jede 0 → -50% a plynule naváže na začátek.
+        // Fotky zdvojené za sebou → jedna "sada" = polovina scrollWidth; jakmile
+        // posun dosáhne téhle šířky, plynule naváže zpátky na začátek.
         track.innerHTML = imgsHtml + imgsHtml;
         wrap.innerHTML = '';
         wrap.appendChild(track);
+
+        const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduced) return;
+
+        const pxPerSec = Math.max(24, Math.min(70, 340 / photos.length));
+        let last = null;
+        let x = 0;
+        function step(ts){
+          if (last === null) last = ts;
+          const dt = (ts - last) / 1000;
+          last = ts;
+          const setWidth = track.scrollWidth / 2;
+          if (setWidth > 0) {
+            x = (x + pxPerSec * dt) % setWidth;
+            track.style.transform = 'translateX(-' + x.toFixed(1) + 'px)';
+          }
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
       }).catch(() => {});
 
       if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -412,58 +429,55 @@ function renderHome(req, data) {
   // ── ZNAČENÍ STAFF DASHBOARDU ────────────────────────────────────────────
   function renderStaffDashboard() {
     return `
-    <div class="dash-widget" style="margin-bottom:1.4rem">
-      <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
-      <div style="padding-top:0.7rem">
-        <div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
-        <div id="vysilacka-frekvence" style="font-family:var(--font-display);font-weight:700;font-size:2.4rem;color:var(--oxblood-bright);letter-spacing:0.04em;line-height:1">—</div>
-        <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-top:0.5rem"></div>
+    <div class="dash-lead">
+      <div class="dash-lead-main">
+        <div class="lead-eyebrow">Denní hlášení</div>
+        <div class="lead-headline" id="briefing-title">${greeting}, ${escapeHtml(firstName)}.</div>
+        <div class="lead-text" id="briefing-text">Načítám provozní souhrn…</div>
+        <a href="/blackbook" class="lead-link">Zobrazit celé hlášení →</a>
+      </div>
+      <div class="dash-lead-stats">
+        <div class="lead-stat-big accent"><div class="lead-stat-big-label">Hotovostní rezerva</div><div class="lead-stat-big-num" id="tally-usd">$${ucet.usd.toLocaleString('cs-CZ')}</div></div>
+        <div class="lead-stat-big"><div class="lead-stat-big-label">Sklad celkem</div><div class="lead-stat-big-num" id="qs-stock">${(totalWeed + totalDrogy + totalZbrane + totalChemky).toLocaleString('cs-CZ')} ks</div></div>
       </div>
     </div>
 
-    <div class="finance-strip">
-      <div class="finance-tile"><div class="finance-tile-label">Hotovostní rezerva</div><div class="finance-tile-val" id="tally-usd">$${ucet.usd.toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">SAD</div></div>
-      <div class="finance-tile"><div class="finance-tile-label">Vedlejší rezerva</div><div class="finance-tile-val" id="tally-pesos">₱${ucet.pesos.toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">Pesos</div></div>
-      <div class="finance-tile"><div class="finance-tile-label">Sklad</div><div class="finance-tile-val" id="qs-stock">${(totalWeed + totalDrogy + totalZbrane + totalChemky).toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">kusů na skladě</div></div>
-      <div class="finance-tile"><div class="finance-tile-label">Odhad hodnoty weedu</div><div class="finance-tile-val" id="tally-weed-value">$${totalValue.toLocaleString('cs-CZ')}</div><div class="finance-tile-sub">v prodejní ceně</div></div>
+    <div class="dash-secondary-strip">
+      <div class="sec-item">
+        <div class="sec-item-label">📻 Vysílačka</div>
+        <div class="sec-item-val" id="vysilacka-frekvence" style="color:var(--oxblood-bright)">—</div>
+        <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint)"></div>
+      </div>
+      <div class="sec-item"><div class="sec-item-label">Vedlejší rezerva</div><div class="sec-item-val" id="tally-pesos">₱${ucet.pesos.toLocaleString('cs-CZ')}</div></div>
+      <div class="sec-item"><div class="sec-item-label">Odhad hodnoty weedu</div><div class="sec-item-val" id="tally-weed-value">$${totalValue.toLocaleString('cs-CZ')}</div></div>
     </div>
 
-    <div class="dash-lower-grid">
-      <div>
-        <div class="dash-widget">
-          <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
-          <div class="quiet-timeline" id="activity-stream">${timelineHtml}</div>
-        </div>
-        <div class="quote-strip"><span>"Kázeň. Loajalita. Výsledky."</span><span class="sig">— Caledonia</span></div>
-      </div>
-      <div>
-        <div class="briefing-card" style="margin-bottom:1.2rem">
-          <div class="briefing-eyebrow">Denní hlášení</div>
-          <div class="briefing-title" id="briefing-title">${greeting}, ${escapeHtml(firstName)}.</div>
-          <div class="briefing-text" id="briefing-text">Načítám provozní souhrn…</div>
-          <a href="/blackbook" class="briefing-link">Zobrazit celé hlášení →</a>
-        </div>
-        <div class="quick-tile-grid">
-          ${canAccess(accessLevel, 'sklad') ? `<a href="/sklad" class="quick-tile">${svgIcon('sklad')}<div><div class="quick-tile-label">Sklad</div><div class="quick-tile-sub">Evidence</div></div></a>` : ''}
-          <a href="/garaz" class="quick-tile">${svgIcon('garaz')}<div><div class="quick-tile-label">Garáž</div><div class="quick-tile-sub">Vozový park</div></div></a>
-          ${canAccess(accessLevel, 'blackbook') ? `<a href="/blackbook" class="quick-tile">${svgIcon('blackbook')}<div><div class="quick-tile-label">Blackbook</div><div class="quick-tile-sub">Reporty</div></div></a>` : ''}
-          ${canAccess(accessLevel, 'audit') ? `<a href="/audit" class="quick-tile">${svgIcon('audit')}<div><div class="quick-tile-label">Audit</div><div class="quick-tile-sub">Historie</div></div></a>` : ''}
-        </div>
-        ${accessLevel === 2 ? `
-        <div class="dash-widget yt-widget" id="yellow-take" style="margin-top:1.2rem">
-          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr <span style="color:var(--ivory-faint);font-weight:400">· $150/sáček</span></div>
-          <div class="yt-chips">
-            ${[4,8,12,20].map(n => `<button type="button" class="yt-chip" onclick="setYellowQty(${n})">${n}×</button>`).join('')}
-          </div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem;align-items:end">
-            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="4" oninput="updateYellowPreview()"></div>
-            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="width:auto;padding:0.7rem 1.3rem">Vzít</button>
-          </div>
-          <div class="yt-preview" id="yellowTakePreview"></div>
-          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
-        </div>` : ''}
-      </div>
+    <div class="dash-shortcuts-row">
+      ${canAccess(accessLevel, 'sklad') ? `<a href="/sklad" class="shortcut-card">${svgIcon('sklad')}<div><div class="shortcut-card-label">Sklad</div><div class="shortcut-card-sub">Evidence</div></div></a>` : ''}
+      <a href="/garaz" class="shortcut-card">${svgIcon('garaz')}<div><div class="shortcut-card-label">Garáž</div><div class="shortcut-card-sub">Vozový park</div></div></a>
+      ${canAccess(accessLevel, 'blackbook') ? `<a href="/blackbook" class="shortcut-card">${svgIcon('blackbook')}<div><div class="shortcut-card-label">Blackbook</div><div class="shortcut-card-sub">Reporty</div></div></a>` : ''}
+      ${canAccess(accessLevel, 'audit') ? `<a href="/audit" class="shortcut-card">${svgIcon('audit')}<div><div class="shortcut-card-label">Audit</div><div class="shortcut-card-sub">Historie</div></div></a>` : ''}
     </div>
+
+    ${accessLevel === 2 ? `
+    <div class="dash-widget yt-widget" id="yellow-take" style="margin-bottom:1.8rem">
+      <div class="dash-widget-title">Žlutý kanabis — rychlý výběr <span style="color:var(--ivory-faint);font-weight:400">· $150/sáček</span></div>
+      <div class="yt-chips">
+        ${[4,8,12,20].map(n => `<button type="button" class="yt-chip" onclick="setYellowQty(${n})">${n}×</button>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem;align-items:end">
+        <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="4" oninput="updateYellowPreview()"></div>
+        <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="width:auto;padding:0.7rem 1.3rem">Vzít</button>
+      </div>
+      <div class="yt-preview" id="yellowTakePreview"></div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
+    </div>` : ''}
+
+    <div class="dash-widget">
+      <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
+      <div class="quiet-timeline" id="activity-stream">${timelineHtml}</div>
+    </div>
+    <div class="quote-strip"><span>"Kázeň. Loajalita. Výsledky."</span><span class="sig">— Caledonia</span></div>
     `;
   }
 
@@ -526,75 +540,64 @@ function renderHome(req, data) {
   // ── ZNAČENÍ MEMBER DASHBOARDU (dle schváleného mocku) ────────────────────
   function renderMemberDashboard() {
     return `
-    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:1.6rem;align-items:start" id="memberGrid">
-      <div>
-        <div style="display:flex;gap:2rem;margin-bottom:1.6rem;flex-wrap:wrap">
-          <div><div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Hodnost</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-rank">—</div></div>
-          <div><div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.3rem">Loajalita</div><div style="font-family:var(--font-display);font-size:1.1rem;color:var(--ivory)" id="member-badges">—</div></div>
-        </div>
-
-        <div class="op-card" style="margin-bottom:1.6rem">
-          <div class="op-card-label">Pěstování</div>
-          <div class="op-card-title" id="op-title">Načítám operaci…</div>
-          <div class="op-track"><div class="op-fill" id="op-fill" style="width:0%"></div></div>
-          <div class="op-meta-row"><span id="op-progress">—</span><span id="op-next">—</span></div>
-        </div>
-
-        <div class="balance-strip">
-          <div class="balance-tile"><div class="balance-label">Zásoba weedu</div><div class="balance-val" id="member-weed">${totalWeed}</div></div>
-          <div class="balance-tile"><div class="balance-label">Připraveno</div><div class="balance-val" id="member-ready" style="color:#7CC79A">—</div></div>
-          <div class="balance-tile"><div class="balance-label">Roste</div><div class="balance-val" id="member-growing">—</div></div>
-        </div>
-
-        <div class="dash-widget" id="deposit" style="margin-bottom:1.4rem">
-          <div class="dash-widget-title">Vklad — hotovost v kufru vozu</div>
-          <div style="font-family:var(--font-body);font-size:0.8rem;color:var(--ivory-dim);margin-bottom:0.9rem;font-weight:300">Nech hotovost v kufru a nahlas to tady, ať má vedení potvrzení.</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem">
-            <div class="form-group"><label>Částka (SAD)</label><input type="number" id="kufrCastka" min="1" placeholder="1000"></div>
-            <button class="btn-submit" id="kufrVkladBtn" onclick="kufrVklad()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Nahlásit</button>
-          </div>
-          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="kufrVkladHint"></div>
-        </div>
-
-        <div class="dash-widget yt-widget" id="yellow-take">
-          <div class="dash-widget-title">Žlutý kanabis — rychlý výběr <span style="color:var(--ivory-faint);font-weight:400">· $150/sáček</span></div>
-          <div class="yt-chips">
-            ${[4,8,12,20].map(n => `<button type="button" class="yt-chip" onclick="setYellowQty(${n})">${n}×</button>`).join('')}
-          </div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem;align-items:end">
-            <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="4" oninput="updateYellowPreview()"></div>
-            <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="width:auto;padding:0.7rem 1.3rem">Vzít</button>
-          </div>
-          <div class="yt-preview" id="yellowTakePreview"></div>
-          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
-        </div>
+    <div class="dash-lead">
+      <div class="dash-lead-main">
+        <div class="lead-eyebrow">Pěstování</div>
+        <div class="lead-headline" id="op-title" style="font-size:1.5rem">Načítám operaci…</div>
+        <div class="op-track" style="margin:0.9rem 0 0.6rem"><div class="op-fill" id="op-fill" style="width:0%"></div></div>
+        <div class="op-meta-row"><span id="op-progress">—</span><span id="op-next">—</span></div>
       </div>
-
-      <div>
-        <div class="dash-widget" style="margin-bottom:1.4rem">
-          <div class="dash-widget-title"><span>📻 Vysílačka</span></div>
-          <div style="padding-top:0.7rem">
-            <div style="font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass);margin-bottom:0.4rem">Aktuální frekvence</div>
-            <div id="vysilacka-frekvence" style="font-family:var(--font-display);font-weight:700;font-size:2.4rem;color:var(--oxblood-bright);letter-spacing:0.04em;line-height:1">—</div>
-            <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.66rem;color:var(--ivory-faint);margin-top:0.5rem"></div>
-          </div>
-        </div>
-
-        <div class="folio-label" style="margin-bottom:1rem">Rychlý přístup</div>
-        <div class="quick-tile-grid" style="margin-bottom:1.6rem">
-          <a href="/garaz" class="quick-tile">${svgIcon('garaz')}<div><div class="quick-tile-label">Garáž</div><div class="quick-tile-sub">Tvoje vozidla</div></div></a>
-          <a href="/nemovitosti" class="quick-tile">${svgIcon('properties')}<div><div class="quick-tile-label">Nemovitosti</div><div class="quick-tile-sub">Tvoje nemovitosti</div></div></a>
-          <a href="/weed-sazeni" class="quick-tile">${svgIcon('weed')}<div><div class="quick-tile-label">Weed</div><div class="quick-tile-sub">Tvoje rostliny</div></div></a>
-          <a href="/weed-sazeni#timers" class="quick-tile">${svgIcon('timer')}<div><div class="quick-tile-label">Časovač weedu</div><div class="quick-tile-sub">Zkontrolovat časovače</div></div></a>
-          <a href="/home#deposit" class="quick-tile">${svgIcon('deposit')}<div><div class="quick-tile-label">Vklad</div><div class="quick-tile-sub">Vložit peníze</div></div></a>
-          <a href="/sklad" class="quick-tile">${svgIcon('reserve')}<div><div class="quick-tile-label">Reserve Fund</div><div class="quick-tile-sub">Tvůj zůstatek</div></div></a>
-        </div>
-
-        <div class="dash-widget">
-          <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
-          <div class="quiet-timeline" id="member-activity-stream"><div class="ledger-loading">Načítám…</div></div>
-        </div>
+      <div class="dash-lead-stats">
+        <div class="lead-stat-big accent"><div class="lead-stat-big-label">Hodnost</div><div class="lead-stat-big-num" id="member-rank" style="font-size:1.5rem">—</div></div>
+        <div class="lead-stat-big"><div class="lead-stat-big-label">Loajalita</div><div class="lead-stat-big-num" id="member-badges" style="font-size:1.5rem">—</div></div>
       </div>
+    </div>
+
+    <div class="dash-secondary-strip">
+      <div class="sec-item">
+        <div class="sec-item-label">📻 Vysílačka</div>
+        <div class="sec-item-val" id="vysilacka-frekvence" style="color:var(--oxblood-bright)">—</div>
+        <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint)"></div>
+      </div>
+      <div class="sec-item"><div class="sec-item-label">Zásoba weedu</div><div class="sec-item-val" id="member-weed">${totalWeed}</div></div>
+      <div class="sec-item"><div class="sec-item-label">Připraveno</div><div class="sec-item-val" id="member-ready" style="color:#7CC79A">—</div></div>
+      <div class="sec-item"><div class="sec-item-label">Roste</div><div class="sec-item-val" id="member-growing">—</div></div>
+    </div>
+
+    <div class="dash-shortcuts-row">
+      <a href="/garaz" class="shortcut-card">${svgIcon('garaz')}<div><div class="shortcut-card-label">Garáž</div><div class="shortcut-card-sub">Tvoje vozidla</div></div></a>
+      <a href="/nemovitosti" class="shortcut-card">${svgIcon('properties')}<div><div class="shortcut-card-label">Nemovitosti</div><div class="shortcut-card-sub">Tvoje nemovitosti</div></div></a>
+      <a href="/weed-sazeni" class="shortcut-card">${svgIcon('weed')}<div><div class="shortcut-card-label">Weed</div><div class="shortcut-card-sub">Tvoje rostliny</div></div></a>
+      <a href="/weed-sazeni#timers" class="shortcut-card">${svgIcon('timer')}<div><div class="shortcut-card-label">Časovač weedu</div><div class="shortcut-card-sub">Zkontrolovat</div></div></a>
+      <a href="/sklad" class="shortcut-card">${svgIcon('reserve')}<div><div class="shortcut-card-label">Reserve Fund</div><div class="shortcut-card-sub">Tvůj zůstatek</div></div></a>
+    </div>
+
+    <div class="dash-widget" id="deposit" style="margin-bottom:1.4rem">
+      <div class="dash-widget-title">Vklad — hotovost v kufru vozu</div>
+      <div style="font-family:var(--font-body);font-size:0.86rem;color:var(--ivory-dim);margin-bottom:0.9rem">Nech hotovost v kufru a nahlas to tady, ať má vedení potvrzení.</div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem">
+        <div class="form-group"><label>Částka (SAD)</label><input type="number" id="kufrCastka" min="1" placeholder="1000"></div>
+        <button class="btn-submit" id="kufrVkladBtn" onclick="kufrVklad()" style="margin-top:1.5rem;width:auto;padding:0.7rem 1.3rem">Nahlásit</button>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.6rem" id="kufrVkladHint"></div>
+    </div>
+
+    <div class="dash-widget yt-widget" id="yellow-take" style="margin-bottom:1.8rem">
+      <div class="dash-widget-title">Žlutý kanabis — rychlý výběr <span style="color:var(--ivory-faint);font-weight:400">· $150/sáček</span></div>
+      <div class="yt-chips">
+        ${[4,8,12,20].map(n => `<button type="button" class="yt-chip" onclick="setYellowQty(${n})">${n}×</button>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:0.6rem;align-items:end">
+        <div class="form-group"><label>Množství (sáčky)</label><input type="number" id="yellowTakeQty" min="1" max="500" value="4" oninput="updateYellowPreview()"></div>
+        <button class="btn-submit" id="yellowTakeBtn" onclick="yellowTake()" style="width:auto;padding:0.7rem 1.3rem">Vzít</button>
+      </div>
+      <div class="yt-preview" id="yellowTakePreview"></div>
+      <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
+    </div>
+
+    <div class="dash-widget">
+      <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
+      <div class="quiet-timeline" id="member-activity-stream"><div class="ledger-loading">Načítám…</div></div>
     </div>
     <div class="quote-strip"><span>"Kázeň. Loajalita. Výsledky."</span><span class="sig">— Caledonia</span></div>
     `;
