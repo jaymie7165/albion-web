@@ -255,14 +255,17 @@ function baseStyles() {
       .sb-brand-name{font-family:var(--font-label);font-size:0.88rem;letter-spacing:0.06em;color:var(--ivory);font-weight:600;text-align:center;margin-top:0.05rem}
       .sb-brand-tag{font-family:var(--font-mono);font-size:0.48rem;letter-spacing:0.05em;color:var(--ivory-faint);text-transform:uppercase}
       .sb-brand::after{content:'';position:absolute;bottom:0;left:22%;right:22%;height:1px;background:var(--border-brass)}
-      .sb-eyebrow{font-family:var(--font-label);font-size:0.64rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--brass);padding:0 0.7rem;margin:1.3rem 0 0.5rem;font-weight:600}
+      .sb-eyebrow{font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ivory-faint);padding:0 0.7rem;margin:1.8rem 0 0.7rem;font-weight:600}
       .sb-eyebrow:first-of-type{margin-top:0}
-      .app-sidebar .sb-link{display:flex;align-items:center;gap:0.75rem;padding:0.66rem 0.8rem;color:var(--ivory-dim);text-decoration:none;border-radius:var(--radius-sm);transition:color .15s,background .15s;margin-bottom:0.2rem;font-family:var(--font-label);font-size:0.76rem;letter-spacing:0.01em;font-weight:500}
-      .app-sidebar .sb-link:hover{color:var(--ivory);background:var(--brass-faint)}
-      .app-sidebar .sb-link.active{background:var(--oxblood-faint);color:var(--ivory);font-weight:700;box-shadow:inset 2px 0 0 0 var(--oxblood-bright)}
+      /* Editorialní "rejstřík", ne aplikační tlačítka — žádné pozadí ani
+         rámeček kolem položek. Aktivní stránka se pozná podle váhy a barvy
+         písma, ne podle vybarveného boxu. */
+      .app-sidebar .sb-link{display:flex;align-items:center;gap:0.7rem;padding:0.5rem 0.7rem;color:var(--ivory-dim);text-decoration:none;transition:color .15s,transform .15s;margin-bottom:0.1rem;font-family:var(--font-body);font-size:0.9rem;font-weight:400}
+      .app-sidebar .sb-link:hover{color:var(--ivory);transform:translateX(3px)}
+      .app-sidebar .sb-link.active{color:var(--oxblood-bright);font-weight:700}
       .app-sidebar .sb-link.active svg{opacity:1;color:var(--oxblood-bright)}
-      .app-sidebar .sb-link svg{width:17px;height:17px;flex-shrink:0;opacity:0.8}
-      .app-sidebar .sb-divider{height:1px;background:var(--border);margin:0.9rem 0.7rem}
+      .app-sidebar .sb-link svg{width:16px;height:16px;flex-shrink:0;opacity:0.55}
+      .app-sidebar .sb-divider{height:1px;background:var(--border);margin:1.1rem 0.7rem}
       .app-sidebar .sb-bottom{margin-top:auto;padding-top:1rem;border-top:1px solid var(--border)}
       .app-sidebar .sb-version{font-family:var(--font-mono);font-size:0.5rem;color:var(--ivory-faint);padding:0.8rem 0.7rem 0;letter-spacing:0.04em}
 
@@ -303,6 +306,20 @@ function baseStyles() {
       .card.spotlight-on::before,.nav-card.spotlight-on::before,.dash-widget.spotlight-on::before,.badge-tile.spotlight-on::before,.stat.spotlight-on::before,.finance-tile.spotlight-on::before,.panel-card.spotlight-on::before,.timer-card.spotlight-on::before,.gal-item.spotlight-on::before,.rank-item.spotlight-on::before,.recipe-plaque.spotlight-on::before,.weed-stat.spotlight-on::before,.lead-stat-big.spotlight-on::before,.shortcut-card.spotlight-on::before{opacity:1}
       .card>*,.nav-card>*,.dash-widget>*,.badge-tile>*,.stat>*,.finance-tile>*,.panel-card>*,.timer-card>*,.rank-item>*,.recipe-plaque>*,.weed-stat>*,.lead-stat-big>*,.shortcut-card>*{position:relative;z-index:1}
       @media(hover:none){.card::before,.nav-card::before,.dash-widget::before,.badge-tile::before,.stat::before,.finance-tile::before,.panel-card::before,.timer-card::before,.gal-item::before,.rank-item::before,.recipe-plaque::before,.weed-stat::before,.lead-stat-big::before,.shortcut-card::before{display:none}}
+
+      /* ══════════════════════════════════════════════
+         PEČEŤNÍ KURZOR — nahrazuje kurzor myši malou pečetí.
+         JS (nav.js) přidává třídu na <body> jen když se mu ji
+         podaří připojit — bez JS zůstává obyčejný kurzor.
+         ══════════════════════════════════════════════ */
+      body.has-seal-cursor,body.has-seal-cursor *{cursor:none!important}
+      body.has-seal-cursor input,body.has-seal-cursor textarea,body.has-seal-cursor [contenteditable]{cursor:text!important}
+      body.has-seal-cursor select{cursor:pointer!important}
+      .seal-cursor{position:fixed;top:0;left:0;width:20px;height:20px;margin:-10px 0 0 -10px;border:1.4px solid var(--brass-bright);border-radius:50%;pointer-events:none;z-index:9999;transition:width .18s ease,height .18s ease,margin .18s ease,border-color .18s ease;will-change:transform}
+      .seal-cursor::before{content:'';position:absolute;inset:34%;background:var(--brass-bright);border-radius:50%;transition:inset .18s ease,background .18s ease}
+      .seal-cursor.hover{width:32px;height:32px;margin:-16px 0 0 -16px;border-color:var(--oxblood-bright)}
+      .seal-cursor.hover::before{inset:22%;background:var(--oxblood-bright)}
+      @media(hover:none){.seal-cursor{display:none}}
 
       .reveal-pending{opacity:0;transform:translateY(14px)}
       .reveal-in{opacity:1;transform:translateY(0);transition:opacity 0.55s ease,transform 0.55s ease}
@@ -445,6 +462,35 @@ function baseStyles() {
       .shortcut-card svg{width:22px;height:22px;color:var(--brass)}
       .shortcut-card-label{font-family:var(--font-label);font-size:0.82rem;color:var(--ivory);font-weight:600}
       .shortcut-card-sub{font-family:var(--font-mono);font-size:0.62rem;color:var(--ivory-faint)}
+
+      /* ══════════════════════════════════════════════
+         DASHBOARD JAKO LANDING PAGE — jeden obří moment,
+         zbytek klidný a bez rámečků. Karty přežívají jen
+         tam, kde je věc samostatný klepnutelný objekt.
+         ══════════════════════════════════════════════ */
+      .dash-statement{background:linear-gradient(135deg,var(--oxblood),var(--seal-deep));border-radius:var(--radius-lg);padding:3.4rem 2.8rem;margin-bottom:2.2rem;position:relative;overflow:hidden}
+      .dash-statement-eyebrow{font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;color:rgba(245,239,230,0.55);margin-bottom:1.1rem}
+      .dash-statement-text{font-family:var(--font-display);font-style:italic;font-weight:600;font-size:clamp(1.7rem,3.2vw,2.7rem);color:var(--ivory);line-height:1.3;max-width:920px}
+      .dash-statement-text strong{color:var(--brass-bright);font-style:normal}
+      .dash-statement-link{margin-top:1.5rem;display:inline-flex;align-items:center;gap:0.4rem;font-family:var(--font-label);font-size:0.78rem;color:var(--ivory);border-bottom:1px solid rgba(245,239,230,0.35);padding-bottom:2px;text-decoration:none;transition:border-color 0.2s}
+      .dash-statement-link:hover{border-color:var(--brass-bright);color:var(--brass-bright)}
+
+      .dash-numbers-row{display:flex;gap:0;margin-bottom:2.2rem;flex-wrap:wrap}
+      .dash-number{flex:1;min-width:150px;padding:0 1.7rem}
+      .dash-number:first-child{padding-left:0}
+      .dash-number+.dash-number{border-left:1px solid var(--border)}
+      .dash-number-label{font-family:var(--font-label);font-size:0.66rem;letter-spacing:0.03em;text-transform:uppercase;color:var(--ivory-faint);margin-bottom:0.55rem}
+      .dash-number-val{font-family:var(--font-display);font-weight:700;font-size:1.85rem;color:var(--ivory)}
+      @media(max-width:640px){.dash-numbers-row{flex-direction:column;gap:1rem}.dash-number{border-left:none!important;padding-left:0!important;border-top:1px solid var(--border);padding-top:1rem}.dash-number:first-child{border-top:none;padding-top:0}}
+
+      .dash-giant-links{display:flex;flex-wrap:wrap;column-gap:2.6rem;row-gap:0.8rem;margin-bottom:2.4rem;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:1.7rem 0}
+      .dash-giant-link{font-family:var(--font-display);font-weight:600;font-size:clamp(1.4rem,2.6vw,2rem);color:var(--ivory-dim);text-decoration:none;transition:color 0.2s;line-height:1.3}
+      .dash-giant-link:hover{color:var(--oxblood-bright)}
+      .dash-giant-link .sub{display:block;font-family:var(--font-mono);font-size:0.58rem;color:var(--ivory-faint);text-transform:uppercase;letter-spacing:0.04em;margin-top:0.25rem}
+
+      .dash-section-label{font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass);margin-bottom:1.1rem}
+      .dash-editorial-row{display:grid;grid-template-columns:56px 1fr auto;gap:1.2rem;padding:1rem 0;border-bottom:1px solid var(--border);align-items:baseline}
+      .dash-editorial-row:first-child{border-top:1px solid var(--border)}
 
       .quiet-timeline{display:flex;flex-direction:column}
       .qt-row{display:grid;grid-template-columns:56px 1fr auto;gap:1rem;padding:0.85rem 0;border-bottom:1px solid var(--border);align-items:start}
