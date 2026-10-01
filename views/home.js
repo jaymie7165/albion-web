@@ -429,38 +429,29 @@ function renderHome(req, data) {
   // ── ZNAČENÍ STAFF DASHBOARDU ────────────────────────────────────────────
   function renderStaffDashboard() {
     return `
-    <div class="dash-lead">
-      <div class="dash-lead-main">
-        <div class="lead-eyebrow">Denní hlášení</div>
-        <div class="lead-headline" id="briefing-title">${greeting}, ${escapeHtml(firstName)}.</div>
-        <div class="lead-text" id="briefing-text">Načítám provozní souhrn…</div>
-        <a href="/blackbook" class="lead-link">Zobrazit celé hlášení →</a>
-      </div>
-      <div class="dash-lead-stats">
-        <div class="lead-stat-big accent"><div class="lead-stat-big-label">Hotovostní rezerva</div><div class="lead-stat-big-num" id="tally-usd">$${ucet.usd.toLocaleString('cs-CZ')}</div></div>
-        <div class="lead-stat-big"><div class="lead-stat-big-label">Sklad celkem</div><div class="lead-stat-big-num" id="qs-stock">${(totalWeed + totalDrogy + totalZbrane + totalChemky).toLocaleString('cs-CZ')} ks</div></div>
-      </div>
+    <div class="dash-statement">
+      <div class="dash-statement-eyebrow">Denní hlášení</div>
+      <div class="dash-statement-text" id="briefing-title">${greeting}, ${escapeHtml(firstName)}.</div>
+      <div class="dash-statement-text" id="briefing-text" style="font-size:1rem;font-style:normal;font-weight:400;margin-top:0.8rem;opacity:0.85">Načítám provozní souhrn…</div>
+      <a href="/blackbook" class="dash-statement-link">Zobrazit celé hlášení →</a>
     </div>
 
-    <div class="dash-secondary-strip">
-      <div class="sec-item">
-        <div class="sec-item-label">📻 Vysílačka</div>
-        <div class="sec-item-val" id="vysilacka-frekvence" style="color:var(--oxblood-bright)">—</div>
-        <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint)"></div>
-      </div>
-      <div class="sec-item"><div class="sec-item-label">Vedlejší rezerva</div><div class="sec-item-val" id="tally-pesos">₱${ucet.pesos.toLocaleString('cs-CZ')}</div></div>
-      <div class="sec-item"><div class="sec-item-label">Odhad hodnoty weedu</div><div class="sec-item-val" id="tally-weed-value">$${totalValue.toLocaleString('cs-CZ')}</div></div>
+    <div class="dash-numbers-row">
+      <div class="dash-number"><div class="dash-number-label">Hotovostní rezerva</div><div class="dash-number-val" id="tally-usd">$${ucet.usd.toLocaleString('cs-CZ')}</div></div>
+      <div class="dash-number"><div class="dash-number-label">Vedlejší rezerva</div><div class="dash-number-val" id="tally-pesos">₱${ucet.pesos.toLocaleString('cs-CZ')}</div></div>
+      <div class="dash-number"><div class="dash-number-label">Sklad celkem</div><div class="dash-number-val" id="qs-stock">${(totalWeed + totalDrogy + totalZbrane + totalChemky).toLocaleString('cs-CZ')} ks</div></div>
+      <div class="dash-number"><div class="dash-number-label">📻 Vysílačka</div><div class="dash-number-val" id="vysilacka-frekvence" style="color:var(--oxblood-bright)">—</div><div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.3rem"></div></div>
     </div>
 
-    <div class="dash-shortcuts-row">
-      ${canAccess(accessLevel, 'sklad') ? `<a href="/sklad" class="shortcut-card">${svgIcon('sklad')}<div><div class="shortcut-card-label">Sklad</div><div class="shortcut-card-sub">Evidence</div></div></a>` : ''}
-      <a href="/garaz" class="shortcut-card">${svgIcon('garaz')}<div><div class="shortcut-card-label">Garáž</div><div class="shortcut-card-sub">Vozový park</div></div></a>
-      ${canAccess(accessLevel, 'blackbook') ? `<a href="/blackbook" class="shortcut-card">${svgIcon('blackbook')}<div><div class="shortcut-card-label">Blackbook</div><div class="shortcut-card-sub">Reporty</div></div></a>` : ''}
-      ${canAccess(accessLevel, 'audit') ? `<a href="/audit" class="shortcut-card">${svgIcon('audit')}<div><div class="shortcut-card-label">Audit</div><div class="shortcut-card-sub">Historie</div></div></a>` : ''}
+    <div class="dash-giant-links">
+      ${canAccess(accessLevel, 'sklad') ? `<a href="/sklad" class="dash-giant-link">Sklad<span class="sub">Evidence</span></a>` : ''}
+      <a href="/garaz" class="dash-giant-link">Garáž<span class="sub">Vozový park</span></a>
+      ${canAccess(accessLevel, 'blackbook') ? `<a href="/blackbook" class="dash-giant-link">Blackbook<span class="sub">Reporty</span></a>` : ''}
+      ${canAccess(accessLevel, 'audit') ? `<a href="/audit" class="dash-giant-link">Audit<span class="sub">Historie</span></a>` : ''}
     </div>
 
     ${accessLevel === 2 ? `
-    <div class="dash-widget yt-widget" id="yellow-take" style="margin-bottom:1.8rem">
+    <div class="dash-widget yt-widget" id="yellow-take" style="margin-bottom:2.2rem">
       <div class="dash-widget-title">Žlutý kanabis — rychlý výběr <span style="color:var(--ivory-faint);font-weight:400">· $150/sáček</span></div>
       <div class="yt-chips">
         ${[4,8,12,20].map(n => `<button type="button" class="yt-chip" onclick="setYellowQty(${n})">${n}×</button>`).join('')}
@@ -473,10 +464,8 @@ function renderHome(req, data) {
       <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
     </div>` : ''}
 
-    <div class="dash-widget">
-      <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
-      <div class="quiet-timeline" id="activity-stream">${timelineHtml}</div>
-    </div>
+    <div class="dash-section-label">Nedávná aktivita</div>
+    <div class="quiet-timeline" id="activity-stream">${timelineHtml}</div>
     <div class="quote-strip"><span>"Kázeň. Loajalita. Výsledky."</span><span class="sig">— Caledonia</span></div>
     `;
   }
@@ -540,36 +529,26 @@ function renderHome(req, data) {
   // ── ZNAČENÍ MEMBER DASHBOARDU (dle schváleného mocku) ────────────────────
   function renderMemberDashboard() {
     return `
-    <div class="dash-lead">
-      <div class="dash-lead-main">
-        <div class="lead-eyebrow">Pěstování</div>
-        <div class="lead-headline" id="op-title" style="font-size:1.5rem">Načítám operaci…</div>
-        <div class="op-track" style="margin:0.9rem 0 0.6rem"><div class="op-fill" id="op-fill" style="width:0%"></div></div>
-        <div class="op-meta-row"><span id="op-progress">—</span><span id="op-next">—</span></div>
-      </div>
-      <div class="dash-lead-stats">
-        <div class="lead-stat-big accent"><div class="lead-stat-big-label">Hodnost</div><div class="lead-stat-big-num" id="member-rank" style="font-size:1.5rem">—</div></div>
-        <div class="lead-stat-big"><div class="lead-stat-big-label">Loajalita</div><div class="lead-stat-big-num" id="member-badges" style="font-size:1.5rem">—</div></div>
-      </div>
+    <div class="dash-statement">
+      <div class="dash-statement-eyebrow">Pěstování</div>
+      <div class="dash-statement-text" id="op-title">Načítám operaci…</div>
+      <div class="op-track" style="margin:1.3rem 0 0.6rem;max-width:480px;background:rgba(245,239,230,0.18)"><div class="op-fill" id="op-fill" style="width:0%;background:var(--brass-bright)"></div></div>
+      <div class="op-meta-row" style="max-width:480px;color:rgba(245,239,230,0.65)"><span id="op-progress">—</span><span id="op-next">—</span></div>
     </div>
 
-    <div class="dash-secondary-strip">
-      <div class="sec-item">
-        <div class="sec-item-label">📻 Vysílačka</div>
-        <div class="sec-item-val" id="vysilacka-frekvence" style="color:var(--oxblood-bright)">—</div>
-        <div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint)"></div>
-      </div>
-      <div class="sec-item"><div class="sec-item-label">Zásoba weedu</div><div class="sec-item-val" id="member-weed">${totalWeed}</div></div>
-      <div class="sec-item"><div class="sec-item-label">Připraveno</div><div class="sec-item-val" id="member-ready" style="color:#7CC79A">—</div></div>
-      <div class="sec-item"><div class="sec-item-label">Roste</div><div class="sec-item-val" id="member-growing">—</div></div>
+    <div class="dash-numbers-row">
+      <div class="dash-number"><div class="dash-number-label">Hodnost</div><div class="dash-number-val" id="member-rank">—</div></div>
+      <div class="dash-number"><div class="dash-number-label">Loajalita</div><div class="dash-number-val" id="member-badges">—</div></div>
+      <div class="dash-number"><div class="dash-number-label">Zásoba weedu</div><div class="dash-number-val" id="member-weed">${totalWeed}</div></div>
+      <div class="dash-number"><div class="dash-number-label">Připraveno / Roste</div><div class="dash-number-val"><span id="member-ready" style="color:#7CC79A">—</span> / <span id="member-growing">—</span></div></div>
+      <div class="dash-number"><div class="dash-number-label">📻 Vysílačka</div><div class="dash-number-val" id="vysilacka-frekvence" style="color:var(--oxblood-bright)">—</div><div id="vysilacka-platnost" style="font-family:var(--font-mono);font-size:0.6rem;color:var(--ivory-faint);margin-top:0.3rem"></div></div>
     </div>
 
-    <div class="dash-shortcuts-row">
-      <a href="/garaz" class="shortcut-card">${svgIcon('garaz')}<div><div class="shortcut-card-label">Garáž</div><div class="shortcut-card-sub">Tvoje vozidla</div></div></a>
-      <a href="/nemovitosti" class="shortcut-card">${svgIcon('properties')}<div><div class="shortcut-card-label">Nemovitosti</div><div class="shortcut-card-sub">Tvoje nemovitosti</div></div></a>
-      <a href="/weed-sazeni" class="shortcut-card">${svgIcon('weed')}<div><div class="shortcut-card-label">Weed</div><div class="shortcut-card-sub">Tvoje rostliny</div></div></a>
-      <a href="/weed-sazeni#timers" class="shortcut-card">${svgIcon('timer')}<div><div class="shortcut-card-label">Časovač weedu</div><div class="shortcut-card-sub">Zkontrolovat</div></div></a>
-      <a href="/sklad" class="shortcut-card">${svgIcon('reserve')}<div><div class="shortcut-card-label">Reserve Fund</div><div class="shortcut-card-sub">Tvůj zůstatek</div></div></a>
+    <div class="dash-giant-links">
+      <a href="/garaz" class="dash-giant-link">Garáž<span class="sub">Tvoje vozidla</span></a>
+      <a href="/nemovitosti" class="dash-giant-link">Nemovitosti<span class="sub">Tvoje nemovitosti</span></a>
+      <a href="/weed-sazeni" class="dash-giant-link">Weed<span class="sub">Tvoje rostliny</span></a>
+      <a href="/sklad" class="dash-giant-link">Reserve Fund<span class="sub">Tvůj zůstatek</span></a>
     </div>
 
     <div class="dash-widget" id="deposit" style="margin-bottom:1.4rem">
@@ -595,10 +574,8 @@ function renderHome(req, data) {
       <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem" id="yellowTakeHint"></div>
     </div>
 
-    <div class="dash-widget">
-      <div class="dash-widget-title"><span>Nedávná aktivita</span></div>
-      <div class="quiet-timeline" id="member-activity-stream"><div class="ledger-loading">Načítám…</div></div>
-    </div>
+    <div class="dash-section-label">Nedávná aktivita</div>
+    <div class="quiet-timeline" id="member-activity-stream"><div class="ledger-loading">Načítám…</div></div>
     <div class="quote-strip"><span>"Kázeň. Loajalita. Výsledky."</span><span class="sig">— Caledonia</span></div>
     `;
   }

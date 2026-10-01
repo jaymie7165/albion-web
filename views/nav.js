@@ -340,6 +340,31 @@ function renderNav(req, active) {
         setTimeout(() => el.classList.remove('reward-flash','reward-pop'), 900);
       };
 
+      // ── PEČEŤNÍ KURZOR — nahrazuje kurzor myši ────────────────────────
+      (function sealCursor(){
+        if (window.matchMedia && window.matchMedia('(hover:none)').matches) return;
+        const el = document.createElement('div');
+        el.className = 'seal-cursor';
+        document.body.appendChild(el);
+        document.body.classList.add('has-seal-cursor');
+        const CLICKABLE = 'a,button,[onclick],select,input[type=checkbox],input[type=radio],.sb-link,.gal-item,.timer-card,.badge-tile';
+        let tx = 0, ty = 0, raf = null;
+        document.addEventListener('mousemove', (e) => {
+          tx = e.clientX; ty = e.clientY;
+          if (raf) return;
+          raf = requestAnimationFrame(() => {
+            el.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
+            raf = null;
+          });
+        }, { passive: true });
+        document.addEventListener('mouseover', (e) => {
+          const t = e.target && e.target.closest ? e.target.closest(CLICKABLE) : null;
+          el.classList.toggle('hover', !!t);
+        }, { passive: true });
+        document.addEventListener('mouseleave', () => { el.style.opacity = '0'; });
+        document.addEventListener('mouseenter', () => { el.style.opacity = '1'; });
+      })();
+
       // ── SPOTLIGHT — kurzorem tažená záře na kartách, napříč úplně celým
       // webem. Jeden delegovaný listener namísto listeneru na každý prvek —
       // levné, funguje i na stránkách přidaných později bez jediné úpravy.
