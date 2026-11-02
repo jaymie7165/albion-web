@@ -46,7 +46,7 @@ function renderHierarchy(req) {
 
     <div id="rank-timeline"><div class="ledger-loading">Načítám…</div></div>
     <div id="rank-editor" style="display:none"></div>
-    ${canEdit ? `<div id="editorActions" style="display:none;margin-top:1rem"><button class="btn-submit" onclick="saveHierarchy()" style="width:auto;padding:0.7rem 1.3rem">Uložit změny</button></div>` : ''}
+    ${canEdit ? `<div id="editorActions" style="display:none;margin-top:1rem"><button class="btn-submit" onclick="addRank()" style="width:auto;padding:0.7rem 1.3rem;margin-right:0.6rem">+ Přidat pozici</button><button class="btn-submit" onclick="saveHierarchy()" style="width:auto;padding:0.7rem 1.3rem">Uložit změny</button></div>` : ''}
 
     ${canEdit ? `
     <div class="folio-rule"></div>
@@ -72,16 +72,23 @@ function renderHierarchy(req) {
       <datalist id="vz-members"></datalist>
       <div class="form-row">
         <div class="form-group"><label>Typ vztahu</label>
-          <select id="vz-typ"><option value="mentor">Mentor → Chráněnec</option><option value="rodina">Rodina</option><option value="spojenec">Spojenec</option><option value="rival">Rival</option></select>
+          <select id="vz-typ"><option value="rodic">Rodič → Dítě (A je rodič B)</option><option value="partner">Partneři / manželé</option><option value="sourozenec">Sourozenci</option><option value="rodina">Jiná rodinná vazba</option><option value="mentor">Mentor → Chráněnec (A mentoruje B)</option><option value="spojenec">Spojenec</option><option value="rival">Rival</option></select>
         </div>
         <div class="form-group"><label>Poznámka (volitelné)</label><input type="text" id="vz-note" placeholder="Krátký kontext…"></div>
       </div>
       <button class="btn-submit" onclick="addVztah()">Zapsat vztah</button>
     </div>` : ''}
+    <div class="report-nav" style="margin-bottom:1.2rem">
+      <button class="report-nav-item active" id="vztab-btn-tree" onclick="vzTab('tree')">Rodinný strom</button>
+      <button class="report-nav-item" id="vztab-btn-network" onclick="vzTab('network')">Síť vztahů</button>
+      <button class="report-nav-item" id="vztab-btn-list" onclick="vzTab('list')">Seznam</button>
+    </div>
     <div id="vztahy-loading" class="ledger-loading">Načítám vztahy…</div>
-    <div class="nav-grid" id="vztahy-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem"></div>
+    <div id="family-viz" style="margin-bottom:1.4rem"></div>
+    <div class="nav-grid" id="vztahy-grid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem"></div>
   </main>
   <div class="toast" id="toast"></div>
+  <script src="/js/family-tree.js"></script>
   <script>
     const CAN_EDIT = ${canEdit};
     const DEFAULT_RANKS = ${JSON.stringify(DEFAULT_RANKS)};
@@ -133,7 +140,8 @@ function renderHierarchy(req) {
         '<div class="form-row"><div class="form-group"><label>Hodnost</label><input type="text" value="' + esc(r.rank) + '" onchange="RANKS[' + i + '].rank=this.value"></div>' +
         '<div class="form-group"><label>Jméno (volitelné)</label><input type="text" value="' + esc(r.member||'') + '" onchange="RANKS[' + i + '].member=this.value||null"></div></div>' +
         '<div class="form-group" style="margin-bottom:0.7rem"><label>Popis</label><textarea rows="2" onchange="RANKS[' + i + '].desc=this.value">' + esc(r.desc) + '</textarea></div>' +
-        '<div class="form-group"><label>Práva (oddělená čárkou)</label><input type="text" value="' + esc((r.rights||[]).join(', ')) + '" onchange="RANKS[' + i + '].rights=this.value.split(\\',\\').map(function(s){return s.trim();}).filter(Boolean)"></div>' +
+        '<div class="form-group" style="margin-bottom:0.8rem"><label>Práva (oddělená čárkou)</label><input type="text" value="' + esc((r.rights||[]).join(', ')) + '" onchange="RANKS[' + i + '].rights=this.value.split(\\',\\').map(function(s){return s.trim();}).filter(Boolean)"></div>' +
+        '<button onclick="removeRank(' + i + ')" style="background:transparent;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);padding:0.4rem 0.8rem;font-family:var(--font-label);font-size:0.55rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer">Smazat pozici</button>' +
       '</div>').join('');
     }
 
@@ -149,7 +157,19 @@ function renderHierarchy(req) {
       if(opening) editor.innerHTML = rankEditorHtml(RANKS);
     };
 
+    window.addRank = function(){
+      RANKS.push({ rank: 'Nová pozice', num: '', member: null, isFounder: false, desc: '', rights: [] });
+      document.getElementById('rank-editor').innerHTML = rankEditorHtml(RANKS);
+    };
+    window.removeRank = function(i){
+      if(!confirm('Smazat tuto pozici z hierarchie?')) return;
+      RANKS.splice(i, 1);
+      document.getElementById('rank-editor').innerHTML = rankEditorHtml(RANKS);
+    };
+
     window.saveHierarchy = async function(){
+      if(!RANKS.length) return showToast('Hierarchie musí obsahovat alespoň jednu pozici', true);
+      RANKS.forEach(function(r, i){ r.num = String(i + 1).padStart(2, '0'); });
       const res = await fetch('/api/content/hierarchy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ data: RANKS }) });
       const d = await res.json();
       if(d.ok){ showToast('Hierarchie uložena'); if(window.albionSound) window.albionSound.success(); toggleEdit(); loadHierarchy(); } else showToast(d.error||'Chyba', true);
@@ -157,7 +177,23 @@ function renderHierarchy(req) {
 
     // Vztahy — beze změny oproti dřívější verzi
     const CAN_MANAGE_VZ = ${canManageVztahy};
-    const VZTAH_LABEL = { mentor:'Mentor', rodina:'Rodina', spojenec:'Spojenec', rival:'Rival' };
+    const VZTAH_LABEL = { mentor:'Mentor', rodina:'Jiná rodinná vazba', spojenec:'Spojenec', rival:'Rival', rodic:'Rodič → dítě', partner:'Partneři', sourozenec:'Sourozenci' };
+    const VZTAH_DIRECTED = { mentor:1, rodic:1 };
+    let VZTAHY = [];
+    let vzMode = 'tree';
+    function renderViz(){
+      const viz = document.getElementById('family-viz');
+      const grid = document.getElementById('vztahy-grid');
+      if(vzMode === 'list'){ viz.style.display='none'; grid.style.display='grid'; return; }
+      grid.style.display='none'; viz.style.display='block';
+      if(window.FamilyViz) window.FamilyViz.render(viz, VZTAHY, vzMode);
+      else viz.innerHTML = '<div class="ledger-loading">Vizualizace se nenačetla (chybí /js/family-tree.js).</div>';
+    }
+    window.vzTab = function(mode){
+      vzMode = mode;
+      ['tree','network','list'].forEach(function(m){ const b=document.getElementById('vztab-btn-'+m); if(b) b.classList.toggle('active', m===mode); });
+      renderViz();
+    };
     async function loadVztahy(){
       const [vzRes, namesRes] = await Promise.all([fetch('/api/vztahy'), fetch('/api/ic-names')]);
       const vz = await vzRes.json(); const names = await namesRes.json();
@@ -165,11 +201,13 @@ function renderHierarchy(req) {
       if(names.ok && document.getElementById('vz-members')) document.getElementById('vz-members').innerHTML = names.names.map(n=>'<option value="'+esc(n)+'">').join('');
       const grid = document.getElementById('vztahy-grid');
       const list = vz.vztahy || [];
+      VZTAHY = list;
+      renderViz();
       if(!list.length){ grid.innerHTML = ledgerEmptyHTML('Zatím žádné zaznamenané vztahy',false,'people'); return; }
       grid.innerHTML = list.map(v => '<div class="nav-card">' +
         (CAN_MANAGE_VZ ? '<button onclick="delVztah(\\''+v.id+'\\')" style="float:right;background:none;border:1px solid var(--border-oxblood);color:var(--oxblood-bright);width:22px;height:22px;cursor:pointer">✕</button>' : '') +
         '<div class="nav-card-cat">' + (VZTAH_LABEL[v.typ]||v.typ) + '</div>' +
-        '<div class="nav-card-title" style="font-size:1rem">' + esc(v.a) + (v.typ==='mentor'?' → ':' ↔ ') + esc(v.b) + '</div>' +
+        '<div class="nav-card-title" style="font-size:1rem">' + esc(v.a) + (VZTAH_DIRECTED[v.typ]?' → ':' ↔ ') + esc(v.b) + '</div>' +
         (v.note ? '<div class="nav-card-desc">' + esc(v.note) + '</div>' : '') + '</div>'
       ).join('');
     }

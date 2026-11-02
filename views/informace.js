@@ -69,7 +69,7 @@ function renderInformace(req) {
       try{
         const res = await fetch('/api/content/informace');
         const d = await res.json();
-        SECTIONS = (d.ok && Array.isArray(d.data) && d.data.length) ? d.data : DEFAULT_SECTIONS;
+        SECTIONS = (d.ok && Array.isArray(d.data)) ? d.data : DEFAULT_SECTIONS;
       }catch(e){ SECTIONS = DEFAULT_SECTIONS; }
       document.getElementById('inf-view').innerHTML = viewHtml(SECTIONS);
     }

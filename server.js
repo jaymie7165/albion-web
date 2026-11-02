@@ -119,6 +119,7 @@ app.post('/api/content/:key', requireAuth, requireAccess('audit'), (req, res) =>
   const stores = { kodex: kodexStore, lore: loreStore, hierarchy: hierStore, informace: informaceStore };
   const store = stores[req.params.key];
   if (!store) return res.status(404).json({ ok: false });
+  if (!Array.isArray(req.body.data)) return res.json({ ok: false, error: 'Neplatná data (očekává se seznam)' });
   store.save(req.body.data);
   res.json({ ok: true });
 });
@@ -338,9 +339,19 @@ app.delete('/api/spis/:id', requireAuth, requireAccess('spis'), (req, res) => {
 
 // ── VZTAHY MEZI ČLENY ──
 const RELATIONSHIPS_FILE = path.join(DATA_DIR, 'relationships.json');
-function loadRelationships() { try { return JSON.parse(fs.readFileSync(RELATIONSHIPS_FILE, 'utf8')) || []; } catch { return []; } }
+function loadRelationships() {
+  try {
+    const list = JSON.parse(fs.readFileSync(RELATIONSHIPS_FILE, 'utf8')) || [];
+    // Starší záznamy bez ID nešly smazat (DELETE /api/vztahy/undefined) — doplníme je.
+    let changed = false;
+    list.forEach((v, i) => { if (!v.id) { v.id = `vz_legacy_${i}_${Math.floor(Math.random()*1e6)}`; changed = true; } });
+    if (changed) { try { writeJsonAtomic(RELATIONSHIPS_FILE, list); } catch (e) {} }
+    return list;
+  } catch { return []; }
+}
 function saveRelationships(r) { try { writeJsonAtomic(RELATIONSHIPS_FILE, r); } catch (e) { console.error('[VZTAHY]', e.message); } }
-const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival'];
+// rodic = "A je rodič B" (směrový), partner/sourozenec/rodina = bez směru, mentor = A mentoruje B
+const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival', 'rodic', 'partner', 'sourozenec'];
 
 app.get('/api/vztahy', requireAuth, (req, res) => res.json({ ok: true, vztahy: loadRelationships() }));
 app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
@@ -2969,7 +2980,12 @@ app.get('/api/leaderboard', requireAuth, async (req, res) => {
 // ── API — TÝDENNÍ SOUHRN ──
 app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (req, res) => {
   try {
-    const ucetRows = await sheets.getRows('Účetnictví').catch(() => []);
+    // Timeout: když Google Sheets neodpoví do 8 s, vrátíme chybu místo nekonečného čekání dashboardu.
+    const ucetRows = await Promise.race([
+      sheets.getRows('Účetnictví').catch(() => null),
+      new Promise(resolve => setTimeout(() => resolve(null), 8000)),
+    ]);
+    if (!ucetRows) return res.json({ ok: false, error: 'Google Sheets neodpovídá' });
     const now = Date.now(), WEEK = 7*86400000;
     let income=0, expense=0, ops=0;
     for (let i=1;i<ucetRows.length;i++){
@@ -3111,7 +3127,7 @@ app.get('/api/me/session', requireAuth, (req, res) => {
   const accessLevel = req.session.accessLevel || 3;
   const pages = ['home','garaz','sklad','blackbook','profit-centrum','audit','statistiky','nastenska','hierarchy','kodex','lore','profil','galerie','karta','weed-sazeni'];
   const permissions = pages.filter(p => canAccess(accessLevel, p));
-  res.json({ ok: true, icName: req.session.icName, accessLevel, photo, permissions });
+  res.json({ ok: true, icName: req.session.icName, accessLevel, isAssociate: !!req.session.isAssociate, photo, permissions });
 });
 
 app.get('/api/me/promotions/pending', requireAuth, (req, res) => {
@@ -3683,11 +3699,17 @@ app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
       return res.json({ ok: true, frekvence: null });
     }
     const msg = messages[0];
-    if (!msg.content) {
-      console.error('[VYSILACKA] Poslední zpráva z kanálu se načetla, ale pole "content" je prázdné — typický příznak vypnutého "MESSAGE CONTENT INTENT" u bota. Zapni ho v Discord Developer Portal → tvoje aplikace → Bot → Privileged Gateway Intents → Message Content Intent, a ulož.');
+    // Bot může frekvenci posílat jako běžnou zprávu NEBO jako embed — čteme obojí.
+    let text = msg.content || '';
+    if (!text && Array.isArray(msg.embeds) && msg.embeds.length) {
+      const e = msg.embeds[0];
+      text = [e.title, e.description, ...(e.fields || []).map(f => `${f.name}: ${f.value}`)].filter(Boolean).join('\n');
+    }
+    if (!text) {
+      console.error('[VYSILACKA] Poslední zpráva nemá ani "content", ani použitelný embed — typický příznak vypnutého "MESSAGE CONTENT INTENT" u bota. Zapni ho v Discord Developer Portal → tvoje aplikace → Bot → Privileged Gateway Intents → Message Content Intent, a ulož.');
       return res.json({ ok: true, frekvence: null });
     }
-    const lines = (msg.content || '').split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const frekvence = lines[0] || null;
     const platnost = lines.slice(1).join(' · ') || (msg.timestamp ? `Aktualizováno ${new Date(msg.timestamp).toLocaleString('cs-CZ')}` : '');
     res.json({ ok: true, frekvence, platnost });

@@ -21,7 +21,7 @@ function renderHome(req, data) {
   const accessLevel = req.session.accessLevel || 3;
   const isRestricted = accessLevel >= 3;
   const canSklad = canAccess(accessLevel, 'sklad');
-  const RANK_LABEL = { 1: 'Founder / Council', 2: 'Senior Member', 3: 'Member / Associate' };
+  const RANK_LABEL = { 1: 'Founder / Council', 2: 'Senior Member', 3: req.session.isAssociate ? 'Associate' : 'Member' };
   // "Rank — Position": u Senior Membera je to přiřazené oddělení (Head of
   // Weapons/Narcotics/Members/Financials, viz roles.js DEPARTMENTS), jinde
   // čistě popisek (např. Council "Legal"/"Illegal") bez vlivu na oprávnění.
@@ -488,13 +488,17 @@ function renderHome(req, data) {
   function staffDashboardScript() {
     return `
     async function loadBriefing(){
+      const el=document.getElementById('briefing-text');
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(),12000);
       try{
-        const res=await fetch('/api/weekly-summary');
+        const res=await fetch('/api/weekly-summary',{signal:ctrl.signal,cache:'no-store'});
         const d=await res.json();
-        const el=document.getElementById('briefing-text');
         if(d.ok) el.textContent='Caledonia zaznamenala '+d.ops+' finančních pohybů tento týden, čistě '+(d.net>=0?'+':'')+'$'+Math.round(d.net).toLocaleString('cs-CZ')+'.';
-        else el.textContent='Zatím nejsou dostupná žádná finanční data.';
-      }catch(e){}
+        else el.textContent=d.error ? ('Souhrn se nepodařilo načíst: '+d.error+'.') : 'Zatím nejsou dostupná žádná finanční data.';
+      }catch(e){
+        el.textContent='Souhrn se nepodařilo načíst (server neodpověděl). Zkus stránku obnovit.';
+      }finally{ clearTimeout(timer); }
     }
     loadBriefing();
 
@@ -597,12 +601,12 @@ function renderHome(req, data) {
       btn.disabled = false;
     };
 
-    const RANK_LABEL = { 1: 'Founder / Council', 2: 'Senior Member', 3: 'Associate' };
+    const RANK_LABEL = { 1: 'Founder / Council', 2: 'Senior Member', 3: 'Member' };
     Promise.all([
       fetch('/api/me/session').then(r=>r.json()).catch(()=>null),
       fetch('/api/me/achievements').then(r=>r.json()).catch(()=>null),
     ]).then(([session, ach]) => {
-      if (session && session.ok) document.getElementById('member-rank').textContent = RANK_LABEL[session.accessLevel] || '—';
+      if (session && session.ok) document.getElementById('member-rank').textContent = (session.accessLevel === 3 && session.isAssociate) ? 'Associate' : (RANK_LABEL[session.accessLevel] || '—');
       if (ach && ach.ok) document.getElementById('member-badges').textContent = ach.earned.length + ' odznaků';
     }).catch(() => {});
 
