@@ -1,7 +1,8 @@
 Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahrávej.
 
-server.js            - vysilacka (embed), vztahy (ID + nove typy), /api/me/session, weekly-summary timeout, validace /api/content
-views/home.js        - Member/Associate stitek, Denni hlaseni uz nevisi
-views/informace.js   - jde smazat vse
-views/hierarchy.js   - pridat/smazat pozici (Head of ...), rodinny strom, sit vztahu
-public/js/family-tree.js - NOVY soubor, vykresleni stromu
+server.js                - NOVY endpoint /api/daily-brief (souhrn z dat Blackbooku), vysilacka vraci jen cislo,
+                           nove typy vztahu (stryc, kmotr, znamy), drobnosti z minula
+views/home.js            - OPRAVA: skript na dashboardu padal na widgetu Zlutý kanabis, proto se Denni hlaseni nikdy nenacetlo
+views/informace.js       - jde smazat vse
+views/hierarchy.js       - formular vztahu s automatickym napojenim (strýc, neter, svagr, kmotr, znamy), rodinny strom, sit
+public/js/family-tree.js - NOVY/PREPSANY soubor, vykresleni stromu a pocitani pribuzenstvi

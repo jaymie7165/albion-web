@@ -366,13 +366,16 @@ function renderHome(req, data) {
     // tady, dostupné bez ohledu na to, který dashboard se právě vykreslil.
     const YELLOW_PRICE = 150;
     window.setYellowQty = function(n){
-      document.getElementById('yellowTakeQty').value = n;
+      const inp = document.getElementById('yellowTakeQty');
+      if (!inp) return;
+      inp.value = n;
       updateYellowPreview();
     };
     window.updateYellowPreview = function(){
-      const qty = parseInt(document.getElementById('yellowTakeQty').value) || 0;
+      const inp = document.getElementById('yellowTakeQty');
       const el = document.getElementById('yellowTakePreview');
-      if (!el) return;
+      if (!inp || !el) return; // widget na tomhle dashboardu (staff) vůbec není — dřív tady skript spadl a nenačetlo se Denní hlášení
+      const qty = parseInt(inp.value) || 0;
       el.textContent = qty > 0 ? '≈ $' + (qty * YELLOW_PRICE).toLocaleString('cs-CZ') + ' při prodeji' : '';
     };
     window.yellowTake = async function(){
@@ -489,13 +492,16 @@ function renderHome(req, data) {
     return `
     async function loadBriefing(){
       const el=document.getElementById('briefing-text');
+      if(!el) return;
       const ctrl=new AbortController();
-      const timer=setTimeout(()=>ctrl.abort(),12000);
+      const timer=setTimeout(()=>ctrl.abort(),15000);
+      const esc=(t)=>String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       try{
-        const res=await fetch('/api/weekly-summary',{signal:ctrl.signal,cache:'no-store'});
+        const res=await fetch('/api/daily-brief',{signal:ctrl.signal,cache:'no-store'});
         const d=await res.json();
-        if(d.ok) el.textContent='Caledonia zaznamenala '+d.ops+' finančních pohybů tento týden, čistě '+(d.net>=0?'+':'')+'$'+Math.round(d.net).toLocaleString('cs-CZ')+'.';
-        else el.textContent=d.error ? ('Souhrn se nepodařilo načíst: '+d.error+'.') : 'Zatím nejsou dostupná žádná finanční data.';
+        if(d.ok && Array.isArray(d.lines) && d.lines.length){
+          el.innerHTML=d.lines.map(l=>'<div style="margin-bottom:0.35rem">'+esc(l)+'</div>').join('');
+        } else el.textContent=d.error||'Zatím nejsou dostupná žádná data.';
       }catch(e){
         el.textContent='Souhrn se nepodařilo načíst (server neodpověděl). Zkus stránku obnovit.';
       }finally{ clearTimeout(timer); }

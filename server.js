@@ -351,7 +351,8 @@ function loadRelationships() {
 }
 function saveRelationships(r) { try { writeJsonAtomic(RELATIONSHIPS_FILE, r); } catch (e) { console.error('[VZTAHY]', e.message); } }
 // rodic = "A je rodič B" (směrový), partner/sourozenec/rodina = bez směru, mentor = A mentoruje B
-const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival', 'rodic', 'partner', 'sourozenec'];
+// stryc = "A je strýc/teta B", kmotr = "A je kmotr B", znamy = rodinný známý
+const VZTAH_TYPY = ['mentor', 'rodina', 'spojenec', 'rival', 'rodic', 'partner', 'sourozenec', 'stryc', 'kmotr', 'znamy'];
 
 app.get('/api/vztahy', requireAuth, (req, res) => res.json({ ok: true, vztahy: loadRelationships() }));
 app.post('/api/vztahy', requireAuth, requireAccess('spis'), (req, res) => {
@@ -3000,6 +3001,75 @@ app.get('/api/weekly-summary', requireAuth, requireAccess('statistiky'), async (
   } catch(e){ res.json({ ok:false }); }
 });
 
+// ── API — DENNÍ HLÁŠENÍ (souhrn z dat Blackbooku: finance, sklad, aktivita) ──
+app.get('/api/daily-brief', requireAuth, requireAccess('statistiky'), async (req, res) => {
+  const guard = (p, ms) => Promise.race([Promise.resolve(p).catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
+  try {
+    const [ucetRows, ucet, sklad] = await Promise.all([
+      guard(sheets.getRows('Účetnictví'), 8000),
+      guard(sheets.getAccountingSummary(), 8000),
+      guard(buildSkladSummary(), 8000),
+    ]);
+    if (!ucetRows && !ucet && !sklad) return res.json({ ok: false, error: 'Google Sheets právě neodpovídá — data nejsou dostupná.' });
+
+    const lines = [];
+    const fmt = (n) => Math.round(n).toLocaleString('cs-CZ');
+    const DAY = 86400000, now = Date.now();
+
+    if (ucetRows) {
+      const parseTs = (s) => { const m = (s || '').toString().match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4}),?\s*(\d{1,2}):(\d{2}):(\d{2})/); return m ? new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime() : 0; };
+      let inc = 0, exp = 0, ops = 0, prevNet = 0;
+      for (let i = 1; i < ucetRows.length; i++) {
+        const r = ucetRows[i]; if (!r || !r[0]) continue;
+        if ((r[3] || 'USD').toString().toUpperCase() !== 'USD') continue;
+        const ts = parseTs(r[0]); if (!ts) continue;
+        const age = now - ts;
+        const castka = parseFloat((r[2] || '0').toString().replace(',', '.')) || 0;
+        const sign = (r[1] || '').toString().toUpperCase() === 'PŘÍJEM' ? 1 : -1;
+        if (age <= 7 * DAY) { ops++; if (sign > 0) inc += castka; else exp += castka; }
+        else if (age <= 14 * DAY) prevNet += sign * castka;
+      }
+      const net = inc - exp;
+      let l = `Tento týden: ${ops} finančních pohybů, příjmy $${fmt(inc)}, výdaje $${fmt(exp)}, čistě ${net >= 0 ? '+' : '−'}$${fmt(Math.abs(net))}`;
+      if (prevNet !== 0) {
+        const ch = Math.round(((net - prevNet) / Math.abs(prevNet)) * 100);
+        l += ` (${ch >= 0 ? '↑' : '↓'} ${Math.abs(ch)} % oproti minulému týdnu)`;
+      }
+      lines.push(l + '.');
+    }
+    if (ucet) lines.push(`Pokladna: $${fmt(ucet.usd || 0)} a ₱${fmt(ucet.pesos || 0)}.`);
+
+    if (sklad) {
+      const prahy = loadThresholds();
+      const nizke = [];
+      ['zbrane', 'weed', 'drogy', 'chemky'].forEach(k => {
+        Object.entries(sklad[k] || {}).forEach(([item, q]) => { if (q > 0 && q < (prahy[k] || 0)) nizke.push(`${item} (${q} ks)`); });
+      });
+      lines.push(nizke.length ? `Dochází zásoby u ${nizke.length} položek: ${nizke.slice(0, 4).join(', ')}${nizke.length > 4 ? '…' : ''}.` : 'Sklad: žádná položka nehrozí vyprodáním.');
+    }
+
+    try {
+      const nev = loadNevyrizeneAkce().filter(r => !r.vyrizeno).length;
+      if (nev) lines.push(`Čeká na vyřízení ${nev} ${nev === 1 ? 'akce' : nev < 5 ? 'akce' : 'akcí'} (žlutý weed / vklady do kufru).`);
+    } catch (e) {}
+    try {
+      const users = db.prepare('SELECT * FROM users').all();
+      const neaktivni = users.filter(u => { const t = u.last_login_at ? new Date(u.last_login_at).getTime() : 0; return !t || (now - t) > 7 * DAY; }).length;
+      if (neaktivni) lines.push(`Neaktivních členů (bez přihlášení 7+ dní): ${neaktivni} z ${users.length}.`);
+    } catch (e) {}
+    try {
+      const paid = new Set(loadReserveFund().filter(r => r.weekKey === getReserveWeekKey()).map(r => r.icName));
+      const dluzi = db.prepare('SELECT * FROM users').all().filter(u => u.ic_name && !u.is_associate && !paid.has(u.ic_name)).length;
+      if (dluzi) lines.push(`Reserve Fund tento týden ještě nezaplatilo ${dluzi} členů.`);
+    } catch (e) {}
+
+    res.json({ ok: true, lines });
+  } catch (e) {
+    console.error('[DAILY BRIEF]', e.message);
+    res.json({ ok: false, error: 'Souhrn se nepodařilo sestavit.' });
+  }
+});
+
 // ── API — EVELYN ASHCROFT ──
 app.get('/api/evelyn/brief', requireAuth, async (req, res) => {
   const page = (req.query.page || 'home').toString();
@@ -3687,6 +3757,21 @@ app.get('/api/profit-centrum', requireAuth, requireAccess('profit-centrum'), asy
 // nikdy nebyl. Bereme nejnovější zprávu: 1. řádek = frekvence, zbytek (pokud
 // je) = platnost/poznámka. Pokud bot posílá jiný formát, dej vědět a
 // parsování doladím přesně na tvar zprávy.
+// Z textu zprávy bota vytáhne jen číslo frekvence (a krátké "Platí do …").
+function parseVysilacka(text) {
+  const out = { frekvence: null, platnost: '' };
+  const withoutTimes = text.replace(/\d{1,2}:\d{2}/g, ' ');
+  let m = withoutTimes.match(/frekvenc\w*\s*[:：]?[^0-9]{0,25}(\d{2,6}(?:[.,]\d{1,3})?)/i);
+  if (!m) {
+    const all = [...withoutTimes.matchAll(/\b(\d{3,6}(?:[.,]\d{1,3})?)\b/g)];
+    if (all.length) m = all[all.length - 1];
+  }
+  if (m) out.frekvence = m[1];
+  const v = text.match(/Plat[ií]\s+do\s+\**\s*([^*\n.]+)/i);
+  if (v) out.platnost = 'Platí do ' + v[1].trim();
+  return out;
+}
+
 app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
   if (!process.env.CHANNEL_VYSILACKA) {
     console.error('[VYSILACKA] Chybí env proměnná CHANNEL_VYSILACKA na Railway — bez ní se nemá odkud číst frekvence. Nastav ji na ID Discord kanálu, kam bot frekvenci píše.');
@@ -3709,9 +3794,14 @@ app.get('/api/vysilacka/latest', requireAuth, async (req, res) => {
       console.error('[VYSILACKA] Poslední zpráva nemá ani "content", ani použitelný embed — typický příznak vypnutého "MESSAGE CONTENT INTENT" u bota. Zapni ho v Discord Developer Portal → tvoje aplikace → Bot → Privileged Gateway Intents → Message Content Intent, a ulož.');
       return res.json({ ok: true, frekvence: null });
     }
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const frekvence = lines[0] || null;
-    const platnost = lines.slice(1).join(' · ') || (msg.timestamp ? `Aktualizováno ${new Date(msg.timestamp).toLocaleString('cs-CZ')}` : '');
+    // Zobrazujeme JEN vygenerované číslo frekvence (ne celou zprávu bota).
+    const parsed = parseVysilacka(text);
+    if (!parsed.frekvence) {
+      console.error('[VYSILACKA] Ve zprávě se nepodařilo najít číslo frekvence:', text.slice(0, 300));
+      return res.json({ ok: true, frekvence: null });
+    }
+    const frekvence = parsed.frekvence;
+    const platnost = parsed.platnost || '';
     res.json({ ok: true, frekvence, platnost });
   } catch (e) {
     console.error('[VYSILACKA]', e.message);

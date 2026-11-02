@@ -72,9 +72,33 @@ function renderHierarchy(req) {
       <datalist id="vz-members"></datalist>
       <div class="form-row">
         <div class="form-group"><label>Typ vztahu</label>
-          <select id="vz-typ"><option value="rodic">Rodič → Dítě (A je rodič B)</option><option value="partner">Partneři / manželé</option><option value="sourozenec">Sourozenci</option><option value="rodina">Jiná rodinná vazba</option><option value="mentor">Mentor → Chráněnec (A mentoruje B)</option><option value="spojenec">Spojenec</option><option value="rival">Rival</option></select>
+          <select id="vz-typ" onchange="vzRoleChanged()">
+            <optgroup label="Základ stromu">
+              <option value="rodic">A je rodič B (otec / matka)</option>
+              <option value="partner">A a B jsou partneři / manželé</option>
+              <option value="sourozenec">A a B jsou sourozenci</option>
+            </optgroup>
+            <optgroup label="Širší rodina (napojí se automaticky)">
+              <option value="stryc">A je strýc / teta B</option>
+              <option value="neter">A je neteř / synovec B</option>
+              <option value="svagr">A je švagr / švagrová B</option>
+              <option value="kmotr">A je kmotr / kmotra B</option>
+              <option value="kmotrenec">A je kmotřenec B</option>
+              <option value="znamy">A a B jsou rodinní známí</option>
+              <option value="rodina">Jiná rodinná vazba</option>
+            </optgroup>
+            <optgroup label="Mimo rodinu">
+              <option value="mentor">A mentoruje B</option>
+              <option value="spojenec">Spojenci</option>
+              <option value="rival">Rivalové</option>
+            </optgroup>
+          </select>
         </div>
         <div class="form-group"><label>Poznámka (volitelné)</label><input type="text" id="vz-note" placeholder="Krátký kontext…"></div>
+      </div>
+      <div class="form-row" id="vz-via-row" style="display:none">
+        <div class="form-group"><label id="vz-via-label">Napojit přes</label><select id="vz-via"></select>
+          <div id="vz-via-hint" style="font-family:var(--font-mono);font-size:0.68rem;color:var(--ivory-faint);margin-top:0.4rem"></div></div>
       </div>
       <button class="btn-submit" onclick="addVztah()">Zapsat vztah</button>
     </div>` : ''}
@@ -177,8 +201,37 @@ function renderHierarchy(req) {
 
     // Vztahy — beze změny oproti dřívější verzi
     const CAN_MANAGE_VZ = ${canManageVztahy};
-    const VZTAH_LABEL = { mentor:'Mentor', rodina:'Jiná rodinná vazba', spojenec:'Spojenec', rival:'Rival', rodic:'Rodič → dítě', partner:'Partneři', sourozenec:'Sourozenci' };
-    const VZTAH_DIRECTED = { mentor:1, rodic:1 };
+    const VZTAH_LABEL = { mentor:'Mentor', rodina:'Jiná rodinná vazba', spojenec:'Spojenec', rival:'Rival', rodic:'Rodič → dítě', partner:'Partneři', sourozenec:'Sourozenci', stryc:'Strýc / teta → neteř / synovec', kmotr:'Kmotr → kmotřenec', znamy:'Rodinní známí' };
+    const VZTAH_DIRECTED = { mentor:1, rodic:1, stryc:1, kmotr:1 };
+    const nk = function(n){ return (n||'').toString().trim().toLowerCase(); };
+    function relsOf(name, typ, asB){ // jména osob, které jsou s "name" ve vztahu typu typ
+      const k = nk(name); const out = [];
+      VZTAHY.forEach(function(v){
+        if(v.typ !== typ) return;
+        if(asB && nk(v.b) === k) out.push(v.a);
+        else if(!asB && nk(v.a) === k) out.push(v.b);
+      });
+      return out;
+    }
+    function partnersOf(name){ const k=nk(name); const o=[]; VZTAHY.forEach(function(v){ if(v.typ!=='partner') return; if(nk(v.a)===k) o.push(v.b); else if(nk(v.b)===k) o.push(v.a); }); return o; }
+    function siblingsOf(name){ const k=nk(name); const o=[]; VZTAHY.forEach(function(v){ if(v.typ!=='sourozenec') return; if(nk(v.a)===k) o.push(v.b); else if(nk(v.b)===k) o.push(v.a); }); return o; }
+    // Co se při zápisu automaticky napojí: strýc/neteř přes rodiče, švagr přes partnera nebo sourozence
+    window.vzRoleChanged = function(){
+      const role = document.getElementById('vz-typ').value;
+      const a = document.getElementById('vz-a').value.trim(), b = document.getElementById('vz-b').value.trim();
+      const row = document.getElementById('vz-via-row'), sel = document.getElementById('vz-via'), label = document.getElementById('vz-via-label'), hint = document.getElementById('vz-via-hint');
+      let opts = [], lab = '', h = '';
+      if(role === 'stryc'){ lab = 'Strýc/teta přes kterého rodiče ' + (b||'B') + '?'; opts = b ? relsOf(b,'rodic',true).map(function(p){ return { v:'sib:'+p, t:(a||'A')+' je sourozenec osoby '+p }; }) : []; h = 'Napojí se jako sourozenec zvoleného rodiče — strýc/teta se pak dopočítá sám.'; }
+      else if(role === 'neter'){ lab = 'Přes kterého rodiče ' + (a||'A') + '?'; opts = a ? relsOf(a,'rodic',true).map(function(p){ return { v:'sib:'+p, t:(b||'B')+' je sourozenec osoby '+p }; }) : []; h = 'Napojí se jako sourozenec zvoleného rodiče.'; }
+      else if(role === 'svagr'){ lab = 'Švagr/švagrová přes koho?';
+        if(b){ partnersOf(b).forEach(function(p){ opts.push({ v:'sib:'+p, t:(a||'A')+' je sourozenec partnera '+p }); }); siblingsOf(b).forEach(function(p){ opts.push({ v:'par:'+p, t:(a||'A')+' je partner sourozence '+p }); }); }
+        h = 'Napojí se jako sourozenec partnera, nebo partner sourozence.'; }
+      else { row.style.display = 'none'; return; }
+      row.style.display = 'block'; label.textContent = lab;
+      sel.innerHTML = opts.map(function(o){ return '<option value="'+esc(o.v)+'">'+esc(o.t)+'</option>'; }).join('') + '<option value="">— jen zapsat bez napojení —</option>';
+      hint.textContent = opts.length ? h : 'Zatím nejsou známí žádní vhodní rodiče / partneři — vztah se zapíše samostatně. Doplň nejdřív rodiče (A je rodič B) a vrať se.';
+    };
+    ['vz-a','vz-b'].forEach(function(id){ setTimeout(function(){ const el=document.getElementById(id); if(el){ el.addEventListener('input', window.vzRoleChanged); el.addEventListener('change', window.vzRoleChanged); } }, 0); });
     let VZTAHY = [];
     let vzMode = 'tree';
     function renderViz(){
@@ -211,14 +264,39 @@ function renderHierarchy(req) {
         (v.note ? '<div class="nav-card-desc">' + esc(v.note) + '</div>' : '') + '</div>'
       ).join('');
     }
-    window.addVztah = async function(){
-      const a=document.getElementById('vz-a').value.trim(), b=document.getElementById('vz-b').value.trim();
-      const typ=document.getElementById('vz-typ').value, note=document.getElementById('vz-note').value.trim();
-      if(!a||!b)return showToast('Vyplň obě osoby',true);
+    async function postVztah(a,b,typ,note){
       const res=await fetch('/api/vztahy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({a,b,typ,note})});
-      const d=await res.json();
-      if(d.ok){showToast('Vztah zapsán');document.getElementById('vz-a').value='';document.getElementById('vz-b').value='';document.getElementById('vz-note').value='';loadVztahy();}
-      else showToast(d.error,true);
+      return res.json();
+    }
+    function existsVztah(a,b,typ){ const x=nk(a), y=nk(b); return VZTAHY.some(function(v){ return v.typ===typ && ((nk(v.a)===x&&nk(v.b)===y) || ((typ==='partner'||typ==='sourozenec') && nk(v.a)===y && nk(v.b)===x)); }); }
+    window.addVztah = async function(){
+      let a=document.getElementById('vz-a').value.trim(), b=document.getElementById('vz-b').value.trim();
+      let typ=document.getElementById('vz-typ').value; const note=document.getElementById('vz-note').value.trim();
+      const via=(document.getElementById('vz-via-row').style.display!=='none') ? document.getElementById('vz-via').value : '';
+      if(!a||!b)return showToast('Vyplň obě osoby',true);
+      if(a.toLowerCase()===b.toLowerCase())return showToast('Osoby musí být různé',true);
+      // role, které se ukládají otočeně
+      if(typ==='neter'){ const t=a; a=b; b=t; typ='stryc'; }          // A je neteř B  =  B je strýc A
+      else if(typ==='kmotrenec'){ const t=a; a=b; b=t; typ='kmotr'; } // A je kmotřenec B = B je kmotr A
+      let msg='Vztah zapsán';
+      try{
+        if(via && (typ==='stryc'||typ==='svagr')){
+          // napojení přes rodiče / partnera / sourozence — strýc, neteř i švagr se pak odvodí sami
+          const kind=via.slice(0,3), other=via.slice(4);
+          const person = a;   // strýc/teta, resp. švagr — ten, kdo se napojuje (u „neteře“ už po otočení rolí)
+          const t2 = kind==='sib' ? 'sourozenec' : 'partner';
+          if(!existsVztah(person,other,t2)) { const d=await postVztah(person,other,t2,''); if(!d.ok) return showToast(d.error,true); }
+          msg='Napojeno: '+person+' — '+(kind==='sib'?'sourozenec ':'partner ')+other+' (příbuzenství se dopočítá)';
+        } else if(typ==='svagr'){
+          const d=await postVztah(a,b,'rodina','švagr/švagrová'); if(!d.ok) return showToast(d.error,true);
+        } else {
+          const d=await postVztah(a,b,typ,note); if(!d.ok) return showToast(d.error,true);
+        }
+      }catch(e){ return showToast('Zápis se nepodařil',true); }
+      showToast(msg);
+      ['vz-a','vz-b','vz-note'].forEach(function(id){ document.getElementById(id).value=''; });
+      document.getElementById('vz-via-row').style.display='none';
+      loadVztahy();
     };
     window.delVztah = async function(id){
       if(!confirm('Smazat tento vztah?'))return;
