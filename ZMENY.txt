@@ -1,8 +1,15 @@
-Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahrávej.
+Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahravej.
 
-server.js                - NOVY endpoint /api/daily-brief (souhrn z dat Blackbooku), vysilacka vraci jen cislo,
-                           nove typy vztahu (stryc, kmotr, znamy), drobnosti z minula
-views/home.js            - OPRAVA: skript na dashboardu padal na widgetu Zlutý kanabis, proto se Denni hlaseni nikdy nenacetlo
-views/informace.js       - jde smazat vse
-views/hierarchy.js       - formular vztahu s automatickym napojenim (strýc, neter, svagr, kmotr, znamy), rodinny strom, sit
-public/js/family-tree.js - NOVY/PREPSANY soubor, vykresleni stromu a pocitani pribuzenstvi
+NOVE:
+  views/rodokmen.js        - stranka /rodokmen
+  public/js/rodokmen.js    - cela logika rodokmenu (strom, detail osoby, editor, fotky)
+
+ZMENENE:
+  server.js                - API rodokmenu (/api/rodokmen...), nahravani fotek, prevzeti starych rodinnych vazeb,
+                             /api/daily-brief, vysilacka jen cislo
+  nav.js                   - polozka "Rodokmen" v menu (Organizace)
+  views/hierarchy.js       - rodokmen odstranen; zustaly jen mentori/spojenci/rivalove + pridat/smazat pozici (Head of ...)
+  views/home.js, views/informace.js - opravy z minula
+
+NA GITHUBU SMAZ (uz se nepouziva):
+  public/js/family-tree.js

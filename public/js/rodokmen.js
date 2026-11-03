@@ -1,0 +1,838 @@
+// public/js/rodokmen.js — CALEDONIA · Rodokmen
+// Samostatná stránka /rodokmen. Osoby (jméno, narození, lore, fotka, titul) + vazby mezi nimi.
+// Příbuzenství (strýc/teta, synovec/neteř, bratranec, švagr, zeť/snacha, tchán…) se nezadává ručně,
+// ale dopočítává se z rodičů, partnerů a sourozenců — a podle pohlaví se skloňuje správně.
+(function () {
+  'use strict';
+
+  var CFG = window.RODOKMEN_CFG || { canEdit: false, isStaff: false };
+  var S = { persons: [], relations: [], sel: null, view: 'full', tab: 'tree', scale: 1, model: null, full: null };
+
+  // ───────────── pomocné ─────────────
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function toast(msg, err) { if (window.showToast) window.showToast(msg, !!err); }
+  function api(method, url, body) {
+    return fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' })
+      .then(function (r) { return r.json(); });
+  }
+  function byId(id) { for (var i = 0; i < S.persons.length; i++) if (S.persons[i].id === id) return S.persons[i]; return null; }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso); if (!m) return iso;
+    return m[3] + '. ' + m[2] + '. ' + m[1];
+  }
+  function ageOf(p) {
+    if (!p.narozeni) return null;
+    var b = new Date(p.narozeni + 'T00:00:00'); if (isNaN(b)) return null;
+    var end = p.umrti ? new Date(p.umrti + 'T00:00:00') : new Date();
+    var a = end.getFullYear() - b.getFullYear();
+    var m = end.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && end.getDate() < b.getDate())) a--;
+    return a >= 0 ? a : null;
+  }
+  function letText(n) { return n === 1 ? '1 rok' : (n >= 2 && n <= 4 ? n + ' roky' : n + ' let'); }
+  function initials(name) {
+    var w = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!w.length) return '?';
+    return w.length === 1 ? w[0].charAt(0).toUpperCase() : (w[0].charAt(0) + w[w.length - 1].charAt(0)).toUpperCase();
+  }
+  function wrapName(name) {
+    name = String(name || '').trim();
+    if (name.length <= 17) return [name];
+    var w = name.split(/\s+/), best = null, bd = 1e9;
+    for (var i = 1; i < w.length; i++) {
+      var a = w.slice(0, i).join(' '), b = w.slice(i).join(' '), d = Math.abs(a.length - b.length);
+      if (d < bd) { bd = d; best = [a, b]; }
+    }
+    if (!best) best = [name.slice(0, 16) + '…'];
+    return best.map(function (l) { return l.length > 20 ? l.slice(0, 19) + '…' : l; });
+  }
+  function push(arr, v) { if (arr.indexOf(v) < 0) arr.push(v); }
+  function cmpName(a, b) { return String(a).localeCompare(String(b), 'cs'); }
+
+  // ───────────── slovník příbuzenství (m / ž / neutrální) ─────────────
+  var T = {
+    parent: ['otec', 'matka', 'rodič'], child: ['syn', 'dcera', 'dítě'], sibling: ['bratr', 'sestra', 'sourozenec'],
+    grandparent: ['dědeček', 'babička', 'prarodič'], grandchild: ['vnuk', 'vnučka', 'vnouče'],
+    greatgp: ['pradědeček', 'prababička', 'praprarodič'], greatgc: ['pravnuk', 'pravnučka', 'pravnouče'],
+    uncle: ['strýc', 'teta', 'strýc/teta'], nephew: ['synovec', 'neteř', 'synovec/neteř'],
+    cousin: ['bratranec', 'sestřenice', 'bratranec/sestřenice'], cousin2: ['druhý bratranec', 'druhá sestřenice', 'druhý bratranec/sestřenice'],
+    greatuncle: ['prastrýc', 'prateta', 'prastrýc/prateta'], greatnephew: ['prasynovec', 'praneteř', 'prasynovec/praneteř'],
+    uncle2: ['vzdálený strýc', 'vzdálená teta', 'vzdálený strýc/teta'], nephew2: ['vzdálený synovec', 'vzdálená neteř', 'vzdálený synovec/neteř'],
+    ancestor: ['předek', 'předek', 'předek'], descendant: ['potomek', 'potomek', 'potomek'], distant: ['vzdálený příbuzný', 'vzdálená příbuzná', 'vzdálený příbuzný'],
+    partner: ['partner', 'partnerka', 'partner/ka'], inlaw: ['švagr', 'švagrová', 'švagr/švagrová'],
+    childinlaw: ['zeť', 'snacha', 'zeť/snacha'], parentinlaw: ['tchán', 'tchyně', 'tchán/tchyně'],
+    stepparent: ['partner rodiče', 'partnerka rodiče', 'partner rodiče'], stepchild: ['nevlastní syn', 'nevlastní dcera', 'nevlastní dítě'],
+    uncleinlaw: ['strýc sňatkem', 'teta sňatkem', 'strýc/teta sňatkem'], nephewinlaw: ['synovec sňatkem', 'neteř sňatkem', 'synovec/neteř sňatkem'],
+    relinlaw: ['příbuzný sňatkem', 'příbuzná sňatkem', 'příbuzný sňatkem'], partneruncle: ['strýc partnera', 'teta partnera', 'strýc/teta partnera'],
+    godparent: ['kmotr', 'kmotra', 'kmotr/kmotra'], godchild: ['kmotřenec', 'kmotřenka', 'kmotřenec/kmotřenka'],
+    friend: ['rodinný známý', 'rodinná známá', 'rodinný známý']
+  };
+  var GROUP_ORDER = ['parent', 'stepparent', 'partner', 'sibling', 'child', 'stepchild', 'grandparent', 'grandchild', 'greatgp', 'greatgc', 'uncle', 'nephew', 'greatuncle', 'greatnephew', 'cousin', 'cousin2', 'uncle2', 'nephew2', 'inlaw', 'childinlaw', 'parentinlaw', 'uncleinlaw', 'nephewinlaw', 'partneruncle', 'relinlaw', 'ancestor', 'descendant', 'godparent', 'godchild', 'friend', 'distant'];
+  function kinText(key, person) {
+    var t = T[key] || T.distant, g = person && person.pohlavi;
+    return g === 'm' ? t[0] : g === 'z' ? t[1] : t[2];
+  }
+
+  // ───────────── model ─────────────
+  function buildModel(persons, relations) {
+    var people = {}, sats = [];
+    persons.forEach(function (p) { people[p.id] = { id: p.id, p: p, parents: [], children: [], partners: [], siblings: [] }; });
+    relations.forEach(function (r) {
+      var a = people[r.a], b = people[r.b]; if (!a || !b || a === b) return;
+      if (r.typ === 'rodic') { push(a.children, b.id); push(b.parents, a.id); }
+      else if (r.typ === 'partner') { push(a.partners, b.id); push(b.partners, a.id); }
+      else if (r.typ === 'sourozenec') { push(a.siblings, b.id); push(b.siblings, a.id); }
+      else if (r.typ === 'stryc' || r.typ === 'kmotr' || r.typ === 'znamy') sats.push({ typ: r.typ, from: r.a, to: r.b });
+    });
+    return { people: people, sats: sats };
+  }
+
+  function makeKinship(model) {
+    var people = model.people, keys = Object.keys(people);
+    var uf = {};
+    keys.forEach(function (k) { uf[k] = k; });
+    function find(x) { while (uf[x] !== x) { uf[x] = uf[uf[x]]; x = uf[x]; } return x; }
+    keys.forEach(function (k) { people[k].siblings.forEach(function (o) { var a = find(k), b = find(o); if (a !== b) uf[a] = b; }); });
+    var cp = {}, cs = {};
+    keys.forEach(function (k) {
+      var r = find(k); cs[r] = (cs[r] || 0) + 1; cp[r] = cp[r] || [];
+      people[k].parents.forEach(function (p) { push(cp[r], p); });
+    });
+    function effParents(k) { var r = find(k); if (cp[r].length) return cp[r]; return cs[r] > 1 ? ['§v' + r] : []; }
+    var cache = {};
+    function anc(k) {
+      if (cache[k]) return cache[k];
+      var m = {}; m[k] = 0; var q = [k];
+      while (q.length) {
+        var c = q.shift();
+        var ps = c.charAt(0) === '§' ? [] : effParents(c);
+        ps.forEach(function (p) { if (m[p] == null || m[p] > m[c] + 1) { m[p] = m[c] + 1; q.push(p); } });
+      }
+      return (cache[k] = m);
+    }
+    function blood(P, Sx) {
+      var a = anc(P), b = anc(Sx), best = null;
+      Object.keys(a).forEach(function (c) { if (b[c] == null) return; var sum = a[c] + b[c]; if (!best || sum < best.sum) best = { da: a[c], db: b[c], sum: sum }; });
+      if (!best || (best.da === 0 && best.db === 0)) return null;
+      var da = best.da, db = best.db;
+      if (da === 0) return db === 1 ? 'parent' : db === 2 ? 'grandparent' : db === 3 ? 'greatgp' : 'ancestor';
+      if (db === 0) return da === 1 ? 'child' : da === 2 ? 'grandchild' : da === 3 ? 'greatgc' : 'descendant';
+      if (da === 1 && db === 1) return 'sibling';
+      if (da === 1 && db === 2) return 'uncle';
+      if (da === 2 && db === 1) return 'nephew';
+      if (da === 2 && db === 2) return 'cousin';
+      if (da === 1 && db === 3) return 'greatuncle';
+      if (da === 3 && db === 1) return 'greatnephew';
+      if (da === 2 && db === 3) return 'uncle2';
+      if (da === 3 && db === 2) return 'nephew2';
+      if (da === 3 && db === 3) return 'cousin2';
+      return 'distant';
+    }
+    // klíč: kým je P pro osobu Sx
+    function label(P, Sx) {
+      if (P === Sx) return null;
+      var i, s, bb;
+      for (i = 0; i < model.sats.length; i++) {
+        s = model.sats[i];
+        if (s.from === P && s.to === Sx) return s.typ === 'stryc' ? 'uncle' : s.typ === 'kmotr' ? 'godparent' : 'friend';
+        if (s.from === Sx && s.to === P) return s.typ === 'stryc' ? 'nephew' : s.typ === 'kmotr' ? 'godchild' : 'friend';
+      }
+      if (people[P].partners.indexOf(Sx) >= 0) return 'partner';
+      var b = blood(P, Sx); if (b) return b;
+      var ps = people[P].partners;
+      for (i = 0; i < ps.length; i++) {
+        bb = blood(ps[i], Sx); if (!bb) continue;
+        return bb === 'sibling' ? 'inlaw' : bb === 'child' ? 'childinlaw' : bb === 'parent' ? 'stepparent' : bb === 'uncle' ? 'uncleinlaw' : bb === 'nephew' ? 'nephewinlaw' : 'relinlaw';
+      }
+      var ss = people[Sx].partners;
+      for (i = 0; i < ss.length; i++) {
+        bb = blood(P, ss[i]); if (!bb) continue;
+        return bb === 'parent' ? 'parentinlaw' : bb === 'sibling' ? 'inlaw' : bb === 'child' ? 'stepchild' : bb === 'uncle' ? 'partneruncle' : 'relinlaw';
+      }
+      return null;
+    }
+    return { label: label };
+  }
+
+  // ───────────── rozložení stromu ─────────────
+  var NODE_W = 256, NODE_H = 110, GAP_X = 48, PARTNER_GAP = 44, GAP_Y = 118, GUTTER = 70, TOP = 60, MARGIN = 50;
+
+  function layout(model) {
+    var people = model.people, keys = Object.keys(people);
+    function nm(k) { return people[k].p.jmeno; }
+    var structured = keys.filter(function (k) { var p = people[k]; return p.parents.length || p.children.length || p.partners.length || p.siblings.length; });
+    var gen = {}; structured.forEach(function (k) { gen[k] = 0; });
+    for (var pass = 0; pass < structured.length + 3; pass++) {
+      var changed = false;
+      structured.forEach(function (k) {
+        var p = people[k];
+        p.children.forEach(function (c) { if (gen[c] < gen[k] + 1 && gen[k] + 1 <= structured.length) { gen[c] = gen[k] + 1; changed = true; } });
+        p.partners.concat(p.siblings).forEach(function (o) { if (gen[o] < gen[k]) { gen[o] = gen[k]; changed = true; } });
+      });
+      if (!changed) break;
+    }
+    var floaters = keys.filter(function (k) { return gen[k] == null; });
+    var anchorOf = {}, guard = floaters.length + 2;
+    if (!structured.length && floaters.length) { /* první plovoucí dostane generaci 0 níže */ }
+    while (guard-- > 0) {
+      var progress = false;
+      floaters.forEach(function (k) {
+        if (gen[k] != null) return;
+        var hit = null;
+        model.sats.forEach(function (s) {
+          if (hit) return;
+          var other = s.from === k ? s.to : (s.to === k ? s.from : null);
+          if (!other || gen[other] == null) return;
+          hit = { g: s.typ === 'znamy' ? gen[other] : (s.from === k ? gen[other] - 1 : gen[other] + 1), other: other };
+        });
+        if (hit) { gen[k] = hit.g; anchorOf[k] = hit.other; progress = true; }
+      });
+      if (!progress) break;
+    }
+    floaters.forEach(function (k) { if (gen[k] == null) gen[k] = 0; });
+    var minGen = 0; keys.forEach(function (k) { if (gen[k] < minGen) minGen = gen[k]; });
+    keys.forEach(function (k) { gen[k] -= minGen; });
+    var maxGen = 0; keys.forEach(function (k) { if (gen[k] > maxGen) maxGen = gen[k]; });
+
+    var uf = {}; structured.forEach(function (k) { uf[k] = k; });
+    function find(x) { while (uf[x] !== x) { uf[x] = uf[uf[x]]; x = uf[x]; } return x; }
+    structured.forEach(function (k) { people[k].partners.forEach(function (o) { var a = find(k), b = find(o); if (a !== b) uf[a] = b; }); });
+    var groups = {}; structured.forEach(function (k) { (groups[find(k)] = groups[find(k)] || []).push(k); });
+    var units = Object.keys(groups).map(function (r) {
+      var m = groups[r].slice().sort(function (a, b) { return cmpName(nm(a), nm(b)); });
+      return { members: m, gen: gen[m[0]] };
+    });
+    var unitOf = {}; units.forEach(function (u, i) { u.id = i; u.members.forEach(function (k) { unitOf[k] = u; }); });
+    var rows = []; for (var g = 0; g <= maxGen; g++) rows.push([]);
+    units.forEach(function (u) { rows[u.gen].push(u); });
+    function uw(u) { return u.members.length * NODE_W + (u.members.length - 1) * PARTNER_GAP; }
+    var x = {};
+
+    function cmpUnits(a, b) {
+      if (a.bary != null && b.bary != null && a.bary !== b.bary) return a.bary - b.bary;
+      if (a.bary != null && b.bary == null) return -1;
+      if (a.bary == null && b.bary != null) return 1;
+      return cmpName(nm(a.members[0]), nm(b.members[0]));
+    }
+    rows.forEach(function (row) {
+      if (!row.length) return;
+      row.forEach(function (u) {
+        var xs = []; u.members.forEach(function (k) { people[k].parents.forEach(function (pk) { if (x[pk] != null) xs.push(x[pk]); }); });
+        u.bary = xs.length ? xs.reduce(function (a, b) { return a + b; }, 0) / xs.length : null;
+      });
+      var ru = {}; row.forEach(function (u) { ru[u.id] = u.id; });
+      function rf(a) { while (ru[a] !== a) { ru[a] = ru[ru[a]]; a = ru[a]; } return a; }
+      row.forEach(function (u) { u.members.forEach(function (k) { people[k].siblings.forEach(function (o) {
+        if (unitOf[o] && ru[unitOf[o].id] != null) { var a = rf(u.id), b = rf(unitOf[o].id); if (a !== b) ru[a] = b; }
+      }); }); });
+      var clusters = {}; row.forEach(function (u) { (clusters[rf(u.id)] = clusters[rf(u.id)] || []).push(u); });
+      var cl = Object.keys(clusters).map(function (id) {
+        var us = clusters[id].sort(cmpUnits);
+        var bs = us.filter(function (u) { return u.bary != null; }).map(function (u) { return u.bary; });
+        return { us: us, bary: bs.length ? bs.reduce(function (a, b) { return a + b; }, 0) / bs.length : null };
+      });
+      cl.sort(function (a, b) { return cmpUnits({ bary: a.bary, members: a.us[0].members }, { bary: b.bary, members: b.us[0].members }); });
+      var flat = []; cl.forEach(function (c) { c.us.forEach(function (u) { flat.push(u); }); });
+      row.length = 0; flat.forEach(function (u) { row.push(u); });
+      row.forEach(function (u, idx) {
+        if (u.members.length < 2) return;
+        var score = {};
+        u.members.forEach(function (k) { var sc = 0; people[k].siblings.forEach(function (o) { var ou = unitOf[o]; if (!ou || ou === u) return; sc += row.indexOf(ou) > idx ? 1 : -1; }); score[k] = sc; });
+        u.members.sort(function (a, b) { return score[a] - score[b] || cmpName(nm(a), nm(b)); });
+      });
+      var cursor = GUTTER + MARGIN;
+      row.forEach(function (u) {
+        var w = uw(u), left = cursor;
+        if (u.bary != null) left = Math.max(cursor, u.bary - w / 2);
+        u.left = left; u.w = w;
+        u.members.forEach(function (k, i) { x[k] = left + NODE_W / 2 + i * (NODE_W + PARTNER_GAP); });
+        cursor = left + w + GAP_X;
+      });
+    });
+    for (var g2 = maxGen - 1; g2 >= 0; g2--) {
+      var row2 = rows[g2];
+      row2.forEach(function (u, idx) {
+        var cx = []; u.members.forEach(function (k) { people[k].children.forEach(function (c) { if (x[c] != null) cx.push(x[c]); }); });
+        if (!cx.length) return;
+        var target = (Math.min.apply(null, cx) + Math.max.apply(null, cx)) / 2, nl = target - u.w / 2;
+        var minL = idx > 0 ? row2[idx - 1].left + row2[idx - 1].w + GAP_X : GUTTER + MARGIN;
+        var nx = row2[idx + 1], maxL = nx ? nx.left - GAP_X - u.w : Infinity;
+        nl = Math.max(minL, Math.min(maxL, nl)); u.left = nl;
+        u.members.forEach(function (k, i) { x[k] = nl + NODE_W / 2 + i * (NODE_W + PARTNER_GAP); });
+      });
+    }
+    var occ = {};
+    structured.forEach(function (k) { (occ[gen[k]] = occ[gen[k]] || []).push([x[k] - NODE_W / 2, x[k] + NODE_W / 2]); });
+    function free(gg, cx) { var l = cx - NODE_W / 2, r = cx + NODE_W / 2; return !(occ[gg] || []).some(function (iv) { return l < iv[1] + GAP_X && r > iv[0] - GAP_X; }); }
+    var order = floaters.slice().sort(function (a, b) { return (anchorOf[a] ? 0 : 1) - (anchorOf[b] ? 0 : 1) || cmpName(nm(a), nm(b)); });
+    var fallbackX = GUTTER + MARGIN + NODE_W / 2, step = NODE_W + GAP_X;
+    order.forEach(function (k) {
+      var ax = anchorOf[k] && x[anchorOf[k]] != null ? x[anchorOf[k]] : fallbackX, chosen = null;
+      for (var n = 0; n < 80 && chosen == null; n++) {
+        var offs = n === 0 ? [0] : [n * step, -n * step];
+        for (var j = 0; j < offs.length; j++) {
+          var cx2 = ax + offs[j];
+          if (cx2 - NODE_W / 2 < GUTTER + MARGIN - 1) continue;
+          if (free(gen[k], cx2)) { chosen = cx2; break; }
+        }
+      }
+      if (chosen == null) chosen = ax + 81 * step;
+      x[k] = chosen; (occ[gen[k]] = occ[gen[k]] || []).push([chosen - NODE_W / 2, chosen + NODE_W / 2]);
+    });
+    var minX = Infinity, maxX = -Infinity;
+    keys.forEach(function (k) { minX = Math.min(minX, x[k] - NODE_W / 2); maxX = Math.max(maxX, x[k] + NODE_W / 2); });
+    var shift = GUTTER + MARGIN - minX; keys.forEach(function (k) { x[k] += shift; }); maxX += shift;
+    var pos = {}; keys.forEach(function (k) { pos[k] = { cx: x[k], top: TOP + gen[k] * (NODE_H + GAP_Y) }; });
+    return { pos: pos, gen: gen, maxGen: maxGen, W: Math.max(maxX + MARGIN, 560), H: TOP + (maxGen + 1) * NODE_H + maxGen * GAP_Y + 80 };
+  }
+
+  function bez(p0, p1, p2, p3, t) {
+    var u = 1 - t;
+    return { x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x, y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y };
+  }
+
+  function geometry(model, L) {
+    var people = model.people, pos = L.pos, keys = Object.keys(people), geo = { arcs: [], partners: [], links: [], chips: [] };
+    var seen = {};
+    keys.forEach(function (k) { people[k].siblings.forEach(function (o) {
+      var pk = [k, o].sort().join('|'); if (seen[pk]) return; seen[pk] = 1;
+      if (people[k].parents.some(function (p) { return people[o].parents.indexOf(p) >= 0; })) return;
+      var a = pos[k], b = pos[o], ty = Math.min(a.top, b.top) - (30 + Math.min(46, Math.abs(a.cx - b.cx) / 9));
+      geo.arcs.push('M' + a.cx + ' ' + a.top + ' C' + a.cx + ' ' + ty + ' ' + b.cx + ' ' + ty + ' ' + b.cx + ' ' + b.top);
+    }); });
+    var anchor = {}, seenP = {};
+    keys.forEach(function (k) { people[k].partners.forEach(function (o) {
+      var pk = [k, o].sort().join('|'); if (seenP[pk]) return; seenP[pk] = 1;
+      var a = pos[k], b = pos[o], l = a.cx <= b.cx ? a : b, r = a.cx <= b.cx ? b : a;
+      if (Math.abs(l.top - r.top) > 1) return;
+      var y = l.top + NODE_H / 2, x1 = l.cx + NODE_W / 2, x2 = r.cx - NODE_W / 2, mx = (x1 + x2) / 2;
+      geo.partners.push({ x1: x1, x2: x2, y: y, mx: mx }); anchor[pk] = { x: mx, y: y };
+    }); });
+    keys.forEach(function (ck) {
+      var c = people[ck]; if (!c.parents.length) return;
+      var cp = pos[ck], used = {}, starts = [];
+      for (var i = 0; i < c.parents.length; i++) for (var j = i + 1; j < c.parents.length; j++) {
+        var pk = [c.parents[i], c.parents[j]].sort().join('|');
+        if (anchor[pk] && !used[c.parents[i]] && !used[c.parents[j]]) { used[c.parents[i]] = used[c.parents[j]] = 1; starts.push({ x: anchor[pk].x, y: anchor[pk].y + 16 }); }
+      }
+      c.parents.forEach(function (p) { if (!used[p]) starts.push({ x: pos[p].cx, y: pos[p].top + NODE_H }); });
+      starts.forEach(function (s) {
+        var ey = cp.top, dy = Math.max(34, (ey - s.y) * 0.55);
+        geo.links.push({ typ: 'rodic', d: 'M' + s.x + ' ' + s.y + ' C' + s.x + ' ' + (s.y + dy) + ' ' + cp.cx + ' ' + (ey - dy) + ' ' + cp.cx + ' ' + ey, ex: cp.cx, ey: ey });
+      });
+    });
+    model.sats.forEach(function (s) {
+      var a = pos[s.from], b = pos[s.to]; if (!a || !b) return;
+      var d, mid;
+      if (Math.abs(a.top - b.top) < 1) {
+        var lift = 40 + Math.min(40, Math.abs(a.cx - b.cx) / 10), up = s.typ !== 'znamy';
+        var y0 = up ? a.top : a.top + NODE_H, ty = up ? a.top - lift : a.top + NODE_H + lift;
+        var p0 = { x: a.cx, y: y0 }, p1 = { x: a.cx, y: ty }, p2 = { x: b.cx, y: ty }, p3 = { x: b.cx, y: y0 };
+        d = 'M' + p0.x + ' ' + p0.y + ' C' + p1.x + ' ' + p1.y + ' ' + p2.x + ' ' + p2.y + ' ' + p3.x + ' ' + p3.y; mid = bez(p0, p1, p2, p3, 0.5);
+      } else {
+        var hi = a.top < b.top ? a : b, lo = a.top < b.top ? b : a;
+        var q0 = { x: hi.cx, y: hi.top + NODE_H }, q3 = { x: lo.cx, y: lo.top }, dy2 = Math.max(34, (q3.y - q0.y) * 0.5);
+        var q1 = { x: q0.x, y: q0.y + dy2 }, q2 = { x: q3.x, y: q3.y - dy2 };
+        d = 'M' + q0.x + ' ' + q0.y + ' C' + q1.x + ' ' + q1.y + ' ' + q2.x + ' ' + q2.y + ' ' + q3.x + ' ' + q3.y; mid = bez(q0, q1, q2, q3, 0.5);
+      }
+      geo.links.push({ typ: s.typ, d: d });
+      var fp = model.people[s.from] && model.people[s.from].p;
+      var txt = s.typ === 'stryc' ? kinText('uncle', fp) : s.typ === 'kmotr' ? kinText('godparent', fp) : 'známý';
+      geo.chips.push({ x: mid.x, y: mid.y, text: txt, typ: s.typ });
+    });
+    geo.chips.forEach(function (c, i) { for (var j = 0; j < i; j++) { var o = geo.chips[j]; if (Math.abs(o.x - c.x) < 90 && Math.abs(o.y - c.y) < 22) c.y = o.y + 24; } });
+    return geo;
+  }
+
+  // ───────────── filtry zobrazení ─────────────
+  function subsetModel(view, sel) {
+    var full = S.full;
+    if (view === 'full' || !sel || !full.people[sel]) return full;
+    var inc = {}; inc[sel] = 1;
+    function addPartners(k) { full.people[k].partners.forEach(function (p) { inc[p] = 1; }); }
+    if (view === 'predci') {
+      var st = [sel]; while (st.length) { var c = st.pop(); full.people[c].parents.forEach(function (p) { if (!inc[p]) { inc[p] = 1; st.push(p); } }); }
+      Object.keys(inc).forEach(addPartners);
+    } else if (view === 'potomci') {
+      var st2 = [sel]; while (st2.length) { var c2 = st2.pop(); full.people[c2].children.forEach(function (p) { if (!inc[p]) { inc[p] = 1; st2.push(p); } }); }
+      Object.keys(inc).forEach(addPartners);
+    } else if (view === 'okoli') {
+      var P = full.people[sel];
+      P.parents.concat(P.children, P.partners, P.siblings).forEach(function (k) { inc[k] = 1; });
+      P.parents.forEach(addPartners);
+    }
+    var persons = S.persons.filter(function (p) { return inc[p.id]; });
+    var rels = S.relations.filter(function (r) { return inc[r.a] && inc[r.b]; });
+    return buildModel(persons, rels);
+  }
+
+  // ───────────── kreslení stromu ─────────────
+  var uidN = 0;
+  function drawer(model, L, geo, kin) {
+    var uid = 'rk' + (++uidN), people = model.people, pos = L.pos, keys = Object.keys(people);
+    var ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+    var CLR = { rodic: '#d9ad5c', partner: '#d4a95a', stryc: '#d99a63', kmotr: '#e6c75e', znamy: '#8f95a3', sib: '#7fb0d6' };
+    var defs = '<defs>' +
+      '<linearGradient id="' + uid + 'c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f2320"/><stop offset="1" stop-color="#1a1413"/></linearGradient>' +
+      '<linearGradient id="' + uid + 'cs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f2c29"/><stop offset="1" stop-color="#2a1a18"/></linearGradient>' +
+      '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#8a2f3d"/><stop offset="1" stop-color="#4a1520"/></radialGradient>' +
+      '<radialGradient id="' + uid + 'bg" cx="0.5" cy="0.3" r="0.9"><stop offset="0" stop-color="#2a1e1a"/><stop offset="1" stop-color="#0f0b0a"/></radialGradient>' +
+      '<filter id="' + uid + 'gl" x="-30%" y="-40%" width="160%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+      '<filter id="' + uid + 'sh" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="0.6"/></filter>' +
+      keys.map(function (k) { var p = pos[k]; return '<clipPath id="' + uid + 'p' + k + '"><rect x="' + (p.cx - NODE_W / 2 + 12) + '" y="' + (p.top + 19) + '" width="72" height="72" rx="12"/></clipPath>'; }).join('') +
+      '</defs>';
+    function bands() {
+      var s = '';
+      for (var g = 0; g <= L.maxGen; g++) {
+        var y = TOP + g * (NODE_H + GAP_Y);
+        s += '<rect x="0" y="' + (y - 28) + '" width="' + L.W + '" height="' + (NODE_H + 56) + '" fill="' + (g % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.03)') + '"/>';
+        s += '<text x="' + (GUTTER / 2 + 4) + '" y="' + (y + NODE_H / 2 + 7) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-display,Georgia,serif);font-size:22px;font-style:italic">' + (ROMAN[g] || (g + 1)) + '</text>';
+        s += '<line x1="' + GUTTER + '" y1="' + (y - 20) + '" x2="' + GUTTER + '" y2="' + (y + NODE_H + 20) + '" stroke="#7a6236" stroke-opacity="0.35"/>';
+      }
+      return s;
+    }
+    function pill(xr, y, text, fill, color, stroke) {
+      var w = text.length * 6.5 + 20;
+      return '<g><rect x="' + (xr - w) + '" y="' + (y - 11) + '" width="' + w + '" height="22" rx="11" fill="' + fill + '" stroke="' + (stroke || fill) + '" stroke-width="1.2"/>' +
+        '<text x="' + (xr - w / 2) + '" y="' + (y + 4) + '" text-anchor="middle" style="fill:' + color + ';font-family:var(--font-mono,monospace);font-size:10.5px;font-weight:600">' + esc(text) + '</text></g>';
+    }
+    function rings(x, y) {
+      return '<g><circle cx="' + x + '" cy="' + y + '" r="17" fill="#1a1413" stroke="#7a6236"/>' +
+        '<circle cx="' + (x - 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="#d9ad5c" stroke-width="2"/><circle cx="' + (x + 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="#d9ad5c" stroke-width="2"/></g>';
+    }
+    function chip(c) {
+      var w = c.text.length * 6.4 + 18, col = CLR[c.typ];
+      return '<g><rect x="' + (c.x - w / 2) + '" y="' + (c.y - 10) + '" width="' + w + '" height="20" rx="10" fill="#1a1413" stroke="' + col + '" stroke-width="1.2"/>' +
+        '<text x="' + c.x + '" y="' + (c.y + 4) + '" text-anchor="middle" style="fill:' + col + ';font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(c.text) + '</text></g>';
+    }
+    function node(k, sel, labels) {
+      var P = people[k], p = P.p, ps = pos[k], x0 = ps.cx - NODE_W / 2, isSel = sel === k;
+      var lab = sel && !isSel ? labels[k] : null, dim = sel && !isSel && !lab, dead = !!p.umrti;
+      var lines = wrapName(p.jmeno), tx = x0 + 98, ty = lines.length === 1 ? ps.top + 40 : ps.top + 33;
+      var name = lines.map(function (l, i) { return '<text x="' + tx + '" y="' + (ty + i * 17) + '" style="fill:#f4ebd9;font-family:var(--font-display,Georgia,serif);font-size:15px">' + esc(l) + '</text>'; }).join('');
+      var date = '';
+      if (p.narozeni || p.umrti) {
+        var dt = p.umrti ? ((p.narozeni ? p.narozeni.slice(0, 4) : '?') + ' – ' + p.umrti.slice(0, 4)) : fmtDate(p.narozeni);
+        date = '<text x="' + tx + '" y="' + (ps.top + (lines.length === 1 ? 59 : 68)) + '" style="fill:#a89c84;font-family:var(--font-mono,monospace);font-size:11px">' + (p.umrti ? '† ' : '') + esc(dt) + '</text>';
+      }
+      var title = '';
+      if (p.titul) {
+        var t = p.titul.length > 20 ? p.titul.slice(0, 19) + '…' : p.titul, w = t.length * 6.3 + 18;
+        title = '<g><rect x="' + tx + '" y="' + (ps.top + (lines.length === 1 ? 70 : 78)) + '" width="' + w + '" height="20" rx="10" fill="rgba(217,173,92,0.12)" stroke="#a8843f"/><text x="' + (tx + w / 2) + '" y="' + (ps.top + (lines.length === 1 ? 84 : 92)) + '" text-anchor="middle" style="fill:#e6c97c;font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(t) + '</text></g>';
+      }
+      var photo;
+      if (p.foto) photo = '<image href="' + esc(p.foto) + '" x="' + (x0 + 12) + '" y="' + (ps.top + 19) + '" width="72" height="72" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'p' + k + ')"' + (dead ? ' style="filter:grayscale(1) brightness(0.85)"' : '') + '/>' +
+        '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 19) + '" width="72" height="72" rx="12" fill="none" stroke="#c9a35b" stroke-width="1.5"/>';
+      else photo = '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 19) + '" width="72" height="72" rx="12" fill="url(#' + uid + 'm)" stroke="#c9a35b" stroke-width="1.5"/>' +
+        '<text x="' + (x0 + 48) + '" y="' + (ps.top + 64) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:25px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>';
+      var badge = isSel ? pill(x0 + NODE_W - 12, ps.top, 'POHLED Z', '#d9ad5c', '#1a1413') : (lab ? pill(x0 + NODE_W - 12, ps.top, kinText(lab, p), '#1a1413', '#e6c97c', '#d9ad5c') : '');
+      return '<g class="rk-node" data-k="' + esc(k) + '" style="cursor:pointer;opacity:' + (dim ? 0.36 : 1) + '"' + (isSel ? ' filter="url(#' + uid + 'gl)"' : '') + '>' +
+        '<title>' + esc(p.jmeno) + (lab ? ' — ' + esc(kinText(lab, p)) : '') + '</title>' +
+        '<rect x="' + x0 + '" y="' + ps.top + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="14" filter="url(#' + uid + 'sh)" fill="url(#' + uid + (isSel ? 'cs' : 'c') + ')" stroke="' + (isSel ? '#f0d38a' : '#7a6236') + '" stroke-width="' + (isSel ? 2.4 : 1.3) + '"/>' +
+        photo + name + date + title + badge + '</g>';
+    }
+    return function (sel) {
+      var labels = {};
+      if (sel && S.full.people[sel]) keys.forEach(function (k) { if (k !== sel) { var l = kin.label(k, sel); if (l) labels[k] = l; } });
+      var out = defs + '<rect width="' + L.W + '" height="' + L.H + '" fill="url(#' + uid + 'bg)"/>' + bands();
+      out += '<g opacity="' + (sel ? 0.5 : 1) + '" fill="none" stroke-linecap="round">';
+      geo.arcs.forEach(function (d) { out += '<path d="' + d + '" stroke="' + CLR.sib + '" stroke-width="2" stroke-dasharray="2 6"/>'; });
+      geo.links.forEach(function (l) {
+        if (l.typ === 'rodic') out += '<path d="' + l.d + '" stroke="' + CLR.rodic + '" stroke-width="2.4"/><circle cx="' + l.ex + '" cy="' + l.ey + '" r="3.6" fill="' + CLR.rodic + '"/>';
+        else out += '<path d="' + l.d + '" stroke="' + CLR[l.typ] + '" stroke-width="2" stroke-dasharray="' + (l.typ === 'kmotr' ? '1 6' : '7 6') + '"/>';
+      });
+      geo.partners.forEach(function (p) { out += '<line x1="' + p.x1 + '" y1="' + p.y + '" x2="' + p.x2 + '" y2="' + p.y + '" stroke="' + CLR.partner + '" stroke-width="3" stroke-dasharray="1 0"/>' + rings(p.mx, p.y); });
+      out += '</g>';
+      geo.chips.forEach(function (c) { out += chip(c); });
+      keys.forEach(function (k) { out += node(k, sel, labels); });
+      return out;
+    };
+  }
+
+  // ───────────── hlavní vykreslení ─────────────
+  var cur = { L: null, drawFn: null };
+  function renderTree() {
+    var host = $('rk-svg-host');
+    if (!S.persons.length) {
+      host.innerHTML = '<div class="rk-empty"><div class="rk-empty-ico">❦</div><div class="rk-empty-t">Rodokmen je zatím prázdný</div>' +
+        (CFG.canEdit ? '<div>Začni tlačítkem <b>+ Přidat osobu</b>. Pak u osoby přidáš rodiče, partnera, děti i širší rodinu — strom se sestaví sám.</div>' : '<div>Vedení sem zatím nepřidalo žádné osoby.</div>') + '</div>';
+      $('rk-info').style.display = 'none';
+      return;
+    }
+    $('rk-info').style.display = '';
+    var model = subsetModel(S.view, S.sel);
+    var L = layout(model), geo = geometry(model, L), kin = makeKinship(S.full);
+    cur.L = L; cur.drawFn = drawer(model, L, geo, kin);
+    host.innerHTML = '<svg id="rk-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.W + ' ' + L.H + '" width="' + L.W + '" height="' + L.H + '"></svg>';
+    paintSvg();
+    applyScale();
+  }
+  function paintSvg() {
+    var svg = $('rk-svg'); if (!svg || !cur.drawFn) return;
+    svg.innerHTML = cur.drawFn(S.sel);
+    var info = $('rk-info'), p = S.sel && byId(S.sel);
+    if (p) info.innerHTML = 'Pohled z: <b>' + esc(p.jmeno) + '</b> — u ostatních vidíš, kým jsou pro tuto osobu. <button type="button" id="rk-clear">zrušit výběr</button>';
+    else info.textContent = 'Klikni na osobu — zobrazí se detail a u ostatních, kým jsou pro ni (strýc, teta, bratranec, švagr, zeť, tchán…).';
+  }
+  function applyScale() {
+    var svg = $('rk-svg'); if (!svg || !cur.L) return;
+    svg.setAttribute('width', Math.round(cur.L.W * S.scale)); svg.setAttribute('height', Math.round(cur.L.H * S.scale));
+  }
+  function fitScale() {
+    var sc = $('rk-scroll'); if (!sc || !cur.L) return;
+    var av = sc.clientWidth - 4; S.scale = av > 0 ? Math.min(1, av / cur.L.W) : 1; applyScale();
+  }
+  function focusOn(id) {
+    var sc = $('rk-scroll'); if (!sc || !cur.L || !cur.L.pos[id]) return;
+    var p = cur.L.pos[id];
+    sc.scrollTo({ left: Math.max(0, p.cx * S.scale - sc.clientWidth / 2), top: Math.max(0, (p.top + NODE_H / 2) * S.scale - sc.clientHeight / 2), behavior: 'smooth' });
+  }
+
+  function renderStats() {
+    var alive = S.persons.filter(function (p) { return !p.umrti; }).length;
+    var gens = S.persons.length ? (S.fullL ? S.fullL.maxGen + 1 : 1) : 0;
+    $('rk-stats').innerHTML = [
+      ['Osob', S.persons.length], ['Generací', gens], ['Vazeb', S.relations.length], ['Žijících', alive]
+    ].map(function (x) { return '<div class="rk-stat"><div class="rk-stat-n">' + x[1] + '</div><div class="rk-stat-l">' + x[0] + '</div></div>'; }).join('');
+  }
+
+  function avatar(p, cls) {
+    return p.foto ? '<img class="' + cls + '" src="' + esc(p.foto) + '" alt="">' : '<div class="' + cls + ' rk-mono">' + esc(initials(p.jmeno)) + '</div>';
+  }
+
+  function renderBottom() {
+    // historie
+    var ev = [];
+    S.persons.forEach(function (p) {
+      var f = p.pohlavi === 'z';
+      if (p.narozeni) ev.push({ d: p.narozeni, p: p, t: (f ? 'Narodila se ' : 'Narodil se ') + p.jmeno });
+      if (p.umrti) ev.push({ d: p.umrti, p: p, t: (f ? 'Zemřela ' : 'Zemřel ') + p.jmeno });
+    });
+    ev.sort(function (a, b) { return a.d < b.d ? 1 : -1; });
+    $('rk-hist').innerHTML = ev.length ? ev.slice(0, 7).map(function (e) {
+      return '<div class="rk-ev" data-k="' + esc(e.p.id) + '">' + avatar(e.p, 'rk-ev-av') + '<div><div class="rk-ev-d">' + fmtDate(e.d) + '</div><div class="rk-ev-t">' + esc(e.t) + '</div></div></div>';
+    }).join('') : '<div class="rk-muted">Zatím žádné zaznamenané události. Doplň datum narození nebo úmrtí u osob.</div>';
+    // klíčové vazby
+    var pairs = [], seen = {};
+    S.relations.filter(function (r) { return r.typ === 'partner'; }).forEach(function (r) {
+      var a = byId(r.a), b = byId(r.b); if (a && b && !seen[r.id]) { seen[r.id] = 1; pairs.push([a, b]); }
+    });
+    $('rk-pairs').innerHTML = pairs.length ? pairs.slice(0, 4).map(function (pr) {
+      return '<div class="rk-pair"><div class="rk-pair-p" data-k="' + esc(pr[0].id) + '">' + avatar(pr[0], 'rk-pair-av') + '<span>' + esc(pr[0].jmeno) + '</span></div>' +
+        '<div class="rk-pair-h">♥</div><div class="rk-pair-p" data-k="' + esc(pr[1].id) + '">' + avatar(pr[1], 'rk-pair-av') + '<span>' + esc(pr[1].jmeno) + '</span></div></div>';
+    }).join('') : '<div class="rk-muted">Zatím žádné zaznamenané partnerské vazby.</div>';
+  }
+
+  // ───────────── detail osoby ─────────────
+  function directRelations(id) {
+    return S.relations.filter(function (r) { return r.a === id || r.b === id; });
+  }
+  function relDesc(r, id) {
+    var other = byId(r.a === id ? r.b : r.a), me = byId(id); if (!other) return null;
+    var key;
+    if (r.typ === 'rodic') key = r.a === id ? 'child' : 'parent';
+    else if (r.typ === 'partner') key = 'partner';
+    else if (r.typ === 'sourozenec') key = 'sibling';
+    else if (r.typ === 'stryc') key = r.a === id ? 'nephew' : 'uncle';
+    else if (r.typ === 'kmotr') key = r.a === id ? 'godchild' : 'godparent';
+    else key = 'friend';
+    return { other: other, text: kinText(key, other) };
+  }
+
+  function renderDetail() {
+    var host = $('rk-detail'), p = S.sel && byId(S.sel);
+    if (!p) {
+      host.innerHTML = '<div class="rk-d-empty"><div class="rk-empty-ico">❦</div><div>Vyber osobu v rodokmenu nebo v seznamu osob.</div>' +
+        (CFG.canEdit ? '<button class="rk-btn rk-btn-gold" data-act="add">+ Přidat osobu</button>' : '') + '</div>';
+      return;
+    }
+    var age = ageOf(p);
+    var born = p.narozeni ? fmtDate(p.narozeni) + (age != null ? ' (' + (p.umrti ? 'dožil/a se ' + letText(age) : letText(age)) + ')' : '') : '';
+    var kin = makeKinship(S.full), groups = {};
+    S.persons.forEach(function (o) { if (o.id === p.id) return; var k = kin.label(o.id, p.id); if (k) (groups[k] = groups[k] || []).push(o); });
+    var kinHtml = GROUP_ORDER.filter(function (k) { return groups[k]; }).map(function (k) {
+      return groups[k].sort(function (a, b) { return cmpName(a.jmeno, b.jmeno); }).map(function (o) {
+        return '<div class="rk-kin" data-k="' + esc(o.id) + '">' + avatar(o, 'rk-kin-av') + '<div><div class="rk-kin-l">' + esc(kinText(k, o)) + '</div><div class="rk-kin-n">' + esc(o.jmeno) + '</div></div></div>';
+      }).join('');
+    }).join('') || '<div class="rk-muted">Zatím žádné vazby.</div>';
+
+    var direct = '';
+    if (CFG.canEdit) {
+      direct = '<div class="rk-d-h">Zapsané vazby</div>' + (directRelations(p.id).map(function (r) {
+        var d = relDesc(r, p.id); if (!d) return '';
+        return '<div class="rk-rel"><span><b>' + esc(d.text) + ':</b> ' + esc(d.other.jmeno) + '</span><button class="rk-x" data-del-rel="' + esc(r.id) + '" title="Smazat vazbu">✕</button></div>';
+      }).join('') || '<div class="rk-muted">Žádné.</div>') + addRelationHtml(p);
+    }
+    var clen = p.clen ? '<div class="rk-d-row"><span>Člen webu</span><b>' + (CFG.isStaff ? '<a href="/karta/' + encodeURIComponent(p.clen) + '">' + esc(p.clen) + '</a>' : esc(p.clen)) + '</b></div>' : '';
+    host.innerHTML =
+      '<button class="rk-d-close" data-act="close" title="Zavřít">✕</button>' +
+      '<div class="rk-d-photo">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt=""' + (p.umrti ? ' style="filter:grayscale(1) brightness(.85)"' : '') + '>' : '<div class="rk-d-mono">' + esc(initials(p.jmeno)) + '</div>') + '<div class="rk-d-fade"></div></div>' +
+      '<div class="rk-d-body"><h2 class="rk-d-name">' + esc(p.jmeno) + (p.umrti ? ' <span title="Zemřel/a">†</span>' : '') + '</h2>' +
+      (p.titul ? '<div class="rk-d-title">' + esc(p.titul) + '</div>' : '') +
+      (born ? '<div class="rk-d-row"><span>Narození</span><b>' + esc(born) + '</b></div>' : '') +
+      (p.umrti ? '<div class="rk-d-row"><span>Úmrtí</span><b>' + esc(fmtDate(p.umrti)) + '</b></div>' : '') + clen +
+      (p.lore ? '<div class="rk-d-h">Představení</div><div class="rk-d-lore">' + esc(p.lore) + '</div>' : '') +
+      '<div class="rk-d-h">Rodinné vazby</div><div class="rk-kins">' + kinHtml + '</div>' +
+      '<div class="rk-d-h">Zobrazit ve stromu</div><div class="rk-views">' +
+      [['full', 'Celý strom'], ['predci', 'Předci'], ['potomci', 'Potomci'], ['okoli', 'Nejbližší okolí']].map(function (v) { return '<button class="rk-chip' + (S.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '">' + v[1] + '</button>'; }).join('') + '</div>' +
+      direct +
+      (CFG.canEdit ? '<div class="rk-d-actions"><button class="rk-btn rk-btn-gold" data-act="edit">Upravit osobu</button><button class="rk-btn rk-btn-red" data-act="delete">Smazat</button></div>' : '') +
+      '</div>';
+    if (CFG.canEdit) bindAddRelation(p);
+  }
+
+  // ───────────── přidání vazby (z pohledu vybrané osoby X) ─────────────
+  var ROLES = [
+    ['rodic', 'je rodič (otec / matka) osoby'], ['dite', 'je dítě osoby'], ['partner', 'je partner / manžel(ka) osoby'], ['sourozenec', 'je sourozenec osoby'],
+    ['stryc', 'je strýc / teta osoby'], ['neter', 'je synovec / neteř osoby'], ['svagr', 'je švagr / švagrová osoby'],
+    ['kmotr', 'je kmotr / kmotra osoby'], ['kmotrenec', 'je kmotřenec osoby'], ['znamy', 'je rodinný známý osoby']
+  ];
+  function addRelationHtml(p) {
+    return '<div class="rk-d-h">Přidat vazbu</div><div class="rk-addrel">' +
+      '<div class="rk-ar-line"><select id="ar-person"><option value="">— vyber osobu —</option>' +
+      S.persons.filter(function (o) { return o.id !== p.id; }).sort(function (a, b) { return cmpName(a.jmeno, b.jmeno); }).map(function (o) { return '<option value="' + esc(o.id) + '">' + esc(o.jmeno) + '</option>'; }).join('') +
+      '<option value="__new__">+ Nová osoba…</option></select></div>' +
+      '<input type="text" id="ar-new" placeholder="Jméno nové osoby" style="display:none">' +
+      '<div class="rk-ar-line"><select id="ar-role">' + ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + ' ' + esc(p.jmeno) + '</option>'; }).join('') + '</select></div>' +
+      '<div id="ar-via-wrap" style="display:none"><select id="ar-via"></select><div class="rk-hint" id="ar-hint"></div></div>' +
+      '<button class="rk-btn rk-btn-gold" id="ar-go">Zapsat vazbu</button></div>';
+  }
+  function bindAddRelation(x) {
+    function parentsOf(id) { return S.relations.filter(function (r) { return r.typ === 'rodic' && r.b === id; }).map(function (r) { return r.a; }); }
+    function partnersOf(id) { var o = []; S.relations.forEach(function (r) { if (r.typ === 'partner') { if (r.a === id) o.push(r.b); else if (r.b === id) o.push(r.a); } }); return o; }
+    function siblingsOf(id) { var o = []; S.relations.forEach(function (r) { if (r.typ === 'sourozenec') { if (r.a === id) o.push(r.b); else if (r.b === id) o.push(r.a); } }); return o; }
+    function name(id) { var p = byId(id); return p ? p.jmeno : '?'; }
+    var selP = $('ar-person'), selR = $('ar-role'), via = $('ar-via'), wrap = $('ar-via-wrap'), hint = $('ar-hint'), nw = $('ar-new');
+    function refresh() {
+      nw.style.display = selP.value === '__new__' ? '' : 'none';
+      var role = selR.value, y = selP.value, opts = [], h = '', allowNone = false;
+      if (role === 'stryc') {
+        parentsOf(x.id).forEach(function (pid) { opts.push(['sib:' + pid, 'Vybraná osoba je sourozenec osoby ' + name(pid)]); });
+        h = opts.length ? 'Napojí se jako sourozenec rodiče — strýc/teta se pak dopočítá sám.' : 'Osoba ' + x.jmeno + ' zatím nemá zapsané rodiče, vazba se zapíše samostatně.'; allowNone = true;
+      } else if (role === 'neter') {
+        if (y && y !== '__new__') parentsOf(y).forEach(function (pid) { opts.push(['sib:' + pid, x.jmeno + ' je sourozenec osoby ' + name(pid)]); });
+        h = opts.length ? 'Napojí se přes rodiče vybrané osoby.' : 'Vybraná osoba zatím nemá zapsané rodiče, vazba se zapíše samostatně.'; allowNone = true;
+      } else if (role === 'svagr') {
+        partnersOf(x.id).forEach(function (pid) { opts.push(['sib:' + pid, 'Vybraná osoba je sourozenec partnera ' + name(pid)]); });
+        siblingsOf(x.id).forEach(function (pid) { opts.push(['par:' + pid, 'Vybraná osoba je partner sourozence ' + name(pid)]); });
+        h = opts.length ? 'Švagr/švagrová se napojí přes partnera nebo sourozence.' : 'Nejdřív u osoby ' + x.jmeno + ' zapiš partnera nebo sourozence — přes něj se švagr napojí.';
+      } else { wrap.style.display = 'none'; return; }
+      wrap.style.display = '';
+      via.innerHTML = opts.map(function (o) { return '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>'; }).join('') + (allowNone ? '<option value="">— jen zapsat, bez napojení —</option>' : '');
+      hint.textContent = h;
+    }
+    selP.addEventListener('change', refresh); selR.addEventListener('change', refresh); refresh();
+
+    $('ar-go').addEventListener('click', function () {
+      var role = selR.value, y = selP.value;
+      if (!y) return toast('Vyber osobu', true);
+      var viaVal = wrap.style.display === 'none' ? '' : via.value;
+      if (role === 'svagr' && !viaVal) return toast('Švagra nejde napojit bez partnera nebo sourozence', true);
+      var chain = Promise.resolve(y);
+      if (y === '__new__') {
+        var nn = nw.value.trim(); if (!nn) return toast('Vyplň jméno nové osoby', true);
+        chain = api('POST', '/api/rodokmen/osoby', { jmeno: nn }).then(function (d) { if (!d.ok) throw new Error(d.error); return d.person.id; });
+      }
+      chain.then(function (yid) {
+        var jobs = [];
+        function rel(a, b, typ) { jobs.push({ a: a, b: b, typ: typ }); }
+        if (role === 'rodic') rel(yid, x.id, 'rodic');
+        else if (role === 'dite') rel(x.id, yid, 'rodic');
+        else if (role === 'partner') rel(x.id, yid, 'partner');
+        else if (role === 'sourozenec') rel(x.id, yid, 'sourozenec');
+        else if (role === 'kmotr') rel(yid, x.id, 'kmotr');
+        else if (role === 'kmotrenec') rel(x.id, yid, 'kmotr');
+        else if (role === 'znamy') rel(x.id, yid, 'znamy');
+        else if (role === 'stryc') { if (viaVal) { var o = viaVal.slice(4); rel(yid, o, 'sourozenec'); } else rel(yid, x.id, 'stryc'); }
+        else if (role === 'neter') { if (viaVal) { rel(x.id, viaVal.slice(4), 'sourozenec'); } else rel(x.id, yid, 'stryc'); }
+        else if (role === 'svagr') { var kind = viaVal.slice(0, 3), other = viaVal.slice(4); rel(yid, other, kind === 'sib' ? 'sourozenec' : 'partner'); }
+        return jobs.reduce(function (pr, j) { return pr.then(function () { return api('POST', '/api/rodokmen/vazby', j).then(function (d) { if (!d.ok) throw new Error(d.error); }); }); }, Promise.resolve());
+      }).then(function () { toast('Vazba zapsána'); return reload(); })
+        .catch(function (e) { toast(e.message || 'Zápis se nepodařil', true); return reload(); });
+    });
+  }
+
+  // ───────────── seznam osob ─────────────
+  function renderPeople() {
+    var q = ($('rk-pq').value || '').trim().toLowerCase();
+    var list = S.persons.filter(function (p) { return !q || p.jmeno.toLowerCase().indexOf(q) >= 0 || (p.titul || '').toLowerCase().indexOf(q) >= 0; })
+      .sort(function (a, b) { return cmpName(a.jmeno, b.jmeno); });
+    $('rk-people-grid').innerHTML = list.length ? list.map(function (p) {
+      var age = ageOf(p);
+      return '<div class="rk-pc" data-k="' + esc(p.id) + '"><div class="rk-pc-ph">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt=""' + (p.umrti ? ' style="filter:grayscale(1) brightness(.85)"' : '') + '>' : '<div class="rk-d-mono">' + esc(initials(p.jmeno)) + '</div>') + '</div>' +
+        '<div class="rk-pc-b"><div class="rk-pc-n">' + esc(p.jmeno) + (p.umrti ? ' †' : '') + '</div>' + (p.titul ? '<div class="rk-pc-t">' + esc(p.titul) + '</div>' : '') +
+        '<div class="rk-pc-d">' + (p.narozeni ? esc(fmtDate(p.narozeni)) + (age != null ? ' · ' + letText(age) : '') : '—') + '</div></div></div>';
+    }).join('') : '<div class="rk-muted" style="padding:1rem">Nic nenalezeno.</div>';
+  }
+
+  // ───────────── editor osoby ─────────────
+  function openEditor(person) {
+    var p = person || { jmeno: '', titul: '', pohlavi: '', narozeni: '', umrti: '', lore: '', foto: null, clen: '' };
+    var photoNew; // undefined = beze změny, '' = odebrat, dataURL = nová
+    var m = $('rk-modal');
+    m.innerHTML = '<div class="rk-ov"><div class="rk-md"><div class="rk-md-h"><span>' + (person ? 'Upravit osobu' : 'Nová osoba') + '</span><button class="rk-x" id="md-close">✕</button></div>' +
+      '<div class="rk-md-b"><div class="rk-md-grid"><div><div class="rk-drop" id="md-drop" tabindex="0"><img id="md-prev" alt="" style="display:none"><div class="rk-drop-t" id="md-drop-t">Klikni, přetáhni<br>nebo <b>Ctrl+V</b><br>fotku</div></div>' +
+      '<button type="button" class="rk-link" id="md-rmphoto" style="display:none">Odebrat fotku</button><input type="file" id="md-file" accept="image/*" style="display:none"></div>' +
+      '<div><div class="form-group"><label>Jméno *</label><input type="text" id="md-jmeno" maxlength="80" value="' + esc(p.jmeno) + '"></div>' +
+      '<div class="form-row"><div class="form-group"><label>Titul / role</label><input type="text" id="md-titul" maxlength="60" placeholder="např. Zakladatel" value="' + esc(p.titul) + '"></div>' +
+      '<div class="form-group"><label>Pohlaví</label><select id="md-pohlavi"><option value="">Neuvedeno</option><option value="m"' + (p.pohlavi === 'm' ? ' selected' : '') + '>Muž</option><option value="z"' + (p.pohlavi === 'z' ? ' selected' : '') + '>Žena</option></select></div></div>' +
+      '<div class="form-row"><div class="form-group"><label>Datum narození</label><input type="date" id="md-nar" value="' + esc(p.narozeni) + '"></div>' +
+      '<div class="form-group"><label>Datum úmrtí (nepovinné)</label><input type="date" id="md-umr" value="' + esc(p.umrti) + '"></div></div>' +
+      '<div class="form-group"><label>Propojit s členem webu (IC jméno, nepovinné)</label><input type="text" id="md-clen" list="md-members" maxlength="80" value="' + esc(p.clen) + '"><datalist id="md-members"></datalist></div></div></div>' +
+      '<div class="form-group" style="margin-top:0.8rem"><label>Představení / lore</label><textarea id="md-lore" rows="6" maxlength="2500" placeholder="Krátký příběh, povaha, role v rodině…">' + esc(p.lore) + '</textarea></div></div>' +
+      '<div class="rk-md-f"><button class="rk-btn" id="md-cancel">Zrušit</button><button class="rk-btn rk-btn-gold" id="md-save">' + (person ? 'Uložit změny' : 'Přidat osobu') + '</button></div></div></div>';
+    fetch('/api/ic-names').then(function (r) { return r.json(); }).then(function (d) { if (d.ok && $('md-members')) $('md-members').innerHTML = d.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join(''); }).catch(function () {});
+
+    var prev = $('md-prev'), dropT = $('md-drop-t'), rm = $('md-rmphoto');
+    function showPhoto(src) {
+      if (src) { prev.src = src; prev.style.display = 'block'; dropT.style.display = 'none'; rm.style.display = ''; }
+      else { prev.style.display = 'none'; dropT.style.display = ''; rm.style.display = 'none'; }
+    }
+    showPhoto(p.foto);
+    function handleFile(file) {
+      if (!file || !file.type || file.type.indexOf('image/') !== 0) return;
+      var fr = new FileReader();
+      fr.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var max = 900, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+          var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+          var ctx = c.getContext('2d'); ctx.fillStyle = '#111'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+          photoNew = c.toDataURL('image/jpeg', 0.86); showPhoto(photoNew);
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    }
+    var drop = $('md-drop'), file = $('md-file');
+    drop.addEventListener('click', function () { file.click(); });
+    file.addEventListener('change', function (e) { handleFile(e.target.files && e.target.files[0]); });
+    drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+    drop.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('over'); handleFile(e.dataTransfer.files && e.dataTransfer.files[0]); });
+    function onPaste(e) {
+      var items = e.clipboardData && e.clipboardData.items; if (!items) return;
+      for (var i = 0; i < items.length; i++) if (items[i].type && items[i].type.indexOf('image/') === 0) { handleFile(items[i].getAsFile()); e.preventDefault(); break; }
+    }
+    document.addEventListener('paste', onPaste);
+    rm.addEventListener('click', function () { photoNew = ''; showPhoto(null); });
+    function close() { document.removeEventListener('paste', onPaste); m.innerHTML = ''; }
+    $('md-close').addEventListener('click', close); $('md-cancel').addEventListener('click', close);
+    $('md-save').addEventListener('click', function () {
+      var body = { jmeno: $('md-jmeno').value.trim(), titul: $('md-titul').value.trim(), pohlavi: $('md-pohlavi').value, narozeni: $('md-nar').value, umrti: $('md-umr').value, clen: $('md-clen').value.trim(), lore: $('md-lore').value.trim() };
+      if (!body.jmeno) return toast('Vyplň jméno', true);
+      if (photoNew !== undefined) body.foto = photoNew;
+      var btn = $('md-save'); btn.disabled = true;
+      api(person ? 'PUT' : 'POST', person ? '/api/rodokmen/osoby/' + person.id : '/api/rodokmen/osoby', body).then(function (d) {
+        btn.disabled = false;
+        if (!d.ok) return toast(d.error || 'Chyba', true);
+        toast(person ? 'Osoba uložena' : 'Osoba přidána'); close();
+        S.sel = d.person.id; return reload().then(function () { focusOn(S.sel); });
+      }).catch(function () { btn.disabled = false; toast('Uložení se nepodařilo', true); });
+    });
+  }
+
+  // ───────────── výběr / události ─────────────
+  function select(id, scroll) {
+    S.sel = id || null;
+    if (!S.sel && S.view !== 'full') S.view = 'full';
+    renderTree(); renderDetail();
+    if (S.sel && scroll) setTimeout(function () { focusOn(S.sel); }, 30);
+  }
+  function setTab(t) {
+    S.tab = t;
+    $('rk-tab-tree').style.display = t === 'tree' ? '' : 'none';
+    $('rk-tab-people').style.display = t === 'people' ? '' : 'none';
+    $('rk-tabbtn-tree').classList.toggle('active', t === 'tree'); $('rk-tabbtn-people').classList.toggle('active', t === 'people');
+    if (t === 'tree') fitScaleSoon(); else renderPeople();
+  }
+  function fitScaleSoon() { setTimeout(function () { fitScale(); if (S.sel) focusOn(S.sel); }, 30); }
+
+  function recompute() {
+    S.full = buildModel(S.persons, S.relations);
+    S.fullL = S.persons.length ? layout(S.full) : null;
+  }
+  function renderAll() {
+    recompute(); renderStats(); renderTree(); renderDetail(); renderBottom(); renderPeople();
+    var dl = $('rk-names'); if (dl) dl.innerHTML = S.persons.map(function (p) { return '<option value="' + esc(p.jmeno) + '">'; }).join('');
+    fitScaleSoon();
+  }
+  function reload() {
+    return fetch('/api/rodokmen', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) { toast('Rodokmen se nepodařilo načíst', true); return; }
+      S.persons = d.persons || []; S.relations = d.relations || [];
+      if (S.sel && !byId(S.sel)) S.sel = null;
+      renderAll();
+    }).catch(function () { toast('Rodokmen se nepodařilo načíst', true); });
+  }
+
+  function init() {
+    // ovládání
+    document.addEventListener('click', function (e) {
+      var t = e.target, n;
+      if (t.id === 'rk-clear') return select(null);
+      n = t.closest && t.closest('[data-del-rel]');
+      if (n) { if (confirm('Smazat tuto vazbu?')) api('DELETE', '/api/rodokmen/vazby/' + n.getAttribute('data-del-rel')).then(function (d) { if (d.ok) { toast('Vazba smazána'); reload(); } else toast(d.error, true); }); return; }
+      n = t.closest && t.closest('[data-act]');
+      if (n) {
+        var a = n.getAttribute('data-act'), p = S.sel && byId(S.sel);
+        if (a === 'add') return openEditor(null);
+        if (a === 'close') return select(null);
+        if (a === 'edit' && p) return openEditor(p);
+        if (a === 'delete' && p) {
+          if (!confirm('Trvale smazat osobu „' + p.jmeno + '“ včetně všech jejích vazeb?')) return;
+          api('DELETE', '/api/rodokmen/osoby/' + p.id).then(function (d) { if (d.ok) { toast('Osoba smazána'); S.sel = null; reload(); } else toast(d.error, true); });
+          return;
+        }
+      }
+      n = t.closest && t.closest('[data-view]');
+      if (n) { S.view = n.getAttribute('data-view'); $('rk-view').value = S.view; renderTree(); renderDetail(); fitScaleSoon(); return; }
+      n = t.closest && t.closest('.rk-pc, .rk-kin, .rk-ev, .rk-pair-p');
+      if (n && n.getAttribute('data-k')) { var id = n.getAttribute('data-k'); if (S.tab !== 'tree') setTab('tree'); S.sel = id; renderTree(); renderDetail(); setTimeout(function () { focusOn(id); }, 60); return; }
+    });
+    $('rk-tabbtn-tree').addEventListener('click', function () { setTab('tree'); });
+    $('rk-tabbtn-people').addEventListener('click', function () { setTab('people'); });
+    $('rk-pq').addEventListener('input', renderPeople);
+    $('rk-view').addEventListener('change', function () {
+      S.view = this.value;
+      if (S.view !== 'full' && !S.sel) { toast('Nejdřív klikni na osobu, ke které se má pohled vztahovat', true); S.view = 'full'; this.value = 'full'; return; }
+      renderTree(); renderDetail(); fitScaleSoon();
+    });
+    $('rk-search').addEventListener('change', function () {
+      var q = this.value.trim().toLowerCase(); if (!q) return;
+      var p = S.persons.filter(function (x) { return x.jmeno.toLowerCase() === q; })[0] || S.persons.filter(function (x) { return x.jmeno.toLowerCase().indexOf(q) >= 0; })[0];
+      if (!p) return toast('Osoba nenalezena', true);
+      S.view = 'full'; $('rk-view').value = 'full'; S.sel = p.id; renderTree(); renderDetail(); setTimeout(function () { focusOn(p.id); }, 60);
+    });
+    ['in', 'out', 'fit'].forEach(function (a) {
+      $('rk-z-' + a).addEventListener('click', function () {
+        if (a === 'in') S.scale = Math.min(2.5, S.scale + 0.15); else if (a === 'out') S.scale = Math.max(0.2, S.scale - 0.15); else return fitScale();
+        applyScale();
+      });
+    });
+    var host = $('rk-svg-host'), sc = $('rk-scroll'), dragged = false, down = false, sx = 0, sy = 0, sl = 0, st = 0;
+    sc.addEventListener('mousedown', function (e) { if (e.button !== 0) return; down = true; dragged = false; sx = e.clientX; sy = e.clientY; sl = sc.scrollLeft; st = sc.scrollTop; });
+    window.addEventListener('mousemove', function (e) {
+      if (!down) return; var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (!dragged && Math.abs(dx) + Math.abs(dy) > 5) { dragged = true; sc.classList.add('rk-drag'); }
+      if (dragged) { sc.scrollLeft = sl - dx; sc.scrollTop = st - dy; }
+    });
+    window.addEventListener('mouseup', function () { if (!down) return; down = false; sc.classList.remove('rk-drag'); setTimeout(function () { dragged = false; }, 0); });
+    host.addEventListener('click', function (e) {
+      if (dragged) return;
+      var n = e.target; while (n && n !== host && !(n.getAttribute && n.getAttribute('data-k'))) n = n.parentNode;
+      var k = n && n !== host ? n.getAttribute('data-k') : null;
+      select(k && k !== S.sel ? k : null, false);
+    });
+    sc.addEventListener('wheel', function (e) {
+      if (!e.ctrlKey) return; e.preventDefault();
+      S.scale = Math.max(0.2, Math.min(2.5, S.scale + (e.deltaY < 0 ? 0.1 : -0.1))); applyScale();
+    }, { passive: false });
+    window.addEventListener('resize', function () { if (S.tab === 'tree') fitScale(); });
+    reload();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();

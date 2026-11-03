@@ -44,6 +44,7 @@ const { renderAlbion } = require('./views/albion');
 const { renderSpisy } = require('./views/spis');
 const { renderBazar } = require('./views/bazar');
 const { renderMentoring } = require('./views/mentoring');
+const { renderRodokmen } = require('./views/rodokmen');
 
 const app  = express();
 const PORT = process.env.PORT || process.env.WEB_PORT || 3000;
@@ -644,6 +645,164 @@ app.delete('/api/mentoring/:id', requireAuth, requireMentoringManage, (req, res)
   program.status = 'zruseny';
   saveMentoring(list);
   broadcastSSE('mentoringUpdate', { action: 'zruseno' });
+  res.json({ ok: true });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// RODOKMEN — osoby (jméno, datum narození, lore, fotka) + vazby mezi nimi
+// ══════════════════════════════════════════════════════════════════════
+// Samostatné úložiště (rodokmen.json v trvalém Volume). Osoby mají vlastní ID,
+// vazby se odkazují na ID osob (ne na jména), takže přejmenování nic nerozbije.
+// Při úplně prvním načtení se rodinné vazby převezmou ze starých "Vztahů mezi
+// členy" (relationships.json), aby se nic z dosavadní práce neztratilo.
+// Čtení vidí každý přihlášený, úpravy jen Founder/Council.
+const RODOKMEN_FILE = path.join(DATA_DIR, 'rodokmen.json');
+const RODOKMEN_UPLOADS_DIR = path.join(DATA_DIR, 'rodokmen-uploads');
+if (!fs.existsSync(RODOKMEN_UPLOADS_DIR)) { try { fs.mkdirSync(RODOKMEN_UPLOADS_DIR, { recursive: true }); } catch (e) { console.error('[RODOKMEN]', e.message); } }
+const RODOKMEN_TYPY = ['rodic', 'partner', 'sourozenec', 'stryc', 'kmotr', 'znamy'];
+
+function rodokmenId(prefix) { return `${prefix}_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`; }
+function seedRodokmenFromVztahy() {
+  const persons = [], relations = [], byName = {};
+  const person = (name) => {
+    const k = (name || '').toString().trim().toLowerCase();
+    if (!k) return null;
+    if (!byName[k]) {
+      byName[k] = { id: rodokmenId('os'), jmeno: name.toString().trim(), titul: '', pohlavi: '', narozeni: '', umrti: '', lore: '', foto: null, clen: '', createdAt: Date.now() };
+      persons.push(byName[k]);
+    }
+    return byName[k];
+  };
+  try {
+    loadRelationships().filter(v => RODOKMEN_TYPY.includes(v.typ)).forEach(v => {
+      const a = person(v.a), b = person(v.b);
+      if (a && b && a.id !== b.id) relations.push({ id: rodokmenId('vz'), a: a.id, b: b.id, typ: v.typ });
+    });
+  } catch (e) { console.error('[RODOKMEN SEED]', e.message); }
+  return { persons, relations };
+}
+function loadRodokmen() {
+  try {
+    if (!fs.existsSync(RODOKMEN_FILE)) { const seed = seedRodokmenFromVztahy(); writeJsonAtomic(RODOKMEN_FILE, seed); return seed; }
+    const d = JSON.parse(fs.readFileSync(RODOKMEN_FILE, 'utf8')) || {};
+    return { persons: Array.isArray(d.persons) ? d.persons : [], relations: Array.isArray(d.relations) ? d.relations : [] };
+  } catch { return { persons: [], relations: [] }; }
+}
+function saveRodokmen(d) { try { writeJsonAtomic(RODOKMEN_FILE, d); } catch (e) { console.error('[RODOKMEN]', e.message); } }
+function requireRodokmenEdit(req, res, next) {
+  if (req.session.accessLevel !== 1) return res.status(403).json({ ok: false, error: 'Rodokmen smí upravovat jen Founder/Council' });
+  next();
+}
+function optText(v, max) { const t = (v == null ? '' : v).toString().trim(); return t.length <= max ? t : null; }
+function optDate(v) { const t = (v == null ? '' : v).toString().trim(); if (!t) return ''; return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null; }
+
+app.get('/rodokmen-uploads/:filename', (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  res.sendFile(path.join(RODOKMEN_UPLOADS_DIR, safeName), (err) => { if (err) res.status(404).end(); });
+});
+
+function saveRodokmenImage(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) return null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  const buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 6 * 1024 * 1024) return null;
+  const filename = `rod_${Date.now()}_${Math.floor(Math.random() * 1e6)}.${ext}`;
+  try { fs.writeFileSync(path.join(RODOKMEN_UPLOADS_DIR, filename), buffer); return `/rodokmen-uploads/${filename}`; }
+  catch (e) { console.error('[RODOKMEN IMG]', e.message); return null; }
+}
+function deleteRodokmenImage(p) {
+  if (p && typeof p === 'string' && p.startsWith('/rodokmen-uploads/')) fs.unlink(path.join(RODOKMEN_UPLOADS_DIR, path.basename(p)), () => {});
+}
+
+app.get('/api/rodokmen', requireAuth, (req, res) => {
+  const d = loadRodokmen();
+  res.json({ ok: true, persons: d.persons, relations: d.relations, canEdit: req.session.accessLevel === 1 });
+});
+
+function readRodokmenPerson(body) {
+  const jmeno = sanitizeText(body.jmeno, 80);
+  if (!jmeno) return { error: 'Vyplň jméno (max 80 znaků)' };
+  const titul = optText(body.titul, 60), clen = optText(body.clen, 80), lore = optText(body.lore, 2500);
+  const narozeni = optDate(body.narozeni), umrti = optDate(body.umrti);
+  const pohlavi = ['m', 'z'].includes(body.pohlavi) ? body.pohlavi : '';
+  if (titul === null) return { error: 'Titul / role je příliš dlouhá (max 60 znaků)' };
+  if (clen === null) return { error: 'Propojené jméno je příliš dlouhé' };
+  if (lore === null) return { error: 'Představení je příliš dlouhé (max 2500 znaků)' };
+  if (narozeni === null || umrti === null) return { error: 'Neplatné datum' };
+  return { value: { jmeno, titul, pohlavi, narozeni, umrti, lore, clen } };
+}
+
+app.post('/api/rodokmen/osoby', requireAuth, requireRodokmenEdit, (req, res) => {
+  const r = readRodokmenPerson(req.body);
+  if (r.error) return res.json({ ok: false, error: r.error });
+  const d = loadRodokmen();
+  const person = { id: rodokmenId('os'), ...r.value, foto: req.body.foto ? saveRodokmenImage(req.body.foto) : null, createdAt: Date.now(), createdBy: req.session.icName };
+  d.persons.push(person);
+  saveRodokmen(d);
+  res.json({ ok: true, person });
+});
+
+app.put('/api/rodokmen/osoby/:id', requireAuth, requireRodokmenEdit, (req, res) => {
+  const d = loadRodokmen();
+  const person = d.persons.find(p => p.id === req.params.id);
+  if (!person) return res.json({ ok: false, error: 'Osoba nenalezena' });
+  const r = readRodokmenPerson(req.body);
+  if (r.error) return res.json({ ok: false, error: r.error });
+  Object.assign(person, r.value);
+  if (req.body.foto === '') { deleteRodokmenImage(person.foto); person.foto = null; }
+  else if (req.body.foto) {
+    const np = saveRodokmenImage(req.body.foto);
+    if (np) { deleteRodokmenImage(person.foto); person.foto = np; }
+  }
+  person.updatedAt = Date.now(); person.updatedBy = req.session.icName;
+  saveRodokmen(d);
+  res.json({ ok: true, person });
+});
+
+app.delete('/api/rodokmen/osoby/:id', requireAuth, requireRodokmenEdit, (req, res) => {
+  const d = loadRodokmen();
+  const person = d.persons.find(p => p.id === req.params.id);
+  if (!person) return res.json({ ok: false, error: 'Osoba nenalezena' });
+  deleteRodokmenImage(person.foto);
+  d.persons = d.persons.filter(p => p.id !== person.id);
+  d.relations = d.relations.filter(v => v.a !== person.id && v.b !== person.id);
+  saveRodokmen(d);
+  res.json({ ok: true });
+});
+
+app.post('/api/rodokmen/vazby', requireAuth, requireRodokmenEdit, (req, res) => {
+  const d = loadRodokmen();
+  const a = (req.body.a || '').toString(), b = (req.body.b || '').toString(), typ = (req.body.typ || '').toString();
+  if (!RODOKMEN_TYPY.includes(typ)) return res.json({ ok: false, error: 'Neplatný typ vazby' });
+  if (a === b) return res.json({ ok: false, error: 'Osoby musí být různé' });
+  if (!d.persons.some(p => p.id === a) || !d.persons.some(p => p.id === b)) return res.json({ ok: false, error: 'Osoba nenalezena' });
+  const symetric = typ === 'partner' || typ === 'sourozenec' || typ === 'znamy';
+  if (d.relations.some(v => v.typ === typ && ((v.a === a && v.b === b) || (symetric && v.a === b && v.b === a)))) {
+    return res.json({ ok: true, duplicate: true });
+  }
+  if (typ === 'rodic') {
+    // rodič nesmí být potomkem svého dítěte (zacyklení stromu)
+    const seen = new Set(); const stack = [a];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (cur === b) return res.json({ ok: false, error: 'Tahle vazba by vytvořila smyčku (rodič by byl svým vlastním potomkem)' });
+      d.relations.filter(v => v.typ === 'rodic' && v.b === cur).forEach(v => { if (!seen.has(v.a)) { seen.add(v.a); stack.push(v.a); } });
+    }
+  }
+  const rel = { id: rodokmenId('vz'), a, b, typ, createdBy: req.session.icName, createdAt: Date.now() };
+  d.relations.push(rel);
+  saveRodokmen(d);
+  res.json({ ok: true, relation: rel });
+});
+
+app.delete('/api/rodokmen/vazby/:id', requireAuth, requireRodokmenEdit, (req, res) => {
+  const d = loadRodokmen();
+  const before = d.relations.length;
+  d.relations = d.relations.filter(v => v.id !== req.params.id);
+  if (d.relations.length === before) return res.json({ ok: false, error: 'Vazba nenalezena' });
+  saveRodokmen(d);
   res.json({ ok: true });
 });
 
@@ -1300,6 +1459,11 @@ app.get('/api/search', requireAuth, (req, res) => {
       if (!b.prodano && (b.nazev || '').toLowerCase().includes(q)) {
         results.push({ type: 'bazar', label: b.nazev, href: '/bazar' });
       }
+    });
+  } catch (e) {}
+  try {
+    loadRodokmen().persons.forEach(p => {
+      if ((p.jmeno || '').toLowerCase().includes(q)) results.push({ type: 'rodokmen', label: p.jmeno, href: '/rodokmen' });
     });
   } catch (e) {}
   res.json({ ok: true, results: results.slice(0, 25) });
@@ -3986,6 +4150,7 @@ app.get('/audit', requireAuth, requireAccess('audit'), (req, res) => res.send(re
 app.get('/statistiky', requireAuth, requireAccess('statistiky'), (req, res) => res.send(renderStatistiky(req)));
 app.get('/lore', requireAuth, (req, res) => res.send(renderLore(req)));
 app.get('/hierarchy', requireAuth, (req, res) => res.send(renderHierarchy(req)));
+app.get('/rodokmen', requireAuth, (req, res) => res.send(renderRodokmen(req)));
 app.get('/prehled', requireAuth, (req, res) => res.send(renderPrehled(req)));
 app.get('/vyznamenani', requireAuth, (req, res) => res.send(renderVyznamenani(req)));
 app.get('/audit-me', requireAuth, (req, res) => res.send(renderAuditMe(req)));
@@ -4050,6 +4215,12 @@ function gcOrphanedUploads() {
     const nemFiles = new Set(loadNemovitosti().flatMap(n => (n.images || []).map(p => path.basename(p))));
     fs.readdirSync(NEMOVITOSTI_UPLOADS_DIR).forEach(f => {
       if (!nemFiles.has(f)) { try { fs.unlinkSync(path.join(NEMOVITOSTI_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený nemovitosti upload:', f); } catch (e) {} }
+    });
+  } catch (e) {}
+  try {
+    const rodFiles = new Set(loadRodokmen().persons.map(p => p.foto && path.basename(p.foto)).filter(Boolean));
+    fs.readdirSync(RODOKMEN_UPLOADS_DIR).forEach(f => {
+      if (!rodFiles.has(f)) { try { fs.unlinkSync(path.join(RODOKMEN_UPLOADS_DIR, f)); console.log('[GC] Smazán osamocený rodokmen upload:', f); } catch (e) {} }
     });
   } catch (e) {}
   try {
