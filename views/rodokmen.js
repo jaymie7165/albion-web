@@ -23,6 +23,8 @@ function renderRodokmen(req) {
     .rk-stat-l{font-family:var(--font-label,sans-serif);font-size:0.56rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ivory-faint,#8a8070);margin-top:0.35rem}
     .rk-toolbar{display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.9rem}
     .rk-toolbar input,.rk-toolbar select{width:auto;min-width:210px}
+    .rk-toggle{display:inline-flex;align-items:center;gap:0.5rem;font-family:var(--font-mono,monospace);font-size:0.72rem;color:var(--ivory-dim,#bfb5a0);cursor:pointer}
+    .rk-toggle input{width:auto}
     .rk-zbtn{background:transparent;border:1px solid var(--border-brass,#7a6236);color:var(--ivory-dim,#bfb5a0);width:34px;height:34px;cursor:pointer;font-size:1rem;border-radius:4px}
     .rk-zbtn:hover{background:rgba(201,163,91,.14);color:#e6c97c}
     .rk-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:1.2rem;align-items:start}
@@ -135,6 +137,7 @@ function renderRodokmen(req) {
           <option value="potomci">Zobrazení: potomci vybrané osoby</option>
           <option value="okoli">Zobrazení: nejbližší okolí vybrané osoby</option>
         </select>
+        <label class="rk-toggle"><input type="checkbox" id="rk-threads" checked><span>Červené nitě (strýc, bratranec, švagr…)</span></label>
         <button class="rk-zbtn" id="rk-z-out" type="button" title="Oddálit">−</button>
         <button class="rk-zbtn" id="rk-z-fit" type="button" title="Přizpůsobit šířce">⤢</button>
         <button class="rk-zbtn" id="rk-z-in" type="button" title="Přiblížit">+</button>
@@ -150,6 +153,7 @@ function renderRodokmen(req) {
             <span><i style="border-top:3px dashed #d99a63"></i>Strýc / teta</span>
             <span><i style="border-top:3px dotted #e6c75e"></i>Kmotr</span>
             <span><i style="border-top:3px dotted #8f95a3"></i>Rodinný známý</span>
+            <span><i style="border-top:3px solid #d6455d"></i>Červená nit (strýc, bratranec, švagr…)</span>
           </div>
         </div>
         <aside class="rk-detail" id="rk-detail"></aside>

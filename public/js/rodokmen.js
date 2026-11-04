@@ -6,7 +6,7 @@
   'use strict';
 
   var CFG = window.RODOKMEN_CFG || { canEdit: false, isStaff: false };
-  var S = { persons: [], relations: [], sel: null, view: 'full', tab: 'tree', scale: 1, model: null, full: null };
+  var S = { persons: [], relations: [], sel: null, view: 'full', tab: 'tree', scale: 1, model: null, full: null, threads: true };
 
   // ───────────── pomocné ─────────────
   function $(id) { return document.getElementById(id); }
@@ -39,14 +39,14 @@
   }
   function wrapName(name) {
     name = String(name || '').trim();
-    if (name.length <= 17) return [name];
+    if (name.length <= 19) return [name];
     var w = name.split(/\s+/), best = null, bd = 1e9;
     for (var i = 1; i < w.length; i++) {
       var a = w.slice(0, i).join(' '), b = w.slice(i).join(' '), d = Math.abs(a.length - b.length);
       if (d < bd) { bd = d; best = [a, b]; }
     }
     if (!best) best = [name.slice(0, 16) + '…'];
-    return best.map(function (l) { return l.length > 20 ? l.slice(0, 19) + '…' : l; });
+    return best.map(function (l) { return l.length > 21 ? l.slice(0, 20) + '…' : l; });
   }
   function push(arr, v) { if (arr.indexOf(v) < 0) arr.push(v); }
   function cmpName(a, b) { return String(a).localeCompare(String(b), 'cs'); }
@@ -157,12 +157,13 @@
   }
 
   // ───────────── rozložení stromu ─────────────
-  var NODE_W = 256, NODE_H = 110, GAP_X = 48, PARTNER_GAP = 44, GAP_Y = 118, GUTTER = 70, TOP = 60, MARGIN = 50;
+  var NODE_W = 258, NODE_H = 104, GAP_X = 44, PARTNER_GAP = 44, GAP_Y = 112, GUTTER = 74, TOP = 104, MARGIN = 50;
 
   function layout(model) {
     var people = model.people, keys = Object.keys(people);
     function nm(k) { return people[k].p.jmeno; }
     var structured = keys.filter(function (k) { var p = people[k]; return p.parents.length || p.children.length || p.partners.length || p.siblings.length; });
+    var isStruct = {}; structured.forEach(function (k) { isStruct[k] = 1; });
     var gen = {}; structured.forEach(function (k) { gen[k] = 0; });
     for (var pass = 0; pass < structured.length + 3; pass++) {
       var changed = false;
@@ -173,28 +174,28 @@
       });
       if (!changed) break;
     }
-    var floaters = keys.filter(function (k) { return gen[k] == null; });
-    var anchorOf = {}, guard = floaters.length + 2;
-    if (!structured.length && floaters.length) { /* první plovoucí dostane generaci 0 níže */ }
+    // osoby jen s „vedlejšími“ vazbami (kmotr, známý, strýc bez rodičů) se přilepí přímo vedle své kotvy
+    var floaters = keys.filter(function (k) { return !isStruct[k]; });
+    var anchorOf = {}, rootOf = {}, depthOf = {}, guard = floaters.length + 2;
     while (guard-- > 0) {
-      var progress = false;
+      var prog = false;
       floaters.forEach(function (k) {
-        if (gen[k] != null) return;
-        var hit = null;
-        model.sats.forEach(function (s) {
-          if (hit) return;
-          var other = s.from === k ? s.to : (s.to === k ? s.from : null);
-          if (!other || gen[other] == null) return;
-          hit = { g: s.typ === 'znamy' ? gen[other] : (s.from === k ? gen[other] - 1 : gen[other] + 1), other: other };
-        });
-        if (hit) { gen[k] = hit.g; anchorOf[k] = hit.other; progress = true; }
+        if (anchorOf[k]) return;
+        for (var i = 0; i < model.sats.length; i++) {
+          var s = model.sats[i], other = s.from === k ? s.to : (s.to === k ? s.from : null);
+          if (!other) continue;
+          if (isStruct[other]) { anchorOf[k] = other; rootOf[k] = other; depthOf[k] = 1; prog = true; return; }
+          if (anchorOf[other]) { anchorOf[k] = other; rootOf[k] = rootOf[other]; depthOf[k] = depthOf[other] + 1; prog = true; return; }
+        }
       });
-      if (!progress) break;
+      if (!prog) break;
     }
-    floaters.forEach(function (k) { if (gen[k] == null) gen[k] = 0; });
-    var minGen = 0; keys.forEach(function (k) { if (gen[k] < minGen) minGen = gen[k]; });
-    keys.forEach(function (k) { gen[k] -= minGen; });
-    var maxGen = 0; keys.forEach(function (k) { if (gen[k] > maxGen) maxGen = gen[k]; });
+    var attached = floaters.filter(function (k) { return anchorOf[k]; });
+    var isolated = floaters.filter(function (k) { return !anchorOf[k]; });
+    attached.forEach(function (k) { gen[k] = gen[rootOf[k]]; });
+    var maxGen = 0; Object.keys(gen).forEach(function (k) { if (gen[k] > maxGen) maxGen = gen[k]; });
+    var isoGen = null;
+    if (isolated.length) { isoGen = Object.keys(gen).length ? maxGen + 1 : 0; isolated.forEach(function (k) { gen[k] = isoGen; }); maxGen = Math.max(maxGen, isoGen); }
 
     var uf = {}; structured.forEach(function (k) { uf[k] = k; });
     function find(x) { while (uf[x] !== x) { uf[x] = uf[uf[x]]; x = uf[x]; } return x; }
@@ -205,11 +206,17 @@
       return { members: m, gen: gen[m[0]] };
     });
     var unitOf = {}; units.forEach(function (u, i) { u.id = i; u.members.forEach(function (k) { unitOf[k] = u; }); });
+    var att = {}; attached.forEach(function (k) { var u = unitOf[rootOf[k]]; (att[u.id] = att[u.id] || []).push(k); });
+    function allOf(u) {
+      var Ls = [], Rs = [];
+      (att[u.id] || []).forEach(function (k) { var left = u.members.length > 1 && u.members[0] === rootOf[k]; (left ? Ls : Rs).push(k); });
+      Ls.sort(function (a, b) { return depthOf[b] - depthOf[a]; }); Rs.sort(function (a, b) { return depthOf[a] - depthOf[b]; });
+      return Ls.concat(u.members, Rs);
+    }
     var rows = []; for (var g = 0; g <= maxGen; g++) rows.push([]);
     units.forEach(function (u) { rows[u.gen].push(u); });
-    function uw(u) { return u.members.length * NODE_W + (u.members.length - 1) * PARTNER_GAP; }
+    function uw(u) { return u.all.length * NODE_W + (u.all.length - 1) * PARTNER_GAP; }
     var x = {};
-
     function cmpUnits(a, b) {
       if (a.bary != null && b.bary != null && a.bary !== b.bary) return a.bary - b.bary;
       if (a.bary != null && b.bary == null) return -1;
@@ -242,12 +249,13 @@
         u.members.forEach(function (k) { var sc = 0; people[k].siblings.forEach(function (o) { var ou = unitOf[o]; if (!ou || ou === u) return; sc += row.indexOf(ou) > idx ? 1 : -1; }); score[k] = sc; });
         u.members.sort(function (a, b) { return score[a] - score[b] || cmpName(nm(a), nm(b)); });
       });
+      row.forEach(function (u) { u.all = allOf(u); });
       var cursor = GUTTER + MARGIN;
       row.forEach(function (u) {
         var w = uw(u), left = cursor;
         if (u.bary != null) left = Math.max(cursor, u.bary - w / 2);
         u.left = left; u.w = w;
-        u.members.forEach(function (k, i) { x[k] = left + NODE_W / 2 + i * (NODE_W + PARTNER_GAP); });
+        u.all.forEach(function (k, i) { x[k] = left + NODE_W / 2 + i * (NODE_W + PARTNER_GAP); });
         cursor = left + w + GAP_X;
       });
     });
@@ -260,90 +268,113 @@
         var minL = idx > 0 ? row2[idx - 1].left + row2[idx - 1].w + GAP_X : GUTTER + MARGIN;
         var nx = row2[idx + 1], maxL = nx ? nx.left - GAP_X - u.w : Infinity;
         nl = Math.max(minL, Math.min(maxL, nl)); u.left = nl;
-        u.members.forEach(function (k, i) { x[k] = nl + NODE_W / 2 + i * (NODE_W + PARTNER_GAP); });
+        u.all.forEach(function (k, i) { x[k] = nl + NODE_W / 2 + i * (NODE_W + PARTNER_GAP); });
       });
     }
-    var occ = {};
-    structured.forEach(function (k) { (occ[gen[k]] = occ[gen[k]] || []).push([x[k] - NODE_W / 2, x[k] + NODE_W / 2]); });
-    function free(gg, cx) { var l = cx - NODE_W / 2, r = cx + NODE_W / 2; return !(occ[gg] || []).some(function (iv) { return l < iv[1] + GAP_X && r > iv[0] - GAP_X; }); }
-    var order = floaters.slice().sort(function (a, b) { return (anchorOf[a] ? 0 : 1) - (anchorOf[b] ? 0 : 1) || cmpName(nm(a), nm(b)); });
-    var fallbackX = GUTTER + MARGIN + NODE_W / 2, step = NODE_W + GAP_X;
-    order.forEach(function (k) {
-      var ax = anchorOf[k] && x[anchorOf[k]] != null ? x[anchorOf[k]] : fallbackX, chosen = null;
-      for (var n = 0; n < 80 && chosen == null; n++) {
-        var offs = n === 0 ? [0] : [n * step, -n * step];
-        for (var j = 0; j < offs.length; j++) {
-          var cx2 = ax + offs[j];
-          if (cx2 - NODE_W / 2 < GUTTER + MARGIN - 1) continue;
-          if (free(gen[k], cx2)) { chosen = cx2; break; }
-        }
-      }
-      if (chosen == null) chosen = ax + 81 * step;
-      x[k] = chosen; (occ[gen[k]] = occ[gen[k]] || []).push([chosen - NODE_W / 2, chosen + NODE_W / 2]);
-    });
+    if (isolated.length) {
+      var cur0 = GUTTER + MARGIN;
+      isolated.sort(function (a, b) { return cmpName(nm(a), nm(b)); }).forEach(function (k) { x[k] = cur0 + NODE_W / 2; cur0 += NODE_W + GAP_X; });
+    }
     var minX = Infinity, maxX = -Infinity;
     keys.forEach(function (k) { minX = Math.min(minX, x[k] - NODE_W / 2); maxX = Math.max(maxX, x[k] + NODE_W / 2); });
     var shift = GUTTER + MARGIN - minX; keys.forEach(function (k) { x[k] += shift; }); maxX += shift;
     var pos = {}; keys.forEach(function (k) { pos[k] = { cx: x[k], top: TOP + gen[k] * (NODE_H + GAP_Y) }; });
-    return { pos: pos, gen: gen, maxGen: maxGen, W: Math.max(maxX + MARGIN, 560), H: TOP + (maxGen + 1) * NODE_H + maxGen * GAP_Y + 80 };
+    return { pos: pos, gen: gen, maxGen: maxGen, isoGen: isoGen, W: Math.max(maxX + MARGIN, 560), H: TOP + (maxGen + 1) * NODE_H + maxGen * GAP_Y + 80 };
   }
 
   function bez(p0, p1, p2, p3, t) {
     var u = 1 - t;
     return { x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x, y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y };
   }
+  function pkey(a, b) { return [a, b].sort().join('|'); }
 
-  function geometry(model, L) {
-    var people = model.people, pos = L.pos, keys = Object.keys(people), geo = { arcs: [], partners: [], links: [], chips: [] };
+  // geometrie hran — každý prvek ví, které dvojice osob spojuje (kvůli zvýraznění cesty)
+  function geometry(model, L, threadsOn) {
+    var people = model.people, pos = L.pos, keys = Object.keys(people), els = [], chips = [];
+    function adjacent(a, b) { return Math.abs(a.top - b.top) < 1 && Math.abs(a.cx - b.cx) - NODE_W <= PARTNER_GAP + 6; }
+    function straight(a, b) {
+      var l = a.cx <= b.cx ? a : b, r = a.cx <= b.cx ? b : a, y = l.top + NODE_H / 2;
+      return { d: 'M' + (l.cx + NODE_W / 2) + ' ' + y + ' L' + (r.cx - NODE_W / 2) + ' ' + y, mid: { x: (l.cx + r.cx) / 2, y: y }, x1: l.cx + NODE_W / 2, x2: r.cx - NODE_W / 2, y: y };
+    }
+    function arcAbove(a, b) {
+      var lift = 34 + Math.min(46, Math.abs(a.cx - b.cx) / 9), ty = Math.min(a.top, b.top) - lift;
+      var p0 = { x: a.cx, y: a.top }, p1 = { x: a.cx, y: ty }, p2 = { x: b.cx, y: ty }, p3 = { x: b.cx, y: b.top };
+      return { d: 'M' + p0.x + ' ' + p0.y + ' C' + p1.x + ' ' + p1.y + ' ' + p2.x + ' ' + p2.y + ' ' + p3.x + ' ' + p3.y, mid: bez(p0, p1, p2, p3, 0.5) };
+    }
+    // sourozenci bez společného rodiče
     var seen = {};
     keys.forEach(function (k) { people[k].siblings.forEach(function (o) {
-      var pk = [k, o].sort().join('|'); if (seen[pk]) return; seen[pk] = 1;
+      var pk = pkey(k, o); if (seen[pk]) return; seen[pk] = 1;
       if (people[k].parents.some(function (p) { return people[o].parents.indexOf(p) >= 0; })) return;
-      var a = pos[k], b = pos[o], ty = Math.min(a.top, b.top) - (30 + Math.min(46, Math.abs(a.cx - b.cx) / 9));
-      geo.arcs.push('M' + a.cx + ' ' + a.top + ' C' + a.cx + ' ' + ty + ' ' + b.cx + ' ' + ty + ' ' + b.cx + ' ' + b.top);
+      var a = pos[k], b = pos[o];
+      var g = adjacent(a, b) ? straight(a, b) : arcAbove(a, b);
+      els.push({ typ: 'sourozenec', d: g.d, w: 2.6, dash: '3 5', pairs: [pk] });
     }); });
+    // partneři + kotvy pro děti
     var anchor = {}, seenP = {};
     keys.forEach(function (k) { people[k].partners.forEach(function (o) {
-      var pk = [k, o].sort().join('|'); if (seenP[pk]) return; seenP[pk] = 1;
-      var a = pos[k], b = pos[o], l = a.cx <= b.cx ? a : b, r = a.cx <= b.cx ? b : a;
-      if (Math.abs(l.top - r.top) > 1) return;
-      var y = l.top + NODE_H / 2, x1 = l.cx + NODE_W / 2, x2 = r.cx - NODE_W / 2, mx = (x1 + x2) / 2;
-      geo.partners.push({ x1: x1, x2: x2, y: y, mx: mx }); anchor[pk] = { x: mx, y: y };
+      var pk = pkey(k, o); if (seenP[pk]) return; seenP[pk] = 1;
+      var a = pos[k], b = pos[o]; if (Math.abs(a.top - b.top) > 1) return;
+      var g = straight(a, b);
+      els.push({ typ: 'partner', d: g.d, w: 3, pairs: [pk], ring: { x: g.mid.x, y: g.y } });
+      anchor[pk] = { x: g.mid.x, y: g.y };
     }); });
+    // rodič → dítě
     keys.forEach(function (ck) {
       var c = people[ck]; if (!c.parents.length) return;
       var cp = pos[ck], used = {}, starts = [];
       for (var i = 0; i < c.parents.length; i++) for (var j = i + 1; j < c.parents.length; j++) {
-        var pk = [c.parents[i], c.parents[j]].sort().join('|');
-        if (anchor[pk] && !used[c.parents[i]] && !used[c.parents[j]]) { used[c.parents[i]] = used[c.parents[j]] = 1; starts.push({ x: anchor[pk].x, y: anchor[pk].y + 16 }); }
+        var pk = pkey(c.parents[i], c.parents[j]);
+        if (anchor[pk] && !used[c.parents[i]] && !used[c.parents[j]]) {
+          used[c.parents[i]] = used[c.parents[j]] = 1;
+          starts.push({ x: anchor[pk].x, y: anchor[pk].y + 18, ps: [c.parents[i], c.parents[j]] });
+        }
       }
-      c.parents.forEach(function (p) { if (!used[p]) starts.push({ x: pos[p].cx, y: pos[p].top + NODE_H }); });
+      c.parents.forEach(function (p) { if (!used[p]) starts.push({ x: pos[p].cx, y: pos[p].top + NODE_H, ps: [p] }); });
       starts.forEach(function (s) {
-        var ey = cp.top, dy = Math.max(34, (ey - s.y) * 0.55);
-        geo.links.push({ typ: 'rodic', d: 'M' + s.x + ' ' + s.y + ' C' + s.x + ' ' + (s.y + dy) + ' ' + cp.cx + ' ' + (ey - dy) + ' ' + cp.cx + ' ' + ey, ex: cp.cx, ey: ey });
+        var ey = cp.top, dy = Math.max(30, (ey - s.y) * 0.5);
+        els.push({ typ: 'rodic', w: 2.4, d: 'M' + s.x + ' ' + s.y + ' C' + s.x + ' ' + (s.y + dy) + ' ' + cp.cx + ' ' + (ey - dy) + ' ' + cp.cx + ' ' + ey, dot: { x: cp.cx, y: ey }, pairs: s.ps.map(function (p) { return pkey(p, ck); }) });
       });
     });
+    // kmotr / známý / strýc bez rodičů — krátká spojnice (vedle sebe) nebo oblouk
     model.sats.forEach(function (s) {
       var a = pos[s.from], b = pos[s.to]; if (!a || !b) return;
-      var d, mid;
-      if (Math.abs(a.top - b.top) < 1) {
-        var lift = 40 + Math.min(40, Math.abs(a.cx - b.cx) / 10), up = s.typ !== 'znamy';
-        var y0 = up ? a.top : a.top + NODE_H, ty = up ? a.top - lift : a.top + NODE_H + lift;
-        var p0 = { x: a.cx, y: y0 }, p1 = { x: a.cx, y: ty }, p2 = { x: b.cx, y: ty }, p3 = { x: b.cx, y: y0 };
-        d = 'M' + p0.x + ' ' + p0.y + ' C' + p1.x + ' ' + p1.y + ' ' + p2.x + ' ' + p2.y + ' ' + p3.x + ' ' + p3.y; mid = bez(p0, p1, p2, p3, 0.5);
-      } else {
+      var d, mid, fp = people[s.from] && people[s.from].p;
+      if (Math.abs(a.top - b.top) < 1) { var g = adjacent(a, b) ? straight(a, b) : arcAbove(a, b); d = g.d; mid = g.mid; }
+      else {
         var hi = a.top < b.top ? a : b, lo = a.top < b.top ? b : a;
-        var q0 = { x: hi.cx, y: hi.top + NODE_H }, q3 = { x: lo.cx, y: lo.top }, dy2 = Math.max(34, (q3.y - q0.y) * 0.5);
+        var q0 = { x: hi.cx, y: hi.top + NODE_H }, q3 = { x: lo.cx, y: lo.top }, dy2 = Math.max(30, (q3.y - q0.y) * 0.5);
         var q1 = { x: q0.x, y: q0.y + dy2 }, q2 = { x: q3.x, y: q3.y - dy2 };
         d = 'M' + q0.x + ' ' + q0.y + ' C' + q1.x + ' ' + q1.y + ' ' + q2.x + ' ' + q2.y + ' ' + q3.x + ' ' + q3.y; mid = bez(q0, q1, q2, q3, 0.5);
       }
-      geo.links.push({ typ: s.typ, d: d });
-      var fp = model.people[s.from] && model.people[s.from].p;
-      var txt = s.typ === 'stryc' ? kinText('uncle', fp) : s.typ === 'kmotr' ? kinText('godparent', fp) : 'známý';
-      geo.chips.push({ x: mid.x, y: mid.y, text: txt, typ: s.typ });
+      els.push({ typ: s.typ, d: d, w: 2.4, dash: s.typ === 'kmotr' ? '2 5' : '7 6', pairs: [pkey(s.from, s.to)] });
+      chips.push({ x: mid.x, y: mid.y, text: s.typ === 'stryc' ? kinText('uncle', fp) : s.typ === 'kmotr' ? kinText('godparent', fp) : 'známý', typ: s.typ });
     });
-    geo.chips.forEach(function (c, i) { for (var j = 0; j < i; j++) { var o = geo.chips[j]; if (Math.abs(o.x - c.x) < 90 && Math.abs(o.y - c.y) < 22) c.y = o.y + 24; } });
-    return geo;
+    chips.forEach(function (c, i) { for (var j = 0; j < i; j++) { var o = chips[j]; if (Math.abs(o.x - c.x) < 90 && Math.abs(o.y - c.y) < 22) c.y = o.y + 24; } });
+
+    // „červené nitě“: odvozené vazby (strýc–synovec, bratranci, švagři, zeť/snacha, tchán) vždy viditelně mezi špendlíky
+    if (threadsOn) {
+      var kin = makeKinship(S.full), TH = { uncle: 1, nephew: 1, cousin: 1, inlaw: 1, childinlaw: 1, parentinlaw: 1 };
+      var hasSat = {}; model.sats.forEach(function (st) { hasSat[pkey(st.from, st.to)] = 1; });
+      var ths = [], n = 0;
+      keys.forEach(function (a) { keys.forEach(function (b) {
+        if (a >= b) return;
+        var pk = pkey(a, b); if (hasSat[pk]) return;
+        var l = kin.label(a, b); if (!l || !TH[l]) return;
+        var A = pos[a], B = pos[b], pa = { x: A.cx - NODE_W / 2 + 22, y: A.top + 5 }, pb = { x: B.cx - NODE_W / 2 + 22, y: B.top + 5 }, d;
+        n++;
+        if (Math.abs(A.top - B.top) < 1) {
+          var lift = 38 + Math.min(40, Math.abs(pa.x - pb.x) / 12) + (n % 3) * 8, ty = A.top - lift;
+          d = 'M' + pa.x + ' ' + pa.y + ' C' + pa.x + ' ' + ty + ' ' + pb.x + ' ' + ty + ' ' + pb.x + ' ' + pb.y;
+        } else {
+          var up = A.top < B.top ? pa : pb, lo = A.top < B.top ? pb : pa, dy = Math.max(60, (lo.y - up.y) * 0.5), bias = ((n % 3) - 1) * 26;
+          d = 'M' + up.x + ' ' + up.y + ' C' + (up.x + bias) + ' ' + (up.y + dy) + ' ' + (lo.x - bias) + ' ' + (lo.y - dy) + ' ' + lo.x + ' ' + lo.y;
+        }
+        ths.push({ typ: 'nit', d: d, w: 1.8, pairs: [pk], thread: true, a: a, b: b, title: people[a].p.jmeno + ' — ' + kinText(l, people[a].p) + ' — ' + people[b].p.jmeno });
+      }); });
+      ths.forEach(function (t) { t.many = ths.length > 40; els.push(t); });
+    }
+    return { els: els, chips: chips };
   }
 
   // ───────────── filtry zobrazení ─────────────
@@ -370,25 +401,45 @@
 
   // ───────────── kreslení stromu ─────────────
   var uidN = 0;
+  // sada dvojic osob ležících na nejkratších cestách od vybrané osoby ke všem „pojmenovaným“ příbuzným
+  function pathEdges(sel, targets) {
+    var F = S.full, adj = {};
+    function link(a, b) { (adj[a] = adj[a] || []).push(b); (adj[b] = adj[b] || []).push(a); }
+    Object.keys(F.people).forEach(function (k) {
+      var P = F.people[k];
+      P.children.forEach(function (c) { link(k, c); }); P.partners.forEach(function (o) { link(k, o); }); P.siblings.forEach(function (o) { link(k, o); });
+    });
+    F.sats.forEach(function (s) { link(s.from, s.to); });
+    var prev = {}, q = [sel]; prev[sel] = null;
+    while (q.length) { var c = q.shift(); (adj[c] || []).forEach(function (n) { if (!(n in prev)) { prev[n] = c; q.push(n); } }); }
+    var set = {};
+    targets.forEach(function (t) { var n = t; while (n != null && prev[n] != null) { set[pkey(n, prev[n])] = 1; n = prev[n]; } });
+    return set;
+  }
+
   function drawer(model, L, geo, kin) {
     var uid = 'rk' + (++uidN), people = model.people, pos = L.pos, keys = Object.keys(people);
     var ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-    var CLR = { rodic: '#d9ad5c', partner: '#d4a95a', stryc: '#d99a63', kmotr: '#e6c75e', znamy: '#8f95a3', sib: '#7fb0d6' };
+    var CLR = { rodic: '#d9ad5c', partner: '#d4a95a', stryc: '#d99a63', kmotr: '#e6c75e', znamy: '#8f95a3', sourozenec: '#7fb0d6', nit: '#d6455d' };
+    var HL = '#ffe08a';
     var defs = '<defs>' +
       '<linearGradient id="' + uid + 'c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f2320"/><stop offset="1" stop-color="#1a1413"/></linearGradient>' +
       '<linearGradient id="' + uid + 'cs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f2c29"/><stop offset="1" stop-color="#2a1a18"/></linearGradient>' +
       '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#8a2f3d"/><stop offset="1" stop-color="#4a1520"/></radialGradient>' +
       '<radialGradient id="' + uid + 'bg" cx="0.5" cy="0.3" r="0.9"><stop offset="0" stop-color="#2a1e1a"/><stop offset="1" stop-color="#0f0b0a"/></radialGradient>' +
       '<filter id="' + uid + 'gl" x="-30%" y="-40%" width="160%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+      '<filter id="' + uid + 'gl2" filterUnits="userSpaceOnUse" x="0" y="0" width="' + L.W + '" height="' + L.H + '"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       '<filter id="' + uid + 'sh" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="0.6"/></filter>' +
-      keys.map(function (k) { var p = pos[k]; return '<clipPath id="' + uid + 'p' + k + '"><rect x="' + (p.cx - NODE_W / 2 + 12) + '" y="' + (p.top + 19) + '" width="72" height="72" rx="12"/></clipPath>'; }).join('') +
+      keys.map(function (k) { var p = pos[k]; return '<clipPath id="' + uid + 'p' + k + '"><rect x="' + (p.cx - NODE_W / 2 + 12) + '" y="' + (p.top + 16) + '" width="72" height="72" rx="12"/></clipPath>'; }).join('') +
       '</defs>';
     function bands() {
       var s = '';
       for (var g = 0; g <= L.maxGen; g++) {
-        var y = TOP + g * (NODE_H + GAP_Y);
-        s += '<rect x="0" y="' + (y - 28) + '" width="' + L.W + '" height="' + (NODE_H + 56) + '" fill="' + (g % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.03)') + '"/>';
-        s += '<text x="' + (GUTTER / 2 + 4) + '" y="' + (y + NODE_H / 2 + 7) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-display,Georgia,serif);font-size:22px;font-style:italic">' + (ROMAN[g] || (g + 1)) + '</text>';
+        var y = TOP + g * (NODE_H + GAP_Y), iso = L.isoGen === g;
+        s += '<rect x="0" y="' + (y - 26) + '" width="' + L.W + '" height="' + (NODE_H + 52) + '" fill="' + (g % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.03)') + '"/>';
+        s += iso
+          ? '<text x="' + (GUTTER / 2 + 2) + '" y="' + (y + NODE_H / 2 + 4) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-mono,monospace);font-size:10px">bez</text><text x="' + (GUTTER / 2 + 2) + '" y="' + (y + NODE_H / 2 + 17) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-mono,monospace);font-size:10px">vazeb</text>'
+          : '<text x="' + (GUTTER / 2 + 2) + '" y="' + (y + NODE_H / 2 + 7) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-display,Georgia,serif);font-size:22px;font-style:italic">' + (ROMAN[g] || (g + 1)) + '</text>';
         s += '<line x1="' + GUTTER + '" y1="' + (y - 20) + '" x2="' + GUTTER + '" y2="' + (y + NODE_H + 20) + '" stroke="#7a6236" stroke-opacity="0.35"/>';
       }
       return s;
@@ -398,53 +449,69 @@
       return '<g><rect x="' + (xr - w) + '" y="' + (y - 11) + '" width="' + w + '" height="22" rx="11" fill="' + fill + '" stroke="' + (stroke || fill) + '" stroke-width="1.2"/>' +
         '<text x="' + (xr - w / 2) + '" y="' + (y + 4) + '" text-anchor="middle" style="fill:' + color + ';font-family:var(--font-mono,monospace);font-size:10.5px;font-weight:600">' + esc(text) + '</text></g>';
     }
-    function rings(x, y) {
-      return '<g><circle cx="' + x + '" cy="' + y + '" r="17" fill="#1a1413" stroke="#7a6236"/>' +
-        '<circle cx="' + (x - 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="#d9ad5c" stroke-width="2"/><circle cx="' + (x + 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="#d9ad5c" stroke-width="2"/></g>';
+    function rings(x, y, hl) {
+      var c = hl ? HL : '#d9ad5c';
+      return '<g><circle cx="' + x + '" cy="' + y + '" r="17" fill="#1a1413" stroke="' + (hl ? HL : '#7a6236') + '"/>' +
+        '<circle cx="' + (x - 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="' + c + '" stroke-width="2"/><circle cx="' + (x + 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="' + c + '" stroke-width="2"/></g>';
     }
     function chip(c) {
       var w = c.text.length * 6.4 + 18, col = CLR[c.typ];
       return '<g><rect x="' + (c.x - w / 2) + '" y="' + (c.y - 10) + '" width="' + w + '" height="20" rx="10" fill="#1a1413" stroke="' + col + '" stroke-width="1.2"/>' +
         '<text x="' + c.x + '" y="' + (c.y + 4) + '" text-anchor="middle" style="fill:' + col + ';font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(c.text) + '</text></g>';
     }
+    function elSvg(el, hl) {
+      var col = hl ? HL : CLR[el.typ], w = hl ? el.w + 1.6 : el.w;
+      var s = '<path d="' + el.d + '" stroke="' + col + '" stroke-width="' + w + '"' + (el.dash && !hl ? ' stroke-dasharray="' + el.dash + '"' : '') + (hl ? ' filter="url(#' + uid + 'gl2)"' : '') + '>' + (el.title ? '<title>' + esc(el.title) + '</title>' : '') + '</path>';
+      if (el.dot) s += '<circle cx="' + el.dot.x + '" cy="' + el.dot.y + '" r="3.8" fill="' + col + '"/>';
+      if (el.ring) s += rings(el.ring.x, el.ring.y, hl);
+      return s;
+    }
     function node(k, sel, labels) {
       var P = people[k], p = P.p, ps = pos[k], x0 = ps.cx - NODE_W / 2, isSel = sel === k;
       var lab = sel && !isSel ? labels[k] : null, dim = sel && !isSel && !lab, dead = !!p.umrti;
-      var lines = wrapName(p.jmeno), tx = x0 + 98, ty = lines.length === 1 ? ps.top + 40 : ps.top + 33;
-      var name = lines.map(function (l, i) { return '<text x="' + tx + '" y="' + (ty + i * 17) + '" style="fill:#f4ebd9;font-family:var(--font-display,Georgia,serif);font-size:15px">' + esc(l) + '</text>'; }).join('');
+      var lines = wrapName(p.jmeno), one = lines.length === 1, tx = x0 + 98;
+      var name = lines.map(function (l, i) { return '<text x="' + tx + '" y="' + (ps.top + (one ? 38 : 31) + i * 17) + '" style="fill:#f4ebd9;font-family:var(--font-display,Georgia,serif);font-size:15px">' + esc(l) + '</text>'; }).join('');
       var date = '';
       if (p.narozeni || p.umrti) {
         var dt = p.umrti ? ((p.narozeni ? p.narozeni.slice(0, 4) : '?') + ' – ' + p.umrti.slice(0, 4)) : fmtDate(p.narozeni);
-        date = '<text x="' + tx + '" y="' + (ps.top + (lines.length === 1 ? 59 : 68)) + '" style="fill:#a89c84;font-family:var(--font-mono,monospace);font-size:11px">' + (p.umrti ? '† ' : '') + esc(dt) + '</text>';
+        date = '<text x="' + tx + '" y="' + (ps.top + (one ? 57 : 65)) + '" style="fill:#a89c84;font-family:var(--font-mono,monospace);font-size:11px">' + (p.umrti ? '† ' : '') + esc(dt) + '</text>';
       }
       var title = '';
       if (p.titul) {
-        var t = p.titul.length > 20 ? p.titul.slice(0, 19) + '…' : p.titul, w = t.length * 6.3 + 18;
-        title = '<g><rect x="' + tx + '" y="' + (ps.top + (lines.length === 1 ? 70 : 78)) + '" width="' + w + '" height="20" rx="10" fill="rgba(217,173,92,0.12)" stroke="#a8843f"/><text x="' + (tx + w / 2) + '" y="' + (ps.top + (lines.length === 1 ? 84 : 92)) + '" text-anchor="middle" style="fill:#e6c97c;font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(t) + '</text></g>';
+        var t = p.titul.length > 17 ? p.titul.slice(0, 16) + '…' : p.titul, w = t.length * 6.3 + 18, ty = ps.top + (one ? 66 : 72);
+        title = '<g><rect x="' + tx + '" y="' + ty + '" width="' + w + '" height="20" rx="10" fill="rgba(217,173,92,0.12)" stroke="#a8843f"/><text x="' + (tx + w / 2) + '" y="' + (ty + 14) + '" text-anchor="middle" style="fill:#e6c97c;font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(t) + '</text></g>';
       }
       var photo;
-      if (p.foto) photo = '<image href="' + esc(p.foto) + '" x="' + (x0 + 12) + '" y="' + (ps.top + 19) + '" width="72" height="72" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'p' + k + ')"' + (dead ? ' style="filter:grayscale(1) brightness(0.85)"' : '') + '/>' +
-        '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 19) + '" width="72" height="72" rx="12" fill="none" stroke="#c9a35b" stroke-width="1.5"/>';
-      else photo = '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 19) + '" width="72" height="72" rx="12" fill="url(#' + uid + 'm)" stroke="#c9a35b" stroke-width="1.5"/>' +
-        '<text x="' + (x0 + 48) + '" y="' + (ps.top + 64) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:25px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>';
+      if (p.foto) photo = '<image href="' + esc(p.foto) + '" x="' + (x0 + 12) + '" y="' + (ps.top + 16) + '" width="72" height="72" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'p' + k + ')"' + (dead ? ' style="filter:grayscale(1) brightness(0.85)"' : '') + '/>' +
+        '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 16) + '" width="72" height="72" rx="12" fill="none" stroke="#c9a35b" stroke-width="1.5"/>';
+      else photo = '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 16) + '" width="72" height="72" rx="12" fill="url(#' + uid + 'm)" stroke="#c9a35b" stroke-width="1.5"/>' +
+        '<text x="' + (x0 + 48) + '" y="' + (ps.top + 62) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:25px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>';
       var badge = isSel ? pill(x0 + NODE_W - 12, ps.top, 'POHLED Z', '#d9ad5c', '#1a1413') : (lab ? pill(x0 + NODE_W - 12, ps.top, kinText(lab, p), '#1a1413', '#e6c97c', '#d9ad5c') : '');
       return '<g class="rk-node" data-k="' + esc(k) + '" style="cursor:pointer;opacity:' + (dim ? 0.36 : 1) + '"' + (isSel ? ' filter="url(#' + uid + 'gl)"' : '') + '>' +
         '<title>' + esc(p.jmeno) + (lab ? ' — ' + esc(kinText(lab, p)) : '') + '</title>' +
         '<rect x="' + x0 + '" y="' + ps.top + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="14" filter="url(#' + uid + 'sh)" fill="url(#' + uid + (isSel ? 'cs' : 'c') + ')" stroke="' + (isSel ? '#f0d38a' : '#7a6236') + '" stroke-width="' + (isSel ? 2.4 : 1.3) + '"/>' +
-        photo + name + date + title + badge + '</g>';
+        photo + name + date + title + badge + pin(x0 + 22, ps.top + 5, isSel) + '</g>';
+    }
+    function pin(x, y, on) {
+      return '<g pointer-events="none"><ellipse cx="' + (x + 1.5) + '" cy="' + (y + 3) + '" rx="5" ry="2.4" fill="#000" opacity="0.4"/>' +
+        '<circle cx="' + x + '" cy="' + y + '" r="5.6" fill="' + (on ? '#ffe08a' : '#d6455d') + '" stroke="#5b1520" stroke-width="1"/>' +
+        '<circle cx="' + (x - 1.7) + '" cy="' + (y - 1.8) + '" r="1.6" fill="#fff" opacity="0.7"/></g>';
     }
     return function (sel) {
-      var labels = {};
-      if (sel && S.full.people[sel]) keys.forEach(function (k) { if (k !== sel) { var l = kin.label(k, sel); if (l) labels[k] = l; } });
+      var labels = {}, hlSet = {}, hasSel = sel && S.full.people[sel];
+      if (hasSel) {
+        keys.forEach(function (k) { if (k !== sel) { var l = kin.label(k, sel); if (l) labels[k] = l; } });
+        hlSet = pathEdges(sel, Object.keys(labels));
+      }
       var out = defs + '<rect width="' + L.W + '" height="' + L.H + '" fill="url(#' + uid + 'bg)"/>' + bands();
-      out += '<g opacity="' + (sel ? 0.5 : 1) + '" fill="none" stroke-linecap="round">';
-      geo.arcs.forEach(function (d) { out += '<path d="' + d + '" stroke="' + CLR.sib + '" stroke-width="2" stroke-dasharray="2 6"/>'; });
-      geo.links.forEach(function (l) {
-        if (l.typ === 'rodic') out += '<path d="' + l.d + '" stroke="' + CLR.rodic + '" stroke-width="2.4"/><circle cx="' + l.ex + '" cy="' + l.ey + '" r="3.6" fill="' + CLR.rodic + '"/>';
-        else out += '<path d="' + l.d + '" stroke="' + CLR[l.typ] + '" stroke-width="2" stroke-dasharray="' + (l.typ === 'kmotr' ? '1 6' : '7 6') + '"/>';
+      var base = '', top = '';
+      geo.els.forEach(function (el) {
+        var hl = hasSel && (el.pairs.some(function (p) { return hlSet[p]; }) || (el.thread && (el.a === sel || el.b === sel) && (labels[el.a] || labels[el.b])));
+        if (hl) top += elSvg(el, true);
+        else if (!(el.many && !hasSel)) base += elSvg(el, false);
       });
-      geo.partners.forEach(function (p) { out += '<line x1="' + p.x1 + '" y1="' + p.y + '" x2="' + p.x2 + '" y2="' + p.y + '" stroke="' + CLR.partner + '" stroke-width="3" stroke-dasharray="1 0"/>' + rings(p.mx, p.y); });
-      out += '</g>';
+      out += '<g opacity="' + (hasSel ? 0.3 : 1) + '" fill="none" stroke-linecap="round">' + base + '</g>';
+      out += '<g fill="none" stroke-linecap="round" stroke-linejoin="round">' + top + '</g>';
       geo.chips.forEach(function (c) { out += chip(c); });
       keys.forEach(function (k) { out += node(k, sel, labels); });
       return out;
@@ -463,7 +530,7 @@
     }
     $('rk-info').style.display = '';
     var model = subsetModel(S.view, S.sel);
-    var L = layout(model), geo = geometry(model, L), kin = makeKinship(S.full);
+    var L = layout(model), geo = geometry(model, L, S.threads), kin = makeKinship(S.full);
     cur.L = L; cur.drawFn = drawer(model, L, geo, kin);
     host.innerHTML = '<svg id="rk-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.W + ' ' + L.H + '" width="' + L.W + '" height="' + L.H + '"></svg>';
     paintSvg();
@@ -482,7 +549,7 @@
   }
   function fitScale() {
     var sc = $('rk-scroll'); if (!sc || !cur.L) return;
-    var av = sc.clientWidth - 4; S.scale = av > 0 ? Math.min(1, av / cur.L.W) : 1; applyScale();
+    var av = sc.clientWidth - 4; S.scale = av > 0 ? Math.max(0.72, Math.min(1, av / cur.L.W)) : 1; applyScale();
   }
   function focusOn(id) {
     var sc = $('rk-scroll'); if (!sc || !cur.L || !cur.L.pos[id]) return;
@@ -795,6 +862,7 @@
     $('rk-tabbtn-tree').addEventListener('click', function () { setTab('tree'); });
     $('rk-tabbtn-people').addEventListener('click', function () { setTab('people'); });
     $('rk-pq').addEventListener('input', renderPeople);
+    $('rk-threads').addEventListener('change', function () { S.threads = this.checked; renderTree(); fitScaleSoon(); });
     $('rk-view').addEventListener('change', function () {
       S.view = this.value;
       if (S.view !== 'full' && !S.sel) { toast('Nejdřív klikni na osobu, ke které se má pohled vztahovat', true); S.view = 'full'; this.value = 'full'; return; }
