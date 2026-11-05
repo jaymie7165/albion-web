@@ -679,13 +679,13 @@ function seedRodokmenFromVztahy() {
       if (a && b && a.id !== b.id) relations.push({ id: rodokmenId('vz'), a: a.id, b: b.id, typ: v.typ });
     });
   } catch (e) { console.error('[RODOKMEN SEED]', e.message); }
-  return { persons, relations };
+  return { persons, relations, events: [] };
 }
 function loadRodokmen() {
   try {
     if (!fs.existsSync(RODOKMEN_FILE)) { const seed = seedRodokmenFromVztahy(); writeJsonAtomic(RODOKMEN_FILE, seed); return seed; }
     const d = JSON.parse(fs.readFileSync(RODOKMEN_FILE, 'utf8')) || {};
-    return { persons: Array.isArray(d.persons) ? d.persons : [], relations: Array.isArray(d.relations) ? d.relations : [] };
+    return { persons: Array.isArray(d.persons) ? d.persons : [], relations: Array.isArray(d.relations) ? d.relations : [], events: Array.isArray(d.events) ? d.events : [] };
   } catch { return { persons: [], relations: [] }; }
 }
 function saveRodokmen(d) { try { writeJsonAtomic(RODOKMEN_FILE, d); } catch (e) { console.error('[RODOKMEN]', e.message); } }
@@ -695,6 +695,76 @@ function requireRodokmenEdit(req, res, next) {
 }
 function optText(v, max) { const t = (v == null ? '' : v).toString().trim(); return t.length <= max ? t : null; }
 function optDate(v) { const t = (v == null ? '' : v).toString().trim(); if (!t) return ''; return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null; }
+
+// ── Významné události rodiny (svatba, narození, rozchod…) ──
+function readRodokmenEvent(body, d) {
+  const nazev = sanitizeText(body.nazev, 100);
+  if (!nazev) return { error: 'Vyplň název události (max 100 znaků)' };
+  const datum = optDate(body.datum);
+  if (!datum) return { error: 'Vyplň platné datum události' };
+  const popis = optText(body.popis, 600);
+  if (popis === null) return { error: 'Popis je příliš dlouhý (max 600 znaků)' };
+  const osoby = (Array.isArray(body.osoby) ? body.osoby : []).map(x => x.toString()).filter(id => d.persons.some(p => p.id === id)).slice(0, 12);
+  return { value: { nazev, datum, popis, osoby } };
+}
+app.post('/api/rodokmen/udalosti', requireAuth, requireRodokmenEdit, (req, res) => {
+  const d = loadRodokmen();
+  const r = readRodokmenEvent(req.body, d);
+  if (r.error) return res.json({ ok: false, error: r.error });
+  const ev = { id: rodokmenId('ud'), ...r.value, createdBy: req.session.icName, createdAt: Date.now() };
+  d.events.push(ev); saveRodokmen(d);
+  res.json({ ok: true, event: ev });
+});
+app.put('/api/rodokmen/udalosti/:id', requireAuth, requireRodokmenEdit, (req, res) => {
+  const d = loadRodokmen();
+  const ev = d.events.find(e => e.id === req.params.id);
+  if (!ev) return res.json({ ok: false, error: 'Událost nenalezena' });
+  const r = readRodokmenEvent(req.body, d);
+  if (r.error) return res.json({ ok: false, error: r.error });
+  Object.assign(ev, r.value); saveRodokmen(d);
+  res.json({ ok: true, event: ev });
+});
+app.delete('/api/rodokmen/udalosti/:id', requireAuth, requireRodokmenEdit, (req, res) => {
+  const d = loadRodokmen();
+  const before = d.events.length;
+  d.events = d.events.filter(e => e.id !== req.params.id);
+  if (d.events.length === before) return res.json({ ok: false, error: 'Událost nenalezena' });
+  saveRodokmen(d);
+  res.json({ ok: true });
+});
+
+// ── Export rodokmenu na Discord (obrázek vyrenderovaný v prohlížeči) ──
+// Posílá se přímo přes Discord API (bot token), kanál CHANNEL_RODOKMEN, jinak CHANNEL_FOTOALBUM.
+// Smí Senior Member a výš. Zmínky (@everyone, role) jsou v odeslané zprávě vypnuté.
+app.post('/api/rodokmen/export-discord', requireAuth, async (req, res) => {
+  if ((req.session.accessLevel || 3) > 2) return res.status(403).json({ ok: false, error: 'Odeslat rodokmen na Discord smí Senior Member a výš' });
+  const channel = process.env.CHANNEL_RODOKMEN || process.env.CHANNEL_FOTOALBUM;
+  if (!channel || !process.env.DISCORD_TOKEN) return res.json({ ok: false, error: 'Chybí nastavení Discordu (CHANNEL_RODOKMEN nebo CHANNEL_FOTOALBUM a DISCORD_TOKEN na Railway).' });
+  if (typeof FormData === 'undefined' || typeof Blob === 'undefined') return res.json({ ok: false, error: 'Server nemá FormData (potřeba Node 18+).' });
+  const m = (req.body.image || '').toString().match(/^data:image\/(png|jpe?g);base64,(.+)$/);
+  if (!m) return res.json({ ok: false, error: 'Neplatný obrázek' });
+  const ext = m[1] === 'png' ? 'png' : 'jpg';
+  const buffer = Buffer.from(m[2], 'base64');
+  if (buffer.length > 7.8 * 1024 * 1024) return res.json({ ok: false, error: 'Obrázek je pro Discord příliš velký (max ~8 MB) — zvol nižší rozlišení nebo menší pohled.' });
+  const note = optText(req.body.caption, 300) || '';
+  const content = `🌳 **Rodokmen Caledonie** — odeslal/a ${req.session.icName}${note ? '\n' + note : ''}`;
+  try {
+    const form = new FormData();
+    form.append('payload_json', JSON.stringify({ content, allowed_mentions: { parse: [] } }));
+    form.append('files[0]', new Blob([buffer], { type: ext === 'png' ? 'image/png' : 'image/jpeg' }), `rodokmen-caledonia.${ext}`);
+    const r = await fetch(`https://discord.com/api/v10/channels/${channel}/messages`, { method: 'POST', headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` }, body: form });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      console.error('[RODOKMEN DISCORD]', r.status, t.slice(0, 300));
+      return res.json({ ok: false, error: `Discord odmítl odeslání (${r.status}). Zkontroluj, že bot v kanálu smí psát a posílat soubory.` });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[RODOKMEN DISCORD]', e.message);
+    res.json({ ok: false, error: 'Odeslání na Discord se nepovedlo.' });
+  }
+});
+
 
 app.get('/rodokmen-uploads/:filename', (req, res) => {
   const safeName = path.basename(req.params.filename);
@@ -718,7 +788,7 @@ function deleteRodokmenImage(p) {
 
 app.get('/api/rodokmen', requireAuth, (req, res) => {
   const d = loadRodokmen();
-  res.json({ ok: true, persons: d.persons, relations: d.relations, canEdit: req.session.accessLevel === 1 });
+  res.json({ ok: true, persons: d.persons, relations: d.relations, events: d.events, canEdit: req.session.accessLevel === 1 });
 });
 
 function readRodokmenPerson(body) {
@@ -768,6 +838,7 @@ app.delete('/api/rodokmen/osoby/:id', requireAuth, requireRodokmenEdit, (req, re
   deleteRodokmenImage(person.foto);
   d.persons = d.persons.filter(p => p.id !== person.id);
   d.relations = d.relations.filter(v => v.a !== person.id && v.b !== person.id);
+  d.events.forEach(e => { e.osoby = (e.osoby || []).filter(id => id !== person.id); });
   saveRodokmen(d);
   res.json({ ok: true });
 });

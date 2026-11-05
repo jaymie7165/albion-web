@@ -5,8 +5,8 @@
 (function () {
   'use strict';
 
-  var CFG = window.RODOKMEN_CFG || { canEdit: false, isStaff: false };
-  var S = { persons: [], relations: [], sel: null, view: 'full', tab: 'tree', scale: 1, model: null, full: null, threads: true };
+  var CFG = window.RODOKMEN_CFG || { canEdit: false, isStaff: false, canDiscord: false };
+  var S = { persons: [], relations: [], events: [], sel: null, view: 'full', mode: 'tree', tab: 'tree', dtab: 'profil', genLimit: 0, status: 'all', scale: 1, full: null, fullL: null, vis: null, threads: true };
 
   // ───────────── pomocné ─────────────
   function $(id) { return document.getElementById(id); }
@@ -39,7 +39,7 @@
   }
   function wrapName(name) {
     name = String(name || '').trim();
-    if (name.length <= 19) return [name];
+    if (name.length <= 16) return [name];
     var w = name.split(/\s+/), best = null, bd = 1e9;
     for (var i = 1; i < w.length; i++) {
       var a = w.slice(0, i).join(' '), b = w.slice(i).join(' '), d = Math.abs(a.length - b.length);
@@ -156,8 +156,9 @@
     return { label: label };
   }
 
+
   // ───────────── rozložení stromu ─────────────
-  var NODE_W = 258, NODE_H = 104, GAP_X = 44, PARTNER_GAP = 44, GAP_Y = 112, GUTTER = 74, TOP = 104, MARGIN = 50;
+  var NODE_W = 236, NODE_H = 92, GAP_X = 36, PARTNER_GAP = 40, GAP_Y = 92, GUTTER = 70, TOP = 100, MARGIN = 44;
 
   function layout(model) {
     var people = model.people, keys = Object.keys(people);
@@ -287,6 +288,12 @@
     return { x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x, y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y };
   }
   function pkey(a, b) { return [a, b].sort().join('|'); }
+  // pravoúhlá spojnice se zaoblenými rohy (rodič → dítě)
+  function elbow(sx, sy, ex, ey, busY, r) {
+    if (Math.abs(sx - ex) < 2) return 'M' + sx + ' ' + sy + ' V' + ey;
+    var dir = ex > sx ? 1 : -1; r = Math.max(2, Math.min(r, Math.abs(ex - sx) / 2, (busY - sy) / 1.5, (ey - busY) / 1.5));
+    return 'M' + sx + ' ' + sy + ' V' + (busY - r) + ' Q' + sx + ' ' + busY + ' ' + (sx + dir * r) + ' ' + busY + ' H' + (ex - dir * r) + ' Q' + ex + ' ' + busY + ' ' + ex + ' ' + (busY + r) + ' V' + ey;
+  }
 
   // geometrie hran — každý prvek ví, které dvojice osob spojuje (kvůli zvýraznění cesty)
   function geometry(model, L, threadsOn) {
@@ -332,8 +339,9 @@
       }
       c.parents.forEach(function (p) { if (!used[p]) starts.push({ x: pos[p].cx, y: pos[p].top + NODE_H, ps: [p] }); });
       starts.forEach(function (s) {
-        var ey = cp.top, dy = Math.max(30, (ey - s.y) * 0.5);
-        els.push({ typ: 'rodic', w: 2.4, d: 'M' + s.x + ' ' + s.y + ' C' + s.x + ' ' + (s.y + dy) + ' ' + cp.cx + ' ' + (ey - dy) + ' ' + cp.cx + ' ' + ey, dot: { x: cp.cx, y: ey }, pairs: s.ps.map(function (p) { return pkey(p, ck); }) });
+        var ey = cp.top, busY = ey - GAP_Y / 2;
+        if (busY < s.y + 14) busY = (s.y + ey) / 2;
+        els.push({ typ: 'rodic', w: 2.2, d: elbow(s.x, s.y, cp.cx, ey, busY, 12), dot: { x: cp.cx, y: ey }, pairs: s.ps.map(function (p) { return pkey(p, ck); }) });
       });
     });
     // kmotr / známý / strýc bez rodičů — krátká spojnice (vedle sebe) nebo oblouk
@@ -361,7 +369,7 @@
         if (a >= b) return;
         var pk = pkey(a, b); if (hasSat[pk]) return;
         var l = kin.label(a, b); if (!l || !TH[l]) return;
-        var A = pos[a], B = pos[b], pa = { x: A.cx - NODE_W / 2 + 22, y: A.top + 5 }, pb = { x: B.cx - NODE_W / 2 + 22, y: B.top + 5 }, d;
+        var A = pos[a], B = pos[b], pa = { x: A.cx - NODE_W / 2 + 16, y: A.top + 5 }, pb = { x: B.cx - NODE_W / 2 + 16, y: B.top + 5 }, d;
         n++;
         if (Math.abs(A.top - B.top) < 1) {
           var lift = 38 + Math.min(40, Math.abs(pa.x - pb.x) / 12) + (n % 3) * 8, ty = A.top - lift;
@@ -377,31 +385,39 @@
     return { els: els, chips: chips };
   }
 
-  // ───────────── filtry zobrazení ─────────────
-  function subsetModel(view, sel) {
-    var full = S.full;
-    if (view === 'full' || !sel || !full.people[sel]) return full;
-    var inc = {}; inc[sel] = 1;
-    function addPartners(k) { full.people[k].partners.forEach(function (p) { inc[p] = 1; }); }
-    if (view === 'predci') {
-      var st = [sel]; while (st.length) { var c = st.pop(); full.people[c].parents.forEach(function (p) { if (!inc[p]) { inc[p] = 1; st.push(p); } }); }
+
+  // ───────────── filtry a pohledy ─────────────
+  function applyFilters() {
+    var gen = S.fullL ? S.fullL.gen : {}, ids = {};
+    S.persons.forEach(function (p) {
+      if (S.status === 'alive' && p.umrti) return;
+      if (S.status === 'dead' && !p.umrti) return;
+      if (S.genLimit && (gen[p.id] || 0) >= S.genLimit) return;
+      ids[p.id] = 1;
+    });
+    S.vis = buildModel(S.persons.filter(function (p) { return ids[p.id]; }), S.relations.filter(function (r) { return ids[r.a] && ids[r.b]; }));
+  }
+  function viewModel() {
+    var base = S.vis;
+    if (S.view === 'full' || !S.sel || !base.people[S.sel]) return base;
+    var inc = {}; inc[S.sel] = 1;
+    function addPartners(k) { base.people[k].partners.forEach(function (p) { inc[p] = 1; }); }
+    if (S.view === 'predci') {
+      var st = [S.sel]; while (st.length) { var c = st.pop(); base.people[c].parents.forEach(function (p) { if (!inc[p]) { inc[p] = 1; st.push(p); } }); }
       Object.keys(inc).forEach(addPartners);
-    } else if (view === 'potomci') {
-      var st2 = [sel]; while (st2.length) { var c2 = st2.pop(); full.people[c2].children.forEach(function (p) { if (!inc[p]) { inc[p] = 1; st2.push(p); } }); }
+    } else if (S.view === 'potomci') {
+      var st2 = [S.sel]; while (st2.length) { var c2 = st2.pop(); base.people[c2].children.forEach(function (p) { if (!inc[p]) { inc[p] = 1; st2.push(p); } }); }
       Object.keys(inc).forEach(addPartners);
-    } else if (view === 'okoli') {
-      var P = full.people[sel];
+    } else if (S.view === 'okoli') {
+      var P = base.people[S.sel];
       P.parents.concat(P.children, P.partners, P.siblings).forEach(function (k) { inc[k] = 1; });
       P.parents.forEach(addPartners);
     }
-    var persons = S.persons.filter(function (p) { return inc[p.id]; });
-    var rels = S.relations.filter(function (r) { return inc[r.a] && inc[r.b]; });
-    return buildModel(persons, rels);
+    return buildModel(S.persons.filter(function (p) { return inc[p.id] && base.people[p.id]; }), S.relations.filter(function (r) { return inc[r.a] && inc[r.b]; }));
   }
 
   // ───────────── kreslení stromu ─────────────
   var uidN = 0;
-  // sada dvojic osob ležících na nejkratších cestách od vybrané osoby ke všem „pojmenovaným“ příbuzným
   function pathEdges(sel, targets) {
     var F = S.full, adj = {};
     function link(a, b) { (adj[a] = adj[a] || []).push(b); (adj[b] = adj[b] || []).push(a); }
@@ -416,12 +432,12 @@
     targets.forEach(function (t) { var n = t; while (n != null && prev[n] != null) { set[pkey(n, prev[n])] = 1; n = prev[n]; } });
     return set;
   }
+  var CLR = { rodic: '#d9ad5c', partner: '#d4a95a', stryc: '#d99a63', kmotr: '#e6c75e', znamy: '#8f95a3', sourozenec: '#7fb0d6', nit: '#d6455d' };
+  var HL = '#ffe08a';
 
   function drawer(model, L, geo, kin) {
     var uid = 'rk' + (++uidN), people = model.people, pos = L.pos, keys = Object.keys(people);
     var ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-    var CLR = { rodic: '#d9ad5c', partner: '#d4a95a', stryc: '#d99a63', kmotr: '#e6c75e', znamy: '#8f95a3', sourozenec: '#7fb0d6', nit: '#d6455d' };
-    var HL = '#ffe08a';
     var defs = '<defs>' +
       '<linearGradient id="' + uid + 'c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f2320"/><stop offset="1" stop-color="#1a1413"/></linearGradient>' +
       '<linearGradient id="' + uid + 'cs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f2c29"/><stop offset="1" stop-color="#2a1a18"/></linearGradient>' +
@@ -430,17 +446,17 @@
       '<filter id="' + uid + 'gl" x="-30%" y="-40%" width="160%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       '<filter id="' + uid + 'gl2" filterUnits="userSpaceOnUse" x="0" y="0" width="' + L.W + '" height="' + L.H + '"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       '<filter id="' + uid + 'sh" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="0.6"/></filter>' +
-      keys.map(function (k) { var p = pos[k]; return '<clipPath id="' + uid + 'p' + k + '"><rect x="' + (p.cx - NODE_W / 2 + 12) + '" y="' + (p.top + 16) + '" width="72" height="72" rx="12"/></clipPath>'; }).join('') +
+      keys.map(function (k) { var p = pos[k]; return '<clipPath id="' + uid + 'p' + k + '"><rect x="' + (p.cx - NODE_W / 2 + 12) + '" y="' + (p.top + 14) + '" width="64" height="64" rx="11"/></clipPath>'; }).join('') +
       '</defs>';
     function bands() {
       var s = '';
       for (var g = 0; g <= L.maxGen; g++) {
         var y = TOP + g * (NODE_H + GAP_Y), iso = L.isoGen === g;
-        s += '<rect x="0" y="' + (y - 26) + '" width="' + L.W + '" height="' + (NODE_H + 52) + '" fill="' + (g % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.03)') + '"/>';
+        s += '<rect x="0" y="' + (y - 24) + '" width="' + L.W + '" height="' + (NODE_H + 48) + '" fill="' + (g % 2 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.03)') + '"/>';
         s += iso
-          ? '<text x="' + (GUTTER / 2 + 2) + '" y="' + (y + NODE_H / 2 + 4) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-mono,monospace);font-size:10px">bez</text><text x="' + (GUTTER / 2 + 2) + '" y="' + (y + NODE_H / 2 + 17) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-mono,monospace);font-size:10px">vazeb</text>'
-          : '<text x="' + (GUTTER / 2 + 2) + '" y="' + (y + NODE_H / 2 + 7) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-display,Georgia,serif);font-size:22px;font-style:italic">' + (ROMAN[g] || (g + 1)) + '</text>';
-        s += '<line x1="' + GUTTER + '" y1="' + (y - 20) + '" x2="' + GUTTER + '" y2="' + (y + NODE_H + 20) + '" stroke="#7a6236" stroke-opacity="0.35"/>';
+          ? '<text x="' + (GUTTER / 2) + '" y="' + (y + NODE_H / 2 + 2) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-mono,monospace);font-size:10px">bez</text><text x="' + (GUTTER / 2) + '" y="' + (y + NODE_H / 2 + 15) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-mono,monospace);font-size:10px">vazeb</text>'
+          : '<text x="' + (GUTTER / 2) + '" y="' + (y + NODE_H / 2 + 7) + '" text-anchor="middle" style="fill:#7a6236;font-family:var(--font-display,Georgia,serif);font-size:22px;font-style:italic">' + (ROMAN[g] || (g + 1)) + '</text>';
+        s += '<line x1="' + GUTTER + '" y1="' + (y - 18) + '" x2="' + GUTTER + '" y2="' + (y + NODE_H + 18) + '" stroke="#7a6236" stroke-opacity="0.35"/>';
       }
       return s;
     }
@@ -451,8 +467,8 @@
     }
     function rings(x, y, hl) {
       var c = hl ? HL : '#d9ad5c';
-      return '<g><circle cx="' + x + '" cy="' + y + '" r="17" fill="#1a1413" stroke="' + (hl ? HL : '#7a6236') + '"/>' +
-        '<circle cx="' + (x - 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="' + c + '" stroke-width="2"/><circle cx="' + (x + 5.5) + '" cy="' + y + '" r="8" fill="none" stroke="' + c + '" stroke-width="2"/></g>';
+      return '<g><circle cx="' + x + '" cy="' + y + '" r="16" fill="#1a1413" stroke="' + (hl ? HL : '#7a6236') + '"/>' +
+        '<circle cx="' + (x - 5) + '" cy="' + y + '" r="7.5" fill="none" stroke="' + c + '" stroke-width="2"/><circle cx="' + (x + 5) + '" cy="' + y + '" r="7.5" fill="none" stroke="' + c + '" stroke-width="2"/></g>';
     }
     function chip(c) {
       var w = c.text.length * 6.4 + 18, col = CLR[c.typ];
@@ -462,40 +478,41 @@
     function elSvg(el, hl) {
       var col = hl ? HL : CLR[el.typ], w = hl ? el.w + 1.6 : el.w;
       var s = '<path d="' + el.d + '" stroke="' + col + '" stroke-width="' + w + '"' + (el.dash && !hl ? ' stroke-dasharray="' + el.dash + '"' : '') + (hl ? ' filter="url(#' + uid + 'gl2)"' : '') + '>' + (el.title ? '<title>' + esc(el.title) + '</title>' : '') + '</path>';
-      if (el.dot) s += '<circle cx="' + el.dot.x + '" cy="' + el.dot.y + '" r="3.8" fill="' + col + '"/>';
+      if (el.dot) s += '<circle cx="' + el.dot.x + '" cy="' + el.dot.y + '" r="3.6" fill="' + col + '"/>';
       if (el.ring) s += rings(el.ring.x, el.ring.y, hl);
       return s;
     }
-    function node(k, sel, labels) {
-      var P = people[k], p = P.p, ps = pos[k], x0 = ps.cx - NODE_W / 2, isSel = sel === k;
-      var lab = sel && !isSel ? labels[k] : null, dim = sel && !isSel && !lab, dead = !!p.umrti;
-      var lines = wrapName(p.jmeno), one = lines.length === 1, tx = x0 + 98;
-      var name = lines.map(function (l, i) { return '<text x="' + tx + '" y="' + (ps.top + (one ? 38 : 31) + i * 17) + '" style="fill:#f4ebd9;font-family:var(--font-display,Georgia,serif);font-size:15px">' + esc(l) + '</text>'; }).join('');
-      var date = '';
-      if (p.narozeni || p.umrti) {
-        var dt = p.umrti ? ((p.narozeni ? p.narozeni.slice(0, 4) : '?') + ' – ' + p.umrti.slice(0, 4)) : fmtDate(p.narozeni);
-        date = '<text x="' + tx + '" y="' + (ps.top + (one ? 57 : 65)) + '" style="fill:#a89c84;font-family:var(--font-mono,monospace);font-size:11px">' + (p.umrti ? '† ' : '') + esc(dt) + '</text>';
-      }
-      var title = '';
-      if (p.titul) {
-        var t = p.titul.length > 17 ? p.titul.slice(0, 16) + '…' : p.titul, w = t.length * 6.3 + 18, ty = ps.top + (one ? 66 : 72);
-        title = '<g><rect x="' + tx + '" y="' + ty + '" width="' + w + '" height="20" rx="10" fill="rgba(217,173,92,0.12)" stroke="#a8843f"/><text x="' + (tx + w / 2) + '" y="' + (ty + 14) + '" text-anchor="middle" style="fill:#e6c97c;font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(t) + '</text></g>';
-      }
-      var photo;
-      if (p.foto) photo = '<image href="' + esc(p.foto) + '" x="' + (x0 + 12) + '" y="' + (ps.top + 16) + '" width="72" height="72" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'p' + k + ')"' + (dead ? ' style="filter:grayscale(1) brightness(0.85)"' : '') + '/>' +
-        '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 16) + '" width="72" height="72" rx="12" fill="none" stroke="#c9a35b" stroke-width="1.5"/>';
-      else photo = '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 16) + '" width="72" height="72" rx="12" fill="url(#' + uid + 'm)" stroke="#c9a35b" stroke-width="1.5"/>' +
-        '<text x="' + (x0 + 48) + '" y="' + (ps.top + 62) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:25px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>';
-      var badge = isSel ? pill(x0 + NODE_W - 12, ps.top, 'POHLED Z', '#d9ad5c', '#1a1413') : (lab ? pill(x0 + NODE_W - 12, ps.top, kinText(lab, p), '#1a1413', '#e6c97c', '#d9ad5c') : '');
-      return '<g class="rk-node" data-k="' + esc(k) + '" style="cursor:pointer;opacity:' + (dim ? 0.36 : 1) + '"' + (isSel ? ' filter="url(#' + uid + 'gl)"' : '') + '>' +
-        '<title>' + esc(p.jmeno) + (lab ? ' — ' + esc(kinText(lab, p)) : '') + '</title>' +
-        '<rect x="' + x0 + '" y="' + ps.top + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="14" filter="url(#' + uid + 'sh)" fill="url(#' + uid + (isSel ? 'cs' : 'c') + ')" stroke="' + (isSel ? '#f0d38a' : '#7a6236') + '" stroke-width="' + (isSel ? 2.4 : 1.3) + '"/>' +
-        photo + name + date + title + badge + pin(x0 + 22, ps.top + 5, isSel) + '</g>';
-    }
     function pin(x, y, on) {
       return '<g pointer-events="none"><ellipse cx="' + (x + 1.5) + '" cy="' + (y + 3) + '" rx="5" ry="2.4" fill="#000" opacity="0.4"/>' +
-        '<circle cx="' + x + '" cy="' + y + '" r="5.6" fill="' + (on ? '#ffe08a' : '#d6455d') + '" stroke="#5b1520" stroke-width="1"/>' +
+        '<circle cx="' + x + '" cy="' + y + '" r="5.4" fill="' + (on ? '#ffe08a' : '#d6455d') + '" stroke="#5b1520" stroke-width="1"/>' +
         '<circle cx="' + (x - 1.7) + '" cy="' + (y - 1.8) + '" r="1.6" fill="#fff" opacity="0.7"/></g>';
+    }
+    function node(k, sel, labels) {
+      var p = people[k].p, ps = pos[k], x0 = ps.cx - NODE_W / 2, isSel = sel === k;
+      var lab = sel && !isSel ? labels[k] : null, dim = sel && !isSel && !lab, dead = !!p.umrti;
+      var lines = wrapName(p.jmeno), nl = lines.length, tx = x0 + 88;
+      var dts = []; if (p.narozeni) dts.push('★ ' + fmtDate(p.narozeni)); if (p.umrti) dts.push('† ' + fmtDate(p.umrti));
+      var showPill = !!p.titul && nl === 1 && dts.length <= 1;
+      var contentH = nl * 16 + dts.length * 14 + (showPill ? 24 : 0);
+      var y = ps.top + (NODE_H - contentH) / 2 + 12;
+      var name = lines.map(function (l, i) { return '<text x="' + tx + '" y="' + (y + i * 16) + '" style="fill:#f4ebd9;font-family:var(--font-display,Georgia,serif);font-size:14.5px">' + esc(l) + '</text>'; }).join('');
+      var yy = y + (nl - 1) * 16, dateSvg = '', lastY = yy;
+      dts.forEach(function (d, i) { lastY = yy + 16 + i * 14; dateSvg += '<text x="' + tx + '" y="' + lastY + '" style="fill:#b3a78d;font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(d) + '</text>'; });
+      var title = '';
+      if (showPill) {
+        var t = p.titul.length > 17 ? p.titul.slice(0, 16) + '…' : p.titul, w = t.length * 6.2 + 16, ty = lastY + 7;
+        title = '<g><rect x="' + tx + '" y="' + ty + '" width="' + w + '" height="18" rx="9" fill="rgba(217,173,92,0.12)" stroke="#a8843f"/><text x="' + (tx + w / 2) + '" y="' + (ty + 12.5) + '" text-anchor="middle" style="fill:#e6c97c;font-family:var(--font-mono,monospace);font-size:10px">' + esc(t) + '</text></g>';
+      }
+      var photo;
+      if (p.foto) photo = '<image href="' + esc(p.foto) + '" x="' + (x0 + 12) + '" y="' + (ps.top + 14) + '" width="64" height="64" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'p' + k + ')"' + (dead ? ' style="filter:grayscale(1) brightness(0.85)"' : '') + '/>' +
+        '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 14) + '" width="64" height="64" rx="11" fill="none" stroke="#c9a35b" stroke-width="1.4"/>';
+      else photo = '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 14) + '" width="64" height="64" rx="11" fill="url(#' + uid + 'm)" stroke="#c9a35b" stroke-width="1.4"/>' +
+        '<text x="' + (x0 + 44) + '" y="' + (ps.top + 55) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:22px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>';
+      var badge = isSel ? pill(x0 + NODE_W - 10, ps.top, 'POHLED Z', '#d9ad5c', '#1a1413') : (lab ? pill(x0 + NODE_W - 10, ps.top, kinText(lab, p), '#1a1413', '#e6c97c', '#d9ad5c') : '');
+      return '<g class="rk-node" data-k="' + esc(k) + '" style="cursor:pointer;opacity:' + (dim ? 0.36 : 1) + '"' + (isSel ? ' filter="url(#' + uid + 'gl)"' : '') + '>' +
+        '<title>' + esc(p.jmeno) + (p.titul ? ' · ' + esc(p.titul) : '') + (lab ? ' — ' + esc(kinText(lab, p)) : '') + '</title>' +
+        '<rect x="' + x0 + '" y="' + ps.top + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="13" filter="url(#' + uid + 'sh)" fill="url(#' + uid + (isSel ? 'cs' : 'c') + ')" stroke="' + (isSel ? '#f0d38a' : '#7a6236') + '" stroke-width="' + (isSel ? 2.4 : 1.3) + '"/>' +
+        photo + name + dateSvg + title + badge + pin(x0 + 16, ps.top + 5, isSel) + '</g>';
     }
     return function (sel) {
       var labels = {}, hlSet = {}, hasSel = sel && S.full.people[sel];
@@ -518,23 +535,105 @@
     };
   }
 
-  // ───────────── hlavní vykreslení ─────────────
+  // ───────────── mapa vztahů (kruhy podle generací) ─────────────
+  function mapLayout(model, mini) {
+    var keys = Object.keys(model.people), gens = layout(model).gen, byGen = {};
+    keys.forEach(function (k) { (byGen[gens[k]] = byGen[gens[k]] || []).push(k); });
+    var gk = Object.keys(byGen).map(Number).sort(function (a, b) { return a - b; });
+    var step = mini ? 26 : 150, base = mini ? 22 : 130, spacing = mini ? 13 : 98, pos = {}, maxR = 0, radii = [];
+    gk.forEach(function (g, ri) {
+      var list = byGen[g].sort(function (a, b) { return cmpName(model.people[a].p.jmeno, model.people[b].p.jmeno); });
+      var r = (ri === 0 && list.length === 1) ? 0 : Math.max(base + (gk[0] === gk[ri] && list.length === 1 ? 0 : ri * step), list.length * spacing / (2 * Math.PI));
+      maxR = Math.max(maxR, r); if (r > 0) radii.push(r);
+      list.forEach(function (k, i) { var ang = -Math.PI / 2 + 2 * Math.PI * i / list.length + ri * 0.5; pos[k] = { x: r * Math.cos(ang), y: r * Math.sin(ang) }; });
+    });
+    var m = mini ? 12 : 100, W = 2 * (maxR + m), H = 2 * (maxR + m);
+    keys.forEach(function (k) { pos[k].x += W / 2; pos[k].y += H / 2; });
+    return { pos: pos, radii: radii, W: Math.max(W, mini ? 80 : 520), H: Math.max(H, mini ? 80 : 520), cx: W / 2, cy: H / 2 };
+  }
+  function mapEdges(model) {
+    var out = [];
+    model.sats.forEach(function (s) { out.push({ a: s.from, b: s.to, typ: s.typ }); });
+    var seen = {};
+    Object.keys(model.people).forEach(function (k) {
+      var P = model.people[k];
+      P.children.forEach(function (c) { out.push({ a: k, b: c, typ: 'rodic' }); });
+      P.partners.forEach(function (o) { var pk = pkey(k, o); if (!seen['p' + pk]) { seen['p' + pk] = 1; out.push({ a: k, b: o, typ: 'partner' }); } });
+      P.siblings.forEach(function (o) { var pk = pkey(k, o); if (!seen['s' + pk]) { seen['s' + pk] = 1; out.push({ a: k, b: o, typ: 'sourozenec' }); } });
+    });
+    return out;
+  }
+  function miniMapSvg(model) {
+    if (!Object.keys(model.people).length) return '';
+    var M = mapLayout(model, true), s = '<svg viewBox="0 0 ' + M.W + ' ' + M.H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:150px">';
+    mapEdges(model).forEach(function (e) {
+      var a = M.pos[e.a], b = M.pos[e.b]; if (!a || !b) return;
+      s += '<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" stroke="' + (CLR[e.typ] || '#888') + '" stroke-width="1" opacity="0.7"/>';
+    });
+    Object.keys(model.people).forEach(function (k) { var q = M.pos[k]; s += '<circle cx="' + q.x + '" cy="' + q.y + '" r="4.5" fill="' + (model.people[k].p.umrti ? '#8f95a3' : '#e6c97c') + '" stroke="#5b4420"/>'; });
+    return s + '</svg>';
+  }
+  function mapDrawer(model, M, kin) {
+    var uid = 'rm' + (++uidN), keys = Object.keys(model.people), R = 30;
+    var defs = '<defs><radialGradient id="' + uid + 'bg" cx="0.5" cy="0.5" r="0.8"><stop offset="0" stop-color="#2a1e1a"/><stop offset="1" stop-color="#0f0b0a"/></radialGradient>' +
+      '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#8a2f3d"/><stop offset="1" stop-color="#4a1520"/></radialGradient>' +
+      '<filter id="' + uid + 'gl" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+      keys.map(function (k) { var q = M.pos[k]; return '<clipPath id="' + uid + 'c' + k + '"><circle cx="' + q.x + '" cy="' + q.y + '" r="' + (R - 2) + '"/></clipPath>'; }).join('') + '</defs>';
+    var edges = mapEdges(model);
+    return function (sel) {
+      var hasSel = sel && model.people[sel], labels = {};
+      if (hasSel) keys.forEach(function (k) { if (k !== sel) { var l = kin.label(k, sel); if (l) labels[k] = l; } });
+      var out = defs + '<rect width="' + M.W + '" height="' + M.H + '" fill="url(#' + uid + 'bg)"/>';
+      (M.radii || []).forEach(function (r, i) { out += '<circle cx="' + M.cx + '" cy="' + M.cy + '" r="' + r + '" fill="none" stroke="#7a6236" stroke-opacity="0.22" stroke-dasharray="4 8"/>'; });
+      var base = '', top = '';
+      edges.forEach(function (e) {
+        var a = M.pos[e.a], b = M.pos[e.b]; if (!a || !b) return;
+        var mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, qx = mx + (M.cx - mx) * 0.22, qy = my + (M.cy - my) * 0.22;
+        var touch = hasSel && (e.a === sel || e.b === sel);
+        var d = '<path d="M' + a.x + ' ' + a.y + ' Q' + qx + ' ' + qy + ' ' + b.x + ' ' + b.y + '" fill="none" stroke="' + (touch ? HL : CLR[e.typ]) + '" stroke-width="' + (touch ? 3.4 : 2) + '"' + (e.typ === 'kmotr' || e.typ === 'sourozenec' ? ' stroke-dasharray="3 5"' : '') + '/>';
+        if (touch) top += d; else base += d;
+      });
+      out += '<g opacity="' + (hasSel ? 0.28 : 0.85) + '">' + base + '</g><g>' + top + '</g>';
+      keys.forEach(function (k) {
+        var p = model.people[k].p, q = M.pos[k], isSel = sel === k, lab = hasSel && !isSel ? labels[k] : null, dim = hasSel && !isSel && !lab;
+        var nm = p.jmeno.length > 22 ? p.jmeno.slice(0, 21) + '…' : p.jmeno;
+        out += '<g class="rk-node" data-k="' + esc(k) + '" style="cursor:pointer;opacity:' + (dim ? 0.35 : 1) + '"' + (isSel ? ' filter="url(#' + uid + 'gl)"' : '') + '><title>' + esc(p.jmeno) + '</title>' +
+          '<circle cx="' + q.x + '" cy="' + q.y + '" r="' + R + '" fill="url(#' + uid + 'm)" stroke="' + (isSel ? HL : '#c9a35b') + '" stroke-width="' + (isSel ? 3 : 2) + '"/>' +
+          (p.foto ? '<image href="' + esc(p.foto) + '" x="' + (q.x - R + 2) + '" y="' + (q.y - R + 2) + '" width="' + (2 * R - 4) + '" height="' + (2 * R - 4) + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'c' + k + ')"' + (p.umrti ? ' style="filter:grayscale(1) brightness(0.85)"' : '') + '/>'
+            : '<text x="' + q.x + '" y="' + (q.y + 6) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:17px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>') +
+          '<text x="' + q.x + '" y="' + (q.y + R + 17) + '" text-anchor="middle" style="fill:#f4ebd9;font-family:var(--font-display,Georgia,serif);font-size:12.5px">' + esc(nm) + '</text>' +
+          (lab ? '<text x="' + q.x + '" y="' + (q.y + R + 31) + '" text-anchor="middle" style="fill:#e6c97c;font-family:var(--font-mono,monospace);font-size:10px">' + esc(kinText(lab, p)) + '</text>' : '') + '</g>';
+      });
+      return out;
+    };
+  }
+
+  // ───────────── vykreslení plátna ─────────────
   var cur = { L: null, drawFn: null };
-  function renderTree() {
-    var host = $('rk-svg-host');
+  function emptyCanvas(title, text) {
+    $('rk-svg-host').innerHTML = '<div class="rk-empty"><div class="rk-empty-ico">❦</div><div class="rk-empty-t">' + esc(title) + '</div><div>' + text + '</div></div>';
+    cur.L = null; cur.drawFn = null;
+  }
+  function renderCanvas() {
     if (!S.persons.length) {
-      host.innerHTML = '<div class="rk-empty"><div class="rk-empty-ico">❦</div><div class="rk-empty-t">Rodokmen je zatím prázdný</div>' +
-        (CFG.canEdit ? '<div>Začni tlačítkem <b>+ Přidat osobu</b>. Pak u osoby přidáš rodiče, partnera, děti i širší rodinu — strom se sestaví sám.</div>' : '<div>Vedení sem zatím nepřidalo žádné osoby.</div>') + '</div>';
-      $('rk-info').style.display = 'none';
-      return;
+      emptyCanvas('Rodokmen je zatím prázdný', CFG.canEdit ? 'Začni tlačítkem <b>+ Přidat osobu</b>. U osoby pak přidáš rodiče, partnera, děti i širší rodinu — strom se sestaví sám.' : 'Vedení sem zatím nepřidalo žádné osoby.');
+      $('rk-info').style.display = 'none'; return;
     }
     $('rk-info').style.display = '';
-    var model = subsetModel(S.view, S.sel);
-    var L = layout(model), geo = geometry(model, L, S.threads), kin = makeKinship(S.full);
-    cur.L = L; cur.drawFn = drawer(model, L, geo, kin);
-    host.innerHTML = '<svg id="rk-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.W + ' ' + L.H + '" width="' + L.W + '" height="' + L.H + '"></svg>';
-    paintSvg();
-    applyScale();
+    var model = viewModel();
+    if (!Object.keys(model.people).length) { emptyCanvas('Filtr nic nenašel', 'Zkus změnit filtr generací nebo členů.'); return; }
+    var host = $('rk-svg-host'), kin = makeKinship(S.full);
+    if (S.mode === 'map') {
+      var M = mapLayout(model, false);
+      cur.L = { W: M.W, H: M.H, pos: {} };
+      Object.keys(M.pos).forEach(function (k) { cur.L.pos[k] = { cx: M.pos[k].x, top: M.pos[k].y - NODE_H / 2 }; });
+      cur.drawFn = mapDrawer(model, M, kin);
+    } else {
+      var L = layout(model), geo = geometry(model, L, S.threads);
+      cur.L = L; cur.drawFn = drawer(model, L, geo, kin);
+    }
+    host.innerHTML = '<svg id="rk-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + cur.L.W + ' ' + cur.L.H + '" width="' + cur.L.W + '" height="' + cur.L.H + '"></svg>';
+    paintSvg(); applyScale();
   }
   function paintSvg() {
     var svg = $('rk-svg'); if (!svg || !cur.drawFn) return;
@@ -554,101 +653,97 @@
   function focusOn(id) {
     var sc = $('rk-scroll'); if (!sc || !cur.L || !cur.L.pos[id]) return;
     var p = cur.L.pos[id];
+    if (!sc.scrollTo) return;
     sc.scrollTo({ left: Math.max(0, p.cx * S.scale - sc.clientWidth / 2), top: Math.max(0, (p.top + NODE_H / 2) * S.scale - sc.clientHeight / 2), behavior: 'smooth' });
   }
 
-  function renderStats() {
-    var alive = S.persons.filter(function (p) { return !p.umrti; }).length;
-    var gens = S.persons.length ? (S.fullL ? S.fullL.maxGen + 1 : 1) : 0;
-    $('rk-stats').innerHTML = [
-      ['Osob', S.persons.length], ['Generací', gens], ['Vazeb', S.relations.length], ['Žijících', alive]
-    ].map(function (x) { return '<div class="rk-stat"><div class="rk-stat-n">' + x[1] + '</div><div class="rk-stat-l">' + x[0] + '</div></div>'; }).join('');
-  }
-
-  function avatar(p, cls) {
-    return p.foto ? '<img class="' + cls + '" src="' + esc(p.foto) + '" alt="">' : '<div class="' + cls + ' rk-mono">' + esc(initials(p.jmeno)) + '</div>';
-  }
-
-  function renderBottom() {
-    // historie
-    var ev = [];
-    S.persons.forEach(function (p) {
-      var f = p.pohlavi === 'z';
-      if (p.narozeni) ev.push({ d: p.narozeni, p: p, t: (f ? 'Narodila se ' : 'Narodil se ') + p.jmeno });
-      if (p.umrti) ev.push({ d: p.umrti, p: p, t: (f ? 'Zemřela ' : 'Zemřel ') + p.jmeno });
+  // ───────────── export obrázku ─────────────
+  function blobToDataUrl(b) { return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.readAsDataURL(b); }); }
+  function renderExport(opts) {
+    var svg = $('rk-svg');
+    if (!svg) return Promise.reject(new Error('Není co exportovat'));
+    var vb = svg.viewBox.baseVal, W = vb.width, H = vb.height;
+    var clone = svg.cloneNode(true);
+    return Promise.all([].slice.call(clone.querySelectorAll('image')).map(function (im) {
+      var href = im.getAttribute('href') || im.getAttribute('xlink:href');
+      if (!href || href.indexOf('data:') === 0) return null;
+      return fetch(href).then(function (r) { return r.blob(); }).then(blobToDataUrl).then(function (d) { im.setAttribute('href', d); }).catch(function () { if (im.parentNode) im.parentNode.removeChild(im); });
+    })).then(function () {
+      var headerH = opts.title ? 90 : 0;
+      var sc = Math.min(opts.scale, 7600 / Math.max(W, H + headerH));
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', Math.round(W * sc)); clone.setAttribute('height', Math.round(H * sc));
+      var str = new XMLSerializer().serializeToString(clone).replace(/var\(--[a-z0-9-]+,([^)]+)\)/g, '$1');
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.onload = function () {
+          var c = document.createElement('canvas'); c.width = Math.round(W * sc); c.height = Math.round((H + headerH) * sc);
+          var ctx = c.getContext('2d'); ctx.fillStyle = '#0f0b0a'; ctx.fillRect(0, 0, c.width, c.height);
+          if (opts.title) {
+            var g = ctx.createLinearGradient(0, 0, c.width, 0); g.addColorStop(0, '#2a1e1a'); g.addColorStop(1, '#120d0c');
+            ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, headerH * sc);
+            ctx.fillStyle = '#e6c97c'; ctx.font = 'italic ' + Math.round(38 * sc) + 'px Georgia, serif'; ctx.textBaseline = 'middle';
+            ctx.fillText('Rodokmen Caledonie', 36 * sc, 42 * sc);
+            ctx.fillStyle = '#9a8f78'; ctx.font = Math.round(14 * sc) + 'px monospace';
+            ctx.fillText(new Date().toLocaleDateString('cs-CZ') + '  ·  ' + S.persons.length + ' osob', 38 * sc, 72 * sc);
+            ctx.strokeStyle = '#7a6236'; ctx.lineWidth = sc; ctx.beginPath(); ctx.moveTo(0, headerH * sc); ctx.lineTo(c.width, headerH * sc); ctx.stroke();
+          }
+          ctx.drawImage(img, 0, headerH * sc, c.width, Math.round(H * sc));
+          try { resolve({ png: c.toDataURL('image/png'), jpg: c.toDataURL('image/jpeg', 0.9), w: c.width, h: c.height }); } catch (e) { reject(e); }
+        };
+        img.onerror = function () { reject(new Error('Obrázek se nepodařilo vykreslit')); };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str);
+      });
     });
-    ev.sort(function (a, b) { return a.d < b.d ? 1 : -1; });
-    $('rk-hist').innerHTML = ev.length ? ev.slice(0, 7).map(function (e) {
-      return '<div class="rk-ev" data-k="' + esc(e.p.id) + '">' + avatar(e.p, 'rk-ev-av') + '<div><div class="rk-ev-d">' + fmtDate(e.d) + '</div><div class="rk-ev-t">' + esc(e.t) + '</div></div></div>';
-    }).join('') : '<div class="rk-muted">Zatím žádné zaznamenané události. Doplň datum narození nebo úmrtí u osob.</div>';
-    // klíčové vazby
-    var pairs = [], seen = {};
-    S.relations.filter(function (r) { return r.typ === 'partner'; }).forEach(function (r) {
-      var a = byId(r.a), b = byId(r.b); if (a && b && !seen[r.id]) { seen[r.id] = 1; pairs.push([a, b]); }
+  }
+  function dataUrlBytes(d) { return Math.round((d.length - d.indexOf(',') - 1) * 0.75); }
+  function openExport() {
+    if (!$('rk-svg')) return toast('Není co exportovat — rodokmen je prázdný', true);
+    var m = $('rk-modal'), res = null, busy = false;
+    m.innerHTML = '<div class="rk-ov"><div class="rk-md" style="max-width:900px"><div class="rk-md-h"><span>Exportovat rodokmen</span><button class="rk-x" id="ex-close">✕</button></div>' +
+      '<div class="rk-md-b"><div class="rk-ex-grid"><div class="rk-ex-prev" id="ex-prev"><div class="rk-muted">Připravuji náhled…</div></div><div>' +
+      '<div class="rk-d-h" style="margin-top:0">Co se exportuje</div><div class="rk-muted">Aktuální pohled (' + (S.mode === 'map' ? 'mapa vztahů' : 'rodinný strom') + (S.sel ? ', zvýrazněná osoba ' + esc(byId(S.sel) ? byId(S.sel).jmeno : '') : '') + '). Chceš-li něco jiného, zavři okno a změň filtr nebo pohled.</div>' +
+      '<div class="form-group" style="margin-top:1rem"><label>Rozlišení</label><select id="ex-scale"><option value="1">Standardní (1×)</option><option value="2" selected>Vysoké (2×)</option><option value="3">Maximální (3×)</option></select></div>' +
+      '<label class="rk-toggle" style="margin-bottom:1rem"><input type="checkbox" id="ex-title" checked><span>Přidat nadpis a datum</span></label>' +
+      '<div class="rk-ex-size rk-muted" id="ex-size"></div>' +
+      '<div class="rk-ex-btns"><button class="rk-btn rk-btn-gold" id="ex-dl" disabled>⤓ Stáhnout obrázek</button><button class="rk-btn" id="ex-copy" disabled>Kopírovat do schránky</button></div>' +
+      (CFG.canDiscord ? '<div class="rk-d-h">Poslat na Discord</div><div class="form-group"><input type="text" id="ex-cap" maxlength="300" placeholder="Poznámka ke zprávě (nepovinné)"></div><button class="rk-btn rk-btn-gold" id="ex-dc" disabled>Odeslat na Discord</button>' : '<div class="rk-muted" style="margin-top:1rem">Odeslání na Discord je dostupné od hodnosti Senior Member. Obrázek si stáhni a pošli ručně.</div>') +
+      '</div></div></div></div></div>';
+    function close() { m.innerHTML = ''; }
+    $('ex-close').addEventListener('click', close);
+    function make() {
+      if (busy) return; busy = true;
+      ['ex-dl', 'ex-copy', 'ex-dc'].forEach(function (id) { var b = $(id); if (b) b.disabled = true; });
+      $('ex-prev').innerHTML = '<div class="rk-muted">Vykresluji…</div>';
+      renderExport({ scale: parseFloat($('ex-scale').value), title: $('ex-title').checked }).then(function (r) {
+        busy = false; res = r;
+        $('ex-prev').innerHTML = '<img src="' + r.png + '" alt="Náhled">';
+        $('ex-size').textContent = r.w + ' × ' + r.h + ' px · PNG ≈ ' + (dataUrlBytes(r.png) / 1048576).toFixed(1) + ' MB';
+        ['ex-dl', 'ex-copy', 'ex-dc'].forEach(function (id) { var b = $(id); if (b) b.disabled = false; });
+      }).catch(function (e) { busy = false; $('ex-prev').innerHTML = '<div class="rk-muted">Export se nepodařil: ' + esc(e.message || '') + '</div>'; });
+    }
+    $('ex-scale').addEventListener('change', make); $('ex-title').addEventListener('change', make);
+    $('ex-dl').addEventListener('click', function () {
+      if (!res) return; var a = document.createElement('a'); a.href = res.png; a.download = 'rodokmen-caledonia.png'; document.body.appendChild(a); a.click(); a.remove();
     });
-    $('rk-pairs').innerHTML = pairs.length ? pairs.slice(0, 4).map(function (pr) {
-      return '<div class="rk-pair"><div class="rk-pair-p" data-k="' + esc(pr[0].id) + '">' + avatar(pr[0], 'rk-pair-av') + '<span>' + esc(pr[0].jmeno) + '</span></div>' +
-        '<div class="rk-pair-h">♥</div><div class="rk-pair-p" data-k="' + esc(pr[1].id) + '">' + avatar(pr[1], 'rk-pair-av') + '<span>' + esc(pr[1].jmeno) + '</span></div></div>';
-    }).join('') : '<div class="rk-muted">Zatím žádné zaznamenané partnerské vazby.</div>';
+    $('ex-copy').addEventListener('click', function () {
+      if (!res) return;
+      fetch(res.png).then(function (r) { return r.blob(); }).then(function (b) { return navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); })
+        .then(function () { toast('Obrázek zkopírován — vlož ho (Ctrl+V) třeba do Discordu'); }).catch(function () { toast('Prohlížeč nepovolil kopírování — použij Stáhnout', true); });
+    });
+    if ($('ex-dc')) $('ex-dc').addEventListener('click', function () {
+      if (!res) return;
+      var img = dataUrlBytes(res.png) > 7.5 * 1048576 ? res.jpg : res.png;
+      if (dataUrlBytes(img) > 7.7 * 1048576) return toast('Obrázek je pro Discord příliš velký — sniž rozlišení', true);
+      var b = $('ex-dc'); b.disabled = true; b.textContent = 'Odesílám…';
+      api('POST', '/api/rodokmen/export-discord', { image: img, caption: $('ex-cap').value.trim() }).then(function (d) {
+        b.disabled = false; b.textContent = 'Odeslat na Discord';
+        if (d.ok) { toast('Rodokmen odeslán na Discord'); close(); } else toast(d.error || 'Odeslání selhalo', true);
+      }).catch(function () { b.disabled = false; b.textContent = 'Odeslat na Discord'; toast('Odeslání selhalo', true); });
+    });
+    make();
   }
 
-  // ───────────── detail osoby ─────────────
-  function directRelations(id) {
-    return S.relations.filter(function (r) { return r.a === id || r.b === id; });
-  }
-  function relDesc(r, id) {
-    var other = byId(r.a === id ? r.b : r.a), me = byId(id); if (!other) return null;
-    var key;
-    if (r.typ === 'rodic') key = r.a === id ? 'child' : 'parent';
-    else if (r.typ === 'partner') key = 'partner';
-    else if (r.typ === 'sourozenec') key = 'sibling';
-    else if (r.typ === 'stryc') key = r.a === id ? 'nephew' : 'uncle';
-    else if (r.typ === 'kmotr') key = r.a === id ? 'godchild' : 'godparent';
-    else key = 'friend';
-    return { other: other, text: kinText(key, other) };
-  }
-
-  function renderDetail() {
-    var host = $('rk-detail'), p = S.sel && byId(S.sel);
-    if (!p) {
-      host.innerHTML = '<div class="rk-d-empty"><div class="rk-empty-ico">❦</div><div>Vyber osobu v rodokmenu nebo v seznamu osob.</div>' +
-        (CFG.canEdit ? '<button class="rk-btn rk-btn-gold" data-act="add">+ Přidat osobu</button>' : '') + '</div>';
-      return;
-    }
-    var age = ageOf(p);
-    var born = p.narozeni ? fmtDate(p.narozeni) + (age != null ? ' (' + (p.umrti ? 'dožil/a se ' + letText(age) : letText(age)) + ')' : '') : '';
-    var kin = makeKinship(S.full), groups = {};
-    S.persons.forEach(function (o) { if (o.id === p.id) return; var k = kin.label(o.id, p.id); if (k) (groups[k] = groups[k] || []).push(o); });
-    var kinHtml = GROUP_ORDER.filter(function (k) { return groups[k]; }).map(function (k) {
-      return groups[k].sort(function (a, b) { return cmpName(a.jmeno, b.jmeno); }).map(function (o) {
-        return '<div class="rk-kin" data-k="' + esc(o.id) + '">' + avatar(o, 'rk-kin-av') + '<div><div class="rk-kin-l">' + esc(kinText(k, o)) + '</div><div class="rk-kin-n">' + esc(o.jmeno) + '</div></div></div>';
-      }).join('');
-    }).join('') || '<div class="rk-muted">Zatím žádné vazby.</div>';
-
-    var direct = '';
-    if (CFG.canEdit) {
-      direct = '<div class="rk-d-h">Zapsané vazby</div>' + (directRelations(p.id).map(function (r) {
-        var d = relDesc(r, p.id); if (!d) return '';
-        return '<div class="rk-rel"><span><b>' + esc(d.text) + ':</b> ' + esc(d.other.jmeno) + '</span><button class="rk-x" data-del-rel="' + esc(r.id) + '" title="Smazat vazbu">✕</button></div>';
-      }).join('') || '<div class="rk-muted">Žádné.</div>') + addRelationHtml(p);
-    }
-    var clen = p.clen ? '<div class="rk-d-row"><span>Člen webu</span><b>' + (CFG.isStaff ? '<a href="/karta/' + encodeURIComponent(p.clen) + '">' + esc(p.clen) + '</a>' : esc(p.clen)) + '</b></div>' : '';
-    host.innerHTML =
-      '<button class="rk-d-close" data-act="close" title="Zavřít">✕</button>' +
-      '<div class="rk-d-photo">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt=""' + (p.umrti ? ' style="filter:grayscale(1) brightness(.85)"' : '') + '>' : '<div class="rk-d-mono">' + esc(initials(p.jmeno)) + '</div>') + '<div class="rk-d-fade"></div></div>' +
-      '<div class="rk-d-body"><h2 class="rk-d-name">' + esc(p.jmeno) + (p.umrti ? ' <span title="Zemřel/a">†</span>' : '') + '</h2>' +
-      (p.titul ? '<div class="rk-d-title">' + esc(p.titul) + '</div>' : '') +
-      (born ? '<div class="rk-d-row"><span>Narození</span><b>' + esc(born) + '</b></div>' : '') +
-      (p.umrti ? '<div class="rk-d-row"><span>Úmrtí</span><b>' + esc(fmtDate(p.umrti)) + '</b></div>' : '') + clen +
-      (p.lore ? '<div class="rk-d-h">Představení</div><div class="rk-d-lore">' + esc(p.lore) + '</div>' : '') +
-      '<div class="rk-d-h">Rodinné vazby</div><div class="rk-kins">' + kinHtml + '</div>' +
-      '<div class="rk-d-h">Zobrazit ve stromu</div><div class="rk-views">' +
-      [['full', 'Celý strom'], ['predci', 'Předci'], ['potomci', 'Potomci'], ['okoli', 'Nejbližší okolí']].map(function (v) { return '<button class="rk-chip' + (S.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '">' + v[1] + '</button>'; }).join('') + '</div>' +
-      direct +
-      (CFG.canEdit ? '<div class="rk-d-actions"><button class="rk-btn rk-btn-gold" data-act="edit">Upravit osobu</button><button class="rk-btn rk-btn-red" data-act="delete">Smazat</button></div>' : '') +
-      '</div>';
-    if (CFG.canEdit) bindAddRelation(p);
-  }
 
   // ───────────── přidání vazby (z pohledu vybrané osoby X) ─────────────
   var ROLES = [
@@ -801,78 +896,271 @@
     });
   }
 
-  // ───────────── výběr / události ─────────────
+
+  // ───────────── události (časová osa) ─────────────
+  function allEvents() {
+    var out = [];
+    S.persons.forEach(function (p) {
+      var f = p.pohlavi === 'z';
+      if (p.narozeni) out.push({ kind: 'birth', d: p.narozeni, persons: [p.id], title: (f ? 'Narodila se ' : 'Narodil se ') + p.jmeno });
+      if (p.umrti) out.push({ kind: 'death', d: p.umrti, persons: [p.id], title: (f ? 'Zemřela ' : 'Zemřel ') + p.jmeno });
+    });
+    S.events.forEach(function (e) { out.push({ kind: 'event', id: e.id, d: e.datum, persons: e.osoby || [], title: e.nazev, text: e.popis }); });
+    out.sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : 0; });
+    return out;
+  }
+  function avatar(p, cls) {
+    return p.foto ? '<img class="' + cls + '" src="' + esc(p.foto) + '" alt="">' : '<div class="' + cls + ' rk-mono">' + esc(initials(p.jmeno)) + '</div>';
+  }
+  var EV_ICON = { birth: '✶', death: '†', event: '◆' };
+  function evRow(e, editable) {
+    var ps = e.persons.map(byId).filter(Boolean);
+    return '<div class="rk-tl-item"><div class="rk-tl-dot rk-tl-' + e.kind + '">' + EV_ICON[e.kind] + '</div><div class="rk-tl-card">' +
+      '<div class="rk-tl-d">' + esc(fmtDate(e.d)) + '</div><div class="rk-tl-t">' + esc(e.title) + '</div>' + (e.text ? '<div class="rk-tl-x">' + esc(e.text) + '</div>' : '') +
+      (ps.length && e.kind === 'event' ? '<div class="rk-tl-p">' + ps.map(function (p) { return '<span class="rk-tl-chip" data-k="' + esc(p.id) + '">' + esc(p.jmeno) + '</span>'; }).join('') + '</div>' : '') +
+      (editable && e.kind === 'event' ? '<div class="rk-tl-a"><button class="rk-link" data-act="edit-event" data-id="' + esc(e.id) + '">Upravit</button><button class="rk-link" data-act="del-event" data-id="' + esc(e.id) + '">Smazat</button></div>' : '') +
+      '</div></div>';
+  }
+
+  // ───────────── spodní panely ─────────────
+  function genCount() { return S.fullL ? S.fullL.maxGen + 1 : 0; }
+  function renderBottom() {
+    var ev = allEvents();
+    $('rk-hist').innerHTML = ev.length ? '<div class="rk-mini-tl">' + ev.slice(0, 5).map(function (e) {
+      return '<div class="rk-mtl-i"><span class="rk-mtl-dot"></span><span class="rk-mtl-y">' + esc(fmtDate(e.d)) + '</span><span class="rk-mtl-t">' + esc(e.title) + '</span></div>';
+    }).join('') + '</div><button class="rk-link" data-tab="history">Zobrazit všechny události →</button>' : '<div class="rk-muted">Zatím žádné události. Doplň datum narození u osob nebo přidej událost.</div>';
+    var last = S.events.slice().sort(function (a, b) { return a.datum < b.datum ? 1 : -1; })[0];
+    $('rk-sig').innerHTML = last
+      ? '<div class="rk-sig-card"><div class="rk-sig-t">' + esc(last.nazev) + '</div><div class="rk-sig-d">◆ ' + esc(fmtDate(last.datum)) + '</div>' + (last.popis ? '<div class="rk-sig-x">' + esc(last.popis.length > 170 ? last.popis.slice(0, 169) + '…' : last.popis) + '</div>' : '') + '<button class="rk-link" data-tab="history">Zobrazit detail →</button></div>'
+      : '<div class="rk-muted">Zatím žádná významná událost (svatba, narození, rozchod…).' + (CFG.canEdit ? '</div><button class="rk-btn" style="margin-top:0.8rem" data-act="add-event">+ Přidat událost</button>' : '</div>');
+    var alive = S.persons.filter(function (p) { return !p.umrti; }).length;
+    $('rk-statp').innerHTML = '<div class="rk-sgrid">' + [['Členů', S.persons.length], ['Generací', genCount()], ['Žijících', alive], ['Vazeb', S.relations.length]].map(function (x) {
+      return '<div class="rk-sg"><div class="rk-sg-n">' + x[1] + '</div><div class="rk-sg-l">' + x[0] + '</div></div>';
+    }).join('') + '</div>';
+    $('rk-mini').innerHTML = S.persons.length ? '<div class="rk-mini-map" data-act="map" title="Otevřít mapu vztahů">' + miniMapSvg(S.full) + '</div><button class="rk-link" data-act="map">Zobrazit mapu →</button>' : '<div class="rk-muted">Mapa se objeví po přidání osob.</div>';
+  }
+
+  // ───────────── detail osoby (záložky Profil / Rodina / Vazby / Historie) ─────────────
+  function directRelations(id) { return S.relations.filter(function (r) { return r.a === id || r.b === id; }); }
+  function relDesc(r, id) {
+    var other = byId(r.a === id ? r.b : r.a); if (!other) return null;
+    var key = r.typ === 'rodic' ? (r.a === id ? 'child' : 'parent') : r.typ === 'partner' ? 'partner' : r.typ === 'sourozenec' ? 'sibling' :
+      r.typ === 'stryc' ? (r.a === id ? 'nephew' : 'uncle') : r.typ === 'kmotr' ? (r.a === id ? 'godchild' : 'godparent') : 'friend';
+    return { other: other, text: kinText(key, other) };
+  }
+  function renderDetail() {
+    var host = $('rk-detail'), p = S.sel && byId(S.sel);
+    if (!p) {
+      host.innerHTML = '<div class="rk-d-empty"><div class="rk-empty-ico">❦</div><div>Vyber osobu v rodokmenu nebo v seznamu osob.</div>' + (CFG.canEdit ? '<button class="rk-btn rk-btn-gold" style="margin-top:1rem" data-act="add">+ Přidat osobu</button>' : '') + '</div>';
+      return;
+    }
+    var age = ageOf(p), kin = makeKinship(S.full), tab = S.dtab, body = '';
+    var sub = p.narozeni ? '★ ' + fmtDate(p.narozeni) + (age != null ? ' (' + (p.umrti ? 'dožil/a se ' + letText(age) : letText(age)) + ')' : '') : '';
+    if (tab === 'profil') {
+      var partners = S.full.people[p.id].partners.map(byId).filter(Boolean);
+      body = '<div class="rk-d-h" style="margin-top:0.4rem">Základní informace</div>' +
+        (p.titul ? '<div class="rk-d-row"><span>Role</span><b>' + esc(p.titul) + '</b></div>' : '') +
+        (p.narozeni ? '<div class="rk-d-row"><span>Narození</span><b>' + esc(fmtDate(p.narozeni)) + '</b></div>' : '') +
+        (p.umrti ? '<div class="rk-d-row"><span>Úmrtí</span><b>' + esc(fmtDate(p.umrti)) + '</b></div>' : '') +
+        '<div class="rk-d-row"><span>Status</span><b>' + (p.umrti ? '<span class="rk-dot rk-dot-dead"></span>Zesnulý/á' : '<span class="rk-dot rk-dot-live"></span>Žije') + '</b></div>' +
+        (partners.length ? '<div class="rk-d-row"><span>Partner/ka</span><b>' + partners.map(function (o) { return '<a href="#" data-k="' + esc(o.id) + '" class="rk-lnk">' + esc(o.jmeno) + '</a>'; }).join(', ') + '</b></div>' : '') +
+        (p.clen ? '<div class="rk-d-row"><span>Člen webu</span><b>' + (CFG.isStaff ? '<a href="/karta/' + encodeURIComponent(p.clen) + '">' + esc(p.clen) + '</a>' : esc(p.clen)) + '</b></div>' : '') +
+        (p.lore ? '<div class="rk-d-h">Představení</div><div class="rk-d-lore">' + esc(p.lore) + '</div>' : '<div class="rk-muted" style="margin-top:1rem">Zatím bez představení.' + (CFG.canEdit ? ' Doplň ho přes Upravit osobu.' : '') + '</div>') +
+        (CFG.canEdit ? '<div class="rk-d-actions"><button class="rk-btn rk-btn-gold" data-act="edit">Upravit osobu</button><button class="rk-btn rk-btn-red" data-act="delete">Smazat</button></div>' : '');
+    } else if (tab === 'rodina') {
+      var groups = {};
+      S.persons.forEach(function (o) { if (o.id === p.id) return; var k = kin.label(o.id, p.id); if (k) (groups[k] = groups[k] || []).push(o); });
+      body = '<div class="rk-d-h" style="margin-top:0.4rem">Rodinné vazby</div><div class="rk-kins">' + (GROUP_ORDER.filter(function (k) { return groups[k]; }).map(function (k) {
+        return groups[k].sort(function (a, b) { return cmpName(a.jmeno, b.jmeno); }).map(function (o) {
+          return '<div class="rk-kin" data-k="' + esc(o.id) + '">' + avatar(o, 'rk-kin-av') + '<div><div class="rk-kin-l">' + esc(kinText(k, o)) + '</div><div class="rk-kin-n">' + esc(o.jmeno) + '</div></div></div>';
+        }).join('');
+      }).join('') || '<div class="rk-muted">Zatím žádné vazby.</div>') + '</div>' +
+        '<div class="rk-d-h">Zobrazit ve stromu</div><div class="rk-views">' + [['full', 'Celý strom'], ['predci', 'Předci'], ['potomci', 'Potomci'], ['okoli', 'Nejbližší okolí']].map(function (v) {
+          return '<button class="rk-chip' + (S.view === v[0] ? ' on' : '') + '" data-view="' + v[0] + '">' + v[1] + '</button>'; }).join('') + '</div>';
+    } else if (tab === 'vazby') {
+      var rels = directRelations(p.id);
+      body = '<div class="rk-d-h" style="margin-top:0.4rem">Zapsané vazby</div>' + (rels.map(function (r) {
+        var d = relDesc(r, p.id); if (!d) return '';
+        return '<div class="rk-rel"><span><b>' + esc(d.text) + ':</b> ' + esc(d.other.jmeno) + '</span>' + (CFG.canEdit ? '<button class="rk-x" data-del-rel="' + esc(r.id) + '" title="Smazat vazbu">✕</button>' : '') + '</div>';
+      }).join('') || '<div class="rk-muted">Zatím žádné zapsané vazby.</div>') + (CFG.canEdit ? addRelationHtml(p) : '');
+    } else {
+      var evs = allEvents().filter(function (e) { return e.persons.indexOf(p.id) >= 0; });
+      body = '<div class="rk-d-h" style="margin-top:0.4rem">Historie osoby</div>' + (evs.length ? '<div class="rk-tl rk-tl-sm">' + evs.map(function (e) { return evRow(e, CFG.canEdit); }).join('') + '</div>' : '<div class="rk-muted">Zatím žádné události.</div>') +
+        (CFG.canEdit ? '<button class="rk-btn" style="margin-top:1rem" data-act="add-event">+ Přidat událost k této osobě</button>' : '');
+    }
+    host.innerHTML =
+      '<button class="rk-d-close" data-act="close" title="Zavřít">✕</button>' +
+      '<div class="rk-d-photo">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt=""' + (p.umrti ? ' style="filter:grayscale(1) brightness(.85)"' : '') + '>' : '<div class="rk-d-mono">' + esc(initials(p.jmeno)) + '</div>') + '<div class="rk-d-fade"></div></div>' +
+      '<div class="rk-d-head"><h2 class="rk-d-name">' + esc(p.jmeno) + (p.umrti ? ' <span title="Zesnulý/á">†</span>' : '') + '</h2>' + (sub ? '<div class="rk-d-sub">' + esc(sub) + '</div>' : '') + (p.titul ? '<div class="rk-d-title">' + esc(p.titul) + '</div>' : '') + '</div>' +
+      '<div class="rk-d-tabs">' + [['profil', 'Profil'], ['rodina', 'Rodina'], ['vazby', 'Vazby'], ['historie', 'Historie']].map(function (t) { return '<button class="rk-dt' + (tab === t[0] ? ' on' : '') + '" data-dtab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="rk-d-body">' + body + '</div>';
+    if (tab === 'vazby' && CFG.canEdit) bindAddRelation(p);
+  }
+
+  // ───────────── záložky Historie a Statistiky ─────────────
+  function renderHistoryTab() {
+    var ev = allEvents(), byYear = {}, years = [];
+    ev.forEach(function (e) { var y = e.d.slice(0, 4); if (!byYear[y]) { byYear[y] = []; years.push(y); } byYear[y].push(e); });
+    $('rk-history').innerHTML = (CFG.canEdit ? '<div style="margin-bottom:1.2rem"><button class="rk-btn rk-btn-gold" data-act="add-event">+ Přidat událost</button></div>' : '') +
+      (years.length ? '<div class="rk-tl">' + years.map(function (y) { return '<div class="rk-tl-year">' + y + '</div>' + byYear[y].map(function (e) { return evRow(e, CFG.canEdit); }).join(''); }).join('') + '</div>' : '<div class="rk-empty"><div class="rk-empty-ico">❦</div><div>Zatím žádné události. Doplň datum narození u osob nebo přidej vlastní událost.</div></div>');
+  }
+  function renderStatsTab() {
+    var P = S.persons;
+    if (!P.length) { $('rk-stats').innerHTML = '<div class="rk-empty"><div class="rk-empty-ico">❦</div><div>Statistiky se zobrazí po přidání osob.</div></div>'; return; }
+    var alive = P.filter(function (p) { return !p.umrti; }), dead = P.filter(function (p) { return p.umrti; });
+    var ages = alive.map(function (p) { return { p: p, a: ageOf(p) }; }).filter(function (x) { return x.a != null; });
+    var avg = ages.length ? Math.round(ages.reduce(function (s, x) { return s + x.a; }, 0) / ages.length) : null;
+    ages.sort(function (a, b) { return b.a - a.a; });
+    var lived = dead.map(function (p) { return { p: p, a: ageOf(p) }; }).filter(function (x) { return x.a != null; }).sort(function (a, b) { return b.a - a.a; });
+    var kids = Object.keys(S.full.people).map(function (k) { return { p: S.full.people[k].p, n: S.full.people[k].children.length }; }).sort(function (a, b) { return b.n - a.n; });
+    var m = P.filter(function (p) { return p.pohlavi === 'm'; }).length, z = P.filter(function (p) { return p.pohlavi === 'z'; }).length, u = P.length - m - z;
+    var gens = {}; if (S.fullL) Object.keys(S.fullL.gen).forEach(function (k) { gens[S.fullL.gen[k]] = (gens[S.fullL.gen[k]] || 0) + 1; });
+    var gk = Object.keys(gens).map(Number).sort(function (a, b) { return a - b; }), maxN = Math.max.apply(null, gk.map(function (g) { return gens[g]; }));
+    var ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    function card(l, v, sub) { return '<div class="rk-sc"><div class="rk-sc-l">' + l + '</div><div class="rk-sc-v">' + v + '</div>' + (sub ? '<div class="rk-sc-s">' + sub + '</div>' : '') + '</div>'; }
+    function who(x, extra) { return x ? '<span class="rk-lnk" data-k="' + esc(x.p.id) + '">' + esc(x.p.jmeno) + '</span>' + (extra || '') : '—'; }
+    $('rk-stats').innerHTML = '<div class="rk-sc-grid">' +
+      card('Členů rodiny', P.length, alive.length + ' žije · ' + dead.length + ' zesnulých') +
+      card('Generací', genCount(), 'od nejstarších předků po nejmladší') +
+      card('Vazeb', S.relations.length, S.relations.filter(function (r) { return r.typ === 'partner'; }).length + ' partnerských') +
+      card('Průměrný věk žijících', avg != null ? avg + ' let' : '—', ages.length ? 'z ' + ages.length + ' osob s datem narození' : 'doplň data narození') +
+      card('Nejstarší žijící', ages[0] ? who(ages[0], ' · ' + ages[0].a + ' let') : '—') +
+      card('Nejmladší žijící', ages.length ? who(ages[ages.length - 1], ' · ' + ages[ages.length - 1].a + ' let') : '—') +
+      card('Nejdéle žil/a', lived[0] ? who(lived[0], ' · ' + lived[0].a + ' let') : '—') +
+      card('Nejvíce dětí', kids[0] && kids[0].n ? who(kids[0], ' · ' + kids[0].n) : '—') + '</div>' +
+      '<div class="rk-bottom" style="margin-top:1.2rem"><div class="rk-panel"><h3>Osob podle generací</h3>' + gk.map(function (g) {
+        return '<div class="rk-bar"><span class="rk-bar-l">' + (ROMAN[g] || (g + 1)) + '.</span><div class="rk-bar-t"><div class="rk-bar-f" style="width:' + Math.round(gens[g] / maxN * 100) + '%"></div></div><span class="rk-bar-n">' + gens[g] + '</span></div>'; }).join('') + '</div>' +
+      '<div class="rk-panel"><h3>Pohlaví</h3><div class="rk-split">' + (m ? '<div style="flex:' + m + ';background:#7fb0d6">' + m + '</div>' : '') + (z ? '<div style="flex:' + z + ';background:#d4688a">' + z + '</div>' : '') + (u ? '<div style="flex:' + u + ';background:#8f95a3">' + u + '</div>' : '') + '</div>' +
+      '<div class="rk-split-l"><span><i style="background:#7fb0d6"></i>muži</span><span><i style="background:#d4688a"></i>ženy</span>' + (u ? '<span><i style="background:#8f95a3"></i>neuvedeno</span>' : '') + '</div></div></div>';
+  }
+
+  // ───────────── editor události ─────────────
+  function openEventEditor(ev, presetPerson) {
+    var e = ev || { nazev: '', datum: '', popis: '', osoby: presetPerson ? [presetPerson] : [] };
+    var m = $('rk-modal');
+    m.innerHTML = '<div class="rk-ov"><div class="rk-md" style="max-width:600px"><div class="rk-md-h"><span>' + (ev ? 'Upravit událost' : 'Nová událost') + '</span><button class="rk-x" id="ev-close">✕</button></div><div class="rk-md-b">' +
+      '<div class="form-row"><div class="form-group"><label>Název *</label><input type="text" id="ev-nazev" maxlength="100" placeholder="např. Svatba" value="' + esc(e.nazev) + '"></div><div class="form-group"><label>Datum *</label><input type="date" id="ev-datum" value="' + esc(e.datum) + '"></div></div>' +
+      '<div class="form-group"><label>Popis (nepovinné)</label><textarea id="ev-popis" rows="4" maxlength="600">' + esc(e.popis || '') + '</textarea></div>' +
+      '<div class="form-group"><label>Koho se týká</label><div class="rk-checks">' + S.persons.slice().sort(function (a, b) { return cmpName(a.jmeno, b.jmeno); }).map(function (p) {
+        return '<label class="rk-check"><input type="checkbox" value="' + esc(p.id) + '"' + ((e.osoby || []).indexOf(p.id) >= 0 ? ' checked' : '') + '><span>' + esc(p.jmeno) + '</span></label>'; }).join('') + '</div></div></div>' +
+      '<div class="rk-md-f"><button class="rk-btn" id="ev-cancel">Zrušit</button><button class="rk-btn rk-btn-gold" id="ev-save">' + (ev ? 'Uložit změny' : 'Přidat událost') + '</button></div></div></div>';
+    function close() { m.innerHTML = ''; }
+    $('ev-close').addEventListener('click', close); $('ev-cancel').addEventListener('click', close);
+    $('ev-save').addEventListener('click', function () {
+      var body = { nazev: $('ev-nazev').value.trim(), datum: $('ev-datum').value, popis: $('ev-popis').value.trim(), osoby: [].slice.call(m.querySelectorAll('.rk-check input:checked')).map(function (i) { return i.value; }) };
+      if (!body.nazev) return toast('Vyplň název', true); if (!body.datum) return toast('Vyplň datum', true);
+      api(ev ? 'PUT' : 'POST', ev ? '/api/rodokmen/udalosti/' + ev.id : '/api/rodokmen/udalosti', body).then(function (d) {
+        if (!d.ok) return toast(d.error || 'Chyba', true);
+        toast(ev ? 'Událost uložena' : 'Událost přidána'); close(); reload();
+      }).catch(function () { toast('Uložení se nepodařilo', true); });
+    });
+  }
+
+
+  // ───────────── výběr / záložky / načítání ─────────────
+  var ROMAN_G = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
   function select(id, scroll) {
     S.sel = id || null;
-    if (!S.sel && S.view !== 'full') S.view = 'full';
-    renderTree(); renderDetail();
-    if (S.sel && scroll) setTimeout(function () { focusOn(S.sel); }, 30);
+    if (!S.sel && S.view !== 'full') { S.view = 'full'; $('rk-view').value = 'full'; }
+    renderCanvas(); renderDetail();
+    if (S.sel && scroll) setTimeout(function () { focusOn(S.sel); }, 40);
   }
+  var TABS = ['tree', 'people', 'history', 'stats'];
   function setTab(t) {
     S.tab = t;
-    $('rk-tab-tree').style.display = t === 'tree' ? '' : 'none';
-    $('rk-tab-people').style.display = t === 'people' ? '' : 'none';
-    $('rk-tabbtn-tree').classList.toggle('active', t === 'tree'); $('rk-tabbtn-people').classList.toggle('active', t === 'people');
-    if (t === 'tree') fitScaleSoon(); else renderPeople();
+    TABS.forEach(function (x) { $('rk-tab-' + x).style.display = x === t ? '' : 'none'; $('rk-tabbtn-' + x).classList.toggle('active', x === t); });
+    if (t === 'tree') fitScaleSoon(); else if (t === 'people') renderPeople();
   }
-  function fitScaleSoon() { setTimeout(function () { fitScale(); if (S.sel) focusOn(S.sel); }, 30); }
-
+  function fitScaleSoon() { setTimeout(function () { fitScale(); if (S.sel) focusOn(S.sel); }, 40); }
   function recompute() {
     S.full = buildModel(S.persons, S.relations);
     S.fullL = S.persons.length ? layout(S.full) : null;
+    applyFilters();
+  }
+  function populateGen() {
+    var n = genCount(), html = '<option value="0">Všechny generace</option>';
+    for (var i = 1; i < n; i++) html += '<option value="' + i + '">Generace I–' + (ROMAN_G[i - 1] || i) + '</option>';
+    var sel = $('rk-gen'); sel.innerHTML = html;
+    if (S.genLimit >= n) S.genLimit = 0;
+    sel.value = String(S.genLimit);
   }
   function renderAll() {
-    recompute(); renderStats(); renderTree(); renderDetail(); renderBottom(); renderPeople();
+    recompute(); populateGen(); renderCanvas(); renderDetail(); renderBottom(); renderPeople(); renderHistoryTab(); renderStatsTab();
     var dl = $('rk-names'); if (dl) dl.innerHTML = S.persons.map(function (p) { return '<option value="' + esc(p.jmeno) + '">'; }).join('');
     fitScaleSoon();
   }
   function reload() {
     return fetch('/api/rodokmen', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d.ok) { toast('Rodokmen se nepodařilo načíst', true); return; }
-      S.persons = d.persons || []; S.relations = d.relations || [];
+      S.persons = d.persons || []; S.relations = d.relations || []; S.events = d.events || [];
       if (S.sel && !byId(S.sel)) S.sel = null;
       renderAll();
     }).catch(function () { toast('Rodokmen se nepodařilo načíst', true); });
   }
 
   function init() {
-    // ovládání
     document.addEventListener('click', function (e) {
       var t = e.target, n;
+      if (!t || !t.closest) return;
       if (t.id === 'rk-clear') return select(null);
-      n = t.closest && t.closest('[data-del-rel]');
+      n = t.closest('[data-del-rel]');
       if (n) { if (confirm('Smazat tuto vazbu?')) api('DELETE', '/api/rodokmen/vazby/' + n.getAttribute('data-del-rel')).then(function (d) { if (d.ok) { toast('Vazba smazána'); reload(); } else toast(d.error, true); }); return; }
-      n = t.closest && t.closest('[data-act]');
+      n = t.closest('[data-act]');
       if (n) {
         var a = n.getAttribute('data-act'), p = S.sel && byId(S.sel);
         if (a === 'add') return openEditor(null);
         if (a === 'close') return select(null);
         if (a === 'edit' && p) return openEditor(p);
+        if (a === 'export') return openExport();
+        if (a === 'add-event') return openEventEditor(null, n.closest('#rk-detail') && p ? p.id : null);
+        if (a === 'edit-event') { var ev = S.events.filter(function (x) { return x.id === n.getAttribute('data-id'); })[0]; if (ev) openEventEditor(ev); return; }
+        if (a === 'del-event') { if (confirm('Smazat tuto událost?')) api('DELETE', '/api/rodokmen/udalosti/' + n.getAttribute('data-id')).then(function (d) { if (d.ok) { toast('Událost smazána'); reload(); } else toast(d.error, true); }); return; }
+        if (a === 'map') { setTab('tree'); setMode('map'); return; }
         if (a === 'delete' && p) {
           if (!confirm('Trvale smazat osobu „' + p.jmeno + '“ včetně všech jejích vazeb?')) return;
           api('DELETE', '/api/rodokmen/osoby/' + p.id).then(function (d) { if (d.ok) { toast('Osoba smazána'); S.sel = null; reload(); } else toast(d.error, true); });
           return;
         }
       }
-      n = t.closest && t.closest('[data-view]');
-      if (n) { S.view = n.getAttribute('data-view'); $('rk-view').value = S.view; renderTree(); renderDetail(); fitScaleSoon(); return; }
-      n = t.closest && t.closest('.rk-pc, .rk-kin, .rk-ev, .rk-pair-p');
-      if (n && n.getAttribute('data-k')) { var id = n.getAttribute('data-k'); if (S.tab !== 'tree') setTab('tree'); S.sel = id; renderTree(); renderDetail(); setTimeout(function () { focusOn(id); }, 60); return; }
+      n = t.closest('[data-view]');
+      if (n) { S.view = n.getAttribute('data-view'); $('rk-view').value = S.view; renderCanvas(); renderDetail(); fitScaleSoon(); return; }
+      n = t.closest('[data-dtab]');
+      if (n) { S.dtab = n.getAttribute('data-dtab'); renderDetail(); return; }
+      n = t.closest('[data-tab]');
+      if (n) { setTab(n.getAttribute('data-tab')); return; }
+      n = t.closest('[data-k]');
+      if (n && !t.closest('#rk-svg-host')) {
+        e.preventDefault();
+        var id = n.getAttribute('data-k'); if (!byId(id)) return;
+        if (S.tab !== 'tree') setTab('tree');
+        S.sel = id; renderCanvas(); renderDetail(); setTimeout(function () { focusOn(id); }, 60);
+      }
     });
-    $('rk-tabbtn-tree').addEventListener('click', function () { setTab('tree'); });
-    $('rk-tabbtn-people').addEventListener('click', function () { setTab('people'); });
+    TABS.forEach(function (x) { $('rk-tabbtn-' + x).addEventListener('click', function () { setTab(x); }); });
     $('rk-pq').addEventListener('input', renderPeople);
-    $('rk-threads').addEventListener('change', function () { S.threads = this.checked; renderTree(); fitScaleSoon(); });
+    $('rk-threads').addEventListener('change', function () { S.threads = this.checked; renderCanvas(); fitScaleSoon(); });
+    $('rk-gen').addEventListener('change', function () { S.genLimit = parseInt(this.value) || 0; applyFilters(); renderCanvas(); fitScaleSoon(); });
+    $('rk-status').addEventListener('change', function () { S.status = this.value; applyFilters(); renderCanvas(); fitScaleSoon(); });
     $('rk-view').addEventListener('change', function () {
       S.view = this.value;
       if (S.view !== 'full' && !S.sel) { toast('Nejdřív klikni na osobu, ke které se má pohled vztahovat', true); S.view = 'full'; this.value = 'full'; return; }
-      renderTree(); renderDetail(); fitScaleSoon();
+      renderCanvas(); renderDetail(); fitScaleSoon();
     });
+    function setMode(m) {
+      S.mode = m; $('rk-mode-tree').classList.toggle('on', m === 'tree'); $('rk-mode-map').classList.toggle('on', m === 'map');
+      $('rk-threads-wrap').style.display = m === 'tree' ? '' : 'none';
+      renderCanvas(); fitScaleSoon();
+    }
+    window.rkSetMode = setMode;
+    $('rk-mode-tree').addEventListener('click', function () { setMode('tree'); });
+    $('rk-mode-map').addEventListener('click', function () { setMode('map'); });
     $('rk-search').addEventListener('change', function () {
       var q = this.value.trim().toLowerCase(); if (!q) return;
       var p = S.persons.filter(function (x) { return x.jmeno.toLowerCase() === q; })[0] || S.persons.filter(function (x) { return x.jmeno.toLowerCase().indexOf(q) >= 0; })[0];
       if (!p) return toast('Osoba nenalezena', true);
-      S.view = 'full'; $('rk-view').value = 'full'; S.sel = p.id; renderTree(); renderDetail(); setTimeout(function () { focusOn(p.id); }, 60);
+      if (S.tab !== 'tree') setTab('tree');
+      S.status = 'all'; $('rk-status').value = 'all'; S.genLimit = 0; $('rk-gen').value = '0'; S.view = 'full'; $('rk-view').value = 'full'; applyFilters();
+      S.sel = p.id; renderCanvas(); renderDetail(); setTimeout(function () { focusOn(p.id); }, 60);
     });
     ['in', 'out', 'fit'].forEach(function (a) {
       $('rk-z-' + a).addEventListener('click', function () {
@@ -898,6 +1186,7 @@
       if (!e.ctrlKey) return; e.preventDefault();
       S.scale = Math.max(0.2, Math.min(2.5, S.scale + (e.deltaY < 0 ? 0.1 : -0.1))); applyScale();
     }, { passive: false });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('rk-modal').innerHTML && S.sel) select(null); });
     window.addEventListener('resize', function () { if (S.tab === 'tree') fitScale(); });
     reload();
   }

@@ -1,15 +1,13 @@
 Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahravej.
 
-NOVE:
-  views/rodokmen.js        - stranka /rodokmen
-  public/js/rodokmen.js    - cela logika rodokmenu (strom, detail osoby, editor, fotky)
+ZMENENE / NOVE:
+  public/js/rodokmen.js  - cely rodokmen (strom, mapa vztahu, detail se zalozkami, udalosti, statistiky, export)
+  views/rodokmen.js      - stranka /rodokmen (banner, zalozky, filtry, panely)
+  server.js              - API udalosti (/api/rodokmen/udalosti) + odeslani obrazku na Discord (/api/rodokmen/export-discord)
+  nav.js, views/hierarchy.js, views/home.js, views/informace.js - beze zmeny oproti minule verzi
 
-ZMENENE:
-  server.js                - API rodokmenu (/api/rodokmen...), nahravani fotek, prevzeti starych rodinnych vazeb,
-                             /api/daily-brief, vysilacka jen cislo
-  nav.js                   - polozka "Rodokmen" v menu (Organizace)
-  views/hierarchy.js       - rodokmen odstranen; zustaly jen mentori/spojenci/rivalove + pridat/smazat pozici (Head of ...)
-  views/home.js, views/informace.js - opravy z minula
+DISCORD EXPORT (Railway -> Variables):
+  CHANNEL_RODOKMEN = ID kanalu, kam se ma obrazek posilat (volitelne; jinak se pouzije CHANNEL_FOTOALBUM)
+  Bot musi mit v kanalu pravo psat a posilat soubory. Posilat smi Senior Member a vys.
 
-NA GITHUBU SMAZ (uz se nepouziva):
-  public/js/family-tree.js
+NA GITHUBU SMAZ (pokud tam jeste je): public/js/family-tree.js
