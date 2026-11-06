@@ -1,11 +1,5 @@
+OPRAVA: v menu (nav.js) se vratila polozka "Rodokmen" (v minule verzi chybela, data ani stranka /rodokmen nebyly dotcene).
 Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahravej.
 
-NOVE / ZMENENE:
-  styles.js              - OLIVOVY MOTIV: cervena (oxblood) nahrazena olivovou v tmavem i svetlem rezimu
-  nav.js                 - barva ikonky notifikace a okraj prepinace motivu
-  server.js              - znacka "hrac v Los Santos" u osob, zari loga na /nabor v olive
-  public/js/rodokmen.js  - zelena tecka u hracu, filtr Hraci/Lorove postavy, olivove barvy rodokmenu
-  views/rodokmen.js      - styl tecky, legenda, filtr
-  views/hierarchy.js, views/home.js, views/informace.js - beze zmeny oproti minule verzi
-
-Zmena odstinu: v styles.js hledej --oxblood, --oxblood-bright, --oxblood-glow, --oxblood-faint, --border-oxblood (radky ~63-67 tmavy, ~119-123 svetly).
+Obsahuje kompletni aktualni stav: olivovy motiv (styles.js, nav.js), rodokmen (views/rodokmen.js, public/js/rodokmen.js),
+server.js (rodokmen API, Discord export, znacka hrace) a drive upravene views.
