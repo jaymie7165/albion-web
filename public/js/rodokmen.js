@@ -392,6 +392,8 @@
     S.persons.forEach(function (p) {
       if (S.status === 'alive' && p.umrti) return;
       if (S.status === 'dead' && !p.umrti) return;
+      if (S.status === 'ls' && !p.ls) return;
+      if (S.status === 'lore' && p.ls) return;
       if (S.genLimit && (gen[p.id] || 0) >= S.genLimit) return;
       ids[p.id] = 1;
     });
@@ -432,7 +434,7 @@
     targets.forEach(function (t) { var n = t; while (n != null && prev[n] != null) { set[pkey(n, prev[n])] = 1; n = prev[n]; } });
     return set;
   }
-  var CLR = { rodic: '#d9ad5c', partner: '#d4a95a', stryc: '#d99a63', kmotr: '#e6c75e', znamy: '#8f95a3', sourozenec: '#7fb0d6', nit: '#d6455d' };
+  var CLR = { rodic: '#d9ad5c', partner: '#d4a95a', stryc: '#d99a63', kmotr: '#e6c75e', znamy: '#8f95a3', sourozenec: '#7fb0d6', nit: '#a8c15a' };
   var HL = '#ffe08a';
 
   function drawer(model, L, geo, kin) {
@@ -440,8 +442,8 @@
     var ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
     var defs = '<defs>' +
       '<linearGradient id="' + uid + 'c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f2320"/><stop offset="1" stop-color="#1a1413"/></linearGradient>' +
-      '<linearGradient id="' + uid + 'cs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f2c29"/><stop offset="1" stop-color="#2a1a18"/></linearGradient>' +
-      '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#8a2f3d"/><stop offset="1" stop-color="#4a1520"/></radialGradient>' +
+      '<linearGradient id="' + uid + 'cs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d4a22"/><stop offset="1" stop-color="#1f2810"/></linearGradient>' +
+      '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#6d8034"/><stop offset="1" stop-color="#34421a"/></radialGradient>' +
       '<radialGradient id="' + uid + 'bg" cx="0.5" cy="0.3" r="0.9"><stop offset="0" stop-color="#2a1e1a"/><stop offset="1" stop-color="#0f0b0a"/></radialGradient>' +
       '<filter id="' + uid + 'gl" x="-30%" y="-40%" width="160%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       '<filter id="' + uid + 'gl2" filterUnits="userSpaceOnUse" x="0" y="0" width="' + L.W + '" height="' + L.H + '"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
@@ -482,9 +484,13 @@
       if (el.ring) s += rings(el.ring.x, el.ring.y, hl);
       return s;
     }
+    function lsDot(x, y, p) {
+      if (!p.ls) return '';
+      return '<g><title>Hráč — přestěhováno do Los Santos</title><circle cx="' + x + '" cy="' + y + '" r="9" fill="#35e068" opacity="0.22"/><circle cx="' + x + '" cy="' + y + '" r="6" fill="#35e068" stroke="#0e3a1b" stroke-width="1.4"/><circle cx="' + (x - 1.8) + '" cy="' + (y - 1.9) + '" r="1.7" fill="#fff" opacity="0.65"/></g>';
+    }
     function pin(x, y, on) {
       return '<g pointer-events="none"><ellipse cx="' + (x + 1.5) + '" cy="' + (y + 3) + '" rx="5" ry="2.4" fill="#000" opacity="0.4"/>' +
-        '<circle cx="' + x + '" cy="' + y + '" r="5.4" fill="' + (on ? '#ffe08a' : '#d6455d') + '" stroke="#5b1520" stroke-width="1"/>' +
+        '<circle cx="' + x + '" cy="' + y + '" r="5.4" fill="' + (on ? '#ffe08a' : '#a8c15a') + '" stroke="#2f3d14" stroke-width="1"/>' +
         '<circle cx="' + (x - 1.7) + '" cy="' + (y - 1.8) + '" r="1.6" fill="#fff" opacity="0.7"/></g>';
     }
     function node(k, sel, labels) {
@@ -512,7 +518,7 @@
       return '<g class="rk-node" data-k="' + esc(k) + '" style="cursor:pointer;opacity:' + (dim ? 0.36 : 1) + '"' + (isSel ? ' filter="url(#' + uid + 'gl)"' : '') + '>' +
         '<title>' + esc(p.jmeno) + (p.titul ? ' · ' + esc(p.titul) : '') + (lab ? ' — ' + esc(kinText(lab, p)) : '') + '</title>' +
         '<rect x="' + x0 + '" y="' + ps.top + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="13" filter="url(#' + uid + 'sh)" fill="url(#' + uid + (isSel ? 'cs' : 'c') + ')" stroke="' + (isSel ? '#f0d38a' : '#7a6236') + '" stroke-width="' + (isSel ? 2.4 : 1.3) + '"/>' +
-        photo + name + dateSvg + title + badge + pin(x0 + 16, ps.top + 5, isSel) + '</g>';
+        photo + name + dateSvg + title + badge + pin(x0 + 16, ps.top + 5, isSel) + lsDot(x0 + NODE_W - 17, ps.top + 20, p) + '</g>';
     }
     return function (sel) {
       var labels = {}, hlSet = {}, hasSel = sel && S.full.people[sel];
@@ -576,7 +582,7 @@
   function mapDrawer(model, M, kin) {
     var uid = 'rm' + (++uidN), keys = Object.keys(model.people), R = 30;
     var defs = '<defs><radialGradient id="' + uid + 'bg" cx="0.5" cy="0.5" r="0.8"><stop offset="0" stop-color="#2a1e1a"/><stop offset="1" stop-color="#0f0b0a"/></radialGradient>' +
-      '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#8a2f3d"/><stop offset="1" stop-color="#4a1520"/></radialGradient>' +
+      '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#6d8034"/><stop offset="1" stop-color="#34421a"/></radialGradient>' +
       '<filter id="' + uid + 'gl" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       keys.map(function (k) { var q = M.pos[k]; return '<clipPath id="' + uid + 'c' + k + '"><circle cx="' + q.x + '" cy="' + q.y + '" r="' + (R - 2) + '"/></clipPath>'; }).join('') + '</defs>';
     var edges = mapEdges(model);
@@ -601,6 +607,7 @@
           '<circle cx="' + q.x + '" cy="' + q.y + '" r="' + R + '" fill="url(#' + uid + 'm)" stroke="' + (isSel ? HL : '#c9a35b') + '" stroke-width="' + (isSel ? 3 : 2) + '"/>' +
           (p.foto ? '<image href="' + esc(p.foto) + '" x="' + (q.x - R + 2) + '" y="' + (q.y - R + 2) + '" width="' + (2 * R - 4) + '" height="' + (2 * R - 4) + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'c' + k + ')"' + (p.umrti ? ' style="filter:grayscale(1) brightness(0.85)"' : '') + '/>'
             : '<text x="' + q.x + '" y="' + (q.y + 6) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:17px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>') +
+          (p.ls ? '<g><title>Hráč — přestěhováno do Los Santos</title><circle cx="' + (q.x + R * 0.72) + '" cy="' + (q.y - R * 0.72) + '" r="7" fill="#35e068" stroke="#0e3a1b" stroke-width="1.5"/></g>' : '') +
           '<text x="' + q.x + '" y="' + (q.y + R + 17) + '" text-anchor="middle" style="fill:#f4ebd9;font-family:var(--font-display,Georgia,serif);font-size:12.5px">' + esc(nm) + '</text>' +
           (lab ? '<text x="' + q.x + '" y="' + (q.y + R + 31) + '" text-anchor="middle" style="fill:#e6c97c;font-family:var(--font-mono,monospace);font-size:10px">' + esc(kinText(lab, p)) + '</text>' : '') + '</g>';
       });
@@ -686,6 +693,10 @@
             ctx.fillText('Rodokmen Caledonie', 36 * sc, 42 * sc);
             ctx.fillStyle = '#9a8f78'; ctx.font = Math.round(14 * sc) + 'px monospace';
             ctx.fillText(new Date().toLocaleDateString('cs-CZ') + '  ·  ' + S.persons.length + ' osob', 38 * sc, 72 * sc);
+            if (S.persons.some(function (p) { return p.ls; })) {
+              ctx.fillStyle = '#35e068'; ctx.beginPath(); ctx.arc(c.width - 250 * sc, 56 * sc, 7 * sc, 0, 2 * Math.PI); ctx.fill();
+              ctx.fillStyle = '#b3a78d'; ctx.font = Math.round(14 * sc) + 'px monospace'; ctx.textAlign = 'left'; ctx.fillText('hráč přestěhovaný do Los Santos', c.width - 236 * sc, 57 * sc);
+            }
             ctx.strokeStyle = '#7a6236'; ctx.lineWidth = sc; ctx.beginPath(); ctx.moveTo(0, headerH * sc); ctx.lineTo(c.width, headerH * sc); ctx.stroke();
           }
           ctx.drawImage(img, 0, headerH * sc, c.width, Math.round(H * sc));
@@ -823,7 +834,7 @@
       .sort(function (a, b) { return cmpName(a.jmeno, b.jmeno); });
     $('rk-people-grid').innerHTML = list.length ? list.map(function (p) {
       var age = ageOf(p);
-      return '<div class="rk-pc" data-k="' + esc(p.id) + '"><div class="rk-pc-ph">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt=""' + (p.umrti ? ' style="filter:grayscale(1) brightness(.85)"' : '') + '>' : '<div class="rk-d-mono">' + esc(initials(p.jmeno)) + '</div>') + '</div>' +
+      return '<div class="rk-pc" data-k="' + esc(p.id) + '"><div class="rk-pc-ph">' + (p.ls ? '<span class="rk-ls" title="Hráč — přestěhováno do Los Santos"></span>' : '') + (p.foto ? '<img src="' + esc(p.foto) + '" alt=""' + (p.umrti ? ' style="filter:grayscale(1) brightness(.85)"' : '') + '>' : '<div class="rk-d-mono">' + esc(initials(p.jmeno)) + '</div>') + '</div>' +
         '<div class="rk-pc-b"><div class="rk-pc-n">' + esc(p.jmeno) + (p.umrti ? ' †' : '') + '</div>' + (p.titul ? '<div class="rk-pc-t">' + esc(p.titul) + '</div>' : '') +
         '<div class="rk-pc-d">' + (p.narozeni ? esc(fmtDate(p.narozeni)) + (age != null ? ' · ' + letText(age) : '') : '—') + '</div></div></div>';
     }).join('') : '<div class="rk-muted" style="padding:1rem">Nic nenalezeno.</div>';
@@ -842,7 +853,8 @@
       '<div class="form-group"><label>Pohlaví</label><select id="md-pohlavi"><option value="">Neuvedeno</option><option value="m"' + (p.pohlavi === 'm' ? ' selected' : '') + '>Muž</option><option value="z"' + (p.pohlavi === 'z' ? ' selected' : '') + '>Žena</option></select></div></div>' +
       '<div class="form-row"><div class="form-group"><label>Datum narození</label><input type="date" id="md-nar" value="' + esc(p.narozeni) + '"></div>' +
       '<div class="form-group"><label>Datum úmrtí (nepovinné)</label><input type="date" id="md-umr" value="' + esc(p.umrti) + '"></div></div>' +
-      '<div class="form-group"><label>Propojit s členem webu (IC jméno, nepovinné)</label><input type="text" id="md-clen" list="md-members" maxlength="80" value="' + esc(p.clen) + '"><datalist id="md-members"></datalist></div></div></div>' +
+      '<div class="form-group"><label>Propojit s členem webu (IC jméno, nepovinné)</label><input type="text" id="md-clen" list="md-members" maxlength="80" value="' + esc(p.clen) + '"><datalist id="md-members"></datalist></div>' +
+      '<label class="rk-toggle rk-ls-check"><input type="checkbox" id="md-ls"' + (p.ls ? ' checked' : '') + '><span><b>Přestěhováno do Los Santos</b> — skutečný hráč (zelená tečka u karty). Nezaškrtnuté = lorová postava.</span></label></div></div>' +
       '<div class="form-group" style="margin-top:0.8rem"><label>Představení / lore</label><textarea id="md-lore" rows="6" maxlength="2500" placeholder="Krátký příběh, povaha, role v rodině…">' + esc(p.lore) + '</textarea></div></div>' +
       '<div class="rk-md-f"><button class="rk-btn" id="md-cancel">Zrušit</button><button class="rk-btn rk-btn-gold" id="md-save">' + (person ? 'Uložit změny' : 'Přidat osobu') + '</button></div></div></div>';
     fetch('/api/ic-names').then(function (r) { return r.json(); }).then(function (d) { if (d.ok && $('md-members')) $('md-members').innerHTML = d.names.map(function (n) { return '<option value="' + esc(n) + '">'; }).join(''); }).catch(function () {});
@@ -883,7 +895,7 @@
     function close() { document.removeEventListener('paste', onPaste); m.innerHTML = ''; }
     $('md-close').addEventListener('click', close); $('md-cancel').addEventListener('click', close);
     $('md-save').addEventListener('click', function () {
-      var body = { jmeno: $('md-jmeno').value.trim(), titul: $('md-titul').value.trim(), pohlavi: $('md-pohlavi').value, narozeni: $('md-nar').value, umrti: $('md-umr').value, clen: $('md-clen').value.trim(), lore: $('md-lore').value.trim() };
+      var body = { jmeno: $('md-jmeno').value.trim(), titul: $('md-titul').value.trim(), pohlavi: $('md-pohlavi').value, narozeni: $('md-nar').value, umrti: $('md-umr').value, clen: $('md-clen').value.trim(), ls: $('md-ls').checked, lore: $('md-lore').value.trim() };
       if (!body.jmeno) return toast('Vyplň jméno', true);
       if (photoNew !== undefined) body.foto = photoNew;
       var btn = $('md-save'); btn.disabled = true;
@@ -962,6 +974,7 @@
         (p.titul ? '<div class="rk-d-row"><span>Role</span><b>' + esc(p.titul) + '</b></div>' : '') +
         (p.narozeni ? '<div class="rk-d-row"><span>Narození</span><b>' + esc(fmtDate(p.narozeni)) + '</b></div>' : '') +
         (p.umrti ? '<div class="rk-d-row"><span>Úmrtí</span><b>' + esc(fmtDate(p.umrti)) + '</b></div>' : '') +
+        '<div class="rk-d-row"><span>Typ postavy</span><b>' + (p.ls ? '<span class="rk-dot rk-dot-ls"></span>Hráč (v Los Santos)' : 'Lorová postava') + '</b></div>' +
         '<div class="rk-d-row"><span>Status</span><b>' + (p.umrti ? '<span class="rk-dot rk-dot-dead"></span>Zesnulý/á' : '<span class="rk-dot rk-dot-live"></span>Žije') + '</b></div>' +
         (partners.length ? '<div class="rk-d-row"><span>Partner/ka</span><b>' + partners.map(function (o) { return '<a href="#" data-k="' + esc(o.id) + '" class="rk-lnk">' + esc(o.jmeno) + '</a>'; }).join(', ') + '</b></div>' : '') +
         (p.clen ? '<div class="rk-d-row"><span>Člen webu</span><b>' + (CFG.isStaff ? '<a href="/karta/' + encodeURIComponent(p.clen) + '">' + esc(p.clen) + '</a>' : esc(p.clen)) + '</b></div>' : '') +
@@ -991,7 +1004,7 @@
     host.innerHTML =
       '<button class="rk-d-close" data-act="close" title="Zavřít">✕</button>' +
       '<div class="rk-d-photo">' + (p.foto ? '<img src="' + esc(p.foto) + '" alt=""' + (p.umrti ? ' style="filter:grayscale(1) brightness(.85)"' : '') + '>' : '<div class="rk-d-mono">' + esc(initials(p.jmeno)) + '</div>') + '<div class="rk-d-fade"></div></div>' +
-      '<div class="rk-d-head"><h2 class="rk-d-name">' + esc(p.jmeno) + (p.umrti ? ' <span title="Zesnulý/á">†</span>' : '') + '</h2>' + (sub ? '<div class="rk-d-sub">' + esc(sub) + '</div>' : '') + (p.titul ? '<div class="rk-d-title">' + esc(p.titul) + '</div>' : '') + '</div>' +
+      '<div class="rk-d-head"><h2 class="rk-d-name">' + esc(p.jmeno) + (p.umrti ? ' <span title="Zesnulý/á">†</span>' : '') + (p.ls ? ' <span class="rk-ls rk-ls-inline" title="Hráč — přestěhováno do Los Santos"></span>' : '') + '</h2>' + (sub ? '<div class="rk-d-sub">' + esc(sub) + '</div>' : '') + (p.titul ? '<div class="rk-d-title">' + esc(p.titul) + '</div>' : '') + '</div>' +
       '<div class="rk-d-tabs">' + [['profil', 'Profil'], ['rodina', 'Rodina'], ['vazby', 'Vazby'], ['historie', 'Historie']].map(function (t) { return '<button class="rk-dt' + (tab === t[0] ? ' on' : '') + '" data-dtab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div class="rk-d-body">' + body + '</div>';
     if (tab === 'vazby' && CFG.canEdit) bindAddRelation(p);
@@ -1021,6 +1034,7 @@
     function who(x, extra) { return x ? '<span class="rk-lnk" data-k="' + esc(x.p.id) + '">' + esc(x.p.jmeno) + '</span>' + (extra || '') : '—'; }
     $('rk-stats').innerHTML = '<div class="rk-sc-grid">' +
       card('Členů rodiny', P.length, alive.length + ' žije · ' + dead.length + ' zesnulých') +
+      card('Hráčů v Los Santos', P.filter(function (p) { return p.ls; }).length, 'zbytek jsou lorové postavy') +
       card('Generací', genCount(), 'od nejstarších předků po nejmladší') +
       card('Vazeb', S.relations.length, S.relations.filter(function (r) { return r.typ === 'partner'; }).length + ' partnerských') +
       card('Průměrný věk žijících', avg != null ? avg + ' let' : '—', ages.length ? 'z ' + ages.length + ' osob s datem narození' : 'doplň data narození') +

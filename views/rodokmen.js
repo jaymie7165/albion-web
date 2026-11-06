@@ -17,7 +17,7 @@ function renderRodokmen(req) {
   <title>Caledonia — Rodokmen</title>
   ${baseStyles()}
 <style>
-    .rk-hero{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;padding:2rem 2rem 1.6rem;margin-bottom:1.3rem;border:1px solid var(--border-brass,#7a6236);border-radius:12px;background:radial-gradient(ellipse at 20% 0%,rgba(122,98,54,.28),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(110,20,35,.35),transparent 55%),linear-gradient(135deg,#1d1513,#0f0b0a)}
+    .rk-hero{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;padding:2rem 2rem 1.6rem;margin-bottom:1.3rem;border:1px solid var(--border-brass,#7a6236);border-radius:12px;background:radial-gradient(ellipse at 20% 0%,rgba(122,98,54,.28),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(86,104,43,.38),transparent 55%),linear-gradient(135deg,#1d1513,#0f0b0a)}
     .rk-hero::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 46px,rgba(201,163,91,.035) 46px 47px);pointer-events:none}
     .rk-hero h1{font-family:var(--font-display,Georgia,serif);font-size:3rem;font-weight:500;color:#f4ebd9;margin:0;line-height:1}
     .rk-slogan{font-family:var(--font-display,Georgia,serif);font-style:italic;font-size:1.15rem;color:#c9a35b;margin-top:0.5rem}
@@ -40,7 +40,7 @@ function renderRodokmen(req) {
     .rk-zbtn:hover{background:rgba(201,163,91,.2)}
     .rk-info{font-family:var(--font-mono,monospace);font-size:0.74rem;color:var(--ivory-dim,#bfb5a0);margin:0 0 0.7rem;padding:0.55rem 0.8rem;border-left:2px solid #c9a35b;background:rgba(201,163,91,.07)}
     .rk-info b{color:#e6c97c}
-    .rk-info button{background:none;border:none;color:#e0627a;cursor:pointer;font:inherit;text-decoration:underline;margin-left:0.5rem}
+    .rk-info button{background:none;border:none;color:#b7c96b;cursor:pointer;font:inherit;text-decoration:underline;margin-left:0.5rem}
     .rk-scroll{overflow:auto;max-height:78vh;min-height:340px;border:1px solid rgba(122,98,54,.45);border-radius:8px;cursor:grab}
     .rk-scroll.rk-drag{cursor:grabbing;user-select:none}
     .rk-scroll svg{display:block;user-select:none}
@@ -54,7 +54,7 @@ function renderRodokmen(req) {
     .rk-d-photo{position:relative;height:270px;background:#120d0c;overflow:hidden}
     .rk-d-photo img{width:100%;height:100%;object-fit:cover;object-position:top}
     .rk-d-fade{position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(180deg,transparent,#1b1412)}
-    .rk-d-mono{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display,Georgia,serif);font-size:4rem;color:#f1e8d6;background:radial-gradient(circle at 35% 30%,#8a2f3d,#4a1520)}
+    .rk-d-mono{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display,Georgia,serif);font-size:4rem;color:#f1e8d6;background:radial-gradient(circle at 35% 30%,#6d8034,#34421a)}
     .rk-d-head{padding:0 1.3rem;margin-top:-2.6rem;position:relative}
     .rk-d-name{font-family:var(--font-display,Georgia,serif);font-size:1.65rem;line-height:1.15;color:#f4ebd9;margin:0 0 0.3rem}
     .rk-d-sub{font-family:var(--font-mono,monospace);font-size:0.76rem;color:#b3a78d;margin-bottom:0.5rem}
@@ -75,7 +75,7 @@ function renderRodokmen(req) {
     .rk-kin{display:flex;gap:0.7rem;align-items:center;padding:0.4rem 0.5rem;border-radius:8px;cursor:pointer}
     .rk-kin:hover,.rk-pair-p:hover{background:rgba(201,163,91,.1)}
     .rk-kin-av,.rk-ev-av{width:38px;height:38px;border-radius:9px;object-fit:cover;border:1px solid #7a6236;flex:none}
-    .rk-mono{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#8a2f3d,#4a1520);color:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:0.9rem}
+    .rk-mono{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#6d8034,#34421a);color:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:0.9rem}
     .rk-kin-l{font-family:var(--font-mono,monospace);font-size:0.62rem;color:#c9a35b;text-transform:uppercase;letter-spacing:0.06em}
     .rk-kin-n{font-family:var(--font-display,Georgia,serif);font-size:0.98rem;color:#f4ebd9}
     .rk-views{display:flex;flex-wrap:wrap;gap:0.4rem}
@@ -150,6 +150,12 @@ function renderRodokmen(req) {
     .rk-pc-n{font-family:var(--font-display,Georgia,serif);font-size:1.05rem;color:#f4ebd9}
     .rk-pc-t{font-family:var(--font-mono,monospace);font-size:0.68rem;color:#e6c97c;margin-top:0.2rem}
     .rk-pc-d{font-family:var(--font-mono,monospace);font-size:0.68rem;color:var(--ivory-faint,#8a8070);margin-top:0.35rem}
+    .rk-ls{position:absolute;top:10px;right:10px;width:15px;height:15px;border-radius:50%;background:#35e068;border:2px solid #0e3a1b;box-shadow:0 0 0 3px rgba(53,224,104,.25),0 0 10px #35e068;z-index:2}
+    .rk-ls-inline{position:static;display:inline-block;width:12px;height:12px;vertical-align:middle;margin-left:0.3rem}
+    .rk-pc-ph{position:relative}
+    .rk-dot-ls{background:#35e068;box-shadow:0 0 6px #35e068}
+    .rk-ls-check{display:flex;align-items:flex-start;gap:0.6rem;margin-top:0.4rem;line-height:1.5;color:var(--ivory-dim,#bfb5a0)}
+    .rk-ls-check input{margin-top:0.2rem}
     .rk-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:4vh 1rem;overflow:auto}
     .rk-md{background:linear-gradient(180deg,#221a17,#151010);border:1px solid #a8843f;border-radius:12px;width:100%;max-width:760px;box-shadow:0 20px 60px rgba(0,0,0,.7)}
     .rk-md-h{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.3rem;border-bottom:1px solid rgba(255,255,255,.08);font-family:var(--font-display,Georgia,serif);font-size:1.3rem;color:#f4ebd9}
@@ -202,7 +208,7 @@ function renderRodokmen(req) {
           <option value="potomci">Potomci vybrané osoby</option>
           <option value="okoli">Nejbližší okolí vybrané osoby</option>
         </select>
-        <select id="rk-status"><option value="all">Všichni členové</option><option value="alive">Jen žijící</option><option value="dead">Jen zesnulí</option></select>
+        <select id="rk-status"><option value="all">Všichni členové</option><option value="alive">Jen žijící</option><option value="dead">Jen zesnulí</option><option value="ls">Jen hráči (Los Santos)</option><option value="lore">Jen lorové postavy</option></select>
         <label class="rk-toggle" id="rk-threads-wrap"><input type="checkbox" id="rk-threads" checked><span>Červené nitě</span></label>
         <div class="rk-seg"><button type="button" id="rk-mode-tree" class="on">Strom</button><button type="button" id="rk-mode-map">Mapa vztahů</button></div>
       </div>
@@ -222,7 +228,8 @@ function renderRodokmen(req) {
             <span><i style="border-top:3px dashed #d99a63"></i>Strýc / teta</span>
             <span><i style="border-top:3px dotted #e6c75e"></i>Kmotr</span>
             <span><i style="border-top:3px dotted #8f95a3"></i>Rodinný známý</span>
-            <span><i style="border-top:3px solid #d6455d"></i>Červená nit (strýc, bratranec, švagr…)</span>
+            <span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#35e068;border:1px solid #0e3a1b"></i>Hráč (přestěhován do Los Santos)</span>
+            <span><i style="border-top:3px solid #a8c15a"></i>Nit (strýc, bratranec, švagr…)</span>
           </div>
         </div>
         <aside class="rk-detail" id="rk-detail"></aside>

@@ -60,10 +60,10 @@ function baseStyles() {
         --panel2:#28212D;
         --panel3:#312936;
         --panel4:#3B323F;
-        --oxblood:#6B2032;
-        --oxblood-bright:#DE5068;
-        --oxblood-glow:rgba(222,80,104,0.30);
-        --oxblood-faint:rgba(222,80,104,0.12);
+        --oxblood:#56682B;
+        --oxblood-bright:#B7C96B;
+        --oxblood-glow:rgba(183,201,107,0.28);
+        --oxblood-faint:rgba(183,201,107,0.12);
         --brass:#B9975E;
         --brass-bright:#E8C083;
         --brass-dim:rgba(232,192,131,0.22);
@@ -77,7 +77,7 @@ function baseStyles() {
         --border:rgba(232,192,131,0.13);
         --border-hover:rgba(232,192,131,0.30);
         --border-brass:rgba(232,192,131,0.24);
-        --border-oxblood:rgba(222,80,104,0.40);
+        --border-oxblood:rgba(183,201,107,0.38);
         --input-bg:rgba(20,17,23,0.72);
         --shadow:0 24px 64px rgba(10,7,13,0.5);
         --shadow-card:0 6px 26px rgba(10,7,13,0.32);
@@ -95,7 +95,7 @@ function baseStyles() {
         --ink:var(--noir);--ink-soft:var(--panel);--leather:var(--panel);
         --leather2:var(--panel2);--leather3:var(--panel3);--leather4:var(--panel4);
         --seal:var(--oxblood);--seal-bright:var(--oxblood-bright);--seal-glow:var(--oxblood-glow);
-        --seal-deep:#3A0F18;--blood:var(--oxblood-bright);--blood-glow:var(--oxblood-glow);
+        --seal-deep:#1F2A0E;--blood:var(--oxblood-bright);--blood-glow:var(--oxblood-glow);
         --vellum:var(--ivory);--vellum-bright:var(--ivory);--text:var(--ivory);
         --text-dim:var(--ivory-dim);--text-muted:var(--ivory-faint);--text-label:var(--ivory-faint);
         --gold-dim:var(--brass-faint);--true-gold:var(--brass);--silver:var(--ivory-dim);
@@ -116,10 +116,10 @@ function baseStyles() {
         --panel2:#E2D9C8;
         --panel3:#D8CCB6;
         --panel4:#CBBC9F;
-        --oxblood:#6E1424;
-        --oxblood-bright:#8E1A2C;
-        --oxblood-glow:rgba(142,26,44,0.14);
-        --oxblood-faint:rgba(142,26,44,0.07);
+        --oxblood:#5C6E26;
+        --oxblood-bright:#566A1E;
+        --oxblood-glow:rgba(86,106,30,0.16);
+        --oxblood-faint:rgba(86,106,30,0.08);
         --brass:#7A5F2E;
         --brass-bright:#5B4520;
         --brass-dim:rgba(122,95,46,0.22);
@@ -132,7 +132,7 @@ function baseStyles() {
         --border:rgba(122,95,46,0.18);
         --border-hover:rgba(122,95,46,0.34);
         --border-brass:rgba(122,95,46,0.28);
-        --border-oxblood:rgba(142,26,44,0.26);
+        --border-oxblood:rgba(86,106,30,0.30);
         --input-bg:rgba(255,252,246,0.9);
         --shadow:0 8px 32px rgba(30,20,10,0.12);
         --shadow-card:0 2px 12px rgba(30,20,10,0.08);
@@ -140,7 +140,7 @@ function baseStyles() {
       }
       body.light::before{
         background:radial-gradient(ellipse 70% 50% at 50% 0%, rgba(122,95,46,0.05), transparent 60%),
-          radial-gradient(ellipse 60% 60% at 100% 100%, rgba(142,26,44,0.04), transparent 60%);
+          radial-gradient(ellipse 60% 60% at 100% 100%, rgba(86,106,30,0.05), transparent 60%);
       }
       body.light::after{box-shadow:inset 0 0 16vw rgba(30,20,10,0.04)}
       body.light .app-topbar{background:rgba(234,227,214,0.96)}
@@ -160,7 +160,7 @@ function baseStyles() {
       body::before{
         content:'';position:fixed;inset:-10%;z-index:0;pointer-events:none;
         background:radial-gradient(ellipse 50% 38% at 30% 8%, rgba(203,164,92,0.035), transparent 60%),
-          radial-gradient(ellipse 46% 46% at 92% 92%, rgba(179,23,47,0.05), transparent 55%);
+          radial-gradient(ellipse 46% 46% at 92% 92%, rgba(140,165,60,0.06), transparent 55%);
         background-size:140% 140%;
       }
       body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;box-shadow:inset 0 0 16vw rgba(0,0,0,0.7)}

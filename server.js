@@ -801,7 +801,8 @@ function readRodokmenPerson(body) {
   if (clen === null) return { error: 'Propojené jméno je příliš dlouhé' };
   if (lore === null) return { error: 'Představení je příliš dlouhé (max 2500 znaků)' };
   if (narozeni === null || umrti === null) return { error: 'Neplatné datum' };
-  return { value: { jmeno, titul, pohlavi, narozeni, umrti, lore, clen } };
+  const ls = body.ls === true || body.ls === 'true' || body.ls === 1;
+  return { value: { jmeno, titul, pohlavi, narozeni, umrti, lore, clen, ls } };
 }
 
 app.post('/api/rodokmen/osoby', requireAuth, requireRodokmenEdit, (req, res) => {
@@ -3527,7 +3528,7 @@ app.get('/nabor', (req, res) => {
   ${require('./styles').baseStyles()}
   </head><body>
   <main style="text-align:center;padding-top:5rem">
-    <img src="/logo.png" style="width:140px;margin-bottom:2rem;filter:drop-shadow(0 0 30px rgba(110,20,35,0.6))">
+    <img src="/logo.png" style="width:140px;margin-bottom:2rem;filter:drop-shadow(0 0 30px rgba(110,140,45,0.55))">
     <h1 class="page-title" style="font-size:3.5rem">ALBION</h1>
     <p class="page-sub" style="max-width:560px;margin:1rem auto 3rem">Organizace postavená na ambicích, loajalitě a důvěře. Nehledáme hlasité — hledáme schopné.</p>
     <div class="folio-footnote" style="text-align:left;max-width:600px;margin:0 auto 2rem">

@@ -27,7 +27,6 @@ const ICONS = {
   blackbook: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3Z"/></svg>',
   profit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17l6-6 4 4 8-8"/></svg>',
   nastenska: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>',
-  rodokmen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="4.5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><path d="M12 6.5V11M12 11H6v6M12 11h6v6"/></svg>',
   informace: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
   denik: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4h9a3 3 0 0 1 3 3v13H8a2 2 0 0 1-2-2z"/><path d="M6 18a2 2 0 0 1 2-2h10"/></svg>',
   mentoring: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="7" r="3"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>',
@@ -88,7 +87,6 @@ function renderNav(req, active) {
         can('nastenska') && { id: 'nastenska', label: 'Nástěnka', href: '/nastenska', icon: ICONS.nastenska },
         can('informace') && { id: 'informace', label: 'Informace', href: '/informace', icon: ICONS.informace },
         { id: 'hierarchy', label: 'Hierarchie', href: '/hierarchy', icon: ICONS.hierarchy },
-        { id: 'rodokmen', label: 'Rodokmen', href: '/rodokmen', icon: ICONS.rodokmen },
         { id: 'navigator', label: 'Rozcestník', href: '/prehled', icon: ICONS.navigator },
       ].filter(Boolean),
     },
@@ -194,7 +192,7 @@ function renderNav(req, active) {
         </div>` : ''}
         <div class="theme-switcher" title="Přepnout téma">
           <button class="theme-dot-btn" id="td-dark" style="background:#07050A;border:1.5px solid #CBA45C" onclick="setTheme('dark')" title="Tmavý"></button>
-          <button class="theme-dot-btn" id="td-light" style="background:#F3EFE7;border:1.5px solid #6E1424" onclick="setTheme('light')" title="Světlý"></button>
+          <button class="theme-dot-btn" id="td-light" style="background:#F3EFE7;border:1.5px solid #55672a" onclick="setTheme('light')" title="Světlý"></button>
         </div>
         <span class="nav-user">${escapeHtml(ic)}</span>
       </div>
@@ -419,7 +417,7 @@ function renderNav(req, active) {
           img.onload = () => {
             ctx.drawImage(img, 0, 0, size, size);
             if (unread > 0) {
-              ctx.beginPath(); ctx.fillStyle = '#B3172F'; ctx.arc(size-14, 14, 14, 0, 2*Math.PI); ctx.fill();
+              ctx.beginPath(); ctx.fillStyle = '#8fa63a'; ctx.arc(size-14, 14, 14, 0, 2*Math.PI); ctx.fill();
               ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
               ctx.fillText(unread > 9 ? '9+' : String(unread), size-14, 15);
             }

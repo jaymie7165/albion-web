@@ -1,13 +1,11 @@
 Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahravej.
 
-ZMENENE / NOVE:
-  public/js/rodokmen.js  - cely rodokmen (strom, mapa vztahu, detail se zalozkami, udalosti, statistiky, export)
-  views/rodokmen.js      - stranka /rodokmen (banner, zalozky, filtry, panely)
-  server.js              - API udalosti (/api/rodokmen/udalosti) + odeslani obrazku na Discord (/api/rodokmen/export-discord)
-  nav.js, views/hierarchy.js, views/home.js, views/informace.js - beze zmeny oproti minule verzi
+NOVE / ZMENENE:
+  styles.js              - OLIVOVY MOTIV: cervena (oxblood) nahrazena olivovou v tmavem i svetlem rezimu
+  nav.js                 - barva ikonky notifikace a okraj prepinace motivu
+  server.js              - znacka "hrac v Los Santos" u osob, zari loga na /nabor v olive
+  public/js/rodokmen.js  - zelena tecka u hracu, filtr Hraci/Lorove postavy, olivove barvy rodokmenu
+  views/rodokmen.js      - styl tecky, legenda, filtr
+  views/hierarchy.js, views/home.js, views/informace.js - beze zmeny oproti minule verzi
 
-DISCORD EXPORT (Railway -> Variables):
-  CHANNEL_RODOKMEN = ID kanalu, kam se ma obrazek posilat (volitelne; jinak se pouzije CHANNEL_FOTOALBUM)
-  Bot musi mit v kanalu pravo psat a posilat soubory. Posilat smi Senior Member a vys.
-
-NA GITHUBU SMAZ (pokud tam jeste je): public/js/family-tree.js
+Zmena odstinu: v styles.js hledej --oxblood, --oxblood-bright, --oxblood-glow, --oxblood-faint, --border-oxblood (radky ~63-67 tmavy, ~119-123 svetly).
