@@ -37,7 +37,7 @@ function renderHierarchy(req) {
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Caledonia</div>
+        <div class="page-label">Caledonia · VassClair</div>
         <h1 class="page-title">Hierarchie</h1>
         <p class="page-sub">Struktura a řád organizace</p>
       </div>

@@ -17,24 +17,24 @@ function renderRodokmen(req) {
   <title>Caledonia — Rodokmen</title>
   ${baseStyles()}
 <style>
-    .rk-hero{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;padding:2rem 2rem 1.6rem;margin-bottom:1.3rem;border:1px solid var(--border-brass,#7a6236);border-radius:12px;background:radial-gradient(ellipse at 20% 0%,rgba(122,98,54,.28),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(86,104,43,.38),transparent 55%),linear-gradient(135deg,#1d1513,#0f0b0a)}
-    .rk-hero::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 46px,rgba(201,163,91,.035) 46px 47px);pointer-events:none}
+    .rk-hero{position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;padding:2rem 2rem 1.6rem;margin-bottom:1.3rem;border:1px solid var(--border-brass,#7a6236);border-radius:12px;background:radial-gradient(ellipse at 20% 0%,rgba(122,98,54,.28),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(86,104,43,.38),transparent 55%),linear-gradient(135deg,#1a1d13,#0d0f0a)}
+    .rk-hero::after{content:"";position:absolute;right:2%;top:50%;width:230px;height:230px;transform:translateY(-50%);background:url('/seal.png') center/contain no-repeat;opacity:.22;pointer-events:none}
     .rk-hero h1{font-family:var(--font-display,Georgia,serif);font-size:3rem;font-weight:500;color:#f4ebd9;margin:0;line-height:1}
     .rk-slogan{font-family:var(--font-display,Georgia,serif);font-style:italic;font-size:1.15rem;color:#c9a35b;margin-top:0.5rem}
     .rk-hero-r{display:flex;gap:0.6rem;align-items:center;position:relative;z-index:1;flex-wrap:wrap}
     .rk-tabs{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:1.1rem}
-    .rk-tab{background:linear-gradient(180deg,#201816,#151010);border:1px solid #4a3c22;color:var(--ivory-dim,#bfb5a0);padding:0.65rem 1.2rem;border-radius:8px;cursor:pointer;font-family:var(--font-display,Georgia,serif);font-size:0.98rem}
+    .rk-tab{background:linear-gradient(180deg,#1d2016,#131510);border:1px solid #3e4a22;color:var(--ivory-dim,#bfb5a0);padding:0.65rem 1.2rem;border-radius:8px;cursor:pointer;font-family:var(--font-display,Georgia,serif);font-size:0.98rem}
     .rk-tab:hover{border-color:#a8843f;color:#e6c97c}
-    .rk-tab.active{border-color:#d4a95a;color:#f0d38a;background:linear-gradient(180deg,#3a2a1c,#1d1512);box-shadow:0 0 18px rgba(212,169,90,.18)}
+    .rk-tab.active{border-color:#d4a95a;color:#f0d38a;background:linear-gradient(180deg,#313a1c,#1a1d12);box-shadow:0 0 18px rgba(212,169,90,.18)}
     .rk-toolbar{display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.9rem}
     .rk-toolbar input,.rk-toolbar select{width:auto;min-width:170px}
     .rk-seg{display:inline-flex;margin-left:auto;border:1px solid #7a6236;border-radius:8px;overflow:hidden}
     .rk-seg button{background:transparent;border:none;color:var(--ivory-dim,#bfb5a0);padding:0.55rem 1rem;cursor:pointer;font-family:var(--font-display,Georgia,serif);font-size:0.9rem}
-    .rk-seg button.on{background:linear-gradient(180deg,#d4a95a,#a8843f);color:#1a1413;font-weight:700}
+    .rk-seg button.on{background:linear-gradient(180deg,#d4a95a,#a8843f);color:#181a13;font-weight:700}
     .rk-toggle{display:inline-flex;align-items:center;gap:0.5rem;font-family:var(--font-mono,monospace);font-size:0.72rem;color:var(--ivory-dim,#bfb5a0);cursor:pointer}
     .rk-toggle input{width:auto;min-width:0}
     .rk-layout{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:1.2rem;align-items:start}
-    .rk-canvas{position:relative;background:linear-gradient(180deg,#1b1413,#120d0c);border:1px solid var(--border-brass,#7a6236);border-radius:12px;padding:0.8rem;box-shadow:0 10px 34px rgba(0,0,0,.4);min-width:0}
+    .rk-canvas{position:relative;background:linear-gradient(180deg,#191b13,#10120c);border:1px solid var(--border-brass,#7a6236);border-radius:12px;padding:0.8rem;box-shadow:0 10px 34px rgba(0,0,0,.4);min-width:0}
     .rk-zoom{position:absolute;left:1.5rem;top:4.2rem;z-index:5;display:flex;flex-direction:column;gap:0.4rem}
     .rk-zbtn{background:rgba(20,15,13,.92);border:1px solid #7a6236;color:#e6c97c;width:36px;height:36px;cursor:pointer;font-size:1.15rem;border-radius:8px}
     .rk-zbtn:hover{background:rgba(201,163,91,.2)}
@@ -49,11 +49,11 @@ function renderRodokmen(req) {
     .rk-empty,.rk-d-empty{padding:3rem 1.5rem;text-align:center;color:var(--ivory-dim,#bfb5a0);font-family:var(--font-mono,monospace);font-size:0.82rem;line-height:1.7}
     .rk-empty-ico{font-size:2.4rem;color:#7a6236;margin-bottom:0.6rem}
     .rk-empty-t{font-family:var(--font-display,Georgia,serif);font-size:1.3rem;color:#e6c97c;margin-bottom:0.5rem}
-    .rk-detail{position:sticky;top:calc(var(--nav-h,0px) + 1rem);background:linear-gradient(180deg,#1f1715,#141010);border:1px solid var(--border-brass,#7a6236);border-radius:12px;max-height:calc(100vh - 2rem);overflow:auto;box-shadow:0 10px 34px rgba(0,0,0,.4)}
+    .rk-detail{position:sticky;top:calc(var(--nav-h,0px) + 1rem);background:linear-gradient(180deg,#1c1f15,#131410);border:1px solid var(--border-brass,#7a6236);border-radius:12px;max-height:calc(100vh - 2rem);overflow:auto;box-shadow:0 10px 34px rgba(0,0,0,.4)}
     .rk-d-close{position:absolute;right:0.7rem;top:0.7rem;z-index:3;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);color:#fff;cursor:pointer}
-    .rk-d-photo{position:relative;height:270px;background:#120d0c;overflow:hidden}
+    .rk-d-photo{position:relative;height:270px;background:#10120c;overflow:hidden}
     .rk-d-photo img{width:100%;height:100%;object-fit:cover;object-position:top}
-    .rk-d-fade{position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(180deg,transparent,#1b1412)}
+    .rk-d-fade{position:absolute;inset:auto 0 0 0;height:120px;background:linear-gradient(180deg,transparent,#181b12)}
     .rk-d-mono{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--font-display,Georgia,serif);font-size:4rem;color:#f1e8d6;background:radial-gradient(circle at 35% 30%,#6d8034,#34421a)}
     .rk-d-head{padding:0 1.3rem;margin-top:-2.6rem;position:relative}
     .rk-d-name{font-family:var(--font-display,Georgia,serif);font-size:1.65rem;line-height:1.15;color:#f4ebd9;margin:0 0 0.3rem}
@@ -89,7 +89,7 @@ function renderRodokmen(req) {
     .rk-btn{background:transparent;border:1px solid #7a6236;color:var(--ivory-dim,#bfb5a0);padding:0.6rem 1rem;font-family:var(--font-label,sans-serif);font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;border-radius:6px}
     .rk-btn:hover:not(:disabled){background:rgba(201,163,91,.12)}
     .rk-btn:disabled{opacity:.45;cursor:default}
-    .rk-btn-gold{background:linear-gradient(180deg,#d4a95a,#a8843f);border-color:#d4a95a;color:#1a1413;font-weight:700}
+    .rk-btn-gold{background:linear-gradient(180deg,#d4a95a,#a8843f);border-color:#d4a95a;color:#181a13;font-weight:700}
     .rk-btn-gold:hover:not(:disabled){background:linear-gradient(180deg,#e6c97c,#b8934a)}
     .rk-btn-red{border-color:var(--border-oxblood,#6a2530);color:var(--oxblood-bright,#d4586a)}
     .rk-d-actions{display:flex;gap:0.6rem;margin-top:1.4rem}
@@ -97,7 +97,7 @@ function renderRodokmen(req) {
     .rk-link{background:none;border:none;color:#e6c97c;cursor:pointer;font-family:var(--font-mono,monospace);font-size:0.72rem;text-decoration:underline;margin-top:0.6rem;padding:0}
     .rk-bottom{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem;margin-top:1.4rem}
     .rk-bottom4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1.2rem;margin-top:1.4rem}
-    .rk-panel{background:linear-gradient(180deg,#1f1715,#141010);border:1px solid var(--border-brass,#7a6236);border-radius:12px;padding:1.1rem 1.3rem}
+    .rk-panel{background:linear-gradient(180deg,#1c1f15,#131410);border:1px solid var(--border-brass,#7a6236);border-radius:12px;padding:1.1rem 1.3rem}
     .rk-panel h3{font-family:var(--font-display,Georgia,serif);font-size:1.15rem;color:#f4ebd9;margin:0 0 0.9rem;font-weight:500}
     .rk-mini-tl{display:grid;gap:0.55rem;border-left:1px solid #5a4a2b;margin-left:0.3rem;padding-left:0.9rem}
     .rk-mtl-i{position:relative;display:flex;flex-direction:column;font-size:0.82rem}
@@ -109,17 +109,17 @@ function renderRodokmen(req) {
     .rk-sig-d{font-family:var(--font-mono,monospace);font-size:0.7rem;color:#c9a35b;margin:0.2rem 0 0.5rem}
     .rk-sig-x{font-size:0.84rem;line-height:1.6;color:var(--ivory-dim,#bfb5a0)}
     .rk-sgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:0.8rem}
-    .rk-sg{text-align:center;padding:0.7rem 0.3rem;border:1px solid #3d321d;border-radius:10px;background:rgba(0,0,0,.18)}
+    .rk-sg{text-align:center;padding:0.7rem 0.3rem;border:1px solid #333d1d;border-radius:10px;background:rgba(0,0,0,.18)}
     .rk-sg-n{font-family:var(--font-display,Georgia,serif);font-size:1.8rem;color:#e6c97c;line-height:1}
     .rk-sg-l{font-family:var(--font-label,sans-serif);font-size:0.54rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ivory-faint,#8a8070);margin-top:0.35rem}
-    .rk-mini-map{cursor:pointer;border-radius:8px;background:#120d0c;border:1px solid #3d321d}
+    .rk-mini-map{cursor:pointer;border-radius:8px;background:#10120c;border:1px solid #333d1d}
     .rk-muted{color:var(--ivory-faint,#8a8070);font-family:var(--font-mono,monospace);font-size:0.78rem;line-height:1.6}
     .rk-tl{position:relative;display:grid;gap:0.9rem;max-width:760px}
     .rk-tl-year{font-family:var(--font-display,Georgia,serif);font-size:1.5rem;color:#e6c97c;margin-top:0.8rem}
     .rk-tl-item{display:flex;gap:0.9rem;align-items:flex-start}
-    .rk-tl-dot{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.95rem;border:1px solid #a8843f;background:#1a1413;color:#e6c97c}
+    .rk-tl-dot{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.95rem;border:1px solid #a8843f;background:#181a13;color:#e6c97c}
     .rk-tl-death{color:#9aa0ac;border-color:#6b7280}.rk-tl-event{color:#ffe08a;background:rgba(212,169,90,.18)}
-    .rk-tl-card{flex:1;border:1px solid #3d321d;border-radius:10px;padding:0.7rem 1rem;background:rgba(0,0,0,.18)}
+    .rk-tl-card{flex:1;border:1px solid #333d1d;border-radius:10px;padding:0.7rem 1rem;background:rgba(0,0,0,.18)}
     .rk-tl-d{font-family:var(--font-mono,monospace);font-size:0.68rem;color:#c9a35b}
     .rk-tl-t{font-family:var(--font-display,Georgia,serif);font-size:1.02rem;color:#f4ebd9}
     .rk-tl-x{font-size:0.84rem;line-height:1.6;color:var(--ivory-dim,#bfb5a0);margin-top:0.3rem;white-space:pre-wrap}
@@ -128,23 +128,23 @@ function renderRodokmen(req) {
     .rk-tl-a{display:flex;gap:1rem;margin-top:0.4rem}
     .rk-tl-sm .rk-tl-dot{width:28px;height:28px;font-size:0.8rem}
     .rk-sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem}
-    .rk-sc{background:linear-gradient(180deg,#221a17,#161110);border:1px solid #4a3c22;border-radius:12px;padding:1rem 1.2rem}
+    .rk-sc{background:linear-gradient(180deg,#1f2217,#141610);border:1px solid #3e4a22;border-radius:12px;padding:1rem 1.2rem}
     .rk-sc-l{font-family:var(--font-label,sans-serif);font-size:0.56rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ivory-faint,#8a8070)}
     .rk-sc-v{font-family:var(--font-display,Georgia,serif);font-size:1.5rem;color:#e6c97c;margin-top:0.4rem;line-height:1.2}
     .rk-sc-s{font-family:var(--font-mono,monospace);font-size:0.68rem;color:var(--ivory-faint,#8a8070);margin-top:0.3rem}
     .rk-bar{display:flex;align-items:center;gap:0.7rem;margin-bottom:0.55rem}
     .rk-bar-l{width:30px;font-family:var(--font-display,Georgia,serif);color:#c9a35b;font-style:italic}
-    .rk-bar-t{flex:1;height:12px;background:#120d0c;border-radius:6px;overflow:hidden;border:1px solid #3d321d}
+    .rk-bar-t{flex:1;height:12px;background:#10120c;border-radius:6px;overflow:hidden;border:1px solid #333d1d}
     .rk-bar-f{height:100%;background:linear-gradient(90deg,#a8843f,#e6c97c)}
     .rk-bar-n{width:28px;text-align:right;font-family:var(--font-mono,monospace);font-size:0.78rem;color:var(--ivory,#efe6d4)}
-    .rk-split{display:flex;height:34px;border-radius:8px;overflow:hidden;font-family:var(--font-mono,monospace);font-size:0.8rem;color:#12100f}
+    .rk-split{display:flex;height:34px;border-radius:8px;overflow:hidden;font-family:var(--font-mono,monospace);font-size:0.8rem;color:#11120f}
     .rk-split div{display:flex;align-items:center;justify-content:center}
     .rk-split-l{display:flex;gap:1rem;margin-top:0.7rem;font-family:var(--font-mono,monospace);font-size:0.7rem;color:var(--ivory-dim,#bfb5a0)}
     .rk-split-l i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:0.35rem}
     .rk-people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
-    .rk-pc{background:linear-gradient(180deg,#221a17,#161110);border:1px solid #5a4a2b;border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s}
+    .rk-pc{background:linear-gradient(180deg,#1f2217,#141610);border:1px solid #5a4a2b;border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .15s,border-color .15s}
     .rk-pc:hover{transform:translateY(-3px);border-color:#d4a95a}
-    .rk-pc-ph{height:210px;background:#120d0c}
+    .rk-pc-ph{height:210px;background:#10120c}
     .rk-pc-ph img{width:100%;height:100%;object-fit:cover;object-position:top}
     .rk-pc-b{padding:0.8rem 1rem 1rem}
     .rk-pc-n{font-family:var(--font-display,Georgia,serif);font-size:1.05rem;color:#f4ebd9}
@@ -157,19 +157,19 @@ function renderRodokmen(req) {
     .rk-ls-check{display:flex;align-items:flex-start;gap:0.6rem;margin-top:0.4rem;line-height:1.5;color:var(--ivory-dim,#bfb5a0)}
     .rk-ls-check input{margin-top:0.2rem}
     .rk-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:4vh 1rem;overflow:auto}
-    .rk-md{background:linear-gradient(180deg,#221a17,#151010);border:1px solid #a8843f;border-radius:12px;width:100%;max-width:760px;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+    .rk-md{background:linear-gradient(180deg,#1f2217,#131510);border:1px solid #a8843f;border-radius:12px;width:100%;max-width:760px;box-shadow:0 20px 60px rgba(0,0,0,.7)}
     .rk-md-h{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.3rem;border-bottom:1px solid rgba(255,255,255,.08);font-family:var(--font-display,Georgia,serif);font-size:1.3rem;color:#f4ebd9}
     .rk-md-b{padding:1.2rem 1.3rem}
     .rk-md-f{display:flex;justify-content:flex-end;gap:0.6rem;padding:1rem 1.3rem;border-top:1px solid rgba(255,255,255,.08)}
     .rk-md-grid{display:grid;grid-template-columns:190px 1fr;gap:1.2rem}
-    .rk-drop{height:230px;border:2px dashed #7a6236;border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;color:var(--ivory-faint,#8a8070);font-family:var(--font-mono,monospace);font-size:0.74rem;line-height:1.7;overflow:hidden;background:#120d0c}
+    .rk-drop{height:230px;border:2px dashed #7a6236;border-radius:12px;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;color:var(--ivory-faint,#8a8070);font-family:var(--font-mono,monospace);font-size:0.74rem;line-height:1.7;overflow:hidden;background:#10120c}
     .rk-drop.over,.rk-drop:hover{border-color:#e6c97c;color:#e6c97c}
     .rk-drop img{width:100%;height:100%;object-fit:cover}
-    .rk-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;max-height:200px;overflow:auto;padding:0.5rem;border:1px solid #3d321d;border-radius:8px}
+    .rk-checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.3rem;max-height:200px;overflow:auto;padding:0.5rem;border:1px solid #333d1d;border-radius:8px}
     .rk-check{display:flex;align-items:center;gap:0.5rem;font-size:0.84rem;color:var(--ivory-dim,#bfb5a0);cursor:pointer}
     .rk-check input{width:auto;min-width:0}
     .rk-ex-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:1.3rem}
-    .rk-ex-prev{background:#0f0b0a;border:1px solid #3d321d;border-radius:8px;min-height:240px;max-height:60vh;overflow:auto;display:flex;align-items:center;justify-content:center;padding:0.5rem}
+    .rk-ex-prev{background:#0d0f0a;border:1px solid #333d1d;border-radius:8px;min-height:240px;max-height:60vh;overflow:auto;display:flex;align-items:center;justify-content:center;padding:0.5rem}
     .rk-ex-prev img{max-width:100%;display:block}
     .rk-ex-btns{display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.6rem}
     @media(max-width:1250px){.rk-bottom4{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -181,9 +181,9 @@ function renderRodokmen(req) {
   <main>
     <div class="rk-hero">
       <div style="position:relative;z-index:1">
-        <div class="page-label">Organizace Caledonia</div>
+        <div class="page-label">Caledonia · VassClair</div>
         <h1>Rodokmen</h1>
-        <div class="rk-slogan">Naše rodina. Naše síla. Věčnost.</div>
+        <div class="rk-slogan">Sinclair &amp; Vass — jedna rodina, jedno jméno.</div>
       </div>
       <div class="rk-hero-r">
         <button class="rk-btn" data-act="export" type="button">⤓ Exportovat rodokmen</button>

@@ -131,7 +131,7 @@ function renderNav(req, active) {
       <a href="/home" class="sb-brand">
         <img src="/logo.png" alt="Caledonia">
         <div class="sb-brand-name">CALEDONIA</div>
-        <div class="sb-brand-tag">Private Network</div>
+        <div class="sb-brand-tag">VassClair · Sinclair &amp; Vass</div>
       </a>
 
       ${sidebarInner}
@@ -193,7 +193,7 @@ function renderNav(req, active) {
           </div>
         </div>` : ''}
         <div class="theme-switcher" title="Přepnout téma">
-          <button class="theme-dot-btn" id="td-dark" style="background:#07050A;border:1.5px solid #CBA45C" onclick="setTheme('dark')" title="Tmavý"></button>
+          <button class="theme-dot-btn" id="td-dark" style="background:#070A04;border:1.5px solid #CBA45C" onclick="setTheme('dark')" title="Tmavý"></button>
           <button class="theme-dot-btn" id="td-light" style="background:#F3EFE7;border:1.5px solid #55672a" onclick="setTheme('light')" title="Světlý"></button>
         </div>
         <span class="nav-user">${escapeHtml(ic)}</span>

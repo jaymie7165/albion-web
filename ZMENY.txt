@@ -1,5 +1,12 @@
-OPRAVA: v menu (nav.js) se vratila polozka "Rodokmen" (v minule verzi chybela, data ani stranka /rodokmen nebyly dotcene).
-Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahravej.
+REBRAND — Caledonia / VassClair (olivova a tmave zelena)
+Nahraj na GitHub (zachovej cesty, vcetne slozky public/), pak Railway redeploy. Tenhle soubor nenahravej.
 
-Obsahuje kompletni aktualni stav: olivovy motiv (styles.js, nav.js), rodokmen (views/rodokmen.js, public/js/rodokmen.js),
-server.js (rodokmen API, Discord export, znacka hrace) a drive upravene views.
+NOVE OBRAZKY (public/):
+  public/logo.png       - nove logo (pruhledne pozadi) -> menu, favicon, ikonka, odkazy
+  public/logo-192.png   - mala verze pro manifest/PWA
+  public/seal.png       - nova pecet (pruhledne pozadi) -> vodoznak na dashboardu, nabor, rodokmen
+  Pokud mela puvodni pecet jiny nazev souboru nez seal.png, napis mi ho a prepojim.
+
+ZMENENE:
+  styles.js, nav.js, server.js, views/home.js, views/hierarchy.js, views/informace.js,
+  views/rodokmen.js, public/js/rodokmen.js

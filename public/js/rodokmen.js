@@ -441,10 +441,10 @@
     var uid = 'rk' + (++uidN), people = model.people, pos = L.pos, keys = Object.keys(people);
     var ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
     var defs = '<defs>' +
-      '<linearGradient id="' + uid + 'c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f2320"/><stop offset="1" stop-color="#1a1413"/></linearGradient>' +
+      '<linearGradient id="' + uid + 'c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2f20"/><stop offset="1" stop-color="#181a13"/></linearGradient>' +
       '<linearGradient id="' + uid + 'cs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d4a22"/><stop offset="1" stop-color="#1f2810"/></linearGradient>' +
       '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#6d8034"/><stop offset="1" stop-color="#34421a"/></radialGradient>' +
-      '<radialGradient id="' + uid + 'bg" cx="0.5" cy="0.3" r="0.9"><stop offset="0" stop-color="#2a1e1a"/><stop offset="1" stop-color="#0f0b0a"/></radialGradient>' +
+      '<radialGradient id="' + uid + 'bg" cx="0.5" cy="0.3" r="0.9"><stop offset="0" stop-color="#252a1a"/><stop offset="1" stop-color="#0d0f0a"/></radialGradient>' +
       '<filter id="' + uid + 'gl" x="-30%" y="-40%" width="160%" height="180%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       '<filter id="' + uid + 'gl2" filterUnits="userSpaceOnUse" x="0" y="0" width="' + L.W + '" height="' + L.H + '"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       '<filter id="' + uid + 'sh" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="0.6"/></filter>' +
@@ -469,12 +469,12 @@
     }
     function rings(x, y, hl) {
       var c = hl ? HL : '#d9ad5c';
-      return '<g><circle cx="' + x + '" cy="' + y + '" r="16" fill="#1a1413" stroke="' + (hl ? HL : '#7a6236') + '"/>' +
+      return '<g><circle cx="' + x + '" cy="' + y + '" r="16" fill="#181a13" stroke="' + (hl ? HL : '#7a6236') + '"/>' +
         '<circle cx="' + (x - 5) + '" cy="' + y + '" r="7.5" fill="none" stroke="' + c + '" stroke-width="2"/><circle cx="' + (x + 5) + '" cy="' + y + '" r="7.5" fill="none" stroke="' + c + '" stroke-width="2"/></g>';
     }
     function chip(c) {
       var w = c.text.length * 6.4 + 18, col = CLR[c.typ];
-      return '<g><rect x="' + (c.x - w / 2) + '" y="' + (c.y - 10) + '" width="' + w + '" height="20" rx="10" fill="#1a1413" stroke="' + col + '" stroke-width="1.2"/>' +
+      return '<g><rect x="' + (c.x - w / 2) + '" y="' + (c.y - 10) + '" width="' + w + '" height="20" rx="10" fill="#181a13" stroke="' + col + '" stroke-width="1.2"/>' +
         '<text x="' + c.x + '" y="' + (c.y + 4) + '" text-anchor="middle" style="fill:' + col + ';font-family:var(--font-mono,monospace);font-size:10.5px">' + esc(c.text) + '</text></g>';
     }
     function elSvg(el, hl) {
@@ -514,7 +514,7 @@
         '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 14) + '" width="64" height="64" rx="11" fill="none" stroke="#c9a35b" stroke-width="1.4"/>';
       else photo = '<rect x="' + (x0 + 12) + '" y="' + (ps.top + 14) + '" width="64" height="64" rx="11" fill="url(#' + uid + 'm)" stroke="#c9a35b" stroke-width="1.4"/>' +
         '<text x="' + (x0 + 44) + '" y="' + (ps.top + 55) + '" text-anchor="middle" style="fill:#f1e8d6;font-family:var(--font-display,Georgia,serif);font-size:22px;font-weight:600">' + esc(initials(p.jmeno)) + '</text>';
-      var badge = isSel ? pill(x0 + NODE_W - 10, ps.top, 'POHLED Z', '#d9ad5c', '#1a1413') : (lab ? pill(x0 + NODE_W - 10, ps.top, kinText(lab, p), '#1a1413', '#e6c97c', '#d9ad5c') : '');
+      var badge = isSel ? pill(x0 + NODE_W - 10, ps.top, 'POHLED Z', '#d9ad5c', '#181a13') : (lab ? pill(x0 + NODE_W - 10, ps.top, kinText(lab, p), '#181a13', '#e6c97c', '#d9ad5c') : '');
       return '<g class="rk-node" data-k="' + esc(k) + '" style="cursor:pointer;opacity:' + (dim ? 0.36 : 1) + '"' + (isSel ? ' filter="url(#' + uid + 'gl)"' : '') + '>' +
         '<title>' + esc(p.jmeno) + (p.titul ? ' · ' + esc(p.titul) : '') + (lab ? ' — ' + esc(kinText(lab, p)) : '') + '</title>' +
         '<rect x="' + x0 + '" y="' + ps.top + '" width="' + NODE_W + '" height="' + NODE_H + '" rx="13" filter="url(#' + uid + 'sh)" fill="url(#' + uid + (isSel ? 'cs' : 'c') + ')" stroke="' + (isSel ? '#f0d38a' : '#7a6236') + '" stroke-width="' + (isSel ? 2.4 : 1.3) + '"/>' +
@@ -581,7 +581,7 @@
   }
   function mapDrawer(model, M, kin) {
     var uid = 'rm' + (++uidN), keys = Object.keys(model.people), R = 30;
-    var defs = '<defs><radialGradient id="' + uid + 'bg" cx="0.5" cy="0.5" r="0.8"><stop offset="0" stop-color="#2a1e1a"/><stop offset="1" stop-color="#0f0b0a"/></radialGradient>' +
+    var defs = '<defs><radialGradient id="' + uid + 'bg" cx="0.5" cy="0.5" r="0.8"><stop offset="0" stop-color="#252a1a"/><stop offset="1" stop-color="#0d0f0a"/></radialGradient>' +
       '<radialGradient id="' + uid + 'm" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#6d8034"/><stop offset="1" stop-color="#34421a"/></radialGradient>' +
       '<filter id="' + uid + 'gl" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
       keys.map(function (k) { var q = M.pos[k]; return '<clipPath id="' + uid + 'c' + k + '"><circle cx="' + q.x + '" cy="' + q.y + '" r="' + (R - 2) + '"/></clipPath>'; }).join('') + '</defs>';
@@ -685,9 +685,9 @@
         var img = new Image();
         img.onload = function () {
           var c = document.createElement('canvas'); c.width = Math.round(W * sc); c.height = Math.round((H + headerH) * sc);
-          var ctx = c.getContext('2d'); ctx.fillStyle = '#0f0b0a'; ctx.fillRect(0, 0, c.width, c.height);
+          var ctx = c.getContext('2d'); ctx.fillStyle = '#0d0f0a'; ctx.fillRect(0, 0, c.width, c.height);
           if (opts.title) {
-            var g = ctx.createLinearGradient(0, 0, c.width, 0); g.addColorStop(0, '#2a1e1a'); g.addColorStop(1, '#120d0c');
+            var g = ctx.createLinearGradient(0, 0, c.width, 0); g.addColorStop(0, '#252a1a'); g.addColorStop(1, '#10120c');
             ctx.fillStyle = g; ctx.fillRect(0, 0, c.width, headerH * sc);
             ctx.fillStyle = '#e6c97c'; ctx.font = 'italic ' + Math.round(38 * sc) + 'px Georgia, serif'; ctx.textBaseline = 'middle';
             ctx.fillText('Rodokmen Caledonie', 36 * sc, 42 * sc);

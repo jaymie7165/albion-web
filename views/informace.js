@@ -17,7 +17,7 @@ const { baseStyles } = require('../styles');
 const { renderNav } = require('../nav');
 
 const DEFAULT_SECTIONS = [
-  { title: 'Vítej', body: 'Tahle stránka je zatím prázdná — Founder/Council sem může doplnit interní informace organizace.' },
+  { title: 'O Caledonii', body: 'Caledonia vznikla spojením dvou rodin — Sinclair a Vass. Společně nesou jméno VassClair. Founder/Council sem může doplnit další interní informace organizace.' },
 ];
 
 function renderInformace(req) {

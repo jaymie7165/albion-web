@@ -74,22 +74,22 @@ function renderHome(req, data) {
       mask-image:linear-gradient(90deg,transparent,black 22%,black 92%,transparent);
     }
     .dash-hero-track{position:absolute;top:0;bottom:0;left:0;display:flex;align-items:center;gap:0.9rem;padding:0 0.9rem;will-change:transform}
-    .dash-hero-track img{height:88%;width:auto;flex-shrink:0;object-fit:cover;aspect-ratio:4/3;border-radius:var(--radius);filter:grayscale(0.1) contrast(1.05) brightness(0.92);box-shadow:0 10px 30px rgba(10,7,13,0.4)}
+    .dash-hero-track img{height:88%;width:auto;flex-shrink:0;object-fit:cover;aspect-ratio:4/3;border-radius:var(--radius);filter:grayscale(0.1) contrast(1.05) brightness(0.92);box-shadow:0 10px 30px rgba(6,9,4,0.4)}
     .dash-hero-veil{position:absolute;inset:0;z-index:1;pointer-events:none;
       background:
         radial-gradient(circle at var(--mx,20%) var(--my,50%),rgba(232,192,131,0.10),transparent 38%),
-        linear-gradient(90deg,rgba(24,20,28,0.98) 0%,rgba(24,20,28,0.9) 26%,rgba(24,20,28,0.45) 48%,rgba(24,20,28,0.18) 68%,rgba(24,20,28,0.35) 100%);
+        linear-gradient(90deg,rgba(16,21,11,0.98) 0%,rgba(16,21,11,0.9) 26%,rgba(16,21,11,0.45) 48%,rgba(16,21,11,0.18) 68%,rgba(16,21,11,0.35) 100%);
     }
     .dash-hero-content,.dash-hero-clock{position:relative;z-index:2}
     .dash-greet-eyebrow{font-family:var(--font-label);font-size:0.68rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:0.5rem}
-    .dash-greet-title{font-family:var(--font-display);font-weight:600;font-size:clamp(2.2rem,4.4vw,3.2rem);color:var(--ivory);line-height:1;text-shadow:0 2px 16px rgba(10,7,13,0.6)}
+    .dash-greet-title{font-family:var(--font-display);font-weight:600;font-size:clamp(2.2rem,4.4vw,3.2rem);color:var(--ivory);line-height:1;text-shadow:0 2px 16px rgba(6,9,4,0.6)}
     .dash-greet-title .dot{color:var(--oxblood-bright)}
     .dash-rank-row{display:flex;align-items:center;gap:0.8rem;margin-top:0.7rem;font-family:var(--font-label);font-size:0.62rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--brass)}
     .dash-rank-rule{flex:1;height:1px;background:var(--border-brass);max-width:80px}
     .dash-clock-box{text-align:right}
     .dash-clock{font-family:var(--font-mono);font-size:1rem;color:var(--ivory-dim)}
     .dash-date{font-family:var(--font-label);font-size:0.62rem;color:var(--ivory-faint);letter-spacing:0.04em;margin-top:0.3rem}
-    @media(max-width:760px){.dash-hero-photos{width:100%;opacity:0.35}.dash-hero-veil{background:linear-gradient(180deg,rgba(24,20,28,0.5),rgba(24,20,28,0.95))}}
+    @media(max-width:760px){.dash-hero-photos{width:100%;opacity:0.35}.dash-hero-veil{background:linear-gradient(180deg,rgba(16,21,11,0.5),rgba(16,21,11,0.95))}}
 
     .dash-top-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:1.4rem;margin-bottom:1.4rem}
     @media(max-width:980px){.dash-top-grid{grid-template-columns:1fr}}
@@ -150,7 +150,7 @@ function renderHome(req, data) {
       <div class="dash-hero-photos" id="dashHeroPhotos"></div>
       <div class="dash-hero-veil"></div>
       <div class="dash-hero-content">
-        <div class="dash-greet-eyebrow">${isRestricted ? 'Nástěnka člena' : 'Organizace Caledonia'}</div>
+        <div class="dash-greet-eyebrow">${isRestricted ? 'Nástěnka člena' : 'Caledonia · VassClair'}</div>
         <div class="dash-greet-title">${greeting},<br>${escapeHtml(firstName)}<span class="dot">.</span></div>
         <div class="dash-rank-row">${escapeHtml(RANK_LABEL[accessLevel] + (positionText ? ' — ' + positionText : ''))}<span class="dash-rank-rule"></span></div>
       </div>
@@ -403,7 +403,7 @@ function renderHome(req, data) {
 
     // ── ONBOARDING (beze změny chování) ──
     const ONB_STEPS = [
-      '<strong style="color:var(--brass-bright)">Krátká historie.</strong><br>Caledonia vznikla krátce po příchodu Christophera Sinclaira do Los Santos. <a href="/lore" style="color:var(--brass)">Číst kroniku →</a>',
+      '<strong style="color:var(--brass-bright)">Krátká historie.</strong><br>Caledonia vznikla spojením dvou rodin — <b>Sinclair</b> a <b>Vass</b> — které dnes dohromady nesou jméno <b>VassClair</b>. <a href="/lore" style="color:var(--brass)">Číst kroniku →</a>',
       '<strong style="color:var(--brass-bright)">Kodex.</strong><br>Deset principů závazných pro každého člena. <a href="/kodex" style="color:var(--brass)">Přečíst kodex →</a>',
       '<strong style="color:var(--brass-bright)">Hierarchie.</strong><br>Pět úrovní členství. <a href="/hierarchy" style="color:var(--brass)">Zobrazit hierarchii →</a>',
       '<strong style="color:var(--brass-bright)">První kroky.</strong><br>Sleduj Nástěnku, drž se Kodexu a v případě dotazů kontaktuj Senior Membera.',

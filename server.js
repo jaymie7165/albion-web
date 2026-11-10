@@ -1062,7 +1062,7 @@ async function checkStockMilestone(sekce, sheetName) {
         await discord.notifyVyznamenani(
           `Milník — ${SEKCE_LABEL[sekce] || sekce}`,
           `${SEKCE_LABEL[sekce] || sekce} poprvé přesáhl **${hranice.toLocaleString('cs-CZ')} ks** celkem.`,
-          'Organizace Albion', null,
+          'Organizace Caledonia', null,
         );
         return;
       }
@@ -1086,7 +1086,7 @@ async function checkPenizeMilestone() {
           await discord.notifyVyznamenani(
             `Milník — Pokladna (${mena.toUpperCase()})`,
             `Pokladna organizace poprvé přesáhla **${symbol}${hranice.toLocaleString('cs-CZ')}**.`,
-            'Organizace Albion', null,
+            'Organizace Caledonia', null,
           );
           break;
         }
@@ -1313,15 +1313,15 @@ app.get('/auth/callback', async (req, res) => {
 app.get('/manifest.webmanifest', (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json');
   res.json({
-    name: 'Albion',
-    short_name: 'Albion',
-    description: 'Albion — interní rejstřík organizace',
+    name: 'Caledonia · VassClair',
+    short_name: 'Caledonia',
+    description: 'Caledonia (VassClair) — spojení rodin Sinclair a Vass — interní rejstřík organizace',
     start_url: '/home',
     display: 'standalone',
-    background_color: '#0A0908',
-    theme_color: '#0A0908',
+    background_color: '#070A04',
+    theme_color: '#070A04',
     icons: [
-      { src: '/logo.png', sizes: '192x192', type: 'image/png' },
+      { src: '/logo-192.png', sizes: '192x192', type: 'image/png' },
       { src: '/logo.png', sizes: '512x512', type: 'image/png' },
     ],
   });
@@ -1584,14 +1584,14 @@ function renderProfil(req, user, aliases) {
   const isFounderCouncil = req.session.realAccessLevel === 1;
   return `<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Profil</title>
+  <title>Caledonia — Profil</title>
   ${baseStyles()}
   </head><body>
   ${renderNav(req, '')}
   <main>
     <div class="page-header">
       <div>
-        <div class="page-label">Organizace Albion</div>
+        <div class="page-label">Caledonia · VassClair</div>
         <h1 class="page-title">Profil</h1>
         <p class="page-sub">Nastavení IC jména, hesla a Discord aliasů pro správné přiřazení záznamů</p>
       </div>
@@ -2860,7 +2860,7 @@ app.get('/api/nastenska', requireAuth, requireAccess('nastenska'), async (req, r
       .filter(m => m.content || (m.embeds && m.embeds.length))
       .map(m => ({
         id: m.id,
-        author: m.author?.username || 'Albion',
+        author: m.author?.username || 'Caledonia',
         content: m.content || (m.embeds[0]?.description || ''),
         title: m.embeds?.[0]?.title || null,
         timestamp: m.timestamp,
@@ -3524,13 +3524,14 @@ app.get('/karta/:icName?', requireAuth, (req, res) => {
 app.get('/nabor', (req, res) => {
   res.send(`<!DOCTYPE html><html lang="cs"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Albion — Připoj se</title>
+  <title>Caledonia — Připoj se</title>
   ${require('./styles').baseStyles()}
   </head><body>
-  <main style="text-align:center;padding-top:5rem">
-    <img src="/logo.png" style="width:140px;margin-bottom:2rem;filter:drop-shadow(0 0 30px rgba(110,140,45,0.55))">
-    <h1 class="page-title" style="font-size:3.5rem">ALBION</h1>
-    <p class="page-sub" style="max-width:560px;margin:1rem auto 3rem">Organizace postavená na ambicích, loajalitě a důvěře. Nehledáme hlasité — hledáme schopné.</p>
+  <main style="text-align:center;padding-top:4rem">
+    <img src="/seal.png" alt="VassClair" style="width:200px;margin-bottom:1.6rem;filter:drop-shadow(0 0 34px rgba(110,140,45,0.45))">
+    <h1 class="page-title" style="font-size:3.5rem">CALEDONIA</h1>
+    <div class="page-label" style="margin-top:0.4rem">VassClair · spojení rodin Sinclair &amp; Vass</div>
+    <p class="page-sub" style="max-width:600px;margin:1.4rem auto 2.4rem">Caledonia vznikla spojením dvou rodin, Sinclair a Vass, které dnes nesou společné jméno VassClair. Stavíme na ambicích, loajalitě a důvěře. Nehledáme hlasité — hledáme schopné.</p>
     <div class="folio-footnote" style="text-align:left;max-width:600px;margin:0 auto 2rem">
       <strong>Poslání.</strong> Budovat dlouhodobý vliv v Los Santos skrze kontakty, důvěru a profesionalitu — ne násilí.
     </div>

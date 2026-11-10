@@ -40,7 +40,7 @@ function baseStyles() {
     <link rel="icon" type="image/png" href="/logo.png">
     <link rel="apple-touch-icon" href="/logo.png">
     <link rel="manifest" href="/manifest.webmanifest">
-    <meta name="theme-color" content="#07050A">
+    <meta name="theme-color" content="#070A04">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&family=Raleway:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700&display=swap" rel="stylesheet">
@@ -55,11 +55,11 @@ function baseStyles() {
            family of colors as v6, deliberately lifted so it reads as
            inviting rather than cold — friendlier, still a dark theme.
            ══════════════════════════════════════════════════════════════ */
-        --noir:#18141C;
-        --panel:#201A24;
-        --panel2:#28212D;
-        --panel3:#312936;
-        --panel4:#3B323F;
+        --noir:#10150B;
+        --panel:#171D10;
+        --panel2:#1F2715;
+        --panel3:#28331C;
+        --panel4:#323E24;
         --oxblood:#56682B;
         --oxblood-bright:#B7C96B;
         --oxblood-glow:rgba(183,201,107,0.28);
@@ -78,9 +78,9 @@ function baseStyles() {
         --border-hover:rgba(232,192,131,0.30);
         --border-brass:rgba(232,192,131,0.24);
         --border-oxblood:rgba(183,201,107,0.38);
-        --input-bg:rgba(20,17,23,0.72);
-        --shadow:0 24px 64px rgba(10,7,13,0.5);
-        --shadow-card:0 6px 26px rgba(10,7,13,0.32);
+        --input-bg:rgba(14,19,9,0.72);
+        --shadow:0 24px 64px rgba(6,9,4,0.5);
+        --shadow-card:0 6px 26px rgba(6,9,4,0.32);
         --nav-h:66px;
         --sidebar-w:236px;
         --radius-sm:8px;
@@ -182,7 +182,7 @@ function baseStyles() {
          TOP BAR — quiet, thin bottom rule, no gradients
          ══════════════════════════════════════════════ */
       .app-topbar{
-        background:rgba(7,5,10,0.92);border-bottom:1px solid var(--border);
+        background:rgba(6,9,4,0.92);border-bottom:1px solid var(--border);
         padding:0 1.8rem;display:flex;align-items:center;justify-content:space-between;gap:1.2rem;
         position:sticky;top:0;z-index:140;height:var(--nav-h);
         backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
@@ -195,6 +195,11 @@ function baseStyles() {
       .app-sidebar ~ .app-topbar{margin-left:var(--sidebar-w)}
       @media(max-width:980px){.app-sidebar ~ .app-topbar{margin-left:0}}
       .topbar-left{display:flex;align-items:center;gap:0.9rem;flex-shrink:0}
+      /* rebrand: pečeť VassClair jako jemný vodoznak a olivová záře pozadí */
+      .dash-statement::after{content:'';position:absolute;right:-30px;top:50%;width:330px;height:330px;transform:translateY(-50%);background:url('/seal.png') center/contain no-repeat;opacity:0.16;pointer-events:none}
+      body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse 70% 50% at 85% -5%,rgba(110,135,50,0.16),transparent 70%),radial-gradient(ellipse 55% 45% at 5% 105%,rgba(86,104,43,0.14),transparent 70%)}
+      body.light::before{background:radial-gradient(ellipse 70% 50% at 85% -5%,rgba(110,135,50,0.12),transparent 70%)}
+      .sb-brand img{filter:drop-shadow(0 0 18px rgba(140,165,60,0.28))}
       .nav-logo{font-family:var(--font-label);letter-spacing:0.06em;font-size:0.92rem;font-weight:600;text-transform:uppercase;text-decoration:none;color:var(--ivory);display:flex;align-items:center;gap:0.7rem;flex-shrink:0;transition:opacity 0.2s}
       .nav-logo:hover{opacity:0.8}
       .nav-logo-img{width:26px;height:26px;object-fit:contain;opacity:0.92}
@@ -236,7 +241,7 @@ function baseStyles() {
       .nav-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:190;opacity:0;pointer-events:none;transition:opacity 0.25s;backdrop-filter:blur(4px)}
       body.nav-locked{overflow:hidden}
       body.nav-locked .nav-overlay{opacity:1;pointer-events:all}
-      .mobile-drawer{display:none;flex-direction:column;gap:0;position:fixed;top:var(--nav-h);left:0;right:0;bottom:0;background:rgba(7,5,10,0.98);border-top:1px solid var(--border);padding:0.5rem 0 1rem;overflow-y:auto;z-index:195;transform:translateY(-8px);opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s}
+      .mobile-drawer{display:none;flex-direction:column;gap:0;position:fixed;top:var(--nav-h);left:0;right:0;bottom:0;background:rgba(6,9,4,0.98);border-top:1px solid var(--border);padding:0.5rem 0 1rem;overflow-y:auto;z-index:195;transform:translateY(-8px);opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s}
       .mobile-drawer.mobile-open{display:flex;opacity:1;pointer-events:all;transform:translateY(0)}
       .mobile-drawer .md-group-label{font-family:var(--font-label);font-size:0.5rem;letter-spacing:0.05em;text-transform:uppercase;color:var(--brass);padding:0.9rem 1.4rem 0.4rem}
       .mobile-drawer a{display:block;padding:0.7rem 1.4rem;font-family:var(--font-display);font-size:1rem;color:var(--ivory-dim);text-decoration:none;border-bottom:1px solid var(--border)}
@@ -468,7 +473,7 @@ function baseStyles() {
          zbytek klidný a bez rámečků. Karty přežívají jen
          tam, kde je věc samostatný klepnutelný objekt.
          ══════════════════════════════════════════════ */
-      .dash-statement{background:linear-gradient(135deg,var(--oxblood),var(--seal-deep));border-radius:var(--radius-lg);padding:3.4rem 2.8rem;margin-bottom:2.2rem;position:relative;overflow:hidden}
+      .dash-statement{position:relative;overflow:hidden;background:linear-gradient(135deg,var(--oxblood),var(--seal-deep));border-radius:var(--radius-lg);padding:3.4rem 2.8rem;margin-bottom:2.2rem;position:relative;overflow:hidden}
       .dash-statement-eyebrow{font-family:var(--font-label);font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;color:rgba(245,239,230,0.55);margin-bottom:1.1rem}
       .dash-statement-text{font-family:var(--font-display);font-style:italic;font-weight:600;font-size:clamp(1.7rem,3.2vw,2.7rem);color:var(--ivory);line-height:1.3;max-width:920px}
       .dash-statement-text strong{color:var(--brass-bright);font-style:normal}
@@ -622,7 +627,7 @@ function baseStyles() {
       .gal-del:hover{background:var(--oxblood-bright)}
 
       /* ── LIGHTBOX — plné prohlížení fotky přes celou obrazovku ── */
-      .gal-lightbox{position:fixed;inset:0;background:rgba(10,7,13,0.92);z-index:998;display:none;align-items:center;justify-content:center;padding:3rem 1.5rem;flex-direction:column}
+      .gal-lightbox{position:fixed;inset:0;background:rgba(6,9,4,0.92);z-index:998;display:none;align-items:center;justify-content:center;padding:3rem 1.5rem;flex-direction:column}
       .gal-lightbox.open{display:flex}
       .gal-lightbox img{max-width:min(90vw,1100px);max-height:70vh;object-fit:contain;border-radius:var(--radius);box-shadow:var(--shadow)}
       .gal-lightbox-caption{color:var(--ivory);font-family:var(--font-body);font-size:0.95rem;margin-top:1.1rem;text-align:center;max-width:640px}
