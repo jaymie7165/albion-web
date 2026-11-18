@@ -26,6 +26,22 @@ const LEVELS = {
 
 const ROLE_ID_TO_KEY = Object.fromEntries(Object.entries(ROLE_IDS).map(([k, v]) => [v, k]));
 
+// Přepsání / doplnění rolí přes Railway Variables — bez zásahu do kódu. Hodí se, když se na Discordu
+// role přejmenují/založí znovu (mají nové ID). Hodnota = jedno ID nebo víc ID oddělených čárkou.
+//   ROLE_ID_FOUNDER, ROLE_ID_COUNCIL, ROLE_ID_GENK, ROLE_ID_SENIOR_MEMBER, ROLE_ID_MEMBER, ROLE_ID_ASSOCIATE
+const ENV_ROLE_VARS = {
+  FOUNDER: 'ROLE_ID_FOUNDER', COUNCIL: 'ROLE_ID_COUNCIL', GENERAL_KOORDINATOR: 'ROLE_ID_GENK',
+  SENIOR_MEMBER: 'ROLE_ID_SENIOR_MEMBER', MEMBER: 'ROLE_ID_MEMBER', ASSOCIATE: 'ROLE_ID_ASSOCIATE',
+};
+Object.entries(ENV_ROLE_VARS).forEach(([key, envName]) => {
+  (process.env[envName] || '').split(',').map(s => s.trim()).filter(Boolean).forEach(id => { ROLE_ID_TO_KEY[id] = key; });
+});
+
+// Pro diagnostiku: ke každému ID role řekne, jakou webovou hodnost představuje (nebo null = nerozpoznáno).
+function describeRoles(roleIds) {
+  return (Array.isArray(roleIds) ? roleIds : []).map(id => ({ id, key: ROLE_ID_TO_KEY[id] || null }));
+}
+
 // Z pole Discord role ID (string[]) vrátí nejvyšší úroveň přístupu uživatele (1=nejvíc práv).
 // Pokud uživatel nemá žádnou ze sledovaných rolí, vrací nejnižší úroveň (3) — chová se jako Member/Associate.
 function levelFromRoleIds(roleIds) {
@@ -188,7 +204,7 @@ function departmentLabel(department) {
 }
 
 module.exports = {
-  ROLE_IDS, LEVELS, levelFromRoleIds, canAccess, requireAccess, PAGE_ACCESS, isAssociateOnly,
+  ROLE_IDS, ROLE_ID_TO_KEY, describeRoles, LEVELS, levelFromRoleIds, canAccess, requireAccess, PAGE_ACCESS, isAssociateOnly,
   DEPARTMENTS, SHARED_SENIOR_TABS, MEMBER_SKLAD_TABS,
   getSkladTabsForUser, canAccessSkladTab, canManageCenik, departmentLabel,
 };

@@ -14,7 +14,7 @@ const { ACHIEVEMENTS } = require('./achievements');
 
 const discord = require('./discord');
 const { requireAuth } = require('./middleware/auth');
-const { levelFromRoleIds, requireAccess, canAccess, isAssociateOnly, DEPARTMENTS, canManageCenik, canAccessSkladTab } = require('./roles');
+const { levelFromRoleIds, ROLE_ID_TO_KEY, describeRoles, requireAccess, canAccess, isAssociateOnly, DEPARTMENTS, canManageCenik, canAccessSkladTab } = require('./roles');
 
 const { CONFIG, WEED_PLANT, METH_RECIPE, CHEMKY_CENY } = require('./constants');
 const { makeStore } = require('./content-store');
@@ -1408,9 +1408,13 @@ app.post('/login/password', async (req, res) => {
     try { db.setAccessLevel(user.id, req.session.accessLevel); } catch (e) {}
   } catch (e) {
     console.error('[LOGIN ROLES]', e.message);
-    req.session.accessLevel = 3;
-    req.session.realAccessLevel = 3;
-    req.session.isAssociate = true;
+    // Discord při přihlášení neodpověděl — nesnižovat hodnost na Member, ale použít naposledy známou z databáze
+    // (za ~30 s se role zkusí načíst znovu).
+    const lastKnown = user.access_level || 3;
+    req.session.accessLevel = lastKnown;
+    req.session.realAccessLevel = lastKnown;
+    req.session.isAssociate = false;
+    req.session.discordCheckedAt = Date.now() - DISCORD_CHECK_INTERVAL_MS + 30 * 1000;
   }
   try { req.session.department = getDepartmentForUser(user.id); } catch (e) { req.session.department = null; }
   try { db.setLastLogin(user.id, new Date().toISOString()); } catch (e) { console.error('[LOGIN]', e.message); }
@@ -1419,6 +1423,30 @@ app.post('/login/password', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
+
+// ── MOJE ROLE (diagnostika + vynucené obnovení) ──
+app.get('/api/me/roles-debug', requireAuth, async (req, res) => {
+  const out = { ok: true, sessionLevel: req.session.accessLevel || 3, realLevel: req.session.realAccessLevel || null, isAssociate: !!req.session.isAssociate, roles: [], computedLevel: null, error: null };
+  try { const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId); out.dbLevel = u ? (u.access_level || null) : null; } catch (e) {}
+  try {
+    if (!req.session.discordId) out.error = 'V session chybí Discord ID — odhlas se a přihlas znovu.';
+    else {
+      const roles = await discord.getMemberRoles(req.session.discordId);
+      if (roles === null) out.error = 'Discord tě na serveru nevidí.';
+      else { out.roles = describeRoles(roles); out.computedLevel = levelFromRoleIds(roles); out.associateOnly = isAssociateOnly(roles); }
+    }
+  } catch (e) { out.error = 'Discord neodpověděl: ' + e.message; }
+  res.json(out);
+});
+
+app.post('/api/me/refresh-roles', requireAuth, async (req, res) => {
+  if (!req.session.discordId) return res.json({ ok: false, error: 'V session chybí Discord ID — odhlas se a přihlas znovu.' });
+  try {
+    const r = await refreshSessionRoles(req);
+    if (r.gone) return res.json({ ok: false, error: 'Discord tě na serveru nevidí.' });
+    res.json({ ok: true, level: req.session.realAccessLevel, isAssociate: !!req.session.isAssociate });
+  } catch (e) { res.json({ ok: false, error: 'Discord neodpověděl: ' + e.message }); }
+});
 
 // ── PROFIL — správa aliasů a IC jména ────────────────────────────────────────
 app.get('/profil', requireAuth, (req, res) => {
@@ -1647,6 +1675,13 @@ function renderProfil(req, user, aliases) {
       </div>
 
       <div class="card" style="grid-column:1/-1">
+        <div class="card-header"><span class="card-title">Moje role z Discordu</span><span class="card-badge">Oprávnění na webu</span></div>
+        <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1rem;line-height:1.7">Oprávnění na webu (Sklad, Účetnictví…) se berou z tvých rolí na Discordu. Po změně role se to na webu projeví do 5 minut, nebo hned po kliknutí na tlačítko níže.</p>
+        <div id="roles-box"><div class="ledger-loading">Načítám…</div></div>
+        <button class="btn-submit" onclick="refreshRoles()" style="width:auto;padding:0.7rem 1.3rem;margin-top:0.8rem">Obnovit role z Discordu</button>
+      </div>
+
+      <div class="card" style="grid-column:1/-1">
         <div class="card-header"><span class="card-title">Trading karta — IC údaje</span><span class="card-badge">Viditelné na kartě</span></div>
         <p style="font-size:0.84rem;color:var(--ivory-dim);margin-bottom:1.2rem;line-height:1.7">Tyto údaje se zobrazí na tvé trading kartě. Fotku vlož přes <strong style="color:var(--brass-bright)">Ctrl+V</strong> (screenshot) nebo klikni a vyber soubor.</p>
 
@@ -1773,6 +1808,32 @@ function renderProfil(req, user, aliases) {
 
     renderAliases();
 
+    function levelName(l){ return l===1?'Founder / Council / GenK':(l===2?'Senior Member':'Member / Associate'); }
+    async function loadRolesBox(){
+      const box=document.getElementById('roles-box');
+      try{
+        const res=await fetch('/api/me/roles-debug',{cache:'no-store'});
+        const d=await res.json();
+        let h='<div class="manifest-row"><span class="mr-name">Hodnost, kterou teď vidí web</span><span class="mr-dots"></span><span class="mr-val">'+levelName(d.sessionLevel)+(d.isAssociate?' (Associate)':'')+'</span></div>';
+        if(d.computedLevel!=null) h+='<div class="manifest-row"><span class="mr-name">Hodnost podle tvých Discord rolí</span><span class="mr-dots"></span><span class="mr-val">'+levelName(d.computedLevel)+'</span></div>';
+        if(d.error) h+='<div style="margin-top:0.7rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--oxblood-bright)">'+escHtml(d.error)+'</div>';
+        if(d.roles&&d.roles.length){
+          h+='<div style="margin-top:0.9rem;font-family:var(--font-label);font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--brass)">Tvoje role (ID)</div>';
+          h+=d.roles.map(function(r){return '<div style="font-family:var(--font-mono);font-size:0.76rem;padding:0.25rem 0;color:'+(r.key?'var(--ivory)':'var(--ivory-faint)')+'">'+escHtml(r.id)+' &nbsp;→&nbsp; '+(r.key?escHtml(r.key):'<em>web tuto roli nezná</em>')+'</div>';}).join('');
+          if(!d.roles.some(function(r){return r.key;})) h+='<div style="margin-top:0.7rem;font-size:0.82rem;line-height:1.7;color:var(--oxblood-bright)">Žádná z tvých rolí není web rozpoznaná, proto jsi Member. Nejspíš mají role na Discordu jiná ID než ta, která má web nastavená. Pošli tato ID adminovi.</div>';
+        } else if(!d.error) h+='<div style="margin-top:0.7rem;font-size:0.82rem;color:var(--ivory-faint)">Na Discordu nemáš žádné role.</div>';
+        box.innerHTML=h;
+      }catch(e){ box.innerHTML='<div style="color:var(--ivory-faint)">Nepodařilo se načíst.</div>'; }
+    }
+    async function refreshRoles(){
+      const res=await fetch('/api/me/refresh-roles',{method:'POST'});
+      const d=await res.json();
+      if(d.ok){ showToast('Role obnoveny — hodnost: '+levelName(d.level)); await loadRolesBox(); setTimeout(function(){location.reload();},900); }
+      else showToast(d.error||'Obnovení se nepovedlo', true);
+    }
+    window.refreshRoles=refreshRoles;
+    loadRolesBox();
+
     let pendingCardPhoto = null;
 
     function setCardPhotoPreview(src){
@@ -1889,8 +1950,45 @@ function renderProfil(req, user, aliases) {
 // ── DISCORD MEMBERSHIP CHECK ──────────────────────────────────────────────────
 const DISCORD_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
+// Přepočítá hodnost z aktuálních Discord rolí a uloží ji do session i do databáze.
+// Vrací { gone:true }, pokud Discord uživatele na serveru nevidí.
+async function refreshSessionRoles(req) {
+  const roles = await discord.getMemberRoles(req.session.discordId);
+  if (roles === null) return { gone: true };
+  const newLevel = levelFromRoleIds(roles);
+  if (roles.length && !roles.some(r => ROLE_ID_TO_KEY[r])) {
+    console.warn(`[ROLES] ${req.session.icName || req.session.discordUsername}: ${roles.length} Discord rolí, ale žádná není v roles.js / ROLE_ID_* — hodnost bude Member. ID rolí: ${roles.join(', ')}`);
+  }
+
+  if (req.session.realAccessLevel !== undefined && newLevel < req.session.realAccessLevel) {
+    const RANK_LABEL = { 1: 'Council', 2: 'Senior Member', 3: 'Member' };
+    const fromLabel = RANK_LABEL[req.session.realAccessLevel] || '—';
+    const toLabel   = RANK_LABEL[newLevel] || '—';
+    try { db.addPromotion(req.session.userId, req.session.realAccessLevel, newLevel, fromLabel, toLabel); } catch(e){}
+    try { await discord.notifyPovyseni(fromLabel, toLabel, req.session.icName || req.session.discordUsername, req.session.discordUsername); } catch(e){ console.error('[POVYSENI]', e.message); }
+  }
+
+  req.session.realAccessLevel = newLevel;
+  req.session.isAssociate = isAssociateOnly(roles);
+  try { db.setAccessLevel(req.session.userId, newLevel); } catch (e) {}
+  if (!req.session.viewAsLevel) req.session.accessLevel = newLevel;
+  try { req.session.department = getDepartmentForUser(req.session.userId); } catch (e) {}
+  req.session.discordCheckedAt = Date.now();
+  return { roles, newLevel };
+}
+
 async function requireDiscordMember(req, res, next) {
-  if (!req.session || !req.session.userId || !req.session.discordId) return next();
+  if (!req.session || !req.session.userId) return next();
+
+  // Starší sessiony (vzniklé před zavedením kontroly) nemají uložené discordId, takže se jim hodnost
+  // NIKDY neobnovovala a zůstala z dne přihlášení — doplníme ho z databáze.
+  if (!req.session.discordId) {
+    try {
+      const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+      if (u && u.discord_id) req.session.discordId = u.discord_id;
+    } catch (e) {}
+    if (!req.session.discordId) return next();
+  }
 
   // Rychlé jednorázové doplnění oddělení pro session, která vznikla ještě
   // před zavedením oddělení (aby uživatel nemusel kvůli tomu dělat nový
@@ -1905,32 +2003,18 @@ async function requireDiscordMember(req, res, next) {
   if (now - lastCheck < DISCORD_CHECK_INTERVAL_MS) return next();
 
   try {
-    const roles = await discord.getMemberRoles(req.session.discordId);
-    if (roles === null) {
+    const r = await refreshSessionRoles(req);
+    if (r.gone) {
       req.session.destroy(() => {});
       const isApi = req.path.startsWith('/api/');
       if (isApi) return res.json({ ok: false, error: 'Přístup odepřen — nejsi evidován/a v systému organizace' });
       return res.redirect('/login?error=not_on_server');
     }
-    const newLevel = levelFromRoleIds(roles);
-
-    if (req.session.realAccessLevel !== undefined && newLevel < req.session.realAccessLevel) {
-      const RANK_LABEL = { 1: 'Council', 2: 'Senior Member', 3: 'Member' };
-      const fromLabel = RANK_LABEL[req.session.realAccessLevel] || '—';
-      const toLabel   = RANK_LABEL[newLevel] || '—';
-      try { db.addPromotion(req.session.userId, req.session.realAccessLevel, newLevel, fromLabel, toLabel); } catch(e){}
-      try { await discord.notifyPovyseni(fromLabel, toLabel, req.session.icName || req.session.discordUsername, req.session.discordUsername); } catch(e){ console.error('[POVYSENI]', e.message); }
-    }
-
-    req.session.realAccessLevel = newLevel;
-    req.session.isAssociate = isAssociateOnly(roles);
-    try { db.setAccessLevel(req.session.userId, newLevel); } catch (e) {}
-    if (!req.session.viewAsLevel) req.session.accessLevel = newLevel;
-    try { req.session.department = getDepartmentForUser(req.session.userId); } catch (e) {}
-    req.session.discordCheckedAt = now;
     return next();
   } catch (err) {
     console.error('[DISCORD CHECK]', err.message);
+    // zkusit znovu za ~30 s (dřív se zkoušelo při KAŽDÉM požadavku, což u výpadku Discordu jen zhoršovalo limity)
+    req.session.discordCheckedAt = now - DISCORD_CHECK_INTERVAL_MS + 30 * 1000;
     return next();
   }
 }

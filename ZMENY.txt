@@ -1,12 +1,8 @@
-REBRAND — Caledonia / VassClair (olivova a tmave zelena)
-Nahraj na GitHub (zachovej cesty, vcetne slozky public/), pak Railway redeploy. Tenhle soubor nenahravej.
+OPRAVA ROLI (Discord -> web)
+Nahraj na GitHub (zachovej cesty), pak Railway redeploy. Tenhle soubor nenahravej.
 
-NOVE OBRAZKY (public/):
-  public/logo.png       - nove logo (pruhledne pozadi) -> menu, favicon, ikonka, odkazy
-  public/logo-192.png   - mala verze pro manifest/PWA
-  public/seal.png       - nova pecet (pruhledne pozadi) -> vodoznak na dashboardu, nabor, rodokmen
-  Pokud mela puvodni pecet jiny nazev souboru nez seal.png, napis mi ho a prepojim.
+  roles.js   - NOVE: role lze doplnit/prepsat v Railway Variables (ROLE_ID_COUNCIL=id1,id2 ...), diagnosticka funkce
+  server.js  - opravy kontroly roli (viz nize) + karta "Moje role z Discordu" na strance Profil
 
-ZMENENE:
-  styles.js, nav.js, server.js, views/home.js, views/hierarchy.js, views/informace.js,
-  views/rodokmen.js, public/js/rodokmen.js
+Kdyz se po nasazeni hodnost porad nezobrazuje spravne: otevri Profil -> "Moje role z Discordu" a posli mi, co tam vidis.
+Dalsi soubory v zipu (styles, nav, views, public) jsou beze zmeny oproti minule verzi.
